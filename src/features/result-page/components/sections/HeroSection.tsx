@@ -35,6 +35,8 @@ import {
   __extractIfcCategories,
 } from "@/features/result-page/components/animations/ElementCategoryCascade";
 import { ElementDistributionDonut } from "@/features/result-page/components/animations/ElementDistributionDonut";
+import { ShotTimeline } from "@/features/result-page/components/animations/ShotTimeline";
+import { RenderStatsDonut } from "@/features/result-page/components/animations/RenderStatsDonut";
 import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
@@ -255,6 +257,29 @@ function VideoVariant({ data }: { data: ResultPageData }) {
           </a>
         ) : null}
       </div>
+
+      {/* Phase 4.2 Fix 3 — shot timeline beneath the player + render donut on the right */}
+      {data.videoData ? (
+        <div className="video-hero-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)", gap: "clamp(20px, 3vw, 36px)", padding: "0 24px 24px", alignItems: "start" }}>
+          <div>
+            <ShotTimeline video={data.videoData} videoRef={videoRef} />
+          </div>
+          <div className="video-hero-donut" style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 8 }}>
+            <RenderStatsDonut video={data.videoData} />
+          </div>
+          <style>{`
+            @media (max-width: 900px) {
+              .video-hero-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+              }
+              .video-hero-donut {
+                justify-content: flex-start !important;
+                padding-top: 0 !important;
+              }
+            }
+          `}</style>
+        </div>
+      ) : null}
     </div>
   );
 }
