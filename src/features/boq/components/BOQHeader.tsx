@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Download, Share2, Building2, MapPin, Calendar, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { normalizeRegion } from "@/lib/normalize-region";
 import type { BOQData } from "@/features/boq/components/types";
 
 interface BOQHeaderProps {
@@ -114,7 +115,7 @@ export function BOQHeader({ data, onExportExcel, onExportPDF, onExportCSV }: BOQ
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 2 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#6B7280" }}>
               <MapPin size={11} color="#6B7280" />
-              {data.location}
+              {normalizeRegion(data.location)}
             </span>
             <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#6B7280" }}>
               <Calendar size={11} color="#6B7280" />

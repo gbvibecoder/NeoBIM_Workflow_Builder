@@ -4,7 +4,7 @@
  * to what an architect / BIM manager actually wants to see at a glance.
  */
 
-import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
+import { normalizeRegion } from "@/lib/normalize-region";
 import type { ResultPageData } from "@/features/result-page/hooks/useResultPageData";
 
 export interface StatTile {

@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { IndianRupee, Ruler, Hammer, ShieldCheck, Check, AlertTriangle } from "lucide-react";
 import { AnimatedNumber } from "@/features/boq/components/AnimatedNumber";
-import { formatCrores } from "@/features/boq/components/recalc-engine";
+import { formatINR } from "@/features/boq/components/recalc-engine";
 import { getIFCQualityLabel, getIFCQualityColor } from "@/features/boq/constants/quality-thresholds";
 
 interface HeroStatsProps {
@@ -33,16 +33,17 @@ function CostRangeGauge({ low, best, high }: { low: number; high: number; best: 
 
   return (
     <div className="mt-4 px-1">
-      {/* Labels */}
+      {/* Labels — formatINR auto-switches Cr / L / raw based on magnitude
+          so a ₹1.37 L estimate doesn't render as "₹0.01 Cr". */}
       <div className="flex justify-between mb-1.5">
         <span className="text-[10px] font-medium" style={{ color: "#6B7280" }}>
-          ₹{formatCrores(low)} Cr
+          {formatINR(low)}
         </span>
         <span className="text-[11px] font-bold" style={{ color: "#0D9488" }}>
-          ₹{formatCrores(best)} Cr
+          {formatINR(best)}
         </span>
         <span className="text-[10px] font-medium" style={{ color: "#6B7280" }}>
-          ₹{formatCrores(high)} Cr
+          {formatINR(high)}
         </span>
       </div>
       {/* Track */}
@@ -207,7 +208,7 @@ export function HeroStats({
           )}
         </div>
         <div className="text-5xl font-bold tracking-tight" style={{ color: "#0D9488", fontVariantNumeric: "tabular-nums" }}>
-          <AnimatedNumber value={totalCost} formatter={(n: number) => `₹${formatCrores(n)} Cr`} duration={1200} />
+          <AnimatedNumber value={totalCost} formatter={formatINR} duration={1200} />
         </div>
         {/* Cost Range Gauge */}
         {costRange && costRange.totalLow > 0 && (
@@ -250,7 +251,7 @@ export function HeroStats({
             <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "#6B7280" }}>Hard Costs</span>
           </div>
           <div className="text-2xl font-bold" style={{ color: "#B45309", fontVariantNumeric: "tabular-nums" }}>
-            <AnimatedNumber value={hardCosts} formatter={(n: number) => `₹${formatCrores(n)} Cr`} duration={800} />
+            <AnimatedNumber value={hardCosts} formatter={formatINR} duration={800} />
           </div>
         </motion.div>
 

@@ -8,8 +8,8 @@
  * surface to the end user. BuildFlow targets Indian AEC.
  *
  * This helper is the single render-side gate for any `region` string
- * shown on the result page. Sacred upstream code (the handler) is
- * untouched per the preservation list.
+ * shown to the user (result page hero, BOQ visualizer header). Sacred
+ * upstream code (the handler) is untouched per the preservation list.
  */
 
 export function normalizeRegion(raw?: string | null): string {

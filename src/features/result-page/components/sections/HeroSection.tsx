@@ -38,7 +38,7 @@ import { ElementDistributionDonut } from "@/features/result-page/components/anim
 import { ShotTimeline } from "@/features/result-page/components/animations/ShotTimeline";
 import { RenderStatsDonut } from "@/features/result-page/components/animations/RenderStatsDonut";
 import { MetadataCascade } from "@/features/result-page/components/animations/MetadataCascade";
-import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
+import { normalizeRegion } from "@/lib/normalize-region";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
   ResultPageData,

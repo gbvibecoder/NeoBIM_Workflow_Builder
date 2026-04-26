@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { RotateCw } from "lucide-react";
-import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
+import { normalizeRegion } from "@/lib/normalize-region";
 import type { ResultPageData } from "@/features/result-page/hooks/useResultPageData";
 
 interface LiveStatusStripProps {
