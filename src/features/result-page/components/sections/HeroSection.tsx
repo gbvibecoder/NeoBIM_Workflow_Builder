@@ -28,6 +28,8 @@ import { IsometricBuilding } from "@/features/result-page/components/animations/
 import { ShutterReveal } from "@/features/result-page/components/animations/ShutterReveal";
 import { PhotoDevelop } from "@/features/result-page/components/animations/PhotoDevelop";
 import { LiveCostBreakdownDonut } from "@/features/result-page/components/animations/LiveCostBreakdownDonut";
+import { RoomScheduleCascade } from "@/features/result-page/components/animations/RoomScheduleCascade";
+import { RoomAreaDonut } from "@/features/result-page/components/animations/RoomAreaDonut";
 import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
@@ -386,6 +388,21 @@ function ImageVariant({ urls }: { urls: string[] }) {
 
 function FloorPlanInteractiveVariant({ model }: { model: FloorPlanInteractiveData }) {
   const summary = model.summary;
+  // Phase 4.2 Fix 1 — defensive room extraction from heterogeneous roomSchedule
+  const rooms = (model.roomSchedule ?? [])
+    .map(r => {
+      const name = typeof r.name === "string" ? r.name : typeof r.label === "string" ? r.label : "Room";
+      const areaRaw = r.area ?? r.area_sqm ?? r.areaSqm;
+      const area = typeof areaRaw === "number" ? areaRaw : parseFloat(String(areaRaw ?? ""));
+      const type = typeof r.type === "string" ? r.type : undefined;
+      return { name, area: Number.isFinite(area) ? area : 0, type };
+    })
+    .filter(r => r.area > 0);
+  const totalArea = summary.totalArea_sqm > 0
+    ? summary.totalArea_sqm
+    : rooms.reduce((s, r) => s + r.area, 0);
+  const showDonut = rooms.length >= 2 && totalArea > 0;
+
   const handleOpenFull = () => {
     try {
       sessionStorage.setItem("floorPlanProject", JSON.stringify(model.floorPlanProject));
@@ -396,55 +413,97 @@ function FloorPlanInteractiveVariant({ model }: { model: FloorPlanInteractiveDat
   };
   return (
     <div>
+      {/* Phase 4.2 Fix 1 — hero block above the embedded editor: 2-col grid
+          mirroring BoqVariant. Left: title + KPI tiles + room cascade.
+          Right: RoomAreaDonut. Below: the dedicated FloorPlanViewer. */}
+      <div style={{ padding: "32px clamp(24px, 4vw, 40px) 16px" }}>
+        <div className="floorplan-hero-grid" style={{ display: "grid", gridTemplateColumns: showDonut ? "minmax(0, 1.3fr) minmax(0, 1fr)" : "minmax(0, 1fr)", gap: "clamp(20px, 3vw, 36px)", alignItems: "start" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 32,
+                  height: 32,
+                  borderRadius: 10,
+                  background: "#F0FDFA",
+                  color: "#0D9488",
+                }}
+              >
+                <PenTool size={16} />
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#0D9488",
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Interactive Floor Plan
+              </span>
+            </div>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: 16,
+                fontSize: "clamp(22px, 3vw, 30px)",
+                fontWeight: 700,
+                color: "#0F172A",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              {model.label}
+            </h2>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 8 }}>
+              <Stat label="Rooms" value={String(summary.totalRooms)} large />
+              <Stat label="Built-up area" value={`${Math.round(totalArea).toLocaleString("en-IN")} m²`} large />
+              <Stat label="Walls" value={String(summary.totalWalls)} large />
+              {summary.totalDoors > 0 ? <Stat label="Doors" value={String(summary.totalDoors)} large /> : null}
+              {summary.totalWindows > 0 ? <Stat label="Windows" value={String(summary.totalWindows)} large /> : null}
+              {summary.floorCount > 1 ? <Stat label="Floors" value={String(summary.floorCount)} large /> : null}
+            </div>
+            <RoomScheduleCascade rooms={rooms} />
+          </div>
+          {showDonut ? (
+            <div className="floorplan-hero-donut" style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 8 }}>
+              <RoomAreaDonut rooms={rooms} totalArea={totalArea} />
+            </div>
+          ) : null}
+        </div>
+        <style>{`
+          @media (max-width: 900px) {
+            .floorplan-hero-grid {
+              grid-template-columns: minmax(0, 1fr) !important;
+            }
+            .floorplan-hero-donut {
+              justify-content: flex-start !important;
+              padding-top: 0 !important;
+            }
+          }
+        `}</style>
+      </div>
+
+      {/* Embedded dedicated viewer (preserved sacred component) */}
       <div style={{ height: "min(60vh, 640px)", minHeight: 420, background: "#FAFAF8" }}>
         <FloorPlanViewer initialProject={model.floorPlanProject} />
       </div>
+
+      {/* Bottom CTA row */}
       <div
         style={{
           padding: "20px 24px 24px",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "flex-end",
           gap: 16,
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span
-            aria-hidden="true"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              background: "#F0FDFA",
-              color: "#0D9488",
-            }}
-          >
-            <PenTool size={16} />
-          </span>
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#0D9488",
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-              }}
-            >
-              {model.label}
-            </div>
-            <div style={{ fontSize: 13, color: "#4B5563", marginTop: 2, display: "flex", flexWrap: "wrap", gap: 12 }}>
-              <Stat label="Rooms" value={String(summary.totalRooms)} />
-              <Stat label="Area" value={`${Math.round(summary.totalArea_sqm).toLocaleString("en-IN")} m²`} />
-              <Stat label="Walls" value={String(summary.totalWalls)} />
-              <Stat label="Floors" value={String(summary.floorCount)} />
-            </div>
-          </div>
-        </div>
         <button
           type="button"
           onClick={handleOpenFull}
