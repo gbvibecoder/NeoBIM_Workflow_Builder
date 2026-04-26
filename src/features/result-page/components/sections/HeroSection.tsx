@@ -27,6 +27,7 @@ import { MaterialChipsCascade } from "@/features/result-page/components/animatio
 import { IsometricBuilding } from "@/features/result-page/components/animations/IsometricBuilding";
 import { ShutterReveal } from "@/features/result-page/components/animations/ShutterReveal";
 import { PhotoDevelop } from "@/features/result-page/components/animations/PhotoDevelop";
+import { LiveCostBreakdownDonut } from "@/features/result-page/components/animations/LiveCostBreakdownDonut";
 import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
@@ -728,71 +729,91 @@ function BoqVariant({ data }: { data: ResultPageData }) {
   const costPerM2 = boq.gfa > 0 ? totalCost / boq.gfa : 0;
   return (
     <div style={{ padding: "32px clamp(24px, 4vw, 40px)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <span
-          aria-hidden="true"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 32,
-            height: 32,
-            borderRadius: 10,
-            background: "#F0FDFA",
-            color: "#0D9488",
-          }}
-        >
-          <Calculator size={16} />
-        </span>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: "#0D9488",
-            letterSpacing: "0.10em",
-            textTransform: "uppercase",
-          }}
-        >
-          Total Project Cost
-        </span>
-      </div>
-      <div
-        style={{
-          fontSize: "clamp(40px, 7vw, 88px)",
-          fontWeight: 700,
-          color: "#0D9488",
-          letterSpacing: "-0.025em",
-          fontVariantNumeric: "tabular-nums",
-          fontFeatureSettings: "'tnum', 'ss01', 'cv11'",
-          lineHeight: 0.96,
-          marginBottom: 4,
-        }}
-      >
-        <AnimatedNumber value={totalCost} formatter={(n: number) => formatINR(n)} duration={1200} />
-      </div>
-      {/* Dimension-line callout — like a measurement stamp on a drawing.
-          Drawn in left-to-right after the cost number lands. */}
-      <div style={{ maxWidth: 360, marginBottom: 4 }}>
-        <DimensionLine color="#0D9488" delay={1.4} duration={0.8} />
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-          <MonoLabel size={10} color="#94A3B8">Total Project</MonoLabel>
-          <MonoLabel size={10} color="#94A3B8">Estimate · ±15%</MonoLabel>
+      {/* Phase 4.1 Fix 2 — left column (KPI + chips + stats) | right column (donut viz) */}
+      <div className="boq-hero-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)", gap: "clamp(20px, 3vw, 36px)", alignItems: "start" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <span
+              aria-hidden="true"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 32,
+                height: 32,
+                borderRadius: 10,
+                background: "#F0FDFA",
+                color: "#0D9488",
+              }}
+            >
+              <Calculator size={16} />
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#0D9488",
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+              }}
+            >
+              Total Project Cost
+            </span>
+          </div>
+          <div
+            style={{
+              fontSize: "clamp(40px, 7vw, 88px)",
+              fontWeight: 700,
+              color: "#0D9488",
+              letterSpacing: "-0.025em",
+              fontVariantNumeric: "tabular-nums",
+              fontFeatureSettings: "'tnum', 'ss01', 'cv11'",
+              lineHeight: 0.96,
+              marginBottom: 4,
+            }}
+          >
+            <AnimatedNumber value={totalCost} formatter={(n: number) => formatINR(n)} duration={1600} />
+          </div>
+          {/* Dimension-line callout — drawn in left-to-right after the cost number lands. */}
+          <div style={{ maxWidth: 360, marginBottom: 4 }}>
+            <DimensionLine color="#0D9488" delay={1.6} duration={0.6} />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+              <MonoLabel size={10} color="#94A3B8">Total Project</MonoLabel>
+              <MonoLabel size={10} color="#94A3B8">Estimate · ±15%</MonoLabel>
+            </div>
+          </div>
+
+          {/* Phase 4.1 Fix 1 · material chips cascade with halo + connecting line */}
+          <MaterialChipsCascade totalCost={boq.totalCost} />
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 24, marginTop: 4 }}>
+            {boq.gfa > 0 ? <Stat label="Built-up area" value={`${Math.round(boq.gfa).toLocaleString("en-IN")} m²`} large /> : null}
+            {costPerM2 > 0 ? (
+              <Stat
+                label="Cost / m²"
+                value={`₹${costPerM2.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+                large
+              />
+            ) : null}
+            <Stat label="Region" value={normalizeRegion(boq.region)} large />
+          </div>
+        </div>
+
+        {/* Right column · live cost breakdown donut */}
+        <div className="boq-hero-donut" style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 8 }}>
+          <LiveCostBreakdownDonut totalCost={boq.totalCost} />
         </div>
       </div>
-
-      {/* Phase 4 signature · material chips cascade (concrete → steel → bricks → labor → finishings) */}
-      <MaterialChipsCascade totalCost={boq.totalCost} />
-      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 24 }}>
-        {boq.gfa > 0 ? <Stat label="Built-up area" value={`${Math.round(boq.gfa).toLocaleString("en-IN")} m²`} large /> : null}
-        {costPerM2 > 0 ? (
-          <Stat
-            label="Cost / m²"
-            value={`₹${costPerM2.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
-            large
-          />
-        ) : null}
-        <Stat label="Region" value={normalizeRegion(boq.region)} large />
-      </div>
+      <style>{`
+        @media (max-width: 900px) {
+          .boq-hero-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+          .boq-hero-donut {
+            justify-content: flex-start !important;
+            padding-top: 0 !important;
+          }
+        }
+      `}</style>
 
       {previewRows.length > 0 && previewTable ? (
         <div
