@@ -27,6 +27,7 @@ import { MaterialChipsCascade } from "@/features/result-page/components/animatio
 import { IsometricBuilding } from "@/features/result-page/components/animations/IsometricBuilding";
 import { ShutterReveal } from "@/features/result-page/components/animations/ShutterReveal";
 import { PhotoDevelop } from "@/features/result-page/components/animations/PhotoDevelop";
+import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
   ResultPageData,
@@ -790,7 +791,7 @@ function BoqVariant({ data }: { data: ResultPageData }) {
             large
           />
         ) : null}
-        {boq.region ? <Stat label="Region" value={boq.region} large /> : null}
+        <Stat label="Region" value={normalizeRegion(boq.region)} large />
       </div>
 
       {previewRows.length > 0 && previewTable ? (
