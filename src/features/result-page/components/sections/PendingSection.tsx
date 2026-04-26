@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import type { VideoGenerationState } from "@/types/execution";
+import { RegistrationMark } from "@/features/result-page/components/animations/RegistrationMark";
 
 const PHASES = [
   "Exterior Pull-in",
@@ -100,7 +101,10 @@ export function PendingSection({ progress }: PendingSectionProps) {
           >
             {headline}
           </h2>
-          <span style={{ fontSize: 13, color: "#6B7280", marginTop: 2, display: "inline-block" }}>{subhead}</span>
+          <span style={{ fontSize: 13, color: "#6B7280", marginTop: 2, display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <RegistrationMark size={14} color="#0D9488" />
+            {subhead}
+          </span>
         </div>
       </div>
 

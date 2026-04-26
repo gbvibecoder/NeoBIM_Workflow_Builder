@@ -6,6 +6,10 @@ import { BarChart3, ChevronDown, ChevronRight, Copy, Check } from "lucide-react"
 import { toast } from "sonner";
 import { ScrollReveal } from "@/features/result-page/components/ScrollReveal";
 import { SectionHeader } from "@/features/result-page/components/sections/SectionHeader";
+import { StatStrip } from "@/features/result-page/components/sections/StatStrip";
+import { CostCompositionBar } from "@/features/result-page/components/sections/CostCompositionBar";
+import { deriveStatStrip } from "@/features/result-page/lib/derive-stat-strip";
+import { deriveCostComposition } from "@/features/result-page/lib/derive-cost-composition";
 import type { ResultPageData, KpiMetric, TableDataItem } from "@/features/result-page/hooks/useResultPageData";
 
 interface DataPreviewSectionProps {
@@ -28,10 +32,15 @@ export function DataPreviewSection({ data }: DataPreviewSectionProps) {
       )
     : data.tableData;
 
+  const statTiles = deriveStatStrip(data);
+  const costSegments = isBoqHero ? deriveCostComposition(data) : null;
+
   const hasContent =
     data.kpiMetrics.length > 0 ||
     tablesToShow.length > 0 ||
-    data.jsonData.length > 0;
+    data.jsonData.length > 0 ||
+    !!statTiles ||
+    !!costSegments;
 
   if (!hasContent) return null;
 
@@ -49,6 +58,10 @@ export function DataPreviewSection({ data }: DataPreviewSectionProps) {
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Phase 4 enrichments — workflow-aware stat strip + (BOQ only) cost composition bar */}
+          {statTiles ? <StatStrip tiles={statTiles} /> : null}
+          {costSegments ? <CostCompositionBar segments={costSegments} /> : null}
+
           {data.kpiMetrics.length > 0 ? <KpiGrid metrics={data.kpiMetrics} /> : null}
           {tablesToShow.map((t, i) => (
             <TablePreview key={i} table={t} index={i} />

@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { NorthArrow } from "@/features/result-page/components/aec/NorthArrow";
 import { MonoLabel } from "@/features/result-page/components/aec/MonoLabel";
+import { WorkflowTypeBadge } from "@/features/result-page/components/aec/WorkflowTypeBadge";
 import { AnnotateButton } from "@/features/result-page/components/features/AnnotateButton";
 import { SmartShareButton } from "@/features/result-page/components/features/SmartShareButton";
 import { QualityFingerprint } from "@/features/result-page/components/features/QualityFingerprint";
@@ -128,7 +129,7 @@ export function PageHeader({ data, initialNote, showNorthArrow, onNoteChange }: 
           </Link>
 
           <div style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               {showNorthArrow ? <NorthArrow size={18} /> : <Building2 size={14} color="#0D9488" aria-hidden="true" />}
               <h1
                 style={{
@@ -145,6 +146,7 @@ export function PageHeader({ data, initialNote, showNorthArrow, onNoteChange }: 
               >
                 {projectTitle}
               </h1>
+              <WorkflowTypeBadge data={data} />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <StatusPill lifecycle={lifecycle} successNodes={successNodes} totalNodes={totalNodes} />

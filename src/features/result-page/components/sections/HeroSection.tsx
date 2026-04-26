@@ -23,6 +23,10 @@ import { getWorkflowAccent } from "@/features/result-page/lib/workflow-accent";
 import { DraftingMarks } from "@/features/result-page/components/aec/DraftingMarks";
 import { DimensionLine } from "@/features/result-page/components/aec/DimensionLine";
 import { MonoLabel } from "@/features/result-page/components/aec/MonoLabel";
+import { MaterialChipsCascade } from "@/features/result-page/components/animations/MaterialChipsCascade";
+import { IsometricBuilding } from "@/features/result-page/components/animations/IsometricBuilding";
+import { ShutterReveal } from "@/features/result-page/components/animations/ShutterReveal";
+import { PhotoDevelop } from "@/features/result-page/components/animations/PhotoDevelop";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
   ResultPageData,
@@ -165,6 +169,8 @@ function VideoVariant({ data }: { data: ResultPageData }) {
           crossOrigin="anonymous"
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
+        {/* Phase 4 signature · cinema shutter retracts, revealing the frame */}
+        <ShutterReveal />
       </div>
       <div
         style={{
@@ -261,17 +267,19 @@ function ImageVariant({ urls }: { urls: string[] }) {
         }}
         onClick={() => setLightbox(url)}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={url}
-          alt={`Render ${activeIdx + 1}`}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            display: "block",
-          }}
-        />
+        <PhotoDevelop style={{ width: "100%", height: "100%" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt={`Render ${activeIdx + 1}`}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+        </PhotoDevelop>
       </div>
       <div
         style={{
@@ -581,8 +589,10 @@ function Model3DVariant({ data, model }: { data: ResultPageData; model: Model3DD
   }
 
   return (
-    <div style={{ padding: "32px clamp(24px, 4vw, 40px)" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 22 }}>
+    <div style={{ padding: "32px clamp(24px, 4vw, 40px)", position: "relative" }}>
+      {/* Phase 4 signature · isometric wireframe draws itself, then sits as ambient backdrop */}
+      <IsometricBuilding color="#0D9488" ambientOpacity={0.10} width={300} />
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 22, position: "relative" }}>
         <span
           aria-hidden="true"
           style={{
@@ -760,14 +770,17 @@ function BoqVariant({ data }: { data: ResultPageData }) {
         <AnimatedNumber value={totalCost} formatter={(n: number) => formatINR(n)} duration={1200} />
       </div>
       {/* Dimension-line callout — like a measurement stamp on a drawing.
-          Drawn in left-to-right on first reveal. */}
-      <div style={{ maxWidth: 360, marginBottom: 16 }}>
-        <DimensionLine color="#0D9488" delay={0.55} duration={0.8} />
+          Drawn in left-to-right after the cost number lands. */}
+      <div style={{ maxWidth: 360, marginBottom: 4 }}>
+        <DimensionLine color="#0D9488" delay={1.4} duration={0.8} />
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
           <MonoLabel size={10} color="#94A3B8">Total Project</MonoLabel>
           <MonoLabel size={10} color="#94A3B8">Estimate · ±15%</MonoLabel>
         </div>
       </div>
+
+      {/* Phase 4 signature · material chips cascade (concrete → steel → bricks → labor → finishings) */}
+      <MaterialChipsCascade totalCost={boq.totalCost} />
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 24 }}>
         {boq.gfa > 0 ? <Stat label="Built-up area" value={`${Math.round(boq.gfa).toLocaleString("en-IN")} m²`} large /> : null}
         {costPerM2 > 0 ? (

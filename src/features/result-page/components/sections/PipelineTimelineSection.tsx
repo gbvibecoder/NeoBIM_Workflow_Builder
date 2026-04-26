@@ -37,9 +37,11 @@ export function PipelineTimelineSection({ steps }: PipelineTimelineSectionProps)
             border: "1px solid rgba(0,0,0,0.06)",
             borderRadius: 16,
             boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            padding: "20px 24px",
+            padding: "16px 24px 20px",
           }}
         >
+          {/* Phase 4 enrichment · aggregate strip — total time, node count, retries */}
+          <PipelineAggregateStrip steps={steps} />
           <div
             style={{
               display: "flex",
@@ -47,6 +49,9 @@ export function PipelineTimelineSection({ steps }: PipelineTimelineSectionProps)
               gap: 0,
               overflowX: "auto",
               paddingBottom: 8,
+              paddingTop: 16,
+              marginTop: 4,
+              borderTop: "1px solid rgba(0,0,0,0.05)",
             }}
           >
             {steps.map((step, i) => {
@@ -157,5 +162,39 @@ export function PipelineTimelineSection({ steps }: PipelineTimelineSectionProps)
         `}</style>
       </section>
     </ScrollReveal>
+  );
+}
+
+function PipelineAggregateStrip({ steps }: { steps: PipelineStep[] }) {
+  const succeeded = steps.filter(s => s.status === "success").length;
+  const errored = steps.filter(s => s.status === "error" || s.status === "failed").length;
+  const monoStyle = {
+    fontFamily: "var(--font-jetbrains), ui-monospace, monospace" as const,
+    fontSize: 11,
+    fontWeight: 500,
+    letterSpacing: "0.06em",
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+      <span style={{ ...monoStyle, color: "#94A3B8", textTransform: "uppercase" }}>
+        Aggregate
+      </span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+        <span style={{ ...monoStyle, color: "#94A3B8", textTransform: "uppercase" }}>Steps</span>
+        <span style={{ ...monoStyle, color: "#0F172A", fontWeight: 700 }}>{steps.length}</span>
+      </span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+        <span style={{ ...monoStyle, color: "#94A3B8", textTransform: "uppercase" }}>Succeeded</span>
+        <span style={{ ...monoStyle, color: succeeded === steps.length ? "#059669" : "#0F172A", fontWeight: 700 }}>
+          {succeeded}
+        </span>
+      </span>
+      {errored > 0 ? (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <span style={{ ...monoStyle, color: "#94A3B8", textTransform: "uppercase" }}>Errored</span>
+          <span style={{ ...monoStyle, color: "#DC2626", fontWeight: 700 }}>{errored}</span>
+        </span>
+      ) : null}
+    </div>
   );
 }
