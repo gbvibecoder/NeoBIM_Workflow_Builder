@@ -9,6 +9,13 @@ import type { ResultPageData } from "@/features/result-page/hooks/useResultPageD
 
 interface GeneratedAssetsSectionProps {
   data: ResultPageData;
+  /** Phase 4.1 Fix 3 — orchestrator-allocated section number. */
+  index: number;
+}
+
+/** Phase 4.1 Fix 3 eligibility predicate. */
+export function isGeneratedAssetsEligible(data: ResultPageData): boolean {
+  return data.allImageUrls.length > 0;
 }
 
 /**
@@ -17,7 +24,7 @@ interface GeneratedAssetsSectionProps {
  * section shows the rest as a richer grid with the BOQ visualizer's
  * card-on-light-bg aesthetic.
  */
-export function GeneratedAssetsSection({ data }: GeneratedAssetsSectionProps) {
+export function GeneratedAssetsSection({ data, index }: GeneratedAssetsSectionProps) {
   const urls = data.allImageUrls;
   const [lightbox, setLightbox] = useState<string | null>(null);
   if (urls.length === 0) return null;
@@ -26,7 +33,7 @@ export function GeneratedAssetsSection({ data }: GeneratedAssetsSectionProps) {
     <ScrollReveal>
       <section id="generated-assets" style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
-          index={2}
+          index={index}
           icon={<ImageIcon size={16} />}
           label="Renders"
           title={urls.length === 1 ? "One render this round" : `${urls.length} renders, drying`}

@@ -14,6 +14,31 @@ import type { ResultPageData, KpiMetric, TableDataItem } from "@/features/result
 
 interface DataPreviewSectionProps {
   data: ResultPageData;
+  /** Phase 4.1 Fix 3 — orchestrator-allocated section number. */
+  index: number;
+}
+
+/** Phase 4.1 Fix 3 eligibility predicate — kept in lockstep with the body's `hasContent`. */
+export function isDataPreviewEligible(data: ResultPageData): boolean {
+  const isBoqHero = !!data.boqSummary;
+  const tablesToShow = isBoqHero
+    ? data.tableData.filter(
+        t =>
+          !t.label?.toLowerCase().includes("bill of quantities") &&
+          !t.label?.toLowerCase().includes("boq"),
+      )
+    : data.tableData;
+  return (
+    data.kpiMetrics.length > 0 ||
+    tablesToShow.length > 0 ||
+    data.jsonData.length > 0 ||
+    !!data.boqSummary || // BOQ stat strip + cost composition always renders for BOQ
+    data.fileDownloads.some(f => f.name.toLowerCase().endsWith(".ifc")) || // IFC stat strip
+    data.model3dData?.kind === "floor-plan-interactive" ||
+    !!data.videoData?.videoUrl ||
+    !!data.clashSummary ||
+    data.pipelineSteps.length > 0
+  );
 }
 
 /**
@@ -21,7 +46,7 @@ interface DataPreviewSectionProps {
  * heuristic CostBreakdownBars derivation is REMOVED per Phase 2 P4 — that
  * was the false-positive landmine the audit flagged.
  */
-export function DataPreviewSection({ data }: DataPreviewSectionProps) {
+export function DataPreviewSection({ data, index }: DataPreviewSectionProps) {
   // Skip BOQ table preview — already shown in HeroBoq
   const isBoqHero = !!data.boqSummary;
   const tablesToShow = isBoqHero
@@ -48,7 +73,7 @@ export function DataPreviewSection({ data }: DataPreviewSectionProps) {
     <ScrollReveal>
       <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
-          index={3}
+          index={index}
           icon={<BarChart3 size={16} />}
           label="Data"
           title="By the numbers"

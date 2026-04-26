@@ -14,11 +14,26 @@ import { HeroSection } from "@/features/result-page/components/sections/HeroSect
 import { PartialBanner } from "@/features/result-page/components/sections/PartialBanner";
 import { FailureSection } from "@/features/result-page/components/sections/FailureSection";
 import { PendingSection } from "@/features/result-page/components/sections/PendingSection";
-import { DedicatedVisualizerEntries } from "@/features/result-page/components/sections/DedicatedVisualizerEntries";
-import { GeneratedAssetsSection } from "@/features/result-page/components/sections/GeneratedAssetsSection";
-import { DataPreviewSection } from "@/features/result-page/components/sections/DataPreviewSection";
-import { ExportsSection } from "@/features/result-page/components/sections/ExportsSection";
-import { PipelineTimelineSection } from "@/features/result-page/components/sections/PipelineTimelineSection";
+import {
+  DedicatedVisualizerEntries,
+  isDedicatedVisualizerEntriesEligible,
+} from "@/features/result-page/components/sections/DedicatedVisualizerEntries";
+import {
+  GeneratedAssetsSection,
+  isGeneratedAssetsEligible,
+} from "@/features/result-page/components/sections/GeneratedAssetsSection";
+import {
+  DataPreviewSection,
+  isDataPreviewEligible,
+} from "@/features/result-page/components/sections/DataPreviewSection";
+import {
+  ExportsSection,
+  isExportsEligible,
+} from "@/features/result-page/components/sections/ExportsSection";
+import {
+  PipelineTimelineSection,
+  isPipelineTimelineEligible,
+} from "@/features/result-page/components/sections/PipelineTimelineSection";
 import { NotFound } from "@/features/result-page/components/empty/NotFound";
 import { Forbidden } from "@/features/result-page/components/empty/Forbidden";
 import { readSavedNote } from "@/features/result-page/components/features/AnnotateButton";
@@ -155,25 +170,53 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
                 </ErrorBoundary>
               )}
 
-              <ErrorBoundary>
-                <DedicatedVisualizerEntries data={data} />
-              </ErrorBoundary>
-
-              <ErrorBoundary>
-                <GeneratedAssetsSection data={data} />
-              </ErrorBoundary>
-
-              <ErrorBoundary>
-                <DataPreviewSection data={data} />
-              </ErrorBoundary>
-
-              <ErrorBoundary>
-                <ExportsSection data={data} />
-              </ErrorBoundary>
-
-              <ErrorBoundary>
-                <PipelineTimelineSection steps={data.pipelineSteps} />
-              </ErrorBoundary>
+              {/* Phase 4.1 Fix 3 — section indices derived from rendered count.
+                  Each section's eligibility predicate is consulted in declaration
+                  order; only eligible sections receive an index. Numbering reads
+                  01 · 02 · 03 · … with no gaps. */}
+              {(() => {
+                let counter = 0;
+                const next = () => ++counter;
+                const willDedicated = isDedicatedVisualizerEntriesEligible(data);
+                const willAssets = isGeneratedAssetsEligible(data);
+                const willData = isDataPreviewEligible(data);
+                const willExports = isExportsEligible(data);
+                const willPipeline = isPipelineTimelineEligible(data.pipelineSteps);
+                const dedicatedIdx = willDedicated ? next() : 0;
+                const assetsIdx = willAssets ? next() : 0;
+                const dataIdx = willData ? next() : 0;
+                const exportsIdx = willExports ? next() : 0;
+                const pipelineIdx = willPipeline ? next() : 0;
+                return (
+                  <>
+                    {willDedicated ? (
+                      <ErrorBoundary>
+                        <DedicatedVisualizerEntries data={data} index={dedicatedIdx} />
+                      </ErrorBoundary>
+                    ) : null}
+                    {willAssets ? (
+                      <ErrorBoundary>
+                        <GeneratedAssetsSection data={data} index={assetsIdx} />
+                      </ErrorBoundary>
+                    ) : null}
+                    {willData ? (
+                      <ErrorBoundary>
+                        <DataPreviewSection data={data} index={dataIdx} />
+                      </ErrorBoundary>
+                    ) : null}
+                    {willExports ? (
+                      <ErrorBoundary>
+                        <ExportsSection data={data} index={exportsIdx} />
+                      </ErrorBoundary>
+                    ) : null}
+                    {willPipeline ? (
+                      <ErrorBoundary>
+                        <PipelineTimelineSection steps={data.pipelineSteps} index={pipelineIdx} />
+                      </ErrorBoundary>
+                    ) : null}
+                  </>
+                );
+              })()}
             </>
           )}
         </main>

@@ -8,6 +8,19 @@ import type { ResultPageData } from "@/features/result-page/hooks/useResultPageD
 
 interface DedicatedVisualizerEntriesProps {
   data: ResultPageData;
+  /** Phase 4.1 Fix 3 — orchestrator-allocated section number, derived from rendered sections (no skips). */
+  index: number;
+}
+
+/** Phase 4.1 Fix 3 eligibility predicate — used by the orchestrator to allocate indices. */
+export function isDedicatedVisualizerEntriesEligible(data: ResultPageData): boolean {
+  if (data.boqSummary) return true;
+  if (data.model3dData?.kind === "floor-plan-interactive") return true;
+  if (data.model3dData?.kind === "floor-plan-editor" && data.model3dData.geometry) return true;
+  if (data.fileDownloads.some(f => f.name.toLowerCase().endsWith(".ifc"))) return true;
+  if (data.videoData?.videoUrl && data.videoData.downloadUrl) return true;
+  if (data.allImageUrls.length >= 3) return true;
+  return false;
 }
 
 interface Entry {
@@ -26,7 +39,7 @@ interface Entry {
  * Hero-grade CTAs to dedicated visualizers. Only renders entries the
  * workflow's artifacts justify — no empty placeholders.
  */
-export function DedicatedVisualizerEntries({ data }: DedicatedVisualizerEntriesProps) {
+export function DedicatedVisualizerEntries({ data, index }: DedicatedVisualizerEntriesProps) {
   const entries: Entry[] = [];
 
   if (data.boqSummary) {
@@ -128,7 +141,7 @@ export function DedicatedVisualizerEntries({ data }: DedicatedVisualizerEntriesP
     <ScrollReveal>
       <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
-          index={1}
+          index={index}
           icon={<ArrowRight size={16} />}
           label="Deep links"
           title="Hand off to the right surface"

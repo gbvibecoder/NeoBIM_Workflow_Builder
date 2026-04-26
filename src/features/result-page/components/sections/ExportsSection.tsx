@@ -26,6 +26,14 @@ import type { ResultPageData } from "@/features/result-page/hooks/useResultPageD
 
 interface ExportsSectionProps {
   data: ResultPageData;
+  /** Phase 4.1 Fix 3 — orchestrator-allocated section number. */
+  index: number;
+}
+
+/** Phase 4.1 Fix 3 eligibility predicate — Exports always has at least the PDF card. */
+export function isExportsEligible(data: ResultPageData): boolean {
+  // PDF report always available; renders unconditionally.
+  return data.totalArtifacts > 0 || data.pipelineSteps.length > 0;
 }
 
 interface DownloadCard {
@@ -45,7 +53,7 @@ interface DownloadCard {
  * (Phase 1's clutter); concept-level footer is gone. The Rich/Lean IFC
  * badge stays — that's signal, not jargon.
  */
-export function ExportsSection({ data }: ExportsSectionProps) {
+export function ExportsSection({ data, index }: ExportsSectionProps) {
   const artifacts = useExecutionStore(s => s.artifacts);
   const nodes = useWorkflowStore(s => s.nodes);
   const [generating, setGenerating] = useState<string | null>(null);
@@ -258,7 +266,7 @@ export function ExportsSection({ data }: ExportsSectionProps) {
     <ScrollReveal>
       <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
-          index={4}
+          index={index}
           icon={<Download size={16} />}
           label="Exports"
           title="Take it with you"

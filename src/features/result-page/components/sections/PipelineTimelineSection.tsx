@@ -8,6 +8,13 @@ import type { PipelineStep } from "@/features/result-page/hooks/useResultPageDat
 
 interface PipelineTimelineSectionProps {
   steps: PipelineStep[];
+  /** Phase 4.1 Fix 3 — orchestrator-allocated section number. */
+  index: number;
+}
+
+/** Phase 4.1 Fix 3 eligibility predicate. */
+export function isPipelineTimelineEligible(steps: PipelineStep[]): boolean {
+  return steps.length >= 2;
 }
 
 const CATEGORY_COLOR: Record<string, { color: string; bg: string }> = {
@@ -17,13 +24,13 @@ const CATEGORY_COLOR: Record<string, { color: string; bg: string }> = {
   export: { color: "#1E40AF", bg: "#EFF6FF" },
 };
 
-export function PipelineTimelineSection({ steps }: PipelineTimelineSectionProps) {
+export function PipelineTimelineSection({ steps, index }: PipelineTimelineSectionProps) {
   if (steps.length < 2) return null;
   return (
     <ScrollReveal>
       <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
-          index={5}
+          index={index}
           icon={<Activity size={16} />}
           label="Pipeline"
           title="The trail your run left"
