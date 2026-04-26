@@ -23,10 +23,11 @@ export function PipelineTimelineSection({ steps }: PipelineTimelineSectionProps)
     <ScrollReveal>
       <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
+          index={5}
           icon={<Activity size={16} />}
           label="Pipeline"
-          title="What ran to produce this"
-          subtitle={`${steps.length} steps · ${steps.filter(s => s.status === "success").length} succeeded`}
+          title="The trail your run left"
+          subtitle={`${steps.length} step${steps.length === 1 ? "" : "s"} · ${steps.filter(s => s.status === "success").length} succeeded · open Diagnostics for the deep trace`}
           iconColor="#7C3AED"
           iconBg="#F5F3FF"
         />

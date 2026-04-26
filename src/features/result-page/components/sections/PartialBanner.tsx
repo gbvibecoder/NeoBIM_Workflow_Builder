@@ -94,18 +94,19 @@ export function PartialBanner({ data }: PartialBannerProps) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
+              fontFamily: "var(--font-jetbrains), ui-monospace, monospace",
               fontSize: 11,
-              fontWeight: 600,
+              fontWeight: 500,
               color: "#92400E",
               letterSpacing: "0.10em",
               textTransform: "uppercase",
               marginBottom: 4,
             }}
           >
-            Mostly finished · {succeededCount}/{totalCount} steps
+            {String(succeededCount).padStart(2, "0")}/{String(totalCount).padStart(2, "0")} · partial run
           </div>
           <p style={{ margin: 0, fontSize: 14, color: "#92400E", lineHeight: 1.55 }}>
-            Most of your workflow finished cleanly. The {failureNoun} hit a snag — your {positiveText} {positives.length > 0 ? "are all ready below." : "are below."}
+            Most of the run cleared. The {failureNoun} stalled — your {positiveText} {positives.length > 0 ? "are intact below." : "are still below."}
           </p>
         </div>
       </div>
@@ -129,7 +130,7 @@ export function PartialBanner({ data }: PartialBannerProps) {
             cursor: "pointer",
           }}
         >
-          What didn&apos;t finish — {failedLabel}
+          The step that stalled · {failedLabel}
           <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ display: "inline-flex" }}>
             <ChevronDown size={12} aria-hidden="true" />
           </motion.span>

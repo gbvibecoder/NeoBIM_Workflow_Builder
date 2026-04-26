@@ -39,10 +39,11 @@ export function DataPreviewSection({ data }: DataPreviewSectionProps) {
     <ScrollReveal>
       <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
+          index={3}
           icon={<BarChart3 size={16} />}
-          label="Data & analysis"
-          title="Numbers behind the result"
-          subtitle="Key metrics, structured data, and tables your downstream tools can consume."
+          label="Data"
+          title="By the numbers"
+          subtitle="Metrics, tables, and structured payloads — the parts your downstream tools can read directly."
           iconColor="#1E40AF"
           iconBg="#EFF6FF"
         />

@@ -258,10 +258,11 @@ export function ExportsSection({ data }: ExportsSectionProps) {
     <ScrollReveal>
       <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
+          index={4}
           icon={<Download size={16} />}
-          label="Downloads"
-          title="Export this run"
-          subtitle="Hand off to clients, downstream tools, or your team."
+          label="Exports"
+          title="Take it with you"
+          subtitle="Hand it off — to clients, to Revit, to anyone."
         />
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {primary?.primary ? <PrimaryDownloadCard card={primary} isGenerating={generating === primary.id} /> : null}

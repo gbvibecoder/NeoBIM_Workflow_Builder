@@ -23,12 +23,12 @@ export function PendingSection({ progress }: PendingSectionProps) {
 
   const headline =
     progress?.status === "submitting"
-      ? "Sending the build to the render farm"
+      ? "Handing the scene to the renderer"
       : progress?.status === "rendering"
-        ? "Rendering your cinematic walkthrough"
-        : "Generating your cinematic walkthrough";
+        ? "Composing your walkthrough — the renderer makes it look easy"
+        : "Drawing the first frame";
   const subhead =
-    progress?.phase ?? (pct < 5 ? "Initializing the pipeline" : `Building shot ${activeIdx + 1 || 1} of ${PHASES.length}`);
+    progress?.phase ?? (pct < 5 ? "Loading the scene" : `Shot ${activeIdx + 1 || 1} of ${PHASES.length}`);
 
   return (
     <motion.section
@@ -150,8 +150,8 @@ export function PendingSection({ progress }: PendingSectionProps) {
         })}
       </div>
 
-      <p style={{ margin: 0, marginTop: 16, fontSize: 13, color: "#6B7280", lineHeight: 1.6 }}>
-        Cinematic walkthroughs typically take 3-8 minutes. You can leave this page and return — progress is saved.
+      <p style={{ margin: 0, marginTop: 16, fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>
+        Three to eight minutes is usual. Close this tab if you need to — when you come back, the render will have kept going.
       </p>
     </motion.section>
   );

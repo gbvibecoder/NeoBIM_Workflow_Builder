@@ -7,14 +7,14 @@ export function NotFound({ executionId }: { executionId: string }) {
   return (
     <EmptyState
       icon={<FileSearch size={28} />}
-      title="We couldn't find this result"
+      title="Nothing under this address"
       description={
         executionId
-          ? `Execution ${executionId.slice(0, 10)}… may have been deleted, or it belongs to a different account.`
-          : "The execution may have been deleted, or it belongs to a different account."
+          ? `Run ${executionId.slice(0, 10)}… isn't on the books — deleted, or it belongs to a different account.`
+          : "This result either no longer exists, or it belongs to a different account."
       }
       primaryHref="/dashboard"
-      primaryLabel="Go to dashboard"
+      primaryLabel="Back to dashboard"
     />
   );
 }

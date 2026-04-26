@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useResultPageData } from "@/features/result-page/hooks/useResultPageData";
 import { selectHero } from "@/features/result-page/lib/select-hero";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { ExecutionDiagnosticsPanel } from "@/components/diagnostics/ExecutionDiagnosticsPanel";
-import { InteractiveDotGrid } from "@/features/boq/components/InteractiveDotGrid";
 
 import { PageHeader } from "@/features/result-page/components/PageHeader";
 import { ScrollReveal } from "@/features/result-page/components/ScrollReveal";
+import { PageBackground } from "@/features/result-page/components/aec/PageBackground";
 import { HeroSection } from "@/features/result-page/components/sections/HeroSection";
 import { PartialBanner } from "@/features/result-page/components/sections/PartialBanner";
 import { FailureSection } from "@/features/result-page/components/sections/FailureSection";
@@ -20,23 +21,78 @@ import { ExportsSection } from "@/features/result-page/components/sections/Expor
 import { PipelineTimelineSection } from "@/features/result-page/components/sections/PipelineTimelineSection";
 import { NotFound } from "@/features/result-page/components/empty/NotFound";
 import { Forbidden } from "@/features/result-page/components/empty/Forbidden";
+import { readSavedNote } from "@/features/result-page/components/features/AnnotateButton";
 
 interface ResultPageRootProps {
   executionId: string;
 }
 
 /**
- * Phase 2 — single-scroll, BOQ-visualizer-aesthetic result page.
+ * Phase 3 — distinct AEC-flavored result page.
  *
- * - One scrollable column (no tabs).
- * - Light theme that matches the BOQ visualizer family.
- * - Floating <ExecutionDiagnosticsPanel /> bottom-right (P3).
- * - Cinematic motion: scroll-driven section reveals + hero blur-to-focus
- *   entrance + parallax + counter springs (all reduced-motion safe).
+ * Architectural personality: section indices, drafting marks, dimension
+ * lines, north arrow, monospace technical labels. Three functional
+ * additions: per-execution notes (localStorage), smart-share dropdown
+ * (deep-links to dedicated visualizers), quality fingerprint widget.
+ *
+ * Phase 2 wins preserved:
+ *  - single scrollable column, no tabs
+ *  - light theme on `#FAFAF8`
+ *  - ₹ via BOQ's canonical formatINR (no `$`)
+ *  - gentle failure UX (amber for partial, red only for full failure)
+ *  - floating ExecutionDiagnosticsPanel bottom-right
  */
 export function ResultPageRoot({ executionId }: ResultPageRootProps) {
   const data = useResultPageData(executionId);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const heroKind = useMemo(() => selectHero(data), [data]);
+
+  // Smart-share deep-link: if arriving with `?open=boq|editor|ifc`, route the
+  // recipient to the relevant dedicated visualizer instead of the wrapper.
+  useEffect(() => {
+    const target = searchParams.get("open");
+    if (!target) return;
+    if (data.lifecycle === "loading") return;
+    if (target === "boq" && data.boqSummary) {
+      router.replace(`/dashboard/results/${executionId}/boq`);
+      return;
+    }
+    if (target === "ifc" && data.fileDownloads.some(f => f.name.toLowerCase().endsWith(".ifc"))) {
+      router.replace(`/dashboard/ifc-viewer?executionId=${executionId}`);
+      return;
+    }
+    if (
+      target === "editor" &&
+      (data.model3dData?.kind === "floor-plan-interactive" ||
+        data.model3dData?.kind === "floor-plan-editor")
+    ) {
+      try {
+        if (data.model3dData.kind === "floor-plan-interactive") {
+          sessionStorage.setItem("floorPlanProject", JSON.stringify(data.model3dData.floorPlanProject));
+        } else if (data.model3dData.kind === "floor-plan-editor" && data.model3dData.geometry) {
+          sessionStorage.setItem("fp-editor-geometry", JSON.stringify(data.model3dData.geometry));
+        }
+      } catch {
+        // sessionStorage unavailable — the editor will open empty
+      }
+      router.replace("/dashboard/floor-plan?source=pipeline");
+    }
+  }, [searchParams, data, executionId, router]);
+
+  // Annotate state — read once, pass into header. Header keeps its own copy
+  // so the textarea writes don't re-render the entire page.
+  const [initialNote, setInitialNote] = useState("");
+  useEffect(() => {
+    setInitialNote(readSavedNote(executionId));
+  }, [executionId]);
+
+  // North-arrow eligibility: floor-plan / model-3d / SVG floor plan workflows
+  const showNorthArrow =
+    data.model3dData?.kind === "floor-plan-interactive" ||
+    data.model3dData?.kind === "floor-plan-editor" ||
+    data.model3dData?.kind === "html-iframe" ||
+    !!data.svgContent;
 
   // ── Terminal lifecycle states ──
   if (data.lifecycle === "not-found") {
@@ -56,18 +112,10 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
 
   return (
     <Frame>
-      <InteractiveDotGrid />
+      <PageBackground />
 
       <div style={{ position: "relative", zIndex: 1 }}>
-        <PageHeader
-          projectTitle={data.projectTitle}
-          workflowId={data.workflowId}
-          executionId={executionId}
-          lifecycle={data.lifecycle}
-          successNodes={data.successNodes}
-          totalNodes={data.totalNodes}
-          startedAt={data.executionMeta.executedAt}
-        />
+        <PageHeader data={data} initialNote={initialNote} showNorthArrow={showNorthArrow} />
 
         <main
           style={{
@@ -76,7 +124,7 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
             padding: "32px clamp(12px, 3vw, 32px) 96px",
             display: "flex",
             flexDirection: "column",
-            gap: 28,
+            gap: 36,
           }}
         >
           {data.lifecycle === "loading" ? (
@@ -91,14 +139,12 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
             </ErrorBoundary>
           ) : (
             <>
-              {/* Partial-state banner appears above the hero — only when status === "partial" */}
               {data.lifecycle === "partial" ? (
                 <ErrorBoundary>
                   <PartialBanner data={data} />
                 </ErrorBoundary>
               ) : null}
 
-              {/* Pending video render replaces the hero with the in-progress card */}
               {heroKind === "pending" ? (
                 <ErrorBoundary>
                   <PendingSection progress={data.primaryVideoProgress} />
@@ -133,22 +179,18 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
         </main>
       </div>
 
-      {/* Floating diagnostics launcher — bottom-right (P3). Same pattern as
-          the BOQ visualizer route. The component renders nothing when there
-          is no trace yet, so it's safe to mount unconditionally. */}
       <ExecutionDiagnosticsPanel />
     </Frame>
   );
 }
 
-/** Outer frame: light bg, full height, owns the scroll. */
 function Frame({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="h-full overflow-y-auto"
       style={{
         background: "#FAFAF8",
-        color: "#111827",
+        color: "#0F172A",
         position: "relative",
       }}
     >
@@ -164,8 +206,7 @@ function SkeletonHero() {
         style={{
           height: 360,
           borderRadius: 20,
-          background:
-            "linear-gradient(110deg, #F3F4F6 8%, #FFFFFF 18%, #F3F4F6 33%)",
+          background: "linear-gradient(110deg, #F1F5F9 8%, #FFFFFF 18%, #F1F5F9 33%)",
           backgroundSize: "200% 100%",
           animation: "result-skeleton-shimmer 1.6s linear infinite",
           border: "1px solid rgba(0,0,0,0.06)",

@@ -128,10 +128,11 @@ export function DedicatedVisualizerEntries({ data }: DedicatedVisualizerEntriesP
     <ScrollReveal>
       <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
+          index={1}
           icon={<ArrowRight size={16} />}
-          label="Open in"
-          title="Dedicated workspaces"
-          subtitle="Hand off to the right surface for deeper editing or analysis."
+          label="Deep links"
+          title="Hand off to the right surface"
+          subtitle="The result was made here. The work happens over there."
         />
         <div
           style={{

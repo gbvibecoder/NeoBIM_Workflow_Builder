@@ -26,10 +26,11 @@ export function GeneratedAssetsSection({ data }: GeneratedAssetsSectionProps) {
     <ScrollReveal>
       <section id="generated-assets" style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
         <SectionHeader
+          index={2}
           icon={<ImageIcon size={16} />}
-          label="Generated assets"
-          title={urls.length === 1 ? "Concept render" : `${urls.length} concept renders`}
-          subtitle="Hi-resolution PNGs ready to download or share with the client."
+          label="Renders"
+          title={urls.length === 1 ? "One render this round" : `${urls.length} renders, drying`}
+          subtitle="Hi-resolution PNGs. Click a render to inspect, hover to grab."
         />
         <div
           style={{

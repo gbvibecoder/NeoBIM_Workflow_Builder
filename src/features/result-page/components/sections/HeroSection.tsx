@@ -20,6 +20,9 @@ import {
 import { AnimatedNumber } from "@/features/boq/components/AnimatedNumber";
 import { formatINR } from "@/features/boq/components/recalc-engine";
 import { getWorkflowAccent } from "@/features/result-page/lib/workflow-accent";
+import { DraftingMarks } from "@/features/result-page/components/aec/DraftingMarks";
+import { DimensionLine } from "@/features/result-page/components/aec/DimensionLine";
+import { MonoLabel } from "@/features/result-page/components/aec/MonoLabel";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
   ResultPageData,
@@ -90,6 +93,9 @@ export function HeroSection({ data, heroKind }: HeroSectionProps) {
           pointerEvents: "none",
         }}
       />
+
+      {/* Drafting-mark corner brackets — quietly architectural */}
+      <DraftingMarks color="#94A3B8" length={14} inset={10} opacity={0.42} />
 
       <div style={{ position: "relative", zIndex: 1 }}>
         {heroKind === "video" && data.videoData ? <VideoVariant data={data} /> : null}
@@ -199,15 +205,15 @@ function VideoVariant({ data }: { data: ResultPageData }) {
             >
               Cinematic walkthrough
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4, flexWrap: "wrap" }}>
-              <Stat label="Duration" value={`${data.videoData?.durationSeconds ?? 15}s`} />
-              <Stat
-                label="Shots"
-                value={String(
-                  data.videoData?.segments?.length ?? data.videoData?.shotCount ?? 3,
-                )}
-              />
-              {data.videoData?.pipeline ? <Stat label="Pipeline" value={data.videoData.pipeline} /> : null}
+            {/* Monospace timecode caption — reads like a frame counter */}
+            <div style={{ marginTop: 6 }}>
+              <MonoLabel size={12} color="#0F172A" uppercase={false}>
+                {`${String(data.videoData?.durationSeconds ?? 15).padStart(2, "0")}.000s`}
+                {" · "}
+                {`${data.videoData?.segments?.length ?? data.videoData?.shotCount ?? 3} shots`}
+                {data.videoData?.pipeline ? ` · ${data.videoData.pipeline}` : ""}
+                {" · 1080p"}
+              </MonoLabel>
             </div>
           </div>
         </div>
@@ -741,16 +747,26 @@ function BoqVariant({ data }: { data: ResultPageData }) {
       </div>
       <div
         style={{
-          fontSize: "clamp(36px, 6vw, 64px)",
+          fontSize: "clamp(40px, 7vw, 88px)",
           fontWeight: 700,
           color: "#0D9488",
-          letterSpacing: "-0.02em",
+          letterSpacing: "-0.025em",
           fontVariantNumeric: "tabular-nums",
-          lineHeight: 1.0,
-          marginBottom: 14,
+          fontFeatureSettings: "'tnum', 'ss01', 'cv11'",
+          lineHeight: 0.96,
+          marginBottom: 4,
         }}
       >
         <AnimatedNumber value={totalCost} formatter={(n: number) => formatINR(n)} duration={1200} />
+      </div>
+      {/* Dimension-line callout — like a measurement stamp on a drawing.
+          Drawn in left-to-right on first reveal. */}
+      <div style={{ maxWidth: 360, marginBottom: 16 }}>
+        <DimensionLine color="#0D9488" delay={0.55} duration={0.8} />
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+          <MonoLabel size={10} color="#94A3B8">Total Project</MonoLabel>
+          <MonoLabel size={10} color="#94A3B8">Estimate · ±15%</MonoLabel>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 24 }}>
         {boq.gfa > 0 ? <Stat label="Built-up area" value={`${Math.round(boq.gfa).toLocaleString("en-IN")} m²`} large /> : null}

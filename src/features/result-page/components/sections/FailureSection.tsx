@@ -87,26 +87,27 @@ export function FailureSection({ errorMessage, workflowId, executionId }: Failur
         <div style={{ minWidth: 0 }}>
           <div
             style={{
+              fontFamily: "var(--font-jetbrains), ui-monospace, monospace",
               fontSize: 11,
-              fontWeight: 600,
-              color: "#DC2626",
+              fontWeight: 500,
+              color: "#B91C1C",
               letterSpacing: "0.10em",
               textTransform: "uppercase",
-              marginBottom: 4,
+              marginBottom: 6,
             }}
           >
-            Run did not complete
+            Run terminated · 00 artifacts
           </div>
           <h2
             style={{
               margin: 0,
-              fontSize: "clamp(20px, 2.6vw, 26px)",
-              fontWeight: 700,
-              color: "#111827",
+              fontSize: "clamp(22px, 2.8vw, 28px)",
+              fontWeight: 600,
+              color: "#0F172A",
               letterSpacing: "-0.01em",
             }}
           >
-            This run didn&apos;t complete.
+            Something stopped this run before it finished.
           </h2>
         </div>
       </div>
@@ -127,7 +128,7 @@ export function FailureSection({ errorMessage, workflowId, executionId }: Failur
         }}
       >
         {errorMessage?.trim() ||
-          "The execution didn't produce any artifacts and no specific error message was recorded. Open the diagnostics panel below for the per-node trace, then retry from the canvas to fix the upstream input."}
+          "No specific error was recorded for this run. Open Diagnostics (bottom-right) — the per-node trace usually tells the story. Then retry from the canvas with whatever needs to change."}
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
