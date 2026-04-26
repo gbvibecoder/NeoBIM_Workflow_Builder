@@ -32,13 +32,17 @@ export default function DashboardLayout({
     pathname === "/dashboard/3d-render" ||
     pathname === "/dashboard/floor-plan" ||
     pathname.startsWith("/dashboard/results/");
+  // BetaBanner visibility — preserve original behavior (hidden only on
+  // immersive landing and 3D-render wizard) so Phase 4.2 result pages
+  // keep showing the banner exactly as before this phase.
+  const hideBetaBanner = isImmersive || pathname === "/dashboard/3d-render";
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ minHeight: "-webkit-fill-available", background: "#0a0c10" }}>
       <Sidebar />
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ transition: "flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
-          {!isImmersive && !isLightSurface && <BetaBanner />}
+          {!hideBetaBanner && <BetaBanner />}
           {!isImmersive && <Header theme={isLightSurface ? "light" : "dark"} />}
           <div className="flex-1 min-h-0 overflow-hidden" style={{ position: "relative" }}>
             {isImmersive && <Header floating />}
