@@ -34,6 +34,7 @@ import {
   PipelineTimelineSection,
   isPipelineTimelineEligible,
 } from "@/features/result-page/components/sections/PipelineTimelineSection";
+import { LiveStatusStrip } from "@/features/result-page/components/sections/LiveStatusStrip";
 import { NotFound } from "@/features/result-page/components/empty/NotFound";
 import { Forbidden } from "@/features/result-page/components/empty/Forbidden";
 import { readSavedNote } from "@/features/result-page/components/features/AnnotateButton";
@@ -131,6 +132,9 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
 
       <div style={{ position: "relative", zIndex: 1 }}>
         <PageHeader data={data} initialNote={initialNote} showNorthArrow={showNorthArrow} />
+
+        {/* Phase 4.1 Fix 5 — workflow-aware mono ticker beneath the header */}
+        <LiveStatusStrip data={data} />
 
         <main
           style={{
