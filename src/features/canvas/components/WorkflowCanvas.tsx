@@ -31,8 +31,9 @@ import { RightNodePanel } from "@/features/canvas/components/panels/RightNodePan
 import { CanvasToolbar } from "@/features/canvas/components/toolbar/CanvasToolbar";
 
 import { ExecutionLog } from "@/features/canvas/components/ExecutionLog";
-import { ResultShowcase } from "@/features/canvas/components/ResultShowcase";
-import { ExecutionDiagnosticsPanel } from "@/components/diagnostics/ExecutionDiagnosticsPanel";
+// Phase 1 redesign: result page is route-mounted at /dashboard/results/[id].
+// The canvas no longer overlays ResultShowcase or floats the diagnostics
+// panel — both live inside the new wrapper at src/features/result-page/.
 import { OnboardingTour } from "@/features/canvas/components/OnboardingTour";
 import { AIChatPanel } from "@/features/canvas/components/panels/AIChatPanel";
 import type { ChatMessage } from "@/features/canvas/components/panels/AIChatPanel";
@@ -407,7 +408,10 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
-  const [showShowcase, setShowShowcase] = useState(false);
+  // Phase 1 redesign: completion now navigates to /dashboard/results/[id]
+  // instead of opening an in-canvas overlay. The old `showShowcase` state
+  // was deleted — the toolbar always renders, and the View Results FAB
+  // gate simplifies to "not executing AND has artifacts".
   const prevExecutingRef = useRef(false);
   // Tracks the pre-run async waterfall (eligibility check + auto-save) that
   // runs BEFORE runWorkflow() reaches startExecution() and flips isExecuting.
@@ -437,17 +441,16 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
         setTimeout(() => setEdgeFlowing(node.id, false), i * edgeDelay + 300);
       });
 
-      // Phase D rewire: under NEXT_PUBLIC_RESULTS_V2, navigate to the V2 result
-      // URL instead of opening the legacy overlay. Falls back to the overlay
-      // when (a) the flag is OFF or (b) no execution id is available.
+      // Phase 1 redesign: navigate to the route-mounted result page on
+      // completion. No flag, no overlay fallback — every successful run
+      // ends with a deep-linkable /dashboard/results/[id] URL. When no
+      // execution id is available (rare race condition), we silently
+      // skip — the user keeps the canvas state and can re-trigger via
+      // the View Results FAB once the id lands.
       const timer = setTimeout(() => {
         const state = useExecutionStore.getState();
         const execId = state.currentExecution?.id ?? state.currentDbExecutionId ?? null;
-        if (process.env.NEXT_PUBLIC_RESULTS_V2 === "true" && execId) {
-          router.push(`/dashboard/results/${execId}`);
-        } else {
-          setShowShowcase(true);
-        }
+        if (execId) router.push(`/dashboard/results/${execId}`);
       }, 500);
       return () => { clearTimeout(timer); };
     }
@@ -815,9 +818,8 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
         onTouchEndCapture={onTouchEndCapture}
         onTouchMoveCapture={onTouchMoveCapture}
       >
-        {/* Hide toolbar when showcase overlay is active to avoid z-index clash */}
-        {!(showShowcase && !isExecuting && artifacts.size > 0) && (
-          <CanvasToolbar
+        {/* Toolbar always renders — the showcase overlay no longer mounts here. */}
+        <CanvasToolbar
             workflowName={workflowName}
             creationMode={creationMode}
             isExecuting={isExecuting}
@@ -849,7 +851,6 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
               }
             }}
           />
-        )}
 
         {/* Execution progress bar */}
         <AnimatePresence>
@@ -994,32 +995,23 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             )}
           </AnimatePresence>
 
-          {/* Post-execution grand reveal showcase */}
-          <AnimatePresence>
-            {showShowcase && !isExecuting && artifacts.size > 0 && (
-              <ResultShowcase onClose={() => setShowShowcase(false)} />
-            )}
-          </AnimatePresence>
-
-          {/* Universal "Behind the Scenes" diagnostics — floats bottom-right
-              during AND after execution. Reads from useExecutionStore.currentTrace
-              so it shows up the moment the first node starts. */}
-          <ExecutionDiagnosticsPanel />
+          {/* Phase 1 redesign:
+              - The post-execution showcase no longer mounts as a canvas
+                overlay — it lives at /dashboard/results/[executionId].
+              - The "Behind the Scenes" diagnostics panel moved into the
+                Diagnostics tab on the new result page (D6). The canvas
+                no longer floats it bottom-right. */}
 
           {/* "View Results" floating CTA — clean, professional, true-centered */}
           <AnimatePresence>
-            {!showShowcase && !isExecuting && artifacts.size > 0 && (
+            {!isExecuting && artifacts.size > 0 && (
               <motion.button
                 className="view-results-fab"
                 key="view-results-fab"
                 onClick={() => {
                   const state = useExecutionStore.getState();
                   const execId = state.currentExecution?.id ?? state.currentDbExecutionId ?? null;
-                  if (process.env.NEXT_PUBLIC_RESULTS_V2 === "true" && execId) {
-                    router.push(`/dashboard/results/${execId}`);
-                  } else {
-                    setShowShowcase(true);
-                  }
+                  if (execId) router.push(`/dashboard/results/${execId}`);
                 }}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
