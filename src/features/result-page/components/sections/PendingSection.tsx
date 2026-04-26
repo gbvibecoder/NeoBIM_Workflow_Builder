@@ -154,9 +154,49 @@ export function PendingSection({ progress }: PendingSectionProps) {
         })}
       </div>
 
+      {/* Phase 4.2 Fix 5 — ETA strip in mono */}
+      {pct > 0 && pct < 100 ? (
+        <div
+          style={{
+            marginTop: 14,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "6px 12px",
+            borderRadius: 9999,
+            background: "#F0FDFA",
+            border: "1px solid rgba(13,148,136,0.20)",
+            fontFamily: "var(--font-jetbrains), ui-monospace, monospace",
+            fontSize: 11,
+            fontWeight: 500,
+            color: "#0D9488",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 9999, background: "#0D9488" }} />
+          ETA · ~{etaForProgress(pct)}
+        </div>
+      ) : null}
+
       <p style={{ margin: 0, marginTop: 16, fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>
         Three to eight minutes is usual. Close this tab if you need to — when you come back, the render will have kept going.
       </p>
     </motion.section>
   );
+}
+
+/** Phase 4.2 — best-effort ETA from progress %. Assumes a 5-minute typical
+ *  render (Kling-grade). Returns "Xm Ys" or "Xm" depending on remaining. */
+function etaForProgress(pct: number): string {
+  if (pct >= 99) return "moments";
+  const remainingPct = 100 - pct;
+  const totalRenderSec = 5 * 60; // 5-minute typical
+  const remainingSec = Math.ceil((remainingPct / 100) * totalRenderSec);
+  if (remainingSec >= 60) {
+    const m = Math.floor(remainingSec / 60);
+    const s = remainingSec % 60;
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  }
+  return `${remainingSec}s`;
 }
