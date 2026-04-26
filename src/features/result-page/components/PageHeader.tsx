@@ -82,8 +82,9 @@ export function PageHeader({ data, initialNote, showNorthArrow, onNoteChange }: 
         background: "rgba(255,255,255,0.85)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
-        boxShadow: "0 1px 0 rgba(0,0,0,0.04)",
-        borderBottom: "1px solid rgba(0,0,0,0.05)",
+        // Phase 5.1 Fix 5: drop boxShadow + borderBottom so PageHeader
+        // reads as a single block with the LiveStatusStrip below it
+        // rather than as two stacked layers with hard separators.
       }}
     >
       <div

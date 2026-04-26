@@ -38,8 +38,12 @@ export function LiveStatusStrip({ data }: LiveStatusStripProps) {
         position: "sticky",
         top: 56,
         zIndex: 15,
-        background: "rgba(13,148,136,0.04)",
-        borderBottom: "1px solid rgba(13,148,136,0.10)",
+        // Phase 5.1 Fix 5: transparent bg + no border so the strip
+        // dissolves into the page surface and reads as one block with
+        // the PageHeader stuck above it. The mono ticker content stays
+        // — only the carrier strip's chrome dissolves.
+        background: "transparent",
+        borderBottom: "none",
         padding: "6px clamp(16px, 3vw, 28px)",
       }}
     >
