@@ -37,6 +37,7 @@ import {
 import { ElementDistributionDonut } from "@/features/result-page/components/animations/ElementDistributionDonut";
 import { ShotTimeline } from "@/features/result-page/components/animations/ShotTimeline";
 import { RenderStatsDonut } from "@/features/result-page/components/animations/RenderStatsDonut";
+import { MetadataCascade } from "@/features/result-page/components/animations/MetadataCascade";
 import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
@@ -289,6 +290,17 @@ function ImageVariant({ urls }: { urls: string[] }) {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const url = urls[Math.min(activeIdx, urls.length - 1)];
   if (!url) return null;
+  // Phase 4.2 Fix 4 — best-effort metadata. Real DALL-E render metadata
+  // isn't routinely available in the artifact (size/style/seed need their
+  // own pipeline plumbing — see PRODUCT QUESTIONS in the report). We show
+  // the constants we know are true and skip what we can't verify.
+  const metadataChips = [
+    { label: "Engine", value: "DALL-E 3", color: "#0D9488" },
+    { label: "Format", value: "PNG · Hi-res", color: "#7C3AED" },
+    ...(urls.length > 1
+      ? [{ label: "Variants", value: String(urls.length), color: "#0EA5E9" }]
+      : []),
+  ];
   return (
     <div>
       <div
@@ -356,6 +368,8 @@ function ImageVariant({ urls }: { urls: string[] }) {
             <div style={{ fontSize: 13, color: "#4B5563", marginTop: 2 }}>
               {urls.length} {urls.length === 1 ? "render" : "renders"} ready · click to view fullsize
             </div>
+            {/* Phase 4.2 Fix 4 — metadata cascade */}
+            <MetadataCascade chips={metadataChips} />
           </div>
         </div>
         {urls.length > 1 ? (
