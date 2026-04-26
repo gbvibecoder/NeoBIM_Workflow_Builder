@@ -32,10 +32,13 @@ export default function DashboardLayout({
     pathname === "/dashboard/3d-render" ||
     pathname === "/dashboard/floor-plan" ||
     pathname.startsWith("/dashboard/results/");
-  // BetaBanner visibility — preserve original behavior (hidden only on
-  // immersive landing and 3D-render wizard) so Phase 4.2 result pages
-  // keep showing the banner exactly as before this phase.
-  const hideBetaBanner = isImmersive || pathname === "/dashboard/3d-render";
+  // BetaBanner visibility — Phase 5.1 widens this to all light-surface
+  // pages so the cream/white pages (result page, BOQ visualizer, floor
+  // plan editor, 3D render wizard) read cleanly without a cyan-tinted
+  // chrome strip above them. Dark-surface pages still show the banner
+  // as before — it has visual contrast there. Immersive landing keeps
+  // the existing override.
+  const hideBetaBanner = isImmersive || isLightSurface;
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ minHeight: "-webkit-fill-available", background: "#0a0c10" }}>
