@@ -232,7 +232,7 @@ function buildItems(data: ResultPageData): StripItem[] {
   if (data.videoData?.videoUrl) {
     const v = data.videoData;
     return [
-      { text: `${v.pipeline?.toUpperCase() ?? "Kling"} render`, emphasis: true },
+      { text: "AI VIDEO · PRO", emphasis: true },
       { text: "1080p · 24fps" },
       { text: `${v.durationSeconds}s · ${v.segments?.length ?? v.shotCount} shots` },
     ];
