@@ -359,8 +359,9 @@ export default function DashboardPage() {
                   gap: isMobileLayout ? 10 : 12, flexWrap: "wrap",
                 }}
               >
+                {/* PRIMARY — Templates (recommended path for new users) */}
                 <Link
-                  href="/dashboard/canvas?new=1"
+                  href="/dashboard/templates"
                   className="db-hero-cta db-hero-cta-primary"
                   style={{
                     position: "relative",
@@ -379,12 +380,15 @@ export default function DashboardPage() {
                     transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-position 0.6s ease",
                   }}
                 >
-                  {t("dash.startBuilding")}
+                  <Sparkles size={14} strokeWidth={2.4} />
+                  {t("dash.exploreTemplates")}
                   <ArrowRight size={14} strokeWidth={2.6} />
                 </Link>
 
+                {/* SECONDARY — Start from scratch (advanced users) */}
                 <Link
-                  href="/dashboard/templates"
+                  href="/dashboard/canvas?new=1"
+                  className="db-hero-cta"
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 8,
                     padding: isMobileLayout ? "11px 16px" : "11px 18px",
@@ -400,7 +404,7 @@ export default function DashboardPage() {
                     transition: "all 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
                   }}
                 >
-                  <Sparkles size={13} /> Browse Templates
+                  {t("dash.startFromScratch")}
                 </Link>
               </motion.div>
 
@@ -1122,7 +1126,7 @@ export default function DashboardPage() {
                 {t("dash.readyDesc")}
               </p>
               <Link
-                href="/dashboard/canvas?new=1"
+                href="/dashboard/templates"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 10,
                   padding: "14px 32px", borderRadius: 16,
@@ -1134,7 +1138,7 @@ export default function DashboardPage() {
                 }}
                 className="db-cta-primary"
               >
-                {t("dash.startBuilding")} <ArrowRight size={18} />
+                <Sparkles size={16} /> {t("dash.exploreTemplates")} <ArrowRight size={18} />
               </Link>
             </div>
           </motion.div>
