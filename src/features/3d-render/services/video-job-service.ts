@@ -109,7 +109,7 @@ async function enqueueWorker(videoJobId: string, attempt: number, delaySeconds: 
     body: { videoJobId },
     delay: delaySeconds,
     retries: 3,
-    deduplicationId: `videojob:${videoJobId}:${attempt}`,
+    deduplicationId: `videojob-${videoJobId}-${attempt}`,
   });
 }
 
