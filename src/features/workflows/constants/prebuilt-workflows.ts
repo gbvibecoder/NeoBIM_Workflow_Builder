@@ -241,6 +241,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
             label: "Exterior Render (DALL-E 3)",
             category: "generate",
             status: "idle",
+            viewType: "exterior",
             inputs: [
               { id: "ctrl-in", label: "Control Image", type: "image" },
               { id: "prompt-in", label: "Style Prompt", type: "text" },
@@ -258,6 +259,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
             label: "Interior Render (DALL-E 3)",
             category: "generate",
             status: "idle",
+            viewType: "interior",
             inputs: [
               { id: "ctrl-in", label: "Control Image", type: "image" },
               { id: "prompt-in", label: "Style Prompt", type: "text" },
