@@ -3,15 +3,17 @@
  * Uses Kling Official API (api.klingai.com) with JWT authentication.
  *
  * Official API reference (from Kling API docs):
- *   POST /v1/videos/image2video — create task
- *   GET  /v1/videos/image2video/{task_id} — poll status
+ *   POST /v1/videos/omni-video — Kling 3.0 Omni (primary, requires public image URL)
+ *   POST /v1/videos/image2video — v2-6 fallback (accepts URL or base64)
+ *   POST /v1/videos/text2video — v2-6 (text-only, no image)
+ *   GET  /v1/videos/{endpoint}/{task_id} — poll status
  *
- * Supported model_name: kling-v1-6, kling-v2-1, kling-v2-1-master, kling-v2-6
+ * Model strategy: kling-v3-omni (primary) → kling-v2-6 (fallback).
+ * Older models (v2-1-master, v1-6) removed — no silent downgrade.
  * Supported duration: "5" or "10"
  * Supported mode: "std" (720p) or "pro" (1080p)
- * cfg_scale: 0-1 (only on v1.x models)
  *
- * Strategy: Generate TWO 10s videos (exterior + interior) for 20s total,
+ * Strategy: Generate TWO videos (5s exterior + 10s interior) for 15s total,
  * or a single 10s cinematic walkthrough for speed.
  */
 
@@ -22,12 +24,19 @@ import {
   KLING_TEXT2VIDEO_PATH,
   KLING_OMNI_PATH,
   COST_PER_SECOND,
-  MODELS,
   VideoServiceError,
   extractKlingVideoUrl,
   klingFetch,
   type KlingTaskResponse,
 } from "@/features/3d-render/services/kling-client";
+import type { BriefExtraction } from "@/features/3d-render/services/brief-extractor";
+import {
+  formatMaterials,
+  formatLighting,
+  formatColors,
+  formatStyle,
+  formatInhabitedDetails,
+} from "@/features/3d-render/services/brief-extractor";
 
 // ─── Local (legacy) constants ───────────────────────────────────────────────
 // REQUEST_TIMEOUT_MS + POLL_INTERVAL_MS are only consumed by the legacy
@@ -101,8 +110,11 @@ async function pollTask(taskId: string): Promise<KlingTaskResponse> {
 // ─── Core Function ──────────────────────────────────────────────────────────
 
 /**
- * Create a Kling image-to-video task, trying model names in priority order.
- * Returns as soon as one model accepts the task.
+ * Create a Kling image-to-video task.
+ *
+ * Model strategy: kling-v3-omni (primary, via Omni endpoint, requires public
+ * HTTP URL) → kling-v2-6 (fallback, via image2video endpoint, accepts URL
+ * or base64). If both fail, throws — no silent downgrade to older models.
  */
 async function createTask(
   imageUrl: string,
@@ -113,44 +125,50 @@ async function createTask(
   mode: string,
 ): Promise<KlingTaskResponse> {
   const errors: string[] = [];
+  const isHttpUrl = imageUrl.startsWith("http");
 
-
-  for (const modelName of MODELS) {
+  // ── Primary: Kling 3.0 Omni (requires public URL) ──
+  if (isHttpUrl) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const body: Record<string, any> = {
-        model_name: modelName,
-        image: imageUrl,
-        prompt: prompt.slice(0, 2500),
-        negative_prompt: negativePrompt.slice(0, 2500),
-        aspect_ratio: aspectRatio,
-        mode,
-        duration,
-      };
-
-      // cfg_scale only supported on v1.x models
-      if (modelName.startsWith("kling-v1")) {
-        body.cfg_scale = 0.7;
-      }
-
-      const result = await klingFetch(KLING_IMAGE2VIDEO_PATH, {
-        method: "POST",
-        body,
-      });
-
-      console.error("[KLING-MODEL] SUCCESS:", modelName, "duration:", duration, "mode:", mode);
+      const result = await createOmniTask(imageUrl, prompt, negativePrompt, duration, aspectRatio, mode);
+      console.error("[KLING-MODEL] SUCCESS: kling-v3-omni duration:", duration, "mode:", mode);
       return result;
     } catch (err) {
       const msg = (err as Error).message;
-      errors.push(`${modelName}: ${msg}`);
-      console.error("[KLING-MODEL] FAILED:", modelName, "error:", msg.slice(0, 100));
+      errors.push(`kling-v3-omni: ${msg}`);
+      console.error("[KLING-MODEL] FAILED: kling-v3-omni error:", msg.slice(0, 200));
     }
+  } else {
+    errors.push("kling-v3-omni: skipped (image is base64, Omni requires public URL)");
+  }
+
+  // ── Fallback: kling-v2-6 via image2video (accepts URL and base64) ──
+  try {
+    const body = {
+      model_name: "kling-v2-6" as const,
+      image: imageUrl,
+      prompt: prompt.slice(0, 2500),
+      negative_prompt: negativePrompt.slice(0, 2500),
+      aspect_ratio: aspectRatio,
+      mode,
+      duration,
+    };
+    const result = await klingFetch(KLING_IMAGE2VIDEO_PATH, {
+      method: "POST",
+      body,
+    });
+    console.error("[KLING-MODEL] SUCCESS: kling-v2-6 duration:", duration, "mode:", mode);
+    return result;
+  } catch (err) {
+    const msg = (err as Error).message;
+    errors.push(`kling-v2-6: ${msg}`);
+    console.error("[KLING-MODEL] FAILED: kling-v2-6 error:", msg.slice(0, 200));
   }
 
   throw new VideoServiceError(
-    `All Kling models failed:\n${errors.join("\n")}`,
+    `All Kling models failed (kling-v3-omni + kling-v2-6). No silent downgrade to older models.\n${errors.join("\n")}`,
     500,
-    false
+    false,
   );
 }
 
@@ -286,68 +304,88 @@ export async function generateDualWalkthrough(
 // ─── Prompt Builders (PDF / Concept Render → Video) ─────────────────────────
 
 /**
- * Build prompt for Part 1 (5s): Cinematic exterior views of the building.
- * Philosophy: use the text description as source of truth, don't over-describe
- * the building — Kling sees the concept render image. We only tell it HOW
- * the video should look (camera movement, rendering style).
- *
- * Scene timeline:
- *   0s–1s: Front elevation approach
- *   1s–3s: Side elevations — left and right orbit
- *   3s–4s: Back elevation
- *   4s–5s: Top-down aerial view
+ * Build prompt for Kling image2video exterior (5s).
+ * Kling 3.0 grammar: subject → camera action with metrics → context → style.
  */
-export function buildExteriorPrompt(buildingDescription: string): string {
-  const desc = buildingDescription.slice(0, 800);
+export function buildExteriorPrompt(buildingDescription: string, extraction?: BriefExtraction): string {
+  const subject = extraction?.exteriorDescription
+    ? extraction.exteriorDescription
+    : `A ${extraction?.buildingType ?? "contemporary"} building`;
+  const footprint = extraction?.footprintHint ? ` ${extraction.footprintHint} footprint.` : "";
+  const materials = extraction ? formatMaterials(extraction) : "realistic materials";
+  const lighting = extraction ? formatLighting(extraction) : "natural daylight with soft shadows";
+  const colors = extraction ? formatColors(extraction) : "";
+  const style = extraction ? formatStyle(extraction) : "";
 
   return (
-    `Use the provided text description as the only source of truth and generate an accurate BIM-style 3D architectural model following AEC industry standards. ` +
-    `Interpret the text to construct the building's layout, structure, rooms, dimensions, materials, and architectural features exactly as described. ` +
-    `Do not add elements, rooms, or features not mentioned in the text. ` +
-    `The rendered building must visually match the provided concept image. ` +
-    `Building description: ${desc.slice(0, 350)}. ` +
-    "Cinematic exterior views (5 seconds): " +
-    "Camera starts at the front elevation — slow cinematic dolly toward the building entrance, " +
-    "showing the complete front façade with accurate proportions. " +
-    "Camera smoothly orbits to the side elevations, revealing the building's depth, massing, and façade details. " +
-    "Continues to the back elevation showing rear façade and service areas. " +
-    "Camera rises on a sweeping crane shot to a dramatic top-down aerial perspective — " +
-    "complete roof plan visible with accurate building footprint. " +
-    "Physically accurate proportions, realistic materials, global illumination, " +
-    "natural lighting with soft shadows, cinematic smooth camera movement, " +
-    "high-end real-estate style architectural visualization, " +
-    "8K resolution, V-Ray/Corona render quality, no distortion, no artifacts."
+    `${subject}.${footprint}\n\n` +
+    "Camera begins approximately 30 meters from the front facade at street level (1.6m height). " +
+    "Tracks forward at a steady walking pace toward the main entrance for 2 seconds. " +
+    "Gradually orbits 30 degrees to the right revealing the side elevation, depth, and proportions over the next 2 seconds. " +
+    "Settles on a hero composition of the front-corner with parallax on foreground elements in the final second. " +
+    "Continuous unbroken motion across 5 seconds.\n\n" +
+    `${lighting}. ${materials}.` +
+    `${colors ? ` ${colors}` : ""}` +
+    `${style ? ` ${style}` : ""}\n\n` +
+    "Cinematic 35mm lens, photorealistic architectural photography, accurate proportions. " +
+    "No text overlay, no logos, no watermark."
   );
 }
 
 /**
- * Build prompt for Part 2 (10s): Smooth interior walkthrough showcasing
- * all spaces described in the text, following natural circulation.
- * Same philosophy: trust the input image + text, describe camera movement only.
- *
- * Scene timeline:
- *   0s–2s: Camera enters through main entrance into lobby/foyer
- *   2s–10s: Smooth walkthrough through all described interior spaces
+ * Build prompt for Kling image2video interior (10s).
+ * Kling 3.0 grammar: subject → camera action with metrics → context → style.
+ * Multi-room: threshold composition when 2+ rooms in extraction.
  */
-export function buildInteriorPrompt(buildingDescription: string): string {
-  const desc = buildingDescription.slice(0, 800);
+export function buildInteriorPrompt(_buildingDescription: string, extraction?: BriefExtraction): string {
+  const materials = extraction
+    ? formatMaterials(extraction)
+    : "materials appropriate to the building type";
+  const lighting = extraction
+    ? formatLighting(extraction)
+    : "natural daylight blended with interior light";
+  const colors = extraction ? formatColors(extraction) : "";
+  const inhabited = extraction ? formatInhabitedDetails(extraction) : "";
 
+  const rooms = extraction?.roomSequence?.length
+    ? [...extraction.roomSequence].sort((a, b) => a.importance - b.importance)
+    : [];
+  const primary = rooms[0];
+  const secondary = rooms[1];
+  const primaryName = primary?.roomType ?? extraction?.spaceType ?? "interior space";
+
+  // Multi-room threshold walkthrough
+  if (secondary) {
+    return (
+      `${primaryName} furnished appropriately to its function as a ${primaryName}. ` +
+      `Camera at eye-level (1.4m height), starts 4 meters back from the far wall, ` +
+      `tracks forward at a steady walking pace through the ${primaryName} for the first 4 seconds. ` +
+      `Passes through the visible doorway into the adjacent ${secondary.roomType} with continuous unbroken motion — ` +
+      `no cut, no jump, no stall at the threshold. Once inside the ${secondary.roomType}, ` +
+      `slows slightly while orbiting 15 degrees to reveal its layout over 4 seconds. ` +
+      `Settles on a hero composition of the ${secondary.roomType} in the final 2 seconds.\n\n` +
+      "The threshold transition is smooth, the pace is steady, and the motion is continuous from start to end of the 10 seconds.\n\n" +
+      `${lighting}. ${materials}.` +
+      `${colors ? ` ${colors}` : ""}` +
+      `${inhabited ? ` ${inhabited}` : ""}\n\n` +
+      "Cinematic 28mm lens, eye-level architectural interior photography, photorealistic, accurate proportions. " +
+      "No text overlay, no logos, no watermark."
+    );
+  }
+
+  // Single-room walkthrough
   return (
-    `Smooth interior walkthrough of the building strictly matching the provided text description and concept image. ` +
-    `Show only the spaces, rooms, and features mentioned in the text — do not add rooms or areas not described. ` +
-    `Building description: ${desc.slice(0, 350)}. ` +
-    "Interior walkthrough (10 seconds): " +
-    "Camera enters the building through the main entrance. " +
-    "Smooth first-person walkthrough following a natural circulation path — " +
-    "showcasing all spaces described in the text in the correct layout order. " +
-    "Each space is furnished consistently with its described function. " +
-    "Camera showcases spatial flow, room proportions, ceiling heights, and connectivity between spaces. " +
-    "Natural light streaming through windows, door positions and wall layouts matching the description. " +
-    "Physically accurate proportions, realistic materials " +
-    "(hardwood floors, stone countertops, painted walls, glass partitions, metal fixtures), " +
-    "global illumination, natural lighting blended with warm interior light, " +
-    "cinematic smooth camera movement, high-end real-estate style architectural visualization, " +
-    "8K resolution, V-Ray/Corona render quality, no distortion, no artifacts."
+    `${primaryName} furnished appropriately. ` +
+    "Camera at eye-level (1.4m height), starts 4 meters back from the far wall. " +
+    `Tracks forward at a steady walking pace through the room for the first 5 seconds. ` +
+    "Gradually orbits 25 degrees to reveal the room layout while continuing forward over the next 3 seconds. " +
+    "Settles on a hero composition with parallax on furniture and surfaces in the final 2 seconds. " +
+    "Continuous unbroken motion across 10 seconds.\n\n" +
+    `${lighting}. ${materials}.` +
+    `${colors ? ` ${colors}` : ""}` +
+    `${inhabited ? ` ${inhabited}` : ""}\n\n` +
+    "Cinematic 28mm lens, eye-level architectural interior photography, photorealistic. " +
+    "No text overlay, no logos, no watermark."
   );
 }
 
@@ -475,15 +513,31 @@ export function buildCombinedWalkthroughPrompt(buildingDescription: string): str
 }
 
 /**
- * Combined floor plan prompt for a single 10s video (fallback if dual isn't used).
+ * Combined floor plan prompt for a single 10s video.
  * Exterior orbit + interior walkthrough in one continuous shot.
- * Same philosophy: don't describe the building, just describe camera movement.
+ *
+ * When roomInfo is available, the room types are listed explicitly instead
+ * of using hardcoded "sofa in the living room, beds in each bedroom" defaults.
  */
-export function buildFloorPlanCombinedPrompt(_buildingDescription: string, _roomInfo?: string): string {
-  // V3 "Anchor then Transform" prompt — keeps camera on floor plan for first 50%
-  // so Kling builds the 3D from the actual lines, then descends into the model.
-  // Do NOT append roomInfo, buildingDescription, or any dynamic data.
-  return "This 2D architectural floor plan slowly transforms into a photorealistic 3D model. The flat lines and walls gradually extrude upward, gaining height, depth, and realistic materials — white plastered walls, polished concrete floors, large glass windows filling every opening. The camera holds a top-down isometric view as the entire floor plan becomes a detailed architectural scale model with furniture appearing in each room — sofa in the living room, dining table, kitchen cabinets, beds in each bedroom, bathroom fixtures. Every wall, door, and room stays exactly where shown in the plan. Then the camera slowly descends and pushes into the model at eye level, gliding through the interior spaces. Ultra-photorealistic, V-Ray quality, natural daylight, modern minimalist design, architectural visualization, 10 seconds.";
+export function buildFloorPlanCombinedPrompt(_buildingDescription: string, roomInfo?: string): string {
+  // When roomInfo is present, use it for room-specific furniture instead of
+  // hardcoded residential defaults (which break for commercial/institutional).
+  const furnitureClause = roomInfo
+    ? `furniture appearing appropriate to each room's function (rooms: ${roomInfo.slice(0, 300)})`
+    : "furniture appearing in each room appropriate to the room's function";
+
+  return (
+    "This 2D architectural floor plan transforms into a photorealistic 3D model. " +
+    "The flat lines and walls gradually extrude upward, gaining height, depth, " +
+    "and realistic materials matching the building type. " +
+    "The camera holds a top-down isometric view as the entire floor plan becomes " +
+    `a detailed architectural scale model with ${furnitureClause}. ` +
+    "Every wall, door, and room stays exactly where shown in the plan. " +
+    "Then the camera briskly descends and pushes into the model at eye level, " +
+    "gliding through the interior spaces with intent. " +
+    "Ultra-photorealistic, V-Ray quality, natural daylight, " +
+    "architectural visualization, 10 seconds."
+  );
 }
 
 /**
@@ -523,8 +577,9 @@ export function buildArchitecturalMultiShot(
 // ─── Text-to-Video (no image required) ──────────────────────────────────────
 
 /**
- * Create a Kling text-to-video task, trying model names in priority order.
- * Used when no upstream render image is available (e.g. PDF → summary → video).
+ * Create a Kling text-to-video task using kling-v2-6.
+ * Text2video only supports v2 models — Omni (v3) requires image input.
+ * No model loop — fails loudly if kling-v2-6 rejects the task.
  */
 async function createTextToVideoTask(
   prompt: string,
@@ -533,43 +588,28 @@ async function createTextToVideoTask(
   aspectRatio: string,
   mode: string,
 ): Promise<KlingTaskResponse> {
-  const errors: string[] = [];
-
-  for (const modelName of MODELS) {
-    try {
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const body: Record<string, any> = {
-        model_name: modelName,
-        prompt: prompt.slice(0, 2500),
-        negative_prompt: negativePrompt.slice(0, 2500),
-        aspect_ratio: aspectRatio,
-        mode,
-        duration,
-      };
-
-      if (modelName.startsWith("kling-v1")) {
-        body.cfg_scale = 0.7;
-      }
-
-      const result = await klingFetch(KLING_TEXT2VIDEO_PATH, {
-        method: "POST",
-        body,
-      });
-
-      return result;
-    } catch (err) {
-      const msg = (err as Error).message;
-      errors.push(`${modelName}: ${msg}`);
-      console.warn(`[Video] Text2Video ${modelName} failed: ${msg}`);
-    }
+  try {
+    const body = {
+      model_name: "kling-v2-6" as const,
+      prompt: prompt.slice(0, 2500),
+      negative_prompt: negativePrompt.slice(0, 2500),
+      aspect_ratio: aspectRatio,
+      mode,
+      duration,
+    };
+    return await klingFetch(KLING_TEXT2VIDEO_PATH, {
+      method: "POST",
+      body,
+    });
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.warn(`[Video] Text2Video kling-v2-6 failed: ${msg}`);
+    throw new VideoServiceError(
+      `Kling text2video failed (kling-v2-6): ${msg}`,
+      500,
+      false,
+    );
   }
-
-  throw new VideoServiceError(
-    `All Kling text2video models failed:\n${errors.join("\n")}`,
-    500,
-    false
-  );
 }
 
 export interface SubmittedTextVideoTasks {
@@ -656,48 +696,46 @@ export async function checkDualTextVideoStatus(
 }
 
 // ─── Text-to-Video Prompt Builders ──────────────────────────────────────────
-// The PDF summary is the ONLY source of truth. We append a BIM-standard
-// instruction to ensure the AI generates the building EXACTLY as described
-// in the uploaded PDF — no invented elements.
-// Kling API limit: 2500 chars per prompt.
-
-/** Max chars reserved for the PDF summary (leaving room for the ~570 char instruction + suffix) */
-const SUMMARY_MAX_CHARS = 1900;
+// Text2video fallback — only reached when concept render failed and no upstream
+// image exists. Uses Kling 3.0 grammar: subject → camera → context → style.
+// No image anchor, so we describe the building and camera action concretely.
 
 /**
- * The BIM instruction appended to the PDF summary.
- * This tells the AI to treat the summary as the sole source of truth.
- */
-const BIM_INSTRUCTION =
-  "Use the provided text description as the only source of truth and generate an accurate BIM-style 3D architectural model following AEC industry standards. " +
-  "Interpret the text to construct the building's layout, structure, rooms, dimensions, materials, and architectural features exactly as described, without adding elements not mentioned in the text. " +
-  "Use physically accurate proportions, realistic materials, global illumination, natural lighting, and cinematic camera movement to produce a high-end real estate style architectural visualization strictly based on the provided text description.";
-
-/**
- * Build exterior prompt for text-to-video (5 seconds).
- * Uses the PDF summary as the ONLY source of truth.
+ * Build exterior prompt for text-to-video (5s).
+ * Kling 3.0 grammar. No "BIM-style" filler — subject + camera metrics + context.
  */
 function buildExteriorTextPrompt(buildingDescription: string): string {
-  const summary = buildingDescription.slice(0, SUMMARY_MAX_CHARS);
+  const summary = buildingDescription.slice(0, 1800);
 
   return (
     `${summary}\n\n` +
-    `${BIM_INSTRUCTION}\n\n` +
-    "Cinematic exterior views including front, sides, back, and top view of the building."
+    "Camera begins approximately 30 meters from the front facade at street level (1.6m height). " +
+    "Tracks forward at a steady walking pace toward the main entrance for 2 seconds. " +
+    "Gradually orbits 30 degrees to the right revealing the side elevation and proportions over the next 2 seconds. " +
+    "Settles on a hero composition of the front-corner in the final second. " +
+    "Continuous unbroken motion across 5 seconds.\n\n" +
+    "Cinematic 35mm lens, photorealistic architectural photography, accurate proportions. " +
+    "No text overlay, no logos, no watermark."
   ).slice(0, 2500);
 }
 
 /**
- * Build interior prompt for text-to-video (10 seconds).
- * Uses the PDF summary as the ONLY source of truth.
+ * Build interior prompt for text-to-video (10s).
+ * Kling 3.0 grammar. Establishing shot + reveal, no spatial "track through doorway"
+ * since text2video has no spatial anchor.
  */
 function buildInteriorTextPrompt(buildingDescription: string): string {
-  const summary = buildingDescription.slice(0, SUMMARY_MAX_CHARS);
+  const summary = buildingDescription.slice(0, 1800);
 
   return (
     `${summary}\n\n` +
-    `${BIM_INSTRUCTION}\n\n` +
-    "Smooth interior walkthrough showcasing all spaces described in the text, following a natural circulation path."
+    "Establishing shot revealing the primary interior space at eye-level (1.4m height). " +
+    "Camera tracks forward at a steady walking pace for 5 seconds, revealing room layout, furnishings, and proportions. " +
+    "Gradually orbits 25 degrees to show spatial depth over the next 3 seconds. " +
+    "Settles on a hero composition in the final 2 seconds. " +
+    "Continuous unbroken motion across 10 seconds.\n\n" +
+    "Cinematic 28mm lens, eye-level architectural interior photography, photorealistic. " +
+    "No text overlay, no logos, no watermark."
   ).slice(0, 2500);
 }
 
@@ -737,6 +775,8 @@ export async function submitDualWalkthrough(
      * is unaffected. Falls back to `imageUrl` when undefined.
      */
     interiorImageUrl?: string;
+    /** Brief extraction — drives materials/lighting in Kling prompts. */
+    extraction?: BriefExtraction;
   },
 ): Promise<SubmittedVideoTasks> {
 
@@ -744,16 +784,17 @@ export async function submitDualWalkthrough(
 
   // Building photos from IN-008 → renovation prompts (transform old to new)
   // Concept renders from GN-003 → standard prompts (match the render)
+  const ext = options?.extraction;
   const exteriorPrompt = options?.isFloorPlan
     ? buildFloorPlanExteriorPrompt(buildingDescription, options.roomInfo)
     : options?.isRenovation
       ? buildRenovationExteriorPrompt(buildingDescription)
-      : buildExteriorPrompt(buildingDescription);
+      : buildExteriorPrompt(buildingDescription, ext);
   const interiorPrompt = options?.isFloorPlan
     ? buildFloorPlanInteriorPrompt(buildingDescription, options.roomInfo)
     : options?.isRenovation
       ? buildRenovationInteriorPrompt(buildingDescription)
-      : buildInteriorPrompt(buildingDescription);
+      : buildInteriorPrompt(buildingDescription, ext);
 
   // Submit both tasks in parallel — don't poll, return task IDs immediately
   // Renovation exterior gets 10s (needs time to pan across full building)

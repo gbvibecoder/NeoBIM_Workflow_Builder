@@ -44,8 +44,8 @@ const KLING_BASE_URL = "https://api.klingai.com";
 const KLING_IMAGE2VIDEO_PATH = "/v1/videos/image2video";
 const JWT_EXPIRY_SECONDS = 1800;
 
-/** Models tried in priority order. v2-1-master = highest quality, v2-6 fallback. */
-const KLING_MODELS = ["kling-v2-1-master", "kling-v2-6"] as const;
+/** Kling model for cinematic pipeline. v2-6 via image2video endpoint. */
+const KLING_MODELS = ["kling-v2-6"] as const;
 
 /** Kling 1303 = parallel-task-slot exhausted. We retry with backoff. */
 const KLING_1303_RETRY_DELAY_MS = 30_000;
@@ -569,8 +569,12 @@ export async function generateLifestyleImage(args: {
   description: string;
   primaryRoom: string;
   apiKey: string;
+  /** When provided, replaces the hardcoded LIFESTYLE_IMAGE_PROMPT_TEMPLATE
+   *  so the interior image matches the uploaded brief (materials, palette,
+   *  lighting, space type) instead of defaulting to residential-family. */
+  promptOverride?: string;
 }): Promise<{ url: string; base64: string }> {
-  const { floorPlanRef, description, primaryRoom, apiKey } = args;
+  const { floorPlanRef, description, primaryRoom, apiKey, promptOverride } = args;
   const client = new OpenAI({ apiKey, timeout: 180_000 });
 
   // ─── REJECT browser blob: URLs explicitly ────────────────────────────────
@@ -673,12 +677,20 @@ export async function generateLifestyleImage(args: {
       : "jpg";
   const refFile = new File([imageBuffer], `floorplan.${ext}`, { type: mimeType });
 
-  const furnitureHint = furnitureHintForRoom(primaryRoom);
   const desc = description.slice(0, 1500);
-  const prompt =
-    LIFESTYLE_IMAGE_PROMPT_TEMPLATE.replace(/\{ROOM\}/g, primaryRoom)
-      .replace("{FURNITURE}", furnitureHint) +
-    `\n\nAdditional layout context: ${desc}`;
+  let prompt: string;
+  if (promptOverride) {
+    // Brief-driven prompt — replaces hardcoded residential defaults
+    prompt = promptOverride;
+  } else {
+    // Legacy path — hardcoded template (residential defaults, used by
+    // cinematic pipeline stages and non-PDF workflows)
+    const furnitureHint = furnitureHintForRoom(primaryRoom);
+    prompt =
+      LIFESTYLE_IMAGE_PROMPT_TEMPLATE.replace(/\{ROOM\}/g, primaryRoom)
+        .replace("{FURNITURE}", furnitureHint) +
+      `\n\nAdditional layout context: ${desc}`;
+  }
 
   logger.info(`[CINEMATIC] Generating lifestyle image for room "${primaryRoom}"...`);
   const start = Date.now();
@@ -686,7 +698,7 @@ export async function generateLifestyleImage(args: {
   // Landscape 1536x1024 — closest to a 16:9 cinematic frame, feeds Kling
   // image2video which generates 16:9 video output.
   const render = await client.images.edit({
-    model: "gpt-image-1",
+    model: "gpt-image-1.5",
     image: refFile,
     prompt,
     size: "1536x1024",

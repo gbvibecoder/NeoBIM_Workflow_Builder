@@ -3,6 +3,7 @@ import {
   generateId,
   formatErrorResponse,
   logger,
+  generateConceptImage,
   generateRenovationRender,
   submitDualWalkthrough,
   submitDualTextToVideo,
@@ -11,6 +12,13 @@ import {
 } from "./deps";
 import type { NodeHandler } from "./types";
 import { createVideoJobAndEnqueue } from "@/features/3d-render/services/video-job-service";
+import {
+  extractBriefContext,
+  buildBriefDrivenExteriorPrompt,
+  buildBriefDrivenInteriorPrompt,
+  EMPTY_EXTRACTION,
+  type BriefExtraction,
+} from "@/features/3d-render/services/brief-extractor";
 
 /**
  * GN-009 — Video Walkthrough Generator (Kling Official API + Three.js fallback)
@@ -266,6 +274,49 @@ export const handleGN009: NodeHandler = async (ctx) => {
   logger.debug("[GN-009] renderImageUrl resolved:", renderImageUrl ? renderImageUrl.slice(0, 120) : "EMPTY");
   logger.debug("==============================");
 
+  // ── Structured brief extraction (Claude Sonnet 4.6) ──
+  // Extract building type, materials, lighting, persona, and space info from
+  // the PDF text so all downstream prompts are brief-driven, not hardcoded.
+  // Runs once; the result is passed through the entire prompt chain.
+  // Graceful fallback: returns EMPTY_EXTRACTION on any failure.
+  let briefExtraction: BriefExtraction = EMPTY_EXTRACTION;
+  if (buildingDesc && buildingDesc.length >= 50) {
+    briefExtraction = await extractBriefContext(buildingDesc);
+  }
+
+  // ── Fallback: generate an exterior concept render when no upstream image ──
+  // WF-08 (PDF Brief → Video) sends only text to GN-009. Without a source
+  // image, the text-to-video Kling endpoint produces near-static exterior clips
+  // and fails to enter the building for interior shots (diagnosis 2026-04-27).
+  // Generate a GPT-Image-1.5 exterior concept render so the image-to-video path
+  // (with Phase 3 interior reference generation) is used.
+  if (!renderImageUrl && hasKlingKeys) {
+    const conceptApiKey = apiKey || process.env.OPENAI_API_KEY || undefined;
+    if (conceptApiKey) {
+      try {
+        logger.debug("[GN-009] No upstream image — generating brief-driven exterior concept render");
+        // Build prompt from extraction — no hardcoded materials/lighting
+        const conceptPrompt = buildBriefDrivenExteriorPrompt(briefExtraction, buildingDesc);
+        const conceptResult = await generateConceptImage(
+          conceptPrompt,
+          "photorealistic architectural exterior, high-end visualization",
+          conceptApiKey,
+          undefined,
+          undefined,
+          undefined,
+          "exterior",
+        );
+        if (conceptResult.url) {
+          renderImageUrl = conceptResult.url;
+          logger.debug("[GN-009] Concept render generated:", renderImageUrl.slice(0, 120));
+        }
+      } catch (conceptErr) {
+        const msg = conceptErr instanceof Error ? conceptErr.message : String(conceptErr);
+        logger.warn("[GN-009] Concept render failed, falling back to text-to-video: " + msg);
+      }
+    }
+  }
+
   if (!hasKlingKeys) {
     // ── No Kling API keys — fall back to Three.js client-side rendering ──
     // Build a rich BuildingStyle from the PDF-extracted description
@@ -516,44 +567,45 @@ export const handleGN009: NodeHandler = async (ctx) => {
           logger.debug("[GN-009] Renovation skipped — missing:", !dalleKey ? "OPENAI_API_KEY" : "originalPhotoBase64");
         }
 
-        // Phase 3 — generate a GPT-Image-1 eye-level interior reference so the Kling
-        // interior task has an actual interior image to animate. Without this, both
-        // Kling tasks shared the exterior image and the interior segment produced
-        // exterior-looking content (visual bug). Reuses the helper already battle-
-        // tested in the cinematic pipeline (generateLifestyleImage).
-        //
-        // Graceful fallback: if GPT-Image-1 fails for any reason (key missing, rate
-        // limit, bad image), interiorImageUrl stays undefined and the interior Kling
-        // task falls back to the exterior image — same as pre-Phase-3 behavior. Job
-        // still proceeds; no hard failure.
+        // Phase 3 — generate a GPT-Image-1.5 eye-level interior reference so the
+        // Kling interior task has an actual interior image to animate. Without this,
+        // both tasks shared the exterior image and the interior segment produced
+        // exterior-looking content. When briefExtraction is available, the prompt is
+        // driven by the PDF's materials/lighting/space — no hardcoded residential
+        // defaults. Falls back to the legacy template when extraction is empty.
         let interiorImageUrl: string | undefined;
         if (dalleKey && klingSourceImage) {
           try {
-            logger.debug("[GN-009] Phase 3: generating GPT-Image-1 interior reference...");
+            logger.debug("[GN-009] Phase 3: generating interior reference...");
             const { generateLifestyleImage } = await import("@/features/3d-render/services/cinematic-pipeline");
+
+            // Build brief-driven prompt when extraction has data; otherwise
+            // let generateLifestyleImage use its built-in template (legacy path).
+            const hasExtraction = briefExtraction !== EMPTY_EXTRACTION;
+            const interiorPromptOverride = hasExtraction
+              ? buildBriefDrivenInteriorPrompt(briefExtraction, buildingDesc)
+              : undefined;
+            const primaryRoom = briefExtraction.spaceType ?? "Living Room";
+
             const interiorRef = await generateLifestyleImage({
-              floorPlanRef: klingSourceImage,    // exterior image as architectural reference
+              floorPlanRef: klingSourceImage,
               description: buildingDesc,
-              primaryRoom: "Living Room",         // safe default — generateLifestyleImage
-                                                  // has room-aware furniture prompt templates;
-                                                  // Living Room produces strong generic-interior
-                                                  // content that works across building types.
+              primaryRoom,
               apiKey: dalleKey,
+              promptOverride: interiorPromptOverride,
             });
             interiorImageUrl = interiorRef.url;
             logger.debug("[GN-009] Phase 3: interior reference ready:", interiorImageUrl?.slice(0, 100));
           } catch (interiorErr) {
             const msg = interiorErr instanceof Error ? interiorErr.message : String(interiorErr);
             logger.warn("[GN-009] Phase 3: interior reference generation failed — falling back to exterior image for interior segment. " + msg);
-            // Non-fatal — interiorImageUrl stays undefined, submitDualWalkthrough
-            // falls back to the exterior image for the interior segment (matches
-            // pre-Phase-3 behavior). User sees same suboptimal content only on failure.
           }
         }
 
         const submitted = await submitDualWalkthrough(klingSourceImage, buildingDesc, "pro", {
           isRenovation: isRenovationInput,
           interiorImageUrl,   // Phase 3 — undefined on failure → falls back to exterior image
+          extraction: briefExtraction !== EMPTY_EXTRACTION ? briefExtraction : undefined,
         });
 
         logger.debug("[GN-009] Dual tasks submitted! exterior:", submitted.exteriorTaskId, "interior:", submitted.interiorTaskId);
@@ -685,8 +737,11 @@ export const handleGN009: NodeHandler = async (ctx) => {
       );
     }
   } else {
-    // ── Kling text-to-video path ──
-    // No render image available (e.g. PDF → video pipeline).
+    // ── Kling text-to-video path (FALLBACK) ──
+    // This path produces inferior results: near-static exterior clips and no
+    // true interior entry (see diagnosis 2026-04-27). It is only reached when
+    // the concept render generation above fails or OPENAI_API_KEY is absent.
+    // The primary path is now image-to-video via the concept render fallback.
     // Generate ultra-realistic video directly from the ORIGINAL PDF text.
     logger.debug("[GN-009] Text2Video — using original PDF text as source of truth");
     logger.debug("[GN-009] Source:", originalPdfText ? "rawText from PDF" : "fallback content");

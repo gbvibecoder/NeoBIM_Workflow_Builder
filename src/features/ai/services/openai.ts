@@ -833,11 +833,11 @@ export async function generateConceptImage(
       }
     }
 
-    // Use gpt-image-1 for generation (much better instruction following than DALL-E 3)
+    // Use gpt-image-1.5 for generation (text-correct, extraction-grade)
     try {
       const size = (viewType === "exterior" || viewType === "interior") ? "1536x1024" : "1024x1024";
       const response = await client.images.generate({
-        model: "gpt-image-1",
+        model: "gpt-image-1.5",
         prompt: imagePrompt,
         n: 1,
         size: size as "1024x1024", // type workaround for extended sizes

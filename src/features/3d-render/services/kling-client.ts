@@ -32,8 +32,12 @@ export const KLING_OMNI_PATH = "/v1/videos/omni-video";
 export const COST_PER_SECOND = 0.10;
 export const JWT_EXPIRY_SECONDS = 1800;
 
-/** Models tried in priority order. v2-1-master = highest quality, v2-6 fallback. */
-export const MODELS = ["kling-v2-1-master", "kling-v2-6"] as const;
+/**
+ * Supported Kling models. v3-omni is used via the Omni endpoint (createOmniTask
+ * in video-service.ts); v2-6 is used via image2video/text2video endpoints.
+ * Older models (v2-1-master, v1-6) have been removed — no silent downgrade.
+ */
+export const MODELS = ["kling-v2-6"] as const;
 export type KlingModel = (typeof MODELS)[number];
 
 /** 1303 = parallel-task-slot exhausted. Backoff + retry constants. */
