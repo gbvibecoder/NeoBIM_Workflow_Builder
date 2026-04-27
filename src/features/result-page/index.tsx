@@ -166,7 +166,7 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
 
               {heroKind === "pending" ? (
                 <ErrorBoundary>
-                  <PendingSection progress={data.primaryVideoProgress} />
+                  <PendingSection progress={data.primaryVideoProgress} previewImageUrls={data.allImageUrls} />
                 </ErrorBoundary>
               ) : (
                 <ErrorBoundary>

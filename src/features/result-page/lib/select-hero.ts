@@ -38,11 +38,11 @@ export function selectHero(data: ResultPageData): HeroKind {
   // 1. Hard-failure: status FAILED with no artifacts → failure hero with errorMessage
   if (data.lifecycle === "failed" && data.totalArtifacts === 0) return "failure";
 
-  // 2. Pending video render (the "Initializing 5%" state replacement)
-  if (data.isVideoGenerating) return "pending";
-
-  // 3. Completed video wins over everything else
+  // 2. Completed video wins — even if stale progress state lingers
   if (data.videoData?.videoUrl) return "video";
+
+  // 3. Pending video render (only when no finished video URL exists)
+  if (data.isVideoGenerating) return "pending";
 
   // 4. Interactive floor plan (full CAD project from GN-012)
   if (data.model3dData?.kind === "floor-plan-interactive") return "floor-plan-interactive";
