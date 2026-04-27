@@ -120,7 +120,7 @@ function LauncherButton({
       title="Open execution diagnostics"
       style={{
         position: "fixed",
-        right: 16,
+        right: 76,
         bottom: 16,
         zIndex: 60,
         display: "flex",
