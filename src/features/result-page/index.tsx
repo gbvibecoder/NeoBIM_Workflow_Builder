@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useResultPageData } from "@/features/result-page/hooks/useResultPageData";
 import { selectHero } from "@/features/result-page/lib/select-hero";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { ExecutionDiagnosticsPanel } from "@/components/diagnostics/ExecutionDiagnosticsPanel";
+import { retryPollVideoGeneration } from "@/features/execution/hooks/useExecution";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 
 import { PageHeader } from "@/features/result-page/components/PageHeader";
 import { ScrollReveal } from "@/features/result-page/components/ScrollReveal";
@@ -102,6 +104,44 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
   useEffect(() => {
     setInitialNote(readSavedNote(executionId));
   }, [executionId]);
+
+  // ── Resume legacy video polling if canvas page polling was interrupted ──
+  // When user navigates from canvas → result page, the canvas unmounts and
+  // its AbortController kills the pollVideoGeneration loop. The result page
+  // hydrates stale videoGenProgress from the DB, showing 4% forever.
+  // This effect detects that state and restarts polling.
+  const pollResumedRef = useRef(false);
+  const addArtifact = useExecutionStore(s => s.addArtifact);
+  const setVideoGenProgress = useExecutionStore(s => s.setVideoGenProgress);
+  const clearVideoGenProgress = useExecutionStore(s => s.clearVideoGenProgress);
+  useEffect(() => {
+    if (pollResumedRef.current) return;
+    const vd = data.videoData;
+    if (!vd || !data.isVideoGenerating) return;
+    // Only resume for legacy path (has task IDs, no videoJobId)
+    if (vd.videoJobId) return;
+    if (!vd.exteriorTaskId || !vd.interiorTaskId) return;
+    if (vd.videoUrl) return; // Already have a URL — no need to poll
+
+    pollResumedRef.current = true;
+    const ctrl = new AbortController();
+    const pipeline = (vd.videoPipeline === "text2video" ? "text2video" : "image2video") as "image2video" | "text2video";
+
+    retryPollVideoGeneration(
+      vd.nodeId,
+      vd.exteriorTaskId,
+      vd.interiorTaskId,
+      addArtifact,
+      setVideoGenProgress,
+      clearVideoGenProgress,
+      {},
+      executionId,
+      pipeline,
+      ctrl.signal,
+    ).catch(() => {});
+
+    return () => { ctrl.abort(); };
+  }, [data.videoData, data.isVideoGenerating, executionId, addArtifact, setVideoGenProgress, clearVideoGenProgress]);
 
   // North-arrow eligibility: floor-plan / model-3d / SVG floor plan workflows
   const showNorthArrow =

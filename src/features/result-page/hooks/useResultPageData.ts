@@ -67,6 +67,10 @@ export interface VideoInfo {
   nodeId: string;
   segments?: VideoSegmentInfo[];
   videoJobId?: string;
+  /** Legacy polling: Kling task IDs for client-side polling */
+  exteriorTaskId?: string;
+  interiorTaskId?: string;
+  videoPipeline?: string;
 }
 
 export interface ProceduralModelData {
@@ -503,6 +507,9 @@ export function useResultPageData(executionId: string): ResultPageData {
         nodeId: videoArtifact.tileInstanceId,
         segments,
         videoJobId: asStr(d.videoJobId) ?? asStr(meta.videoJobId),
+        exteriorTaskId: asStr(d.exteriorTaskId),
+        interiorTaskId: asStr(d.interiorTaskId),
+        videoPipeline: asStr(d.videoPipeline),
       };
     }
 
