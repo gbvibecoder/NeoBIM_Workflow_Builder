@@ -140,8 +140,15 @@ export function HeroSection({ data, heroKind }: HeroSectionProps) {
 function VideoVariant({ data }: { data: ResultPageData }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const reduce = useReducedMotion();
-  const url = data.videoData?.videoUrl ?? "";
+  const segments = useMemo(() => data.videoData?.segments ?? [], [data.videoData?.segments]);
+  const [activeIdx, setActiveIdx] = useState(0);
 
+  // Determine the currently-playing segment URL
+  const activeSegment = segments[activeIdx];
+  const url = activeSegment?.videoUrl || data.videoData?.videoUrl || "";
+  const downloadUrl = activeSegment?.downloadUrl || data.videoData?.downloadUrl || "";
+
+  // Auto-play on intersection
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !url || reduce) return;
@@ -161,6 +168,28 @@ function VideoVariant({ data }: { data: ResultPageData }) {
     return () => obs.disconnect();
   }, [url, reduce]);
 
+  // When a segment finishes, auto-advance to the next playable segment
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || segments.length <= 1) return;
+    const handleEnded = () => {
+      const next = segments.findIndex((s, i) => i > activeIdx && !!s.videoUrl);
+      if (next >= 0) {
+        setActiveIdx(next);
+      }
+    };
+    el.addEventListener("ended", handleEnded);
+    return () => el.removeEventListener("ended", handleEnded);
+  }, [activeIdx, segments]);
+
+  // When activeIdx changes, reload the video
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !url) return;
+    el.load();
+    void el.play().catch(() => {});
+  }, [url]);
+
   return (
     <div>
       <div
@@ -175,13 +204,12 @@ function VideoVariant({ data }: { data: ResultPageData }) {
           ref={videoRef}
           src={url}
           muted
-          loop
+          loop={segments.length <= 1}
           playsInline
           controls
           crossOrigin="anonymous"
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
-        {/* Phase 4 signature · cinema shutter retracts, revealing the frame */}
         <ShutterReveal />
       </div>
       <div
@@ -223,22 +251,21 @@ function VideoVariant({ data }: { data: ResultPageData }) {
             >
               Cinematic walkthrough
             </div>
-            {/* Monospace timecode caption — reads like a frame counter */}
             <div style={{ marginTop: 6 }}>
               <MonoLabel size={12} color="#0F172A" uppercase={false}>
                 {`${String(data.videoData?.durationSeconds ?? 15).padStart(2, "0")}.000s`}
                 {" · "}
-                {`${data.videoData?.segments?.length ?? data.videoData?.shotCount ?? 3} shots`}
+                {`${segments.length || data.videoData?.shotCount || 1} shots`}
                 {data.videoData?.pipeline ? ` · ${data.videoData.pipeline}` : ""}
                 {" · 1080p"}
               </MonoLabel>
             </div>
           </div>
         </div>
-        {data.videoData?.downloadUrl ? (
+        {downloadUrl ? (
           <a
-            href={data.videoData.downloadUrl}
-            download={data.videoData.name}
+            href={downloadUrl}
+            download={data.videoData?.name ?? "walkthrough.mp4"}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -259,11 +286,14 @@ function VideoVariant({ data }: { data: ResultPageData }) {
         ) : null}
       </div>
 
-      {/* Phase 4.2 Fix 3 — shot timeline beneath the player + render donut on the right */}
       {data.videoData ? (
         <div className="video-hero-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)", gap: "clamp(20px, 3vw, 36px)", padding: "0 24px 24px", alignItems: "start" }}>
           <div>
-            <ShotTimeline video={data.videoData} videoRef={videoRef} />
+            <ShotTimeline
+              video={data.videoData}
+              activeSegmentIndex={activeIdx}
+              onSegmentSelect={(seg, idx) => setActiveIdx(idx)}
+            />
           </div>
           <div className="video-hero-donut" style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 8 }}>
             <RenderStatsDonut video={data.videoData} />

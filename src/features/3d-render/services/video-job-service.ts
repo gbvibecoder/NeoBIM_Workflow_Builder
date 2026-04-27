@@ -283,6 +283,39 @@ export async function advanceVideoJob(
               lastPolledAt: new Date(),
             },
           });
+
+          // ── Incremental patch: show the first completed video immediately ──
+          // Don't make users wait for ALL segments. As soon as one segment
+          // finishes, patch the execution artifact so the result page shows
+          // a playable video instead of a loading spinner.
+          if (statusAfter === "complete" && job.dbExecutionId) {
+            const completedSoFar = segments.filter((s) => s.status === "complete");
+            const completedDur = completedSoFar.reduce((sum, s) => sum + s.durationSeconds, 0);
+            try {
+              await patchExecutionArtifact({
+                videoJobId,
+                dbExecutionId: job.dbExecutionId,
+                userId: job.userId,
+                nodeId: job.nodeId,
+                terminalStatus: "partial",
+                failureReason: null,
+                segments,
+                completedDuration: completedDur,
+                finalCostUsd: computeCostUsd(completedDur, job.isRenovation),
+                isRenovation: job.isRenovation,
+                isFloorPlan: job.isFloorPlan,
+                pipeline: job.pipeline as VideoPipeline,
+              });
+              logger.info(
+                `[VIDEO_JOB] ${videoJobId} incremental patch — ${completedSoFar.length} segment(s) playable`,
+              );
+            } catch (earlyPatchErr) {
+              // Non-fatal — the terminal patch will catch up.
+              logger.warn(
+                `[VIDEO_JOB] ${videoJobId} incremental patch failed (non-fatal): ${(earlyPatchErr as Error).message}`,
+              );
+            }
+          }
         }
       }
     }
@@ -697,20 +730,22 @@ async function patchExecutionArtifact(input: PatchArtifactInput): Promise<void> 
     const interior = completeSegments.find((s) => s.kind === "interior");
     const interiorUrl = interior ? (interior.r2Url ?? interior.klingUrl) : undefined;
 
-    const flatSegments = prioritized
-      .map((s) => {
-        const url = s.r2Url ?? s.klingUrl;
-        if (!url) return null;
-        return {
-          kind: s.kind,
-          url,
-          videoUrl: url,
-          downloadUrl: url,
-          durationSeconds: s.durationSeconds,
-          label: segmentLabel(s.kind, s.durationSeconds),
-        };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
+    // Include ALL segments — complete ones with URLs, in-progress ones with
+    // empty URLs so the frontend can show "generating…" pills for pending shots.
+    const allSorted = [...segments].sort(
+      (a, b) => segmentPriority(a.kind) - segmentPriority(b.kind),
+    );
+    const flatSegments = allSorted.map((s) => {
+      const url = s.status === "complete" ? (s.r2Url ?? s.klingUrl ?? "") : "";
+      return {
+        kind: s.kind,
+        url: url || undefined,
+        videoUrl: url,
+        downloadUrl: url,
+        durationSeconds: s.durationSeconds,
+        label: segmentLabel(s.kind, s.durationSeconds),
+      };
+    });
 
     const label = deriveFinalLabel({
       terminalStatus,

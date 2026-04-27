@@ -1,34 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useMemo, useRef } from "react";
 import { motion, useInView, useReducedMotion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import type { VideoInfo, VideoSegmentInfo } from "@/features/result-page/hooks/useResultPageData";
 
 interface ShotTimelineProps {
   video: VideoInfo;
-  videoRef: RefObject<HTMLVideoElement | null>;
+  /** Called when user clicks a different segment — parent switches the <video> src */
+  onSegmentSelect?: (segment: VideoSegmentInfo, index: number) => void;
+  activeSegmentIndex?: number;
 }
 
 /**
- * Phase 4.2 · Fix 3 — clickable shot timeline beneath the video player.
+ * Clickable shot timeline — one pill per video segment.
  *
- * Renders one pill per video segment. If the artifact has only one shot/no
- * segments, falls back to a single full-width WALKTHROUGH pill. Active
- * shot (computed from <video>.currentTime) gets a teal underline + halo
- * dot. Click a pill to seek to that timecode.
- *
- * Reduced motion: pills render fully formed; no halo / underline animation.
+ * Segments are SEPARATE MP4 files (not concatenated), so clicking a pill
+ * fires `onSegmentSelect` to switch the <video> src in the parent.
+ * Segments without a URL show as "generating…" (disabled).
  */
-export function ShotTimeline({ video, videoRef }: ShotTimelineProps) {
+export function ShotTimeline({ video, onSegmentSelect, activeSegmentIndex = 0 }: ShotTimelineProps) {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.3 });
-  const [currentTime, setCurrentTime] = useState(0);
 
-  // Derive ordered shots with cumulative start offsets
-  const shots = useMemo<Array<VideoSegmentInfo & { start: number }>>(() => {
+  const shots = useMemo<VideoSegmentInfo[]>(() => {
     const segs = video.segments ?? [];
-    let cumulative = 0;
     if (segs.length === 0) {
       return [
         {
@@ -36,40 +33,11 @@ export function ShotTimeline({ video, videoRef }: ShotTimelineProps) {
           downloadUrl: video.downloadUrl,
           durationSeconds: video.durationSeconds,
           label: "Walkthrough",
-          start: 0,
         },
       ];
     }
-    return segs.map(seg => {
-      const out = { ...seg, start: cumulative };
-      cumulative += seg.durationSeconds;
-      return out;
-    });
+    return segs;
   }, [video]);
-
-  // Listen to <video>.timeupdate to drive the active-shot highlight
-  useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-    const handler = () => setCurrentTime(el.currentTime || 0);
-    el.addEventListener("timeupdate", handler);
-    return () => el.removeEventListener("timeupdate", handler);
-  }, [videoRef]);
-
-  const activeIdx = useMemo(() => {
-    let active = 0;
-    for (let i = 0; i < shots.length; i++) {
-      if (currentTime >= shots[i].start) active = i;
-    }
-    return active;
-  }, [currentTime, shots]);
-
-  const handleSeek = (shot: { start: number }) => {
-    const el = videoRef.current;
-    if (!el) return;
-    el.currentTime = shot.start;
-    if (el.paused) void el.play().catch(() => {});
-  };
 
   return (
     <div
@@ -82,12 +50,17 @@ export function ShotTimeline({ video, videoRef }: ShotTimelineProps) {
       }}
     >
       {shots.map((shot, i) => {
-        const isActive = i === activeIdx;
+        const isActive = i === activeSegmentIndex;
+        const isPlayable = !!shot.videoUrl;
+        const isGenerating = !isPlayable && shot.durationSeconds > 0;
         return (
           <motion.button
             key={`${shot.label}-${i}`}
             type="button"
-            onClick={() => handleSeek(shot)}
+            disabled={!isPlayable}
+            onClick={() => {
+              if (isPlayable && onSegmentSelect) onSegmentSelect(shot, i);
+            }}
             initial={
               reduce || !inView
                 ? { opacity: 1, y: 0 }
@@ -110,10 +83,11 @@ export function ShotTimeline({ video, videoRef }: ShotTimelineProps) {
               gap: 8,
               padding: "7px 14px",
               borderRadius: 9999,
-              background: isActive ? "#7C3AED" : "#FFFFFF",
-              border: isActive ? "1px solid #7C3AED" : "1px solid rgba(0,0,0,0.08)",
-              color: isActive ? "#FFFFFF" : "#0F172A",
-              cursor: "pointer",
+              background: isActive ? "#7C3AED" : isGenerating ? "#F9FAFB" : "#FFFFFF",
+              border: isActive ? "1px solid #7C3AED" : isGenerating ? "1px dashed rgba(0,0,0,0.12)" : "1px solid rgba(0,0,0,0.08)",
+              color: isActive ? "#FFFFFF" : isGenerating ? "#9CA3AF" : "#0F172A",
+              cursor: isPlayable ? "pointer" : "default",
+              opacity: isPlayable || isActive ? 1 : 0.7,
               fontFamily: "var(--font-jetbrains), ui-monospace, monospace",
               fontSize: 11,
               fontWeight: 600,
@@ -122,24 +96,33 @@ export function ShotTimeline({ video, videoRef }: ShotTimelineProps) {
               transition: "background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
             }}
           >
-            <span
-              aria-hidden="true"
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 9999,
-                background: isActive ? "#FFFFFF" : "#7C3AED",
-                flexShrink: 0,
-              }}
-            />
+            {isGenerating ? (
+              <Loader2 size={10} style={{ animation: "spin 1.2s linear infinite" }} />
+            ) : (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 9999,
+                  background: isActive ? "#FFFFFF" : "#7C3AED",
+                  flexShrink: 0,
+                }}
+              />
+            )}
             <span style={{ opacity: 0.7 }}>{String(i + 1).padStart(2, "0")}</span>
             <span>{shot.label}</span>
-            <span style={{ opacity: 0.7 }}>
-              · {shot.durationSeconds.toFixed(1)}s
-            </span>
+            {isGenerating ? (
+              <span style={{ opacity: 0.6 }}>· generating…</span>
+            ) : (
+              <span style={{ opacity: 0.7 }}>
+                · {shot.durationSeconds.toFixed(1)}s
+              </span>
+            )}
           </motion.button>
         );
       })}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
