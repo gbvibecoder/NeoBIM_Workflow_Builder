@@ -440,7 +440,8 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   persistDiagnostics: async () => {
     if (typeof window === "undefined") return;
     const state = get();
-    const executionId = state.currentExecution?.id;
+    // Prefer DB CUID over in-memory ID — the PATCH endpoint queries by DB id.
+    const executionId = state.currentDbExecutionId ?? state.currentExecution?.id;
     const trace = state.currentTrace;
     if (!executionId || !trace) return;
     try {
