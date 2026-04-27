@@ -6,6 +6,7 @@ import {
   selectHydrateDiagnostics,
 } from "@/features/execution/stores/execution-store";
 import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
 import type { ExecutionArtifact, VideoGenerationState } from "@/types/execution";
 import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
@@ -402,9 +403,27 @@ export function useResultPageData(executionId: string): ResultPageData {
     };
   }, [executionId, matchesLive, hydrateDiagnostics]);
 
+  // ── Extract videoJobId early so useVideoJob can be called unconditionally ──
+  const rawArtifacts = matchesLive ? liveArtifacts : fetched.artifacts;
+  const earlyVideoJobId = useMemo(() => {
+    for (const [, a] of rawArtifacts) {
+      if (a.type === "video") {
+        const d = a.data as Record<string, unknown> | undefined;
+        if (d) {
+          const jid = (d.videoJobId as string) ?? ((d.metadata as Record<string, unknown> | undefined)?.videoJobId as string);
+          if (jid) return jid;
+        }
+      }
+    }
+    return null;
+  }, [rawArtifacts]);
+
+  // Poll the video job endpoint for BG jobs (VIDEO_BG_JOBS=true path)
+  const videoJob = useVideoJob(earlyVideoJobId);
+
   // ── Build the normalized ResultPageData shape ────────────────────────────
   return useMemo<ResultPageData>(() => {
-    const artifacts = matchesLive ? liveArtifacts : fetched.artifacts;
+    const artifacts = rawArtifacts;
 
     // Lifecycle resolution
     let lifecycle: ResultLifecycle = "loading";
@@ -513,19 +532,62 @@ export function useResultPageData(executionId: string): ResultPageData {
       };
     }
 
+    // ── BG jobs integration: overlay live video job data onto videoData ──
+    // When VIDEO_BG_JOBS=true, the artifact starts with videoUrl="" and a
+    // videoJobId. The useVideoJob hook polls /api/video-jobs/[id] for live
+    // progress and segment URLs. Overlay this data so the result page
+    // shows progress and plays videos as soon as segments complete.
+    if (videoData && videoJob.data && !videoData.videoUrl) {
+      const jd = videoJob.data;
+      if (jd.primaryVideoUrl) {
+        videoData = { ...videoData, videoUrl: jd.primaryVideoUrl, downloadUrl: jd.primaryVideoUrl };
+      }
+      if (jd.playableSegments.length > 0) {
+        videoData = {
+          ...videoData,
+          segments: jd.segments.map(s => ({
+            videoUrl: s.url ?? "",
+            downloadUrl: s.url ?? "",
+            durationSeconds: s.durationSeconds,
+            label: s.kind === "exterior" ? `Exterior — ${s.durationSeconds}s`
+              : s.kind === "interior" ? `Interior — ${s.durationSeconds}s`
+              : `Walkthrough — ${s.durationSeconds}s`,
+          })),
+          durationSeconds: jd.totalDurationSeconds ?? videoData.durationSeconds,
+          shotCount: jd.segments.length,
+        };
+      }
+    }
+
     // Live video generation progress for the primary video node
     const primaryVideoProgress = videoData?.nodeId
       ? videoGenProgress.get(videoData.nodeId) ?? null
       : null;
+
+    // BG jobs: synthesize progress from the video job if no store entry exists
+    const bgJobGenerating = !!(
+      videoJob.data &&
+      !videoData?.videoUrl &&
+      videoJob.data.status !== "complete" &&
+      videoJob.data.status !== "failed"
+    );
+    const bgJobProgress: VideoGenerationState | null = bgJobGenerating
+      ? {
+          progress: videoJob.data!.progress,
+          status: "processing" as const,
+        }
+      : null;
+
     // If the video URL already exists, the video is ready — stale progress
     // state should never block the finished video from displaying.
     const videoAlreadyReady = !!(videoData?.videoUrl);
     const isVideoGenerating =
       !videoAlreadyReady &&
-      !!primaryVideoProgress &&
-      (primaryVideoProgress.status === "submitting" ||
-        primaryVideoProgress.status === "processing" ||
-        primaryVideoProgress.status === "rendering");
+      (bgJobGenerating ||
+        (!!primaryVideoProgress &&
+          (primaryVideoProgress.status === "submitting" ||
+            primaryVideoProgress.status === "processing" ||
+            primaryVideoProgress.status === "rendering")));
 
     // ── KPIs ─────────
     const kpiMetrics: KpiMetric[] = [];
@@ -758,7 +820,7 @@ export function useResultPageData(executionId: string): ResultPageData {
       workflowId,
       lifecycle,
       isVideoGenerating,
-      primaryVideoProgress,
+      primaryVideoProgress: primaryVideoProgress ?? bgJobProgress,
       totalArtifacts: artifacts.size,
       successNodes,
       totalNodes,
@@ -779,10 +841,11 @@ export function useResultPageData(executionId: string): ResultPageData {
       clashSummary,
     };
   }, [
+    rawArtifacts,
     matchesLive,
-    liveArtifacts,
     liveExecution,
     videoGenProgress,
+    videoJob.data,
     nodes,
     currentWorkflow,
     fetched,
