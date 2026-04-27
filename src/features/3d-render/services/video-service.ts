@@ -358,13 +358,16 @@ export function buildInteriorPrompt(_buildingDescription: string, extraction?: B
   if (secondary) {
     return (
       `${primaryName} furnished appropriately to its function as a ${primaryName}. ` +
-      `Camera at eye-level (1.4m height), starts 4 meters back from the far wall, ` +
-      `tracks forward at a steady walking pace through the ${primaryName} for the first 4 seconds. ` +
-      `Passes through the visible doorway into the adjacent ${secondary.roomType} with continuous unbroken motion — ` +
-      `no cut, no jump, no stall at the threshold. Once inside the ${secondary.roomType}, ` +
-      `slows slightly while orbiting 15 degrees to reveal its layout over 4 seconds. ` +
-      `Settles on a hero composition of the ${secondary.roomType} in the final 2 seconds.\n\n` +
-      "The threshold transition is smooth, the pace is steady, and the motion is continuous from start to end of the 10 seconds.\n\n" +
+      `Camera at eye-level (1.4m height) starts 5 meters back from the far wall of the ${primaryName}. ` +
+      `Tracks forward briskly at 1.5x walking pace through the ${primaryName} for the first 3 seconds, ` +
+      "sweeping the camera 20 degrees laterally to maximize visible coverage of the room's layout, furniture, and key features. " +
+      `Passes through the doorway into the adjacent ${secondary.roomType} with continuous unbroken motion — ` +
+      "no stall, no slow-down at the threshold. " +
+      `Inside the ${secondary.roomType}, continues forward and orbits 30 degrees over 5 seconds to reveal ` +
+      "as much of the room as possible — walls, ceiling height, furniture, windows, depth. " +
+      "Final 2 seconds: settle on a hero composition.\n\n" +
+      "Total 10 seconds of brisk, sweeping, dynamic motion. Camera covers maximum visible area of both rooms. " +
+      "Prioritize coverage and dynamic movement over slow contemplation.\n\n" +
       `${lighting}. ${materials}.` +
       `${colors ? ` ${colors}` : ""}` +
       `${inhabited ? ` ${inhabited}` : ""}\n\n` +
@@ -376,11 +379,13 @@ export function buildInteriorPrompt(_buildingDescription: string, extraction?: B
   // Single-room walkthrough
   return (
     `${primaryName} furnished appropriately. ` +
-    "Camera at eye-level (1.4m height), starts 4 meters back from the far wall. " +
-    `Tracks forward at a steady walking pace through the room for the first 5 seconds. ` +
-    "Gradually orbits 25 degrees to reveal the room layout while continuing forward over the next 3 seconds. " +
-    "Settles on a hero composition with parallax on furniture and surfaces in the final 2 seconds. " +
-    "Continuous unbroken motion across 10 seconds.\n\n" +
+    "Camera at eye-level (1.4m height) starts 5 meters back from the far wall. " +
+    "Tracks forward briskly at 1.5x walking pace into the room for the first 3 seconds, revealing the full room depth. " +
+    "Orbits 45 degrees over the next 5 seconds while continuing forward, " +
+    "sweeping the camera to reveal as much of the room as possible — walls, ceiling, furniture, windows, corners, depth, and texture detail. " +
+    "Final 2 seconds: settle on a hero composition with parallax on furniture.\n\n" +
+    "Total 10 seconds of brisk, sweeping, dynamic motion. Camera covers maximum visible area. " +
+    "Prioritize coverage and dynamic movement over slow contemplation.\n\n" +
     `${lighting}. ${materials}.` +
     `${colors ? ` ${colors}` : ""}` +
     `${inhabited ? ` ${inhabited}` : ""}\n\n` +
@@ -730,10 +735,12 @@ function buildInteriorTextPrompt(buildingDescription: string): string {
   return (
     `${summary}\n\n` +
     "Establishing shot revealing the primary interior space at eye-level (1.4m height). " +
-    "Camera tracks forward at a steady walking pace for 5 seconds, revealing room layout, furnishings, and proportions. " +
-    "Gradually orbits 25 degrees to show spatial depth over the next 3 seconds. " +
-    "Settles on a hero composition in the final 2 seconds. " +
-    "Continuous unbroken motion across 10 seconds.\n\n" +
+    "Camera tracks forward briskly at 1.5x walking pace for 3 seconds, revealing the full room depth. " +
+    "Orbits 45 degrees over the next 5 seconds while continuing forward, " +
+    "sweeping to reveal as much of the space as possible — walls, ceiling, furniture, windows, depth. " +
+    "Final 2 seconds: settle on a hero composition.\n\n" +
+    "Total 10 seconds of brisk, sweeping, dynamic motion. Camera covers maximum visible area. " +
+    "Prioritize coverage and dynamic movement over slow contemplation.\n\n" +
     "Cinematic 28mm lens, eye-level architectural interior photography, photorealistic. " +
     "No text overlay, no logos, no watermark."
   ).slice(0, 2500);
