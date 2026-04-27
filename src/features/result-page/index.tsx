@@ -183,7 +183,7 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
             padding: "32px clamp(12px, 3vw, 32px) 96px",
             display: "flex",
             flexDirection: "column",
-            gap: 36,
+            gap: 56,
           }}
         >
           {data.lifecycle === "loading" ? (

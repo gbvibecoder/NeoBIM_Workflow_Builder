@@ -370,15 +370,11 @@ export const handleGN009: NodeHandler = async (ctx) => {
               name: `walkthrough_${generateId()}.mp4`,
               videoUrl: "",
               downloadUrl: "",
-              label: submitted.usedOmni
-                ? `Floor Plan → Kling 3.0 Walkthrough — ${submitted.durationSeconds}s (generating...)`
-                : `Floor Plan → Cinematic Walkthrough — ${submitted.durationSeconds}s (generating...)`,
+              label: `Floor Plan → Cinematic Walkthrough — ${submitted.durationSeconds}s (generating...)`,
               content: `${submitted.durationSeconds}s AEC walkthrough: exterior + interior in one continuous shot — ${buildingDesc.slice(0, 100)}`,
               durationSeconds: submitted.durationSeconds,
               shotCount: 1,
-              pipeline: submitted.usedOmni
-                ? `floor plan → Kling 3.0 Omni (std, ${submitted.durationSeconds}s) → MP4`
-                : `floor plan → Kling v2.6 (pro, ${submitted.durationSeconds}s) → MP4`,
+              pipeline: `floor plan → AI video · pro → MP4`,
               costUsd: submitted.durationSeconds * 0.10,
               videoGenerationStatus: "queued" as const,
               videoJobId,
@@ -572,8 +568,8 @@ export const handleGN009: NodeHandler = async (ctx) => {
           ? `${totalDuration}s renovation walkthrough: ${exteriorDuration}s exterior sweep + ${interiorDuration}s renovated interior — ${buildingDesc.slice(0, 100)}`
           : `${totalDuration}s AEC walkthrough: ${exteriorDuration}s exterior + ${interiorDuration}s interior — ${buildingDesc.slice(0, 100)}`;
         const videoPipelineLabel = isRenovationInput
-          ? "building photo → gpt-image-1 renovation render → Kling Official API (pro, image2video) → 2x MP4 video"
-          : "concept render → Kling Official API (pro, image2video) → 2x MP4 video";
+          ? "building photo → AI renovation render → AI video · pro → 2x MP4 video"
+          : "concept render → AI video · pro → 2x MP4 video";
 
         // ── New path: background VideoJob via QStash worker ────────────────
         if (useBackgroundJobs) {
@@ -708,8 +704,8 @@ export const handleGN009: NodeHandler = async (ctx) => {
       ? "AEC Cinematic Walkthrough — 15s (generating from PDF summary...)"
       : "AEC Cinematic Walkthrough — 15s (generating from text prompt...)";
     const textPipelineLabel = hasPdfSource
-      ? "PDF summary → Kling Official API (pro, text2video) → 2x MP4 video"
-      : "Text prompt → Kling Official API (pro, text2video) → 2x MP4 video";
+      ? "PDF summary → AI video · pro → 2x MP4 video"
+      : "text prompt → AI video · pro → 2x MP4 video";
 
     // ── New path: background VideoJob via QStash worker ──────────────────
     if (useBackgroundJobs) {

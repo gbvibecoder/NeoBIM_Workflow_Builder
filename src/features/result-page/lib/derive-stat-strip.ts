@@ -112,7 +112,7 @@ export function deriveStatStrip(data: ResultPageData): StatTile[] | null {
     return [
       { tag: "DURATION", value: `${v.durationSeconds}s`, color: "#7C3AED" },
       { tag: "SHOTS", value: String(v.segments?.length ?? v.shotCount) },
-      { tag: "PIPELINE", value: v.pipeline?.toUpperCase() ?? "KLING" },
+      { tag: "PIPELINE", value: "AI Video · Pro" },
       { tag: "FORMAT", value: "1080p · MP4" },
     ];
   }
