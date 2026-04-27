@@ -849,6 +849,15 @@ function Model3DVariant({ data, model }: { data: ResultPageData; model: Model3DD
             href={`/dashboard/ifc-viewer?executionId=${data.executionId}`}
             target="_blank"
             rel="noopener noreferrer"
+            onMouseEnter={() => {
+              // Pre-warm the viewer page on hover so navigation feels instant
+              const link = document.createElement("link");
+              link.rel = "prefetch";
+              link.href = `/dashboard/ifc-viewer?executionId=${data.executionId}`;
+              if (!document.head.querySelector(`link[href="${link.href}"]`)) {
+                document.head.appendChild(link);
+              }
+            }}
             style={{
               display: "inline-flex",
               alignItems: "center",

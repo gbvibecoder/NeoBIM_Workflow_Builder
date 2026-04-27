@@ -104,9 +104,25 @@ export const handleGN001: NodeHandler = async (ctx) => {
 
   logger.debug("[GN-001] massingInput:", JSON.stringify(massingInput, null, 2));
 
-  const geometry = generateMassingGeometry(massingInput);
+  let geometry = generateMassingGeometry(massingInput);
 
   logger.debug("[GN-001] geometry result:", { floors: geometry.floors, height: geometry.totalHeight, footprint: geometry.footprintArea, gfa: geometry.gfa, buildingType: geometry.buildingType });
+
+  // ── VIP Bridge: room-accurate interior geometry (feature-gated) ──
+  try {
+    const { shouldUseVipBridge, generateBuildingFromVIP, mergeVipIntoGeometry } = await import("@/features/3d-render/services/vip-bridge");
+    if (shouldUseVipBridge(buildingType, floors)) {
+      logger.info("[GN-001] VIP-BRIDGE: generating room-accurate plans");
+      const vipResult = await generateBuildingFromVIP(
+        { prompt: textContent, floors, floorToFloorHeight: geometry.totalHeight / geometry.floors, footprint_m2: computedFootprint, buildingType },
+        geometry,
+      );
+      geometry = mergeVipIntoGeometry(geometry, vipResult);
+      logger.info("[GN-001] VIP-BRIDGE: merged", { totalElements: vipResult.totalElements, fallbackCount: vipResult.fallbackCount, costUsd: vipResult.costUsd.toFixed(2) });
+    }
+  } catch (vipErr) {
+    logger.warn("[GN-001] VIP-BRIDGE failed (non-fatal, using procedural):", vipErr instanceof Error ? vipErr.message : vipErr);
+  }
 
   // ── AI Material Palette: Generate concept render + extract color palette ──
   let aiThumbnailUrl: string | null = null;

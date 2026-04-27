@@ -3,6 +3,7 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -73,12 +74,16 @@ import {
 interface IFCEnhancePanelProps {
   viewportRef: RefObject<ViewportHandle | null>;
   hasModel: boolean;
+  /** Called whenever enhance status changes — used by auto-enhance overlay. */
+  onStatusChange?: (status: EnhanceStatus) => void;
 }
 
 export interface IFCEnhancePanelHandle {
   /** Safe cleanup hook for IFCViewerPage to call before re-loading a model.
       No-op if nothing is applied. */
   resetIfApplied: () => Promise<void>;
+  /** Trigger full enhance with default toggles (auto-enhance entry point). */
+  applyAll: () => Promise<void>;
 }
 
 /* ─── HDRI preset metadata ───────────────────────────────────────────── */
@@ -173,7 +178,7 @@ const switchThumbStyle = (on: boolean): CSSProperties => ({
 /* ─── Panel ───────────────────────────────────────────────────────────── */
 
 export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanelProps>(
-  function IFCEnhancePanel({ viewportRef, hasModel }, panelRef) {
+  function IFCEnhancePanel({ viewportRef, hasModel, onStatusChange }, panelRef) {
     const [toggles, setToggles] = useState<EnhanceToggles>(DEFAULT_TOGGLES);
     const [tier2Toggles, setTier2Toggles] = useState<Tier2Toggles>(DEFAULT_TIER2_TOGGLES);
     const [tier3Toggles, setTier3Toggles] = useState<Tier3Toggles>(DEFAULT_TIER3_TOGGLES);
@@ -202,10 +207,21 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     const isLoading = status.kind === "loading";
     const isApplied = status.kind === "applied";
 
-    /* ── Reset-before-reload safety hook ── */
+    // Notify parent of status changes (drives AutoEnhanceLoader overlay)
+    useEffect(() => {
+      onStatusChange?.(status);
+    }, [status, onStatusChange]);
+
+    // handleAuto ref for imperative handle (populated below by useCallback)
+    const handleAutoRef = useRef<(() => Promise<void>) | null>(null);
+
+    /* ── Reset-before-reload + applyAll hook ── */
     useImperativeHandle(
       panelRef,
       () => ({
+        applyAll: async () => {
+          await handleAutoRef.current?.();
+        },
         resetIfApplied: async () => {
           /* Order: tier4 → tier3 → tier2 → tier1. Stack-unwind: building
              details come off first (they hang off wall / window / slab
@@ -381,13 +397,15 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         setTier3Result(null);
         setTier4Result(null);
         setStatus({ kind: "idle" });
+        // Re-fit camera after stripping ground/roof geometry
+        setTimeout(() => viewportRef.current?.fitToView(), 150);
       } catch (err) {
         setStatus({
           kind: "error",
           message: err instanceof Error ? err.message : "Reset failed.",
         });
       }
-    }, []);
+    }, [viewportRef]);
 
     /* ── Auto button — pick defaults based on model size, then apply ── */
     const handleAuto = useCallback(async () => {
@@ -412,6 +430,9 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         DEFAULT_TIER4_TOGGLES,
       );
     }, [handleApply, viewportRef]);
+
+    // Keep ref in sync so useImperativeHandle can call it
+    handleAutoRef.current = handleAuto;
 
     const classifiedSummary = useMemo(() => {
       if (status.kind !== "applied") return null;

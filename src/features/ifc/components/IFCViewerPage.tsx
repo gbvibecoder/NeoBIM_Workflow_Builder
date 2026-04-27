@@ -13,6 +13,10 @@ import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
 import { Sparkles, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
 import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/components/IFCEnhancePanel";
+import { AutoEnhanceLoader } from "@/features/ifc/components/AutoEnhanceLoader";
+import { ViewerSkeleton } from "@/features/ifc/components/ViewerSkeleton";
+import { shouldAutoEnhance } from "@/features/ifc/enhance/auto-enhance-orchestrator";
+import type { EnhanceStatus } from "@/features/ifc/enhance/types";
 
 /**
  * Sidebar tab identifiers.
@@ -54,7 +58,7 @@ function useBreakpoint() {
   return bp;
 }
 
-export default function IFCViewerPage() {
+export default function IFCViewerPage({ autoEnhance = false }: { autoEnhance?: boolean }) {
   /* State */
   const [modelInfo, setModelInfo] = useState<IFCModelInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,6 +80,9 @@ export default function IFCViewerPage() {
   const enhancePanelRef = useRef<IFCEnhancePanelHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resizingRef = useRef(false);
+  const autoEnhancedRef = useRef(false);
+  const [autoEnhancing, setAutoEnhancing] = useState(false);
+  const [enhanceStatus, setEnhanceStatus] = useState<EnhanceStatus>({ kind: "idle" });
   const bp = useBreakpoint();
 
   /* Panel resize handler */
@@ -247,11 +254,24 @@ export default function IFCViewerPage() {
   const handleLoadComplete = useCallback(() => {
     setLoading(false);
     setBottomPanelOpen(true);
-    /* Snap to Editor tab after a fresh load so the feature surface is the
-       first thing the user sees — they just dropped a file in, now they can
-       modify it. Users can manually switch to Tree/Properties/Enhance any time. */
     setBottomTab("editor");
-  }, []);
+
+    // Auto-enhance: apply all tiers when opening a BuildFlow-generated IFC
+    if (shouldAutoEnhance(autoEnhance) && !autoEnhancedRef.current) {
+      autoEnhancedRef.current = true;
+      setAutoEnhancing(true);
+      // Short delay so the viewport renders at least one frame first
+      setTimeout(() => {
+        enhancePanelRef.current?.applyAll()
+          .catch((err) => console.warn("[auto-enhance] failed:", err))
+          .finally(() => {
+            setAutoEnhancing(false);
+            // Re-fit camera after enhance adds ground/roof geometry
+            setTimeout(() => viewportRef.current?.fitToView(), 200);
+          });
+      }, 300);
+    }
+  }, [autoEnhance]);
 
   const handleError = useCallback((message: string) => {
     setError(message);
@@ -487,6 +507,16 @@ export default function IFCViewerPage() {
             onMeasurement={handleMeasurement}
             onContextMenu={handleContextMenu}
           />
+
+          {/* Skeleton overlay during WASM + IFC parse */}
+          <ViewerSkeleton
+            visible={loading && !hasModel}
+            progress={loadProgress}
+            message={loadMessage}
+          />
+
+          {/* Auto-enhance progress overlay */}
+          <AutoEnhanceLoader status={enhanceStatus} visible={autoEnhancing} />
 
           {/* Upload zone overlay */}
           {!hasModel && (
@@ -735,6 +765,7 @@ export default function IFCViewerPage() {
                         ref={enhancePanelRef}
                         viewportRef={viewportRef}
                         hasModel={hasModel}
+                        onStatusChange={setEnhanceStatus}
                       />
                     </div>
                   )}
