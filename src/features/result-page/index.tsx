@@ -36,6 +36,10 @@ import {
   PipelineTimelineSection,
   isPipelineTimelineEligible,
 } from "@/features/result-page/components/sections/PipelineTimelineSection";
+import {
+  LogsSection,
+  isLogsSectionEligible,
+} from "@/features/result-page/components/sections/LogsSection";
 import { LiveStatusStrip } from "@/features/result-page/components/sections/LiveStatusStrip";
 import { NotFound } from "@/features/result-page/components/empty/NotFound";
 import { Forbidden } from "@/features/result-page/components/empty/Forbidden";
@@ -226,11 +230,13 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
                 const willData = isDataPreviewEligible(data);
                 const willExports = isExportsEligible(data);
                 const willPipeline = isPipelineTimelineEligible(data.pipelineSteps);
+                const willLogs = isLogsSectionEligible();
                 const dedicatedIdx = willDedicated ? next() : 0;
                 const assetsIdx = willAssets ? next() : 0;
                 const dataIdx = willData ? next() : 0;
                 const exportsIdx = willExports ? next() : 0;
                 const pipelineIdx = willPipeline ? next() : 0;
+                const logsIdx = willLogs ? next() : 0;
                 return (
                   <>
                     {willDedicated ? (
@@ -256,6 +262,11 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
                     {willPipeline ? (
                       <ErrorBoundary>
                         <PipelineTimelineSection steps={data.pipelineSteps} index={pipelineIdx} />
+                      </ErrorBoundary>
+                    ) : null}
+                    {willLogs ? (
+                      <ErrorBoundary>
+                        <LogsSection index={logsIdx} />
                       </ErrorBoundary>
                     ) : null}
                   </>
