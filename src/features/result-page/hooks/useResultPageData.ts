@@ -510,7 +510,11 @@ export function useResultPageData(executionId: string): ResultPageData {
     const primaryVideoProgress = videoData?.nodeId
       ? videoGenProgress.get(videoData.nodeId) ?? null
       : null;
+    // If the video URL already exists, the video is ready — stale progress
+    // state should never block the finished video from displaying.
+    const videoAlreadyReady = !!(videoData?.videoUrl);
     const isVideoGenerating =
+      !videoAlreadyReady &&
       !!primaryVideoProgress &&
       (primaryVideoProgress.status === "submitting" ||
         primaryVideoProgress.status === "processing" ||
