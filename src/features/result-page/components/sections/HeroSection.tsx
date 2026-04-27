@@ -864,7 +864,7 @@ function Model3DVariant({ data, model }: { data: ResultPageData; model: Model3DD
             }}
           >
             <ExternalLink size={15} aria-hidden="true" />
-            Open in IFC Viewer
+            Walk Through in 3D
             <ArrowRight size={15} aria-hidden="true" />
           </a>
         ) : null}

@@ -100,7 +100,7 @@ export function DedicatedVisualizerEntries({ data, index }: DedicatedVisualizerE
   if (ifcFile) {
     entries.push({
       id: "ifc",
-      title: "Open in IFC Viewer",
+      title: "Walk Through in 3D",
       subtitle: "Inspect every BIM element · web-ifc WASM",
       icon: <Box size={20} />,
       iconColor: "#D97706",
