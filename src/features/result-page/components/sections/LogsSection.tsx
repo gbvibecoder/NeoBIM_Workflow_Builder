@@ -22,10 +22,10 @@ const MONO = "var(--font-jetbrains), ui-monospace, monospace";
 
 const LEVEL_COLOR: Record<string, string> = {
   debug: "#94A3B8",
-  info: "#3B82F6",
+  info: "#2563EB",
   warn: "#D97706",
-  error: "#EF4444",
-  success: "#10B981",
+  error: "#DC2626",
+  success: "#059669",
 };
 
 const STATUS_ICON: Record<string, { icon: typeof CheckCircle2; color: string }> = {
@@ -144,10 +144,10 @@ export function LogsSection({ index }: LogsSectionProps) {
 
         <div
           style={{
-            background: "#0F172A",
+            background: "#FFFFFF",
             borderRadius: 16,
-            border: "1px solid rgba(255,255,255,0.06)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            border: "1px solid rgba(0,0,0,0.06)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
             overflow: "hidden",
           }}
         >
@@ -155,17 +155,18 @@ export function LogsSection({ index }: LogsSectionProps) {
           <div
             style={{
               padding: "12px 20px",
-              borderBottom: "1px solid rgba(255,255,255,0.06)",
+              borderBottom: "1px solid rgba(0,0,0,0.06)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               fontFamily: MONO,
               fontSize: 11,
-              color: "#94A3B8",
+              color: "#64748B",
+              background: "#F8FAFC",
             }}
           >
             <span>EXECUTION · {trace.executionId}</span>
-            <span>{trace.totalDurationMs ? formatMs(trace.totalDurationMs) : ""}</span>
+            <span style={{ color: "#0F172A", fontWeight: 600 }}>{trace.totalDurationMs ? formatMs(trace.totalDurationMs) : ""}</span>
           </div>
 
           {/* Node entries */}
@@ -204,7 +205,7 @@ function NodeLogEntry({
   return (
     <div
       style={{
-        borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.04)",
+        borderBottom: isLast ? "none" : "1px solid rgba(0,0,0,0.04)",
       }}
     >
       {/* Node header (clickable) */}
@@ -216,19 +217,19 @@ function NodeLogEntry({
           alignItems: "center",
           gap: 12,
           padding: "12px 20px",
-          background: isExpanded ? "rgba(255,255,255,0.03)" : "transparent",
+          background: isExpanded ? "#F8FAFC" : "transparent",
           border: "none",
           cursor: "pointer",
           textAlign: "left",
           fontFamily: MONO,
           fontSize: 12,
-          color: "#E2E8F0",
+          color: "#0F172A",
         }}
       >
         {isExpanded ? (
-          <ChevronDown size={14} color="#64748B" />
+          <ChevronDown size={14} color="#94A3B8" />
         ) : (
-          <ChevronRight size={14} color="#64748B" />
+          <ChevronRight size={14} color="#94A3B8" />
         )}
         <StatusIcon size={14} color={statusInfo.color} />
         <span style={{ fontWeight: 600, minWidth: 0, flex: 1 }}>
@@ -239,8 +240,8 @@ function NodeLogEntry({
             fontSize: 10,
             padding: "2px 8px",
             borderRadius: 9999,
-            background: node.isMock ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.06)",
-            color: node.isMock ? "#D97706" : "#94A3B8",
+            background: node.isMock ? "#FEF3C7" : "#F1F5F9",
+            color: node.isMock ? "#92400E" : "#64748B",
             fontWeight: 500,
           }}
         >
@@ -260,6 +261,7 @@ function NodeLogEntry({
           style={{
             padding: "0 20px 14px 52px",
             overflow: "hidden",
+            background: "#FAFBFC",
           }}
         >
           {/* Summary */}
@@ -268,7 +270,7 @@ function NodeLogEntry({
               style={{
                 fontFamily: MONO,
                 fontSize: 11,
-                color: "#94A3B8",
+                color: "#64748B",
                 marginBottom: 8,
                 lineHeight: 1.5,
               }}
@@ -291,13 +293,13 @@ function NodeLogEntry({
                   style={{
                     fontFamily: MONO,
                     fontSize: 10,
-                    color: attempt.status === "success" ? "#10B981" : "#EF4444",
+                    color: attempt.status === "success" ? "#059669" : "#DC2626",
                     display: "flex",
                     gap: 8,
                     padding: "2px 0",
                   }}
                 >
-                  <span style={{ color: "#64748B" }}>attempt {attempt.attemptNumber}</span>
+                  <span style={{ color: "#94A3B8" }}>attempt {attempt.attemptNumber}</span>
                   <span>{attempt.action}</span>
                   <span style={{ color: "#64748B" }}>{formatMs(attempt.durationMs)}</span>
                   {attempt.detail && (
@@ -327,7 +329,7 @@ function LogLine({ entry, baseTs }: { entry: LogEntry; baseTs: number }) {
         lineHeight: 1.5,
       }}
     >
-      <span style={{ color: "#475569", flexShrink: 0, width: 80 }}>
+      <span style={{ color: "#94A3B8", flexShrink: 0, width: 80 }}>
         {formatTimestamp(entry.timestamp, baseTs)}
       </span>
       <span
@@ -342,7 +344,7 @@ function LogLine({ entry, baseTs }: { entry: LogEntry; baseTs: number }) {
       >
         {entry.level}
       </span>
-      <span style={{ color: "#CBD5E1", minWidth: 0, wordBreak: "break-word" }}>
+      <span style={{ color: "#334155", minWidth: 0, wordBreak: "break-word" }}>
         {entry.message}
       </span>
     </div>
