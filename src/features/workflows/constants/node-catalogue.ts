@@ -354,7 +354,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   {
     id: "GN-001",
     name: "Massing Generator",
-    description: "Generate AI-powered 3D massing models from building description using Text-to-3D",
+    description: "Generate procedural BIM massing geometry with walls, windows, doors, slabs, columns, and MEP",
     category: "generate",
     icon: "Box",
     inputs: [{ id: "req-in", label: "Requirements", type: "json" }],
@@ -362,9 +362,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
       { id: "geo-out", label: "3D Massing", type: "geometry" },
       { id: "kpi-out", label: "KPIs", type: "json" },
     ],
-    apiEngine: "3D AI Studio",
-    tags: ["massing", "3d", "geometry", "building", "volume", "ai", "text-to-3d"],
-    executionTime: "2-5 min",
+    apiEngine: "Procedural BIM",
+    tags: ["massing", "3d", "geometry", "building", "volume", "bim", "ifc"],
+    executionTime: "10-30s",
   },
   {
     id: "GN-002",
