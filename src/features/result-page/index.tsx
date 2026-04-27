@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useResultPageData } from "@/features/result-page/hooks/useResultPageData";
 import { selectHero } from "@/features/result-page/lib/select-hero";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
-import { ExecutionDiagnosticsPanel } from "@/components/diagnostics/ExecutionDiagnosticsPanel";
 import { retryPollVideoGeneration } from "@/features/execution/hooks/useExecution";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 
@@ -277,7 +276,6 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
         </main>
       </div>
 
-      <ExecutionDiagnosticsPanel />
     </Frame>
   );
 }
