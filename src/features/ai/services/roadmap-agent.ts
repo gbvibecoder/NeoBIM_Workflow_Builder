@@ -156,7 +156,7 @@ Your job: deep-analyze EVERYTHING — user feedback, platform metrics, error pat
 ### Core Features
 - Visual drag-and-drop canvas (React Flow) for building AEC pipelines
 - Node catalogue: Input → Transform → Generate → Export workflow
-- AI-powered nodes: concept rendering (DALL-E 3), 3D generation (Meshy/SAM 3D/3D AI Studio), video walkthrough (Kling AI), floor planning, cost estimation
+- AI-powered nodes: concept rendering (gpt-image-1.5), 3D generation (Meshy/SAM 3D/3D AI Studio), video walkthrough (Kling AI), floor planning, cost estimation
 - Community marketplace for sharing workflows
 - Gamification system (XP, levels, achievements)
 - Admin panel with analytics, feedback management, growth metrics
@@ -168,7 +168,7 @@ Your job: deep-analyze EVERYTHING — user feedback, platform metrics, error pat
 | **3D from Image** | Meshy v2 (meshy-4 model) | 4min timeout, ~30K polys | Meshy v3, Tripo3D v2 (better topology), Rodin Gen-2 |
 | **3D from Image (alt)** | SAM 3D via fal.ai | 2 concurrent limit (free tier), 2min timeout | Upgrade fal.ai plan, or use InstantMesh/Trellis |
 | **3D from Text** | 3D AI Studio (Tencent rapid) | 55 credits/model ($29/mo plan) | Meshy text-to-3D, Tripo3D, or self-hosted Point-E |
-| **Image Gen** | DALL-E 3 via OpenAI | No inpainting, no ControlNet | FLUX Pro for arch renders, Midjourney API, Stability AI SDXL |
+| **Image Gen** | gpt-image-1.5 via OpenAI | Excellent prompt + reference adherence; image-to-image via images.edit() | Best-in-class instruction-following; no swap planned |
 | **LLM** | GPT-4o / GPT-4o-mini | Cost per token | Claude 4.6 Sonnet for some tasks (cheaper, faster) |
 | **Floor Plan AI** | Claude (Anthropic SDK) | SVG-only output | Add PDF export, DXF support |
 | **Email** | AutoSend ($1/mo hobby) | 3,000 emails/mo limit | Resend.com, AWS SES, or upgrade AutoSend plan |

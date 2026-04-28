@@ -357,16 +357,18 @@ export const handleGN011: NodeHandler = async (ctx) => {
     console.warn("[GN-011] R2 upload failed:", r2Err);
   }
 
-  // ── DALL-E 3 Photorealistic Render (non-blocking) ──
-  // Use same key resolution as TR-004: user key → env var fallback
+  // ── Photorealistic floor plan render (non-blocking) ──
+  // Pipeline: rasterize room layout → gpt-image-1.5 images.edit with
+  // input_fidelity:"high" → photorealistic dollhouse cutaway preserving the
+  // exact room positions and proportions. See generateFloorPlanRender.
   const renderApiKey = apiKey || process.env.OPENAI_API_KEY || undefined;
   let aiRenderUrl = "";
   try {
     const { generateFloorPlanRender } = await import("@/features/ai/services/openai");
-    const renderRooms = fpRooms.map((r: { name: string; type: string; width: number; depth: number }) => ({
-      name: r.name, type: r.type, width: r.width, depth: r.depth,
+    const renderRooms = fpRooms.map((r: { name: string; type: string; width: number; depth: number; x?: number; y?: number }) => ({
+      name: r.name, type: r.type, width: r.width, depth: r.depth, x: r.x, y: r.y,
     }));
-    logger.debug(`[GN-011] Generating DALL-E 3 photorealistic render for ${renderRooms.length} rooms...`);
+    logger.debug(`[GN-011] Generating photorealistic floor-plan render for ${renderRooms.length} rooms...`);
     logger.debug(`[GN-011] API key present: ${!!renderApiKey}, source: ${apiKey ? "user" : process.env.OPENAI_API_KEY ? "env" : "NONE"}, key prefix: ${renderApiKey ? renderApiKey.substring(0, 8) + "..." : "NONE"}`);
     const renderResult = await generateFloorPlanRender(
       renderRooms,
@@ -374,11 +376,11 @@ export const handleGN011: NodeHandler = async (ctx) => {
       { userApiKey: renderApiKey },
     );
     aiRenderUrl = renderResult.imageUrl;
-    logger.debug(`[GN-011] DALL-E render ready: ${aiRenderUrl ? aiRenderUrl.substring(0, 60) + "..." : "EMPTY"} (${(aiRenderUrl.length / 1024).toFixed(0)}KB)`);
+    logger.debug(`[GN-011] Floor-plan render ready: ${aiRenderUrl ? aiRenderUrl.substring(0, 60) + "..." : "EMPTY"} (${(aiRenderUrl.length / 1024).toFixed(0)}KB)`);
   } catch (renderErr: unknown) {
     const errMsg = renderErr instanceof Error ? renderErr.message : String(renderErr);
     const stack = renderErr instanceof Error ? renderErr.stack : "";
-    console.warn(`[GN-011] DALL-E render failed (non-critical): ${errMsg}`);
+    console.warn(`[GN-011] Floor-plan render failed (non-critical): ${errMsg}`);
     if (stack) console.warn(`[GN-011] Stack: ${stack}`);
   }
   logger.debug(`[GN-011] Final aiRenderUrl: ${aiRenderUrl ? "YES (" + aiRenderUrl.length + " chars)" : "NONE"}`);

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { detectOpenAIError, APIError } from "@/lib/user-errors";
 import type { FloorPlanRoomType } from "@/features/floor-plan/types/floor-plan";
+import { OPENAI_IMAGE_MODEL, normalizeImageResponse, fetchAsDataUrl } from "./image-generation";
 
 export function getClient(userApiKey?: string, timeout?: number): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;
@@ -732,7 +733,7 @@ async function sketchToRender(
   // but allow full creative freedom for photorealistic materials, depth, and detail.
   // "medium" produced too-literal/flat results that looked CGI.
   const response = await client.images.edit({
-    model: "gpt-image-1",
+    model: OPENAI_IMAGE_MODEL,
     image: imageFile,
     prompt: fullPrompt,
     size: "1536x1024" as "1024x1024", // landscape for exterior renders (type workaround)
@@ -769,12 +770,33 @@ async function sketchToRender(
   };
 }
 
+/**
+ * Softens an architectural prompt for content-policy retry.
+ * Removes commonly-flagged terms while preserving structural intent.
+ * Used as a Path-3 retry strategy when Path 2 fails (replaces the legacy
+ * DALL-E 3 fallback — DALL-E 3 cannot accept reference images and produces
+ * generic output, so retrying with the same model under safer parameters is
+ * strictly better).
+ */
+function softenArchitecturalPromptForRetry(prompt: string): string {
+  return prompt
+    .replace(/\bdemolish(ed|ing)?\b/gi, "renovate")
+    .replace(/\bruins?\b/gi, "weathered structure")
+    .replace(/\bblood\w*\b/gi, "warm")
+    .replace(/\babandoned\b/gi, "vacant")
+    .replace(/\bmilitary\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 // ─── generateConceptImage ─────────────────────────────────────────────────────
 //
 // Primary render pipeline for GN-003. Uses a tiered approach:
-// 1. BuildingDescription → Elevation Sketch (SVG) → gpt-image-1 edit (BEST accuracy)
-// 2. String prompt → gpt-image-1 generate (good accuracy, no sketch)
-// 3. Fallback → DALL-E 3 (legacy, if gpt-image-1 unavailable)
+// 0. PDF brief reference images → gpt-image-1.5 multi-reference edit (HIGHEST
+//    fidelity to user's actual brief; fires when referenceImageUrls supplied)
+// 1. BuildingDescription → Elevation Sketch (SVG) → gpt-image-1.5 edit
+// 2. String prompt → gpt-image-1.5 generate (good accuracy, no sketch)
+// 3. Fallback → gpt-image-1.5 retry with softened prompt + smaller size/quality
 
 export async function generateConceptImage(
   descriptionOrPrompt: BuildingDescription | string,
@@ -783,10 +805,76 @@ export async function generateConceptImage(
   location?: string,
   cameraAngle?: string,
   timeOfDay?: string,
-  viewType: "exterior" | "floor_plan" | "site_plan" | "interior" = "exterior"
+  viewType: "exterior" | "floor_plan" | "site_plan" | "interior" = "exterior",
+  /** Optional reference images extracted from a PDF brief (R2 URLs). When
+   *  present, Path 0 runs first and feeds them to gpt-image-1.5 images.edit()
+   *  so the rendered output is anchored to the user's actual visual brief
+   *  (mood photos, site shots, sketches) instead of a generic interpretation. */
+  referenceImageUrls?: string[],
 ): Promise<{ url: string; revisedPrompt: string }> {
   return handleOpenAICall(async () => {
-    const client = getClient(userApiKey, 120000); // 120s for gpt-image-1
+    const client = getClient(userApiKey, 120000); // 120s for gpt-image-1.5
+
+    // ── Path 0: PDF brief references → multi-reference edit (HIGHEST priority) ──
+    // gpt-image-1.5 images.edit() accepts up to 16 reference images. When the
+    // user uploaded a PDF brief that contained mood photos / site references,
+    // those images are FAR more accurate signal than any text description.
+    // Use input_fidelity:"low" — references are mood/style anchors, not
+    // literal copies (the rendered building should match the BRIEF's vibe,
+    // not pixel-copy the references).
+    if (referenceImageUrls && referenceImageUrls.length > 0) {
+      try {
+        const pdfBriefPrompt = typeof descriptionOrPrompt === "string"
+          ? descriptionOrPrompt
+          : buildPhotorealisticPrompt(
+              descriptionOrPrompt,
+              location || "urban setting",
+              cameraAngle || "eye-level corner",
+              timeOfDay || "golden hour",
+            );
+
+        const referenceFiles = await Promise.all(
+          referenceImageUrls.slice(0, 16).map(async (url, idx) => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Failed to fetch reference ${idx}: ${res.status}`);
+            const buf = Buffer.from(await res.arrayBuffer());
+            return new File([new Uint8Array(buf)], `brief-ref-${idx}.png`, { type: "image/png" });
+          }),
+        );
+
+        const compositePrompt =
+          `${pdfBriefPrompt}\n\n` +
+          `IMPORTANT: Use the attached ${referenceFiles.length} reference image(s) ` +
+          `from the user's brief as PRIMARY visual inspiration — match their style, ` +
+          `materials, atmosphere, and architectural language. Do NOT pixel-copy any ` +
+          `reference; produce an original ${viewType} render of the described building ` +
+          `that visibly belongs to the same design family as the references. ` +
+          `Photorealistic, no text or labels in output.`;
+
+        const size = (viewType === "exterior" || viewType === "interior") ? "1536x1024" : "1024x1024";
+        const response = await client.images.edit({
+          model: OPENAI_IMAGE_MODEL,
+          image: referenceFiles,
+          prompt: compositePrompt,
+          n: 1,
+          size: size as "1024x1024",
+          quality: "high",
+          input_fidelity: "low" as "high", // mood reference, not literal copy
+        });
+
+        const { url, revisedPrompt } = await normalizeImageResponse(
+          response.data?.[0],
+          "concept-pdf-brief",
+        );
+        return { url, revisedPrompt: revisedPrompt || compositePrompt };
+      } catch (pdfRefErr) {
+        console.warn(
+          "[generateConceptImage] PDF reference path failed, falling through to sketch/text paths:",
+          pdfRefErr,
+        );
+        // Fall through to Path 1
+      }
+    }
 
     // ── Path 1: BuildingDescription → Sketch → gpt-image-1 Render (highest accuracy) ──
     if (typeof descriptionOrPrompt !== "string" && viewType === "exterior") {
@@ -837,7 +925,7 @@ export async function generateConceptImage(
     try {
       const size = (viewType === "exterior" || viewType === "interior") ? "1536x1024" : "1024x1024";
       const response = await client.images.generate({
-        model: "gpt-image-1.5",
+        model: OPENAI_IMAGE_MODEL,
         prompt: imagePrompt,
         n: 1,
         size: size as "1024x1024", // type workaround for extended sizes
@@ -866,25 +954,27 @@ export async function generateConceptImage(
         revisedPrompt: image?.revised_prompt ?? imagePrompt,
       };
     } catch (gptImgErr) {
-      // ── Path 3: Fallback to DALL-E 3 (legacy) ──
-      console.warn("[generateConceptImage] gpt-image-1 failed, falling back to DALL-E 3:", gptImgErr);
+      // ── Path 3: Retry gpt-image-1.5 with softened prompt + smaller size ──
+      // Replaces the legacy DALL-E 3 fallback. DALL-E 3 cannot accept reference
+      // images and produces generic output; retrying with the same model under
+      // safer parameters (softened prompt, 1024x1024, medium quality) is strictly
+      // better than switching models. Common Path-2 failures this recovers:
+      //   - content policy rejections (softened prompt usually passes)
+      //   - timeouts (smaller image is faster)
+      //   - transient 5xx (clean retry)
+      console.warn("[generateConceptImage] gpt-image-1.5 path 2 failed, retrying with softened prompt:", gptImgErr);
       const fallbackClient = getClient(userApiKey, 60000);
+      const softened = softenArchitecturalPromptForRetry(imagePrompt);
       const response = await fallbackClient.images.generate({
-        model: "dall-e-3",
-        prompt: imagePrompt,
+        model: OPENAI_IMAGE_MODEL,
+        prompt: softened,
         n: 1,
         size: "1024x1024",
-        quality: "hd",
-        style: "natural",
+        quality: "medium",
       });
 
-      const image = response.data?.[0];
-      if (!image?.url) throw new Error("No image URL in DALL-E response");
-
-      return {
-        url: image.url,
-        revisedPrompt: image.revised_prompt ?? imagePrompt,
-      };
+      const { url, revisedPrompt } = await normalizeImageResponse(response.data?.[0], "concept-fallback");
+      return { url, revisedPrompt: revisedPrompt || softened };
     }
   });
 }
@@ -1042,7 +1132,7 @@ export async function generateRenovationRender(
     let response;
     try {
       response = await client.images.edit({
-        model: "gpt-image-1",
+        model: OPENAI_IMAGE_MODEL,
         image: imageFile,
         prompt: renovationPrompt,
         size: "auto" as "1024x1024",
@@ -1052,7 +1142,7 @@ export async function generateRenovationRender(
     } catch (autoErr) {
       console.warn("[RenovationRender] 'auto' size not supported, falling back to 1536x1024:", autoErr);
       response = await client.images.edit({
-        model: "gpt-image-1",
+        model: OPENAI_IMAGE_MODEL,
         image: imageFile,
         prompt: renovationPrompt,
         size: "1536x1024" as "1024x1024",
@@ -2643,12 +2733,34 @@ export interface ParsedBrief {
   designIntent?: string;
   keyRequirements?: string[];
   rawText: string;
+  /** R2 URLs of reference images extracted from the PDF (mood photos, site
+   *  shots, mood-board pages). Downstream image-generation nodes pass these
+   *  to gpt-image-1.5 images.edit() so the rendered output is anchored to
+   *  the user's actual visual references instead of generic interpretation. */
+  referenceImageUrls?: string[];
 }
 
 export async function parseBriefDocument(
   pdfText: string,
-  userApiKey?: string
+  userApiKey?: string,
+  /** Optional raw PDF buffer. When provided, embedded raster images are
+   *  extracted, ranked, and uploaded to R2 — their URLs are returned in
+   *  ParsedBrief.referenceImageUrls. Backward compatible: callers passing
+   *  only text continue to receive a text-only ParsedBrief. */
+  pdfBuffer?: Buffer,
 ): Promise<ParsedBrief> {
+  // Kick off image extraction in parallel with text parsing — the two
+  // operations are independent and the wall-clock saving is meaningful
+  // (extraction + upload can take 2-4s on a typical brief).
+  const referenceImagesPromise: Promise<string[]> = pdfBuffer
+    ? import("./pdf-image-extractor")
+        .then((m) => m.extractAndUploadBriefReferenceImages(pdfBuffer))
+        .catch((err) => {
+          console.warn("[parseBriefDocument] reference image extraction failed:", err);
+          return [];
+        })
+    : Promise.resolve([]);
+
   return handleOpenAICall(async () => {
     const client = getClient(userApiKey);
 
@@ -2691,12 +2803,14 @@ If information is not found in the text, omit the field. Be precise with numbers
     if (!content) throw new Error("OpenAI returned empty response for brief parsing");
 
     const parsed = JSON.parse(content) as Omit<ParsedBrief, "rawText">;
+    const referenceImageUrls = await referenceImagesPromise;
 
     return {
       ...parsed,
       projectTitle: parsed.projectTitle || "Untitled Project",
       projectType: parsed.projectType || "unknown",
       rawText: text,
+      ...(referenceImageUrls.length > 0 ? { referenceImageUrls } : {}),
     };
   });
 }
@@ -3407,27 +3521,31 @@ JSON response:
   }
 }
 
-// ─── DALL-E 3 Photorealistic Floor Plan Render ──────────────────────────────
+// ─── Photorealistic Floor Plan Render (gpt-image-1.5) ───────────────────────
 
 /**
- * Generates a photorealistic aerial render of a floor plan using DALL-E 3.
- * Takes room descriptions and building info → creates an architectural visualization.
- * Returns the image as a base64 data URL.
+ * Generates a photorealistic dollhouse render of a floor plan.
+ *
+ * Architectural fix (2026-04): the previous implementation flattened room
+ * data into a text prompt and called images.generate() with no reference
+ * image — the model never saw the actual layout, so the output was generic.
+ * Now we rasterize the room layout into a PNG via floor-plan-rasterizer.ts
+ * and pass it to images.edit() with input_fidelity:"high". The model sees
+ * the geometry directly and preserves room positions and proportions.
+ *
+ * Returns the image as a base64 data URL (the GN-011 Three.js scene
+ * embeds it directly without fetching).
  */
 export async function generateFloorPlanRender(
-  rooms: Array<{ name: string; type: string; width: number; depth: number }>,
+  rooms: Array<{ name: string; type: string; width: number; depth: number; x?: number; y?: number }>,
   buildingDimensions: { width: number; depth: number },
   options?: {
     style?: "modern" | "scandinavian" | "industrial" | "luxury" | "minimal";
     userApiKey?: string;
   },
 ): Promise<{ imageUrl: string; revisedPrompt: string }> {
-  const client = getClient(options?.userApiKey, 60000); // 60s — DALL-E 3 HD images take longer
+  const client = getClient(options?.userApiKey, 120000); // 120s — gpt-image-1.5 high-quality renders
   const style = options?.style ?? "modern";
-
-  const roomList = rooms
-    .map(r => `${r.name} (${r.type}, ${r.width.toFixed(1)}m x ${r.depth.toFixed(1)}m)`)
-    .join(", ");
 
   const styleDescriptions: Record<string, string> = {
     modern: "clean contemporary design with warm wood floors, white walls, designer furniture, indoor plants, and natural light streaming through large windows",
@@ -3437,32 +3555,56 @@ export async function generateFloorPlanRender(
     minimal: "Japanese-inspired minimalist design with tatami mats, shoji screens, low furniture, neutral earth tones, and zen garden elements",
   };
 
-  const prompt = `Architectural dollhouse cutaway from above at a 45-degree angle, looking into a ${buildingDimensions.width.toFixed(0)}m x ${buildingDimensions.depth.toFixed(0)}m residential floor plan with the ceiling/roof completely removed, open top view like a miniature model home. Rooms: ${roomList}. Interior is fully furnished and decorated in ${styleDescriptions[style]}. Real wood plank floors in living spaces, clean white walls with subtle shadows between rooms. Each room has appropriate furniture arranged naturally. Warm golden-hour sunlight streaming through windows casting soft long shadows across the interior. Photorealistic, architectural visualization quality, tilt-shift depth of field, 8K detail. No text, no labels, no annotations, no people.`;
+  // Pass the room semantics in the prompt so each room gets appropriate furniture.
+  // The schematic provides geometry; this list provides "what each labelled room is for".
+  const roomSemantics = rooms
+    .map((r) => `${r.name} (${r.type})`)
+    .join(", ");
 
+  const prompt =
+    `Photorealistic architectural dollhouse cutaway from above at a 45-degree angle, ` +
+    `matching the EXACT floor plan layout shown in the reference image. The roof and ` +
+    `ceiling are completely removed, like a miniature model home seen from above. ` +
+    `EVERY ROOM in the reference must be present, in the SAME POSITION and SAME ` +
+    `PROPORTIONS as drawn. Rooms: ${roomSemantics}. Each room is fully furnished ` +
+    `and decorated in ${styleDescriptions[style]}. Real wood plank floors in living ` +
+    `spaces, clean white walls with subtle shadows between rooms. Each room has ` +
+    `appropriate furniture for its labelled type. Warm golden-hour sunlight streaming ` +
+    `through windows casting soft long shadows across the interior. Photorealistic, ` +
+    `architectural visualization quality, tilt-shift depth of field, 8K detail. ` +
+    `IGNORE any text labels in the reference image — render the OUTPUT with NO text, ` +
+    `NO labels, NO annotations, NO people. Match the reference floor plan exactly.`;
 
   return handleOpenAICall(async () => {
-    const response = await client.images.generate({
-      model: "dall-e-3",
-      prompt,
-      n: 1,
-      size: "1792x1024",
-      quality: "hd",
-      style: "natural",
+    // Rasterize the room layout to a PNG. This is the accuracy anchor —
+    // gpt-image-1.5 with input_fidelity:"high" preserves the room positions
+    // and proportions exactly, fixing the "generic output" failure mode of
+    // the previous text-only DALL-E 3 implementation.
+    const { rasterizeFloorPlanToPng } = await import("./floor-plan-rasterizer");
+    const layoutPng = await rasterizeFloorPlanToPng(rooms, buildingDimensions);
+    const layoutFile = new File([new Uint8Array(layoutPng)], "floor-plan.png", {
+      type: "image/png",
     });
 
-    const imageUrl = response.data?.[0]?.url;
-    const revisedPrompt = response.data?.[0]?.revised_prompt ?? "";
+    const response = await client.images.edit({
+      model: OPENAI_IMAGE_MODEL,
+      image: layoutFile,
+      prompt,
+      n: 1,
+      size: "1536x1024" as "1024x1024", // 3:2 landscape; closest supported aspect to old 1792x1024
+      quality: "high",
+      input_fidelity: "high", // critical: preserve the room layout exactly
+    });
 
-    if (!imageUrl) throw new Error("DALL-E 3 returned no image");
+    const { url, revisedPrompt } = await normalizeImageResponse(
+      response.data?.[0],
+      "floor-plan-render",
+    );
 
+    // GN-011 consumer expects a data URL embeddable directly in Three.js;
+    // convert if R2 returned an HTTP URL.
+    const imageUrl = url.startsWith("http") ? await fetchAsDataUrl(url) : url;
 
-    // Fetch the image and convert to base64 data URL for persistence
-    const imgResponse = await fetch(imageUrl);
-    const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
-    const base64 = imgBuffer.toString("base64");
-    const dataUrl = `data:image/png;base64,${base64}`;
-
-
-    return { imageUrl: dataUrl, revisedPrompt };
+    return { imageUrl, revisedPrompt: revisedPrompt || prompt };
   });
 }

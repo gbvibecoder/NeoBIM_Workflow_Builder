@@ -36,6 +36,7 @@
 import { redis, redisConfigured } from "@/lib/rate-limit";
 import { uploadToR2, uploadVideoToR2, isR2Configured } from "@/lib/r2";
 import { logger } from "@/lib/logger";
+import { OPENAI_IMAGE_MODEL } from "@/features/ai/services/image-generation";
 import OpenAI from "openai";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -698,7 +699,7 @@ export async function generateLifestyleImage(args: {
   // Landscape 1536x1024 — closest to a 16:9 cinematic frame, feeds Kling
   // image2video which generates 16:9 video output.
   const render = await client.images.edit({
-    model: "gpt-image-1.5",
+    model: OPENAI_IMAGE_MODEL,
     image: refFile,
     prompt,
     size: "1536x1024",

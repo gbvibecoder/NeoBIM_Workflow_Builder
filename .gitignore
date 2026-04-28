@@ -60,6 +60,7 @@ analytics-logs/
 
 # Generated files (AI tools, reports, scripts)
 *.sh
+!scripts/check-no-deprecated-image-models.sh
 *.txt
 *_SUMMARY.md
 *_REPORT.md

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateBuildingDescription, generateConceptImage } from "@/features/ai/services/openai";
+import { OPENAI_IMAGE_MODEL } from "@/features/ai/services/image-generation";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
 
@@ -127,10 +128,10 @@ export async function POST(req: NextRequest) {
         type: "image",
         data: {
           url,
-          label: "Concept Render (DALL-E 3)",
+          label: "Concept Render",
           style: revisedPrompt.substring(0, 100),
         },
-        metadata: { model: "dall-e-3", real: true, demo: true },
+        metadata: { model: OPENAI_IMAGE_MODEL, real: true, demo: true },
         createdAt: new Date(),
       };
     } else {

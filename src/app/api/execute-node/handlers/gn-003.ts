@@ -2,18 +2,18 @@ import {
   generateConceptImage,
   validateRenderWithClaude,
   generateId,
+  OPENAI_IMAGE_MODEL,
   type BuildingDescription,
   type RenderQAResult,
 } from "./deps";
 import type { NodeHandler } from "./types";
 
 /**
- * GN-003 — Concept Render Generator (DALL-E 3 / gpt-image-1) with Claude QA loop.
- * Pure copy from execute-node/route.ts (lines 1117-1241 of the pre-decomposition file).
+ * GN-003 — Concept Render Generator (gpt-image-1.5) with Claude QA loop.
  */
 export const handleGN003: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId, apiKey } = ctx;
-  // Concept Render Generator — DALL-E 3
+  // Concept Render Generator — gpt-image-1.5 via generateConceptImage
   const description = inputData?._raw ?? null;
   const prompt = inputData?.prompt ?? inputData?.content ?? "Modern mixed-use building, Nordic minimal style";
   const viewType = ((inputData?.viewType as string) ?? "exterior") as "exterior" | "floor_plan" | "site_plan" | "interior";
@@ -27,6 +27,14 @@ export const handleGN003: NodeHandler = async (ctx) => {
     ? inputData.content.match(/SITE ANALYSIS\s*[—–-]\s*(.+)/)?.[1]?.trim()
     : undefined;
   const effectiveLocation = locationFromDesc ?? locationFromContent ?? undefined;
+
+  // Reference images extracted from a PDF brief upstream (TR-001 populates this
+  // when the user uploaded a PDF with embedded photos / mood references). Path 0
+  // of generateConceptImage feeds them to gpt-image-1.5 images.edit() so the
+  // render is anchored to the user's actual visual brief.
+  const referenceImageUrls = Array.isArray(descRaw?.referenceImageUrls)
+    ? (descRaw.referenceImageUrls as string[]).filter((u) => typeof u === "string" && u.length > 0)
+    : undefined;
 
   // If upstream TR-005 already enhanced the prompt, use it directly.
   // Also check for render prompts from TR-004 floor plan pipeline (GPT-4o generated).
@@ -51,7 +59,8 @@ export const handleGN003: NodeHandler = async (ctx) => {
       effectiveLocation,
       undefined,
       undefined,
-      viewType
+      viewType,
+      referenceImageUrls,
     );
     url = result.url;
     revisedPrompt = result.revisedPrompt;
@@ -83,7 +92,8 @@ export const handleGN003: NodeHandler = async (ctx) => {
       effectiveLocation ?? desc.location,
       undefined,
       undefined,
-      viewType
+      viewType,
+      referenceImageUrls,
     );
     url = result.url;
     revisedPrompt = result.revisedPrompt;
@@ -134,7 +144,7 @@ export const handleGN003: NodeHandler = async (ctx) => {
       style: revisedPrompt.substring(0, 100),
       ...(qaResult && { _qa: { passed: qaResult.passed, floors: qaResult.detectedFloors, feedback: qaResult.feedback } }),
     },
-    metadata: { model: "gpt-image-1", real: true, qaValidated: !!qaResult?.passed },
+    metadata: { model: OPENAI_IMAGE_MODEL, real: true, qaValidated: !!qaResult?.passed },
     createdAt: new Date(),
   };
 };
