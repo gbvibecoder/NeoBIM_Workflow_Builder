@@ -35,6 +35,10 @@ export const handleTR001: NodeHandler = async (ctx) => {
   }
 
   let extractedText = typeof rawText === "string" ? rawText : "";
+  // Hoisted: parseBriefDocument can accept this buffer to extract embedded
+  // reference images (site photos, mood references, sketches) and pass them
+  // through to downstream image generation as visual anchors.
+  let pdfBuffer: Buffer | undefined;
 
   logger.debug("[TR-001] rawText from inputData:", typeof rawText, "length:", typeof rawText === "string" ? rawText.length : 0);
   logger.debug("[TR-001] pdfBase64 present:", !!pdfBase64, "type:", typeof pdfBase64, "length:", typeof pdfBase64 === "string" ? pdfBase64.length : 0);
@@ -46,9 +50,9 @@ export const handleTR001: NodeHandler = async (ctx) => {
       // (index.js tries to open ./test/data/05-versions-space.pdf when !module.parent)
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (buf: Buffer) => Promise<{ text: string; numpages: number; info: Record<string, unknown> }>;
-      const buffer = Buffer.from(pdfBase64, "base64");
-      logger.debug("[TR-001] PDF buffer size:", buffer.length, "bytes");
-      const pdfData = await pdfParse(buffer);
+      pdfBuffer = Buffer.from(pdfBase64, "base64");
+      logger.debug("[TR-001] PDF buffer size:", pdfBuffer.length, "bytes");
+      const pdfData = await pdfParse(pdfBuffer);
       logger.debug("[TR-001] pdf-parse result — pages:", pdfData.numpages, "text length:", pdfData.text?.length ?? 0);
       logger.debug("[TR-001] Extracted text (first 300):", pdfData.text?.slice(0, 300));
       extractedText = pdfData.text || "";
@@ -72,7 +76,10 @@ export const handleTR001: NodeHandler = async (ctx) => {
     );
   }
 
-  const parsed = await parseBriefDocument(extractedText, apiKey);
+  // Pass the PDF buffer (when available) so parseBriefDocument also extracts
+  // embedded reference images and uploads them to R2 for downstream renders.
+  const parsed = await parseBriefDocument(extractedText, apiKey, pdfBuffer);
+  logger.debug("[TR-001] reference images extracted:", parsed.referenceImageUrls?.length ?? 0);
 
   // Build a formatted text output that downstream nodes (TR-002, GN-001) can consume
   const programLines = (parsed.programme ?? [])

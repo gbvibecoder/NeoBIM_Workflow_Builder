@@ -28,6 +28,14 @@ export const handleGN003: NodeHandler = async (ctx) => {
     : undefined;
   const effectiveLocation = locationFromDesc ?? locationFromContent ?? undefined;
 
+  // Reference images extracted from a PDF brief upstream (TR-001 populates this
+  // when the user uploaded a PDF with embedded photos / mood references). Path 0
+  // of generateConceptImage feeds them to gpt-image-1.5 images.edit() so the
+  // render is anchored to the user's actual visual brief.
+  const referenceImageUrls = Array.isArray(descRaw?.referenceImageUrls)
+    ? (descRaw.referenceImageUrls as string[]).filter((u) => typeof u === "string" && u.length > 0)
+    : undefined;
+
   // If upstream TR-005 already enhanced the prompt, use it directly.
   // Also check for render prompts from TR-004 floor plan pipeline (GPT-4o generated).
   const enhancedPrompt = (inputData?.enhancedPrompt as string | undefined)
@@ -51,7 +59,8 @@ export const handleGN003: NodeHandler = async (ctx) => {
       effectiveLocation,
       undefined,
       undefined,
-      viewType
+      viewType,
+      referenceImageUrls,
     );
     url = result.url;
     revisedPrompt = result.revisedPrompt;
@@ -83,7 +92,8 @@ export const handleGN003: NodeHandler = async (ctx) => {
       effectiveLocation ?? desc.location,
       undefined,
       undefined,
-      viewType
+      viewType,
+      referenceImageUrls,
     );
     url = result.url;
     revisedPrompt = result.revisedPrompt;

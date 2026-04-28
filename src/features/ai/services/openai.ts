@@ -792,7 +792,9 @@ function softenArchitecturalPromptForRetry(prompt: string): string {
 // ─── generateConceptImage ─────────────────────────────────────────────────────
 //
 // Primary render pipeline for GN-003. Uses a tiered approach:
-// 1. BuildingDescription → Elevation Sketch (SVG) → gpt-image-1.5 edit (BEST accuracy)
+// 0. PDF brief reference images → gpt-image-1.5 multi-reference edit (HIGHEST
+//    fidelity to user's actual brief; fires when referenceImageUrls supplied)
+// 1. BuildingDescription → Elevation Sketch (SVG) → gpt-image-1.5 edit
 // 2. String prompt → gpt-image-1.5 generate (good accuracy, no sketch)
 // 3. Fallback → gpt-image-1.5 retry with softened prompt + smaller size/quality
 
@@ -803,10 +805,76 @@ export async function generateConceptImage(
   location?: string,
   cameraAngle?: string,
   timeOfDay?: string,
-  viewType: "exterior" | "floor_plan" | "site_plan" | "interior" = "exterior"
+  viewType: "exterior" | "floor_plan" | "site_plan" | "interior" = "exterior",
+  /** Optional reference images extracted from a PDF brief (R2 URLs). When
+   *  present, Path 0 runs first and feeds them to gpt-image-1.5 images.edit()
+   *  so the rendered output is anchored to the user's actual visual brief
+   *  (mood photos, site shots, sketches) instead of a generic interpretation. */
+  referenceImageUrls?: string[],
 ): Promise<{ url: string; revisedPrompt: string }> {
   return handleOpenAICall(async () => {
-    const client = getClient(userApiKey, 120000); // 120s for gpt-image-1
+    const client = getClient(userApiKey, 120000); // 120s for gpt-image-1.5
+
+    // ── Path 0: PDF brief references → multi-reference edit (HIGHEST priority) ──
+    // gpt-image-1.5 images.edit() accepts up to 16 reference images. When the
+    // user uploaded a PDF brief that contained mood photos / site references,
+    // those images are FAR more accurate signal than any text description.
+    // Use input_fidelity:"low" — references are mood/style anchors, not
+    // literal copies (the rendered building should match the BRIEF's vibe,
+    // not pixel-copy the references).
+    if (referenceImageUrls && referenceImageUrls.length > 0) {
+      try {
+        const pdfBriefPrompt = typeof descriptionOrPrompt === "string"
+          ? descriptionOrPrompt
+          : buildPhotorealisticPrompt(
+              descriptionOrPrompt,
+              location || "urban setting",
+              cameraAngle || "eye-level corner",
+              timeOfDay || "golden hour",
+            );
+
+        const referenceFiles = await Promise.all(
+          referenceImageUrls.slice(0, 16).map(async (url, idx) => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Failed to fetch reference ${idx}: ${res.status}`);
+            const buf = Buffer.from(await res.arrayBuffer());
+            return new File([new Uint8Array(buf)], `brief-ref-${idx}.png`, { type: "image/png" });
+          }),
+        );
+
+        const compositePrompt =
+          `${pdfBriefPrompt}\n\n` +
+          `IMPORTANT: Use the attached ${referenceFiles.length} reference image(s) ` +
+          `from the user's brief as PRIMARY visual inspiration — match their style, ` +
+          `materials, atmosphere, and architectural language. Do NOT pixel-copy any ` +
+          `reference; produce an original ${viewType} render of the described building ` +
+          `that visibly belongs to the same design family as the references. ` +
+          `Photorealistic, no text or labels in output.`;
+
+        const size = (viewType === "exterior" || viewType === "interior") ? "1536x1024" : "1024x1024";
+        const response = await client.images.edit({
+          model: OPENAI_IMAGE_MODEL,
+          image: referenceFiles,
+          prompt: compositePrompt,
+          n: 1,
+          size: size as "1024x1024",
+          quality: "high",
+          input_fidelity: "low" as "high", // mood reference, not literal copy
+        });
+
+        const { url, revisedPrompt } = await normalizeImageResponse(
+          response.data?.[0],
+          "concept-pdf-brief",
+        );
+        return { url, revisedPrompt: revisedPrompt || compositePrompt };
+      } catch (pdfRefErr) {
+        console.warn(
+          "[generateConceptImage] PDF reference path failed, falling through to sketch/text paths:",
+          pdfRefErr,
+        );
+        // Fall through to Path 1
+      }
+    }
 
     // ── Path 1: BuildingDescription → Sketch → gpt-image-1 Render (highest accuracy) ──
     if (typeof descriptionOrPrompt !== "string" && viewType === "exterior") {
@@ -2665,12 +2733,34 @@ export interface ParsedBrief {
   designIntent?: string;
   keyRequirements?: string[];
   rawText: string;
+  /** R2 URLs of reference images extracted from the PDF (mood photos, site
+   *  shots, mood-board pages). Downstream image-generation nodes pass these
+   *  to gpt-image-1.5 images.edit() so the rendered output is anchored to
+   *  the user's actual visual references instead of generic interpretation. */
+  referenceImageUrls?: string[];
 }
 
 export async function parseBriefDocument(
   pdfText: string,
-  userApiKey?: string
+  userApiKey?: string,
+  /** Optional raw PDF buffer. When provided, embedded raster images are
+   *  extracted, ranked, and uploaded to R2 — their URLs are returned in
+   *  ParsedBrief.referenceImageUrls. Backward compatible: callers passing
+   *  only text continue to receive a text-only ParsedBrief. */
+  pdfBuffer?: Buffer,
 ): Promise<ParsedBrief> {
+  // Kick off image extraction in parallel with text parsing — the two
+  // operations are independent and the wall-clock saving is meaningful
+  // (extraction + upload can take 2-4s on a typical brief).
+  const referenceImagesPromise: Promise<string[]> = pdfBuffer
+    ? import("./pdf-image-extractor")
+        .then((m) => m.extractAndUploadBriefReferenceImages(pdfBuffer))
+        .catch((err) => {
+          console.warn("[parseBriefDocument] reference image extraction failed:", err);
+          return [];
+        })
+    : Promise.resolve([]);
+
   return handleOpenAICall(async () => {
     const client = getClient(userApiKey);
 
@@ -2713,12 +2803,14 @@ If information is not found in the text, omit the field. Be precise with numbers
     if (!content) throw new Error("OpenAI returned empty response for brief parsing");
 
     const parsed = JSON.parse(content) as Omit<ParsedBrief, "rawText">;
+    const referenceImageUrls = await referenceImagesPromise;
 
     return {
       ...parsed,
       projectTitle: parsed.projectTitle || "Untitled Project",
       projectType: parsed.projectType || "unknown",
       rawText: text,
+      ...(referenceImageUrls.length > 0 ? { referenceImageUrls } : {}),
     };
   });
 }
