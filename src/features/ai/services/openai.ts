@@ -770,12 +770,31 @@ async function sketchToRender(
   };
 }
 
+/**
+ * Softens an architectural prompt for content-policy retry.
+ * Removes commonly-flagged terms while preserving structural intent.
+ * Used as a Path-3 retry strategy when Path 2 fails (replaces the legacy
+ * DALL-E 3 fallback — DALL-E 3 cannot accept reference images and produces
+ * generic output, so retrying with the same model under safer parameters is
+ * strictly better).
+ */
+function softenArchitecturalPromptForRetry(prompt: string): string {
+  return prompt
+    .replace(/\bdemolish(ed|ing)?\b/gi, "renovate")
+    .replace(/\bruins?\b/gi, "weathered structure")
+    .replace(/\bblood\w*\b/gi, "warm")
+    .replace(/\babandoned\b/gi, "vacant")
+    .replace(/\bmilitary\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 // ─── generateConceptImage ─────────────────────────────────────────────────────
 //
 // Primary render pipeline for GN-003. Uses a tiered approach:
-// 1. BuildingDescription → Elevation Sketch (SVG) → gpt-image-1 edit (BEST accuracy)
-// 2. String prompt → gpt-image-1 generate (good accuracy, no sketch)
-// 3. Fallback → DALL-E 3 (legacy, if gpt-image-1 unavailable)
+// 1. BuildingDescription → Elevation Sketch (SVG) → gpt-image-1.5 edit (BEST accuracy)
+// 2. String prompt → gpt-image-1.5 generate (good accuracy, no sketch)
+// 3. Fallback → gpt-image-1.5 retry with softened prompt + smaller size/quality
 
 export async function generateConceptImage(
   descriptionOrPrompt: BuildingDescription | string,
@@ -867,25 +886,27 @@ export async function generateConceptImage(
         revisedPrompt: image?.revised_prompt ?? imagePrompt,
       };
     } catch (gptImgErr) {
-      // ── Path 3: Fallback to DALL-E 3 (legacy) ──
-      console.warn("[generateConceptImage] gpt-image-1 failed, falling back to DALL-E 3:", gptImgErr);
+      // ── Path 3: Retry gpt-image-1.5 with softened prompt + smaller size ──
+      // Replaces the legacy DALL-E 3 fallback. DALL-E 3 cannot accept reference
+      // images and produces generic output; retrying with the same model under
+      // safer parameters (softened prompt, 1024x1024, medium quality) is strictly
+      // better than switching models. Common Path-2 failures this recovers:
+      //   - content policy rejections (softened prompt usually passes)
+      //   - timeouts (smaller image is faster)
+      //   - transient 5xx (clean retry)
+      console.warn("[generateConceptImage] gpt-image-1.5 path 2 failed, retrying with softened prompt:", gptImgErr);
       const fallbackClient = getClient(userApiKey, 60000);
+      const softened = softenArchitecturalPromptForRetry(imagePrompt);
       const response = await fallbackClient.images.generate({
-        model: "dall-e-3",
-        prompt: imagePrompt,
+        model: OPENAI_IMAGE_MODEL,
+        prompt: softened,
         n: 1,
         size: "1024x1024",
-        quality: "hd",
-        style: "natural",
+        quality: "medium",
       });
 
-      const image = response.data?.[0];
-      if (!image?.url) throw new Error("No image URL in DALL-E response");
-
-      return {
-        url: image.url,
-        revisedPrompt: image.revised_prompt ?? imagePrompt,
-      };
+      const { url, revisedPrompt } = await normalizeImageResponse(response.data?.[0], "concept-fallback");
+      return { url, revisedPrompt: revisedPrompt || softened };
     }
   });
 }
