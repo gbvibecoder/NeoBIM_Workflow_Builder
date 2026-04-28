@@ -6,8 +6,9 @@
 import OpenAI from "openai";
 import type { GeneratedImage } from "../types";
 import { ImageGenError } from "./types";
+import { OPENAI_IMAGE_MODEL } from "@/features/ai/services/image-generation";
 
-export const MODEL_ID = "gpt-image-1.5";
+export const MODEL_ID = OPENAI_IMAGE_MODEL;
 export const COST_PER_IMAGE = 0.034; // $0.034 at 1024x1024, medium quality
 const TIMEOUT_MS = 30_000;
 

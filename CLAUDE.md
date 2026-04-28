@@ -146,6 +146,12 @@ If unsure, default to the feature folder. It's easier to move something to share
 **Showcase Error Boundaries:**
 - `src/features/execution/components/result-showcase/index.tsx` wraps each tab (`OverviewTab`, `MediaTab`, `DataTab`, `ModelTab`, `ExportTab`) in the shared `ErrorBoundary` from `src/shared/components/ErrorBoundary.tsx`. A crash in one tab does not tear down the showcase or block users from switching to a working tab.
 
+**Image generation:**
+- All image generation uses **OpenAI `gpt-image-1.5`** via a single canonical module: `src/features/ai/services/image-generation.ts`. The exported `OPENAI_IMAGE_MODEL` constant is the only model literal that should appear anywhere in the codebase. The `scripts/check-no-deprecated-image-models.sh` lint guard (wired into `npm run lint`) blocks accidental re-introduction of `dall-e-3` or bare `gpt-image-1` literals.
+- **Architectural rule:** when a reference image (sketch / floor plan / photo / PDF page) is available at the call site, it MUST be passed via `images.edit()` with `input_fidelity` tuned for the use case — never described in text and submitted to `images.generate()`. Generic output is the failure mode this rule prevents. The `floor-plan-rasterizer.ts` module is the canonical way to convert room data into a reference PNG.
+- **Emergency rollback:** set `IMAGE_MODEL_OVERRIDE=gpt-image-1` in production env to revert without redeploy. The override logs a `[image-gen]` warning at boot when active so it doesn't silently control production. Permanent escape hatch by design.
+- `normalizeImageResponse()` is the canonical handler for OpenAI image responses (handles both URL and `b64_json` shapes; uploads to R2 when present, falls back to data URI).
+
 **Auth (split config pattern):**
 - `src/lib/auth.config.ts` — Lightweight, edge-safe config used by middleware
 - `src/lib/auth.ts` — Full config with Prisma adapter and providers (Google OAuth + Credentials)
