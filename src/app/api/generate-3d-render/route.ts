@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
+import { OPENAI_IMAGE_MODEL } from "@/features/ai/services/image-generation";
 import OpenAI from "openai";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
@@ -376,7 +377,7 @@ export async function POST(req: NextRequest) {
 
       render = await withRetry(() =>
         client.images.edit({
-          model: "gpt-image-1.5",
+          model: OPENAI_IMAGE_MODEL,
           image: editImageFile,
           prompt: roomPrompt,
           size: "1024x1024",
@@ -400,7 +401,7 @@ export async function POST(req: NextRequest) {
       render = await withRetry(async () => {
         try {
           return await client.images.edit({
-            model: "gpt-image-1.5",
+            model: OPENAI_IMAGE_MODEL,
             image: editImageFile,
             prompt: renderPrompt,
             size: layoutSize,
@@ -411,7 +412,7 @@ export async function POST(req: NextRequest) {
           // Fallback: let the model choose the best size itself rather than
           // forcing 1024x1024 (which mangles rectangular plans).
           return await client.images.edit({
-            model: "gpt-image-1.5",
+            model: OPENAI_IMAGE_MODEL,
             image: editImageFile,
             prompt: renderPrompt,
             size: "auto",

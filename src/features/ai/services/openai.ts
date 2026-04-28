@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { detectOpenAIError, APIError } from "@/lib/user-errors";
 import type { FloorPlanRoomType } from "@/features/floor-plan/types/floor-plan";
+import { OPENAI_IMAGE_MODEL, normalizeImageResponse, fetchAsDataUrl } from "./image-generation";
 
 export function getClient(userApiKey?: string, timeout?: number): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;
@@ -732,7 +733,7 @@ async function sketchToRender(
   // but allow full creative freedom for photorealistic materials, depth, and detail.
   // "medium" produced too-literal/flat results that looked CGI.
   const response = await client.images.edit({
-    model: "gpt-image-1",
+    model: OPENAI_IMAGE_MODEL,
     image: imageFile,
     prompt: fullPrompt,
     size: "1536x1024" as "1024x1024", // landscape for exterior renders (type workaround)
@@ -837,7 +838,7 @@ export async function generateConceptImage(
     try {
       const size = (viewType === "exterior" || viewType === "interior") ? "1536x1024" : "1024x1024";
       const response = await client.images.generate({
-        model: "gpt-image-1.5",
+        model: OPENAI_IMAGE_MODEL,
         prompt: imagePrompt,
         n: 1,
         size: size as "1024x1024", // type workaround for extended sizes
@@ -1042,7 +1043,7 @@ export async function generateRenovationRender(
     let response;
     try {
       response = await client.images.edit({
-        model: "gpt-image-1",
+        model: OPENAI_IMAGE_MODEL,
         image: imageFile,
         prompt: renovationPrompt,
         size: "auto" as "1024x1024",
@@ -1052,7 +1053,7 @@ export async function generateRenovationRender(
     } catch (autoErr) {
       console.warn("[RenovationRender] 'auto' size not supported, falling back to 1536x1024:", autoErr);
       response = await client.images.edit({
-        model: "gpt-image-1",
+        model: OPENAI_IMAGE_MODEL,
         image: imageFile,
         prompt: renovationPrompt,
         size: "1536x1024" as "1024x1024",
