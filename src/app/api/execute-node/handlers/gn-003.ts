@@ -2,18 +2,18 @@ import {
   generateConceptImage,
   validateRenderWithClaude,
   generateId,
+  OPENAI_IMAGE_MODEL,
   type BuildingDescription,
   type RenderQAResult,
 } from "./deps";
 import type { NodeHandler } from "./types";
 
 /**
- * GN-003 — Concept Render Generator (DALL-E 3 / gpt-image-1) with Claude QA loop.
- * Pure copy from execute-node/route.ts (lines 1117-1241 of the pre-decomposition file).
+ * GN-003 — Concept Render Generator (gpt-image-1.5) with Claude QA loop.
  */
 export const handleGN003: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId, apiKey } = ctx;
-  // Concept Render Generator — DALL-E 3
+  // Concept Render Generator — gpt-image-1.5 via generateConceptImage
   const description = inputData?._raw ?? null;
   const prompt = inputData?.prompt ?? inputData?.content ?? "Modern mixed-use building, Nordic minimal style";
   const viewType = ((inputData?.viewType as string) ?? "exterior") as "exterior" | "floor_plan" | "site_plan" | "interior";
@@ -134,7 +134,7 @@ export const handleGN003: NodeHandler = async (ctx) => {
       style: revisedPrompt.substring(0, 100),
       ...(qaResult && { _qa: { passed: qaResult.passed, floors: qaResult.detectedFloors, feedback: qaResult.feedback } }),
     },
-    metadata: { model: "gpt-image-1", real: true, qaValidated: !!qaResult?.passed },
+    metadata: { model: OPENAI_IMAGE_MODEL, real: true, qaValidated: !!qaResult?.passed },
     createdAt: new Date(),
   };
 };

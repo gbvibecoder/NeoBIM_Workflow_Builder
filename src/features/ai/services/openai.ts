@@ -3429,27 +3429,31 @@ JSON response:
   }
 }
 
-// ─── DALL-E 3 Photorealistic Floor Plan Render ──────────────────────────────
+// ─── Photorealistic Floor Plan Render (gpt-image-1.5) ───────────────────────
 
 /**
- * Generates a photorealistic aerial render of a floor plan using DALL-E 3.
- * Takes room descriptions and building info → creates an architectural visualization.
- * Returns the image as a base64 data URL.
+ * Generates a photorealistic dollhouse render of a floor plan.
+ *
+ * Architectural fix (2026-04): the previous implementation flattened room
+ * data into a text prompt and called images.generate() with no reference
+ * image — the model never saw the actual layout, so the output was generic.
+ * Now we rasterize the room layout into a PNG via floor-plan-rasterizer.ts
+ * and pass it to images.edit() with input_fidelity:"high". The model sees
+ * the geometry directly and preserves room positions and proportions.
+ *
+ * Returns the image as a base64 data URL (the GN-011 Three.js scene
+ * embeds it directly without fetching).
  */
 export async function generateFloorPlanRender(
-  rooms: Array<{ name: string; type: string; width: number; depth: number }>,
+  rooms: Array<{ name: string; type: string; width: number; depth: number; x?: number; y?: number }>,
   buildingDimensions: { width: number; depth: number },
   options?: {
     style?: "modern" | "scandinavian" | "industrial" | "luxury" | "minimal";
     userApiKey?: string;
   },
 ): Promise<{ imageUrl: string; revisedPrompt: string }> {
-  const client = getClient(options?.userApiKey, 60000); // 60s — DALL-E 3 HD images take longer
+  const client = getClient(options?.userApiKey, 120000); // 120s — gpt-image-1.5 high-quality renders
   const style = options?.style ?? "modern";
-
-  const roomList = rooms
-    .map(r => `${r.name} (${r.type}, ${r.width.toFixed(1)}m x ${r.depth.toFixed(1)}m)`)
-    .join(", ");
 
   const styleDescriptions: Record<string, string> = {
     modern: "clean contemporary design with warm wood floors, white walls, designer furniture, indoor plants, and natural light streaming through large windows",
@@ -3459,32 +3463,56 @@ export async function generateFloorPlanRender(
     minimal: "Japanese-inspired minimalist design with tatami mats, shoji screens, low furniture, neutral earth tones, and zen garden elements",
   };
 
-  const prompt = `Architectural dollhouse cutaway from above at a 45-degree angle, looking into a ${buildingDimensions.width.toFixed(0)}m x ${buildingDimensions.depth.toFixed(0)}m residential floor plan with the ceiling/roof completely removed, open top view like a miniature model home. Rooms: ${roomList}. Interior is fully furnished and decorated in ${styleDescriptions[style]}. Real wood plank floors in living spaces, clean white walls with subtle shadows between rooms. Each room has appropriate furniture arranged naturally. Warm golden-hour sunlight streaming through windows casting soft long shadows across the interior. Photorealistic, architectural visualization quality, tilt-shift depth of field, 8K detail. No text, no labels, no annotations, no people.`;
+  // Pass the room semantics in the prompt so each room gets appropriate furniture.
+  // The schematic provides geometry; this list provides "what each labelled room is for".
+  const roomSemantics = rooms
+    .map((r) => `${r.name} (${r.type})`)
+    .join(", ");
 
+  const prompt =
+    `Photorealistic architectural dollhouse cutaway from above at a 45-degree angle, ` +
+    `matching the EXACT floor plan layout shown in the reference image. The roof and ` +
+    `ceiling are completely removed, like a miniature model home seen from above. ` +
+    `EVERY ROOM in the reference must be present, in the SAME POSITION and SAME ` +
+    `PROPORTIONS as drawn. Rooms: ${roomSemantics}. Each room is fully furnished ` +
+    `and decorated in ${styleDescriptions[style]}. Real wood plank floors in living ` +
+    `spaces, clean white walls with subtle shadows between rooms. Each room has ` +
+    `appropriate furniture for its labelled type. Warm golden-hour sunlight streaming ` +
+    `through windows casting soft long shadows across the interior. Photorealistic, ` +
+    `architectural visualization quality, tilt-shift depth of field, 8K detail. ` +
+    `IGNORE any text labels in the reference image — render the OUTPUT with NO text, ` +
+    `NO labels, NO annotations, NO people. Match the reference floor plan exactly.`;
 
   return handleOpenAICall(async () => {
-    const response = await client.images.generate({
-      model: "dall-e-3",
-      prompt,
-      n: 1,
-      size: "1792x1024",
-      quality: "hd",
-      style: "natural",
+    // Rasterize the room layout to a PNG. This is the accuracy anchor —
+    // gpt-image-1.5 with input_fidelity:"high" preserves the room positions
+    // and proportions exactly, fixing the "generic output" failure mode of
+    // the previous text-only DALL-E 3 implementation.
+    const { rasterizeFloorPlanToPng } = await import("./floor-plan-rasterizer");
+    const layoutPng = await rasterizeFloorPlanToPng(rooms, buildingDimensions);
+    const layoutFile = new File([new Uint8Array(layoutPng)], "floor-plan.png", {
+      type: "image/png",
     });
 
-    const imageUrl = response.data?.[0]?.url;
-    const revisedPrompt = response.data?.[0]?.revised_prompt ?? "";
+    const response = await client.images.edit({
+      model: OPENAI_IMAGE_MODEL,
+      image: layoutFile,
+      prompt,
+      n: 1,
+      size: "1536x1024" as "1024x1024", // 3:2 landscape; closest supported aspect to old 1792x1024
+      quality: "high",
+      input_fidelity: "high", // critical: preserve the room layout exactly
+    });
 
-    if (!imageUrl) throw new Error("DALL-E 3 returned no image");
+    const { url, revisedPrompt } = await normalizeImageResponse(
+      response.data?.[0],
+      "floor-plan-render",
+    );
 
+    // GN-011 consumer expects a data URL embeddable directly in Three.js;
+    // convert if R2 returned an HTTP URL.
+    const imageUrl = url.startsWith("http") ? await fetchAsDataUrl(url) : url;
 
-    // Fetch the image and convert to base64 data URL for persistence
-    const imgResponse = await fetch(imageUrl);
-    const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
-    const base64 = imgBuffer.toString("base64");
-    const dataUrl = `data:image/png;base64,${base64}`;
-
-
-    return { imageUrl: dataUrl, revisedPrompt };
+    return { imageUrl, revisedPrompt: revisedPrompt || prompt };
   });
 }

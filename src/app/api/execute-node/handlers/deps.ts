@@ -57,6 +57,7 @@ export {
   validateRenderWithClaude,
 } from "@/features/ai/services/openai";
 export type { BuildingDescription, RenderQAResult } from "@/features/ai/services/openai";
+export { OPENAI_IMAGE_MODEL } from "@/features/ai/services/image-generation";
 export { analyzeSite } from "@/features/ai/services/site-analysis";
 export { generatePDFBase64 } from "@/services/pdf-report-server";
 export { reconstructHiFi3D, isMeshyConfigured } from "@/features/3d-render/services/meshy-service";
