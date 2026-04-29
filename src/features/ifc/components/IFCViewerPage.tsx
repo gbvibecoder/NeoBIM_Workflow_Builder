@@ -10,7 +10,7 @@ import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
 import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
-import { Sparkles, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Sparkles, PanelRightClose, PanelRightOpen, ArrowLeft } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
 import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/components/IFCEnhancePanel";
 import { AutoEnhanceLoader } from "@/features/ifc/components/AutoEnhanceLoader";
@@ -58,7 +58,7 @@ function useBreakpoint() {
   return bp;
 }
 
-export default function IFCViewerPage({ autoEnhance = false }: { autoEnhance?: boolean }) {
+export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = false }: { autoEnhance?: boolean; restoreFromCache?: boolean }) {
   /* State */
   const [modelInfo, setModelInfo] = useState<IFCModelInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -199,6 +199,15 @@ export default function IFCViewerPage({ autoEnhance = false }: { autoEnhance?: b
     let cancelled = false;
 
     (async () => {
+      /* Skip cache restore unless explicitly requested (e.g. execution
+         hydration pre-populates IndexedDB before mounting this component).
+         Normal navigation should always land on the upload screen. */
+      if (!restoreFromCache) {
+        console.info("[ifc-restore] restoreFromCache=false — showing upload zone");
+        setLoading(false);
+        return;
+      }
+
       /* Flip loading UI on IMMEDIATELY. The IDB open + cache read takes a
          few ms and the viewport readiness poll takes at least one tick;
          without this, the empty upload screen flashes before the restore
@@ -244,7 +253,7 @@ export default function IFCViewerPage({ autoEnhance = false }: { autoEnhance?: b
     return () => {
       cancelled = true;
     };
-  }, [loadBufferIntoViewer]);
+  }, [loadBufferIntoViewer, restoreFromCache]);
 
   const handleProgress = useCallback((progress: number, message: string) => {
     setLoadProgress(progress);
@@ -473,8 +482,48 @@ export default function IFCViewerPage({ autoEnhance = false }: { autoEnhance?: b
         onChange={handleFileInput}
       />
 
-      {/* Toolbar — only show once a model is loaded; the empty state has its own Browse Files CTA */}
+      {/* Back button + Toolbar — only show once a model is loaded */}
       {hasModel && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 0,
+          }}
+        >
+          <button
+            onClick={handleUnload}
+            title="Back to Upload"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 14px",
+              margin: "6px 0 6px 8px",
+              background: "rgba(99,130,255,0.10)",
+              border: "1px solid rgba(99,130,255,0.20)",
+              borderRadius: UI.radius.sm,
+              color: UI.text.primary,
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: UI.transition,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(99,130,255,0.20)";
+              e.currentTarget.style.borderColor = "rgba(99,130,255,0.35)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(99,130,255,0.10)";
+              e.currentTarget.style.borderColor = "rgba(99,130,255,0.20)";
+            }}
+          >
+            <ArrowLeft size={15} />
+            Upload New
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
         <Toolbar
           viewportRef={viewportRef}
           modelInfo={modelInfo}
@@ -487,6 +536,8 @@ export default function IFCViewerPage({ autoEnhance = false }: { autoEnhance?: b
           measureUnit={measureUnit}
           onToggleUnit={handleToggleUnit}
         />
+          </div>
+        </div>
       )}
 
       {/* Integration banner — full-width bar between toolbar and viewport */}
