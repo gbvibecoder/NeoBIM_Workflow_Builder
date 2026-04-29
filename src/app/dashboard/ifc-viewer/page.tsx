@@ -126,7 +126,7 @@ function IFCViewerEntry() {
     return <Splash label="Hydrating IFC from execution…" />;
   }
 
-  return <IFCViewerPage autoEnhance={!!executionId} />;
+  return <IFCViewerPage autoEnhance={!!executionId} restoreFromCache={!!executionId} />;
 }
 
 function isIfcArtifact(art: ApiArtifact): boolean {
