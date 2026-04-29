@@ -56,6 +56,7 @@ model User {
   vipGenerations       VipGeneration[]
   vipJobs              VipJob[]
   videoJobs            VideoJob[]
+  briefRenderJobs      BriefRenderJob[]
 
   @@map("users")
 }
@@ -471,13 +472,13 @@ model DemoRequest {
   email       String
   phone       String?
   company     String
-  roleTitle   String?           // job title / role — "Architect", "Principal", etc. (avoid collision with UserRole enum)
+  roleTitle   String? // job title / role — "Architect", "Principal", etc. (avoid collision with UserRole enum)
   message     String?
   status      DemoRequestStatus @default(NEW)
-  adminNote   String?           // admin's private notes about the lead
-  contactedAt DateTime?         // set when admin marks CONTACTED
-  scheduledAt DateTime?         // set when admin marks SCHEDULED
-  completedAt DateTime?         // set when admin marks COMPLETED
+  adminNote   String? // admin's private notes about the lead
+  contactedAt DateTime? // set when admin marks CONTACTED
+  scheduledAt DateTime? // set when admin marks SCHEDULED
+  completedAt DateTime? // set when admin marks COMPLETED
   // First-touch attribution — captured at submission time.
   ipAddress   String?
   userAgent   String?
@@ -930,9 +931,9 @@ model VideoJob {
   id String @id @default(cuid())
 
   // Association
-  userId      String
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  executionId String // client-correlation ID, not a FK
+  userId        String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executionId   String // client-correlation ID, not a FK
   // DB Execution.id when the workflow was persisted at run time (nullable —
   // unsaved / demo workflows run without a DB row). Plumbed through from the
   // client via useExecution → /api/execute-node body → handler ctx. Used by
@@ -977,4 +978,77 @@ model VideoJob {
   @@index([status])
   @@index([status, lastPolledAt])
   @@map("video_jobs")
+}
+
+// ─── Brief-to-Renders Background Jobs ──────────────────────────
+//
+// Backing store for the "Brief-to-Renders" pipeline (Phase 1+).
+// Each row is one user-initiated run: PDF/DOCX brief → spec extraction
+// → user approval → N image renders → editorial PDF compile.
+//
+// Mirrors VipJob's status machine, stage log, and approval gate, with
+// brief-renders-specific fields:
+//   • briefUrl    — the input document on R2 (set at job creation)
+//   • specResult  — Phase 2 BriefSpec JSON (every leaf nullable; strict
+//                   faithfulness contract — no LLM invention)
+//   • shots       — Phase 4 per-shot ShotResult[] (status, prompt,
+//                   imageUrl, error). Updated in place by the worker
+//                   as each shot completes; client polls for progress.
+//   • pdfUrl      — Phase 5 final compiled PDF (R2 URL).
+//
+// Status machine matches VipJobStatus:
+//   QUEUED → RUNNING → AWAITING_APPROVAL → RUNNING → COMPLETED
+//                  └→ FAILED / CANCELLED
+//
+// Phase 1 only writes/reads `briefUrl` and the lifecycle columns —
+// `specResult`, `shots`, and `pdfUrl` are populated in later phases.
+
+enum BriefRenderJobStatus {
+  QUEUED
+  RUNNING
+  AWAITING_APPROVAL
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model BriefRenderJob {
+  id           String               @id @default(cuid())
+  userId       String
+  requestId    String               @unique
+  briefUrl     String
+  status       BriefRenderJobStatus @default(QUEUED)
+  progress     Int                  @default(0)
+  currentStage String?
+  // Phase 2 BriefSpec — strict-faithfulness JSON. Every leaf field is
+  // either source-extracted from the brief or null. Shape defined in
+  // src/features/brief-renders/services/brief-pipeline/types.ts.
+  specResult   Json?
+  // Phase 4 per-shot array — ShotResult[] (status, prompt, imageUrl,
+  // error). Populated incrementally as the worker completes each shot.
+  shots        Json?
+  // Phase 5 final compiled PDF (R2 URL).
+  pdfUrl       String?
+  errorMessage String?
+  costUsd      Float                @default(0)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  pausedAt     DateTime?
+  // Spec-review approval gate. Status flips to AWAITING_APPROVAL after
+  // Stage 2 (prompt-gen). Mirrors VipJob.userApproval semantics:
+  //   'pending' | 'approved' | 'regenerating'
+  userApproval String?
+  // Stage-by-stage log for the Pipeline Logs Panel UI. Array of
+  // BriefStageLogEntry — written incrementally from the worker so the
+  // client can poll and render each stage as it completes. Shape
+  // defined in src/features/brief-renders/services/brief-pipeline/types.ts.
+  stageLog     Json?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("brief_render_jobs")
 }

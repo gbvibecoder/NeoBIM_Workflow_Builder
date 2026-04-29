@@ -84,6 +84,106 @@ export async function scheduleVipWorkerRegenerateImage(jobId: string): Promise<s
   return result.messageId;
 }
 
+// ─── Brief-to-Renders pipeline ──────────────────────────────────────
+
+/**
+ * Schedule the Brief-to-Renders worker for a freshly-created job.
+ * QStash will POST to /api/brief-renders/worker with `{ jobId }`.
+ *
+ * Mirrors `scheduleVipWorker` exactly — same `retries: 0`, same
+ * `timeout: "10m"`, same body shape. The orchestrator handles its own
+ * retries (idempotent on cached stages) so QStash retry would just
+ * cause duplicate work; `retries: 0` keeps the failure semantics clean.
+ */
+export async function scheduleBriefRenderWorker(jobId: string): Promise<string> {
+  const client = getClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const workerUrl = `${appUrl}/api/brief-renders/worker`;
+
+  const result = await client.publishJSON({
+    url: workerUrl,
+    body: { jobId },
+    retries: 0,
+    timeout: "10m",
+  });
+
+  return result.messageId;
+}
+
+/**
+ * Schedule the per-shot render worker. Mirrors `scheduleBriefRenderWorker`
+ * (retries=0, timeout=10m). Body shape matches
+ * `/api/brief-renders/worker/render` — when `apartmentIndex` /
+ * `shotIndexInApartment` are omitted, the worker picks the first
+ * pending shot in row-major order. When specified, that exact shot
+ * is targeted (used by `regenerate-shot` and the rate-limit-retry path).
+ *
+ * `delay` is a per-call enqueue delay in seconds — used by the rate-
+ * limit backoff (5s → 15s → 45s) and the lock-busy retry.
+ */
+export interface ScheduleBriefRenderRenderOptions {
+  apartmentIndex?: number;
+  shotIndexInApartment?: number;
+  retryCount?: number;
+  /** Delay in seconds before QStash dispatches. Default: 0. */
+  delay?: number;
+}
+
+export async function scheduleBriefRenderRenderWorker(
+  jobId: string,
+  options: ScheduleBriefRenderRenderOptions = {},
+): Promise<string> {
+  const client = getClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const workerUrl = `${appUrl}/api/brief-renders/worker/render`;
+
+  const body: Record<string, unknown> = { jobId };
+  if (typeof options.apartmentIndex === "number") {
+    body.apartmentIndex = options.apartmentIndex;
+  }
+  if (typeof options.shotIndexInApartment === "number") {
+    body.shotIndexInApartment = options.shotIndexInApartment;
+  }
+  if (typeof options.retryCount === "number") {
+    body.retryCount = options.retryCount;
+  }
+
+  const result = await client.publishJSON({
+    url: workerUrl,
+    body,
+    retries: 0,
+    timeout: "10m",
+    ...(typeof options.delay === "number" && options.delay > 0
+      ? { delay: options.delay }
+      : {}),
+  });
+
+  return result.messageId;
+}
+
+/**
+ * Schedule the Stage 4 compile worker for a job whose shots are all
+ * rendered. Mirrors `scheduleBriefRenderRenderWorker` shape (retries=0,
+ * timeout=10m). Body is just `{ jobId }` — Stage 4 is a single-shot
+ * orchestration, no per-shot indices or retry counters.
+ */
+export async function scheduleBriefRenderCompileWorker(
+  jobId: string,
+): Promise<string> {
+  const client = getClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const workerUrl = `${appUrl}/api/brief-renders/worker/compile`;
+
+  const result = await client.publishJSON({
+    url: workerUrl,
+    body: { jobId },
+    retries: 0,
+    timeout: "10m",
+  });
+
+  return result.messageId;
+}
+
 /**
  * Verify that a request came from QStash (signature validation).
  * Returns true if valid, false otherwise.

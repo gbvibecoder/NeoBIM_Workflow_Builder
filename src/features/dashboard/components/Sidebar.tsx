@@ -24,9 +24,11 @@ import {
   Video,
   MessageSquare,
   Zap,
+  ScrollText,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import { PLAN_EXEC_LIMITS, PLAN_RANK } from "@/constants/limits";
 
@@ -40,6 +42,7 @@ export function Sidebar() {
   const userRole = ((session?.user as { role?: string })?.role) || "FREE";
   const userRank = PLAN_RANK[userRole] ?? 0;
   const isFreeUser = userRole === "FREE";
+  const { briefRendersEnabled } = useFeatureFlags();
 
   // Nav items — premiumTier marks features that require a minimum plan
   const PRIMARY_NAV: Array<{
@@ -52,6 +55,12 @@ export function Sidebar() {
     { href: "/dashboard/ifc-viewer", label: t("nav.ifcViewer"),   icon: FileBox, badge: "New" },
     { href: "/dashboard/floor-plan", label: "Floor Plan",         icon: PenTool, badge: "New" },
     { href: "/dashboard/3d-render",  label: t("nav.3dRender"),    icon: Video,   badge: "New", premiumTier: "STARTER" },
+    // Brief-to-Renders is canary-gated; absence of `briefRendersEnabled`
+    // keeps the entry hidden from non-allowlisted users (server-side
+    // canary in `/api/config/feature-flags`).
+    ...(briefRendersEnabled
+      ? [{ href: "/dashboard/brief-renders", label: "Brief → Renders", icon: ScrollText, badge: "Beta" }]
+      : []),
   ];
 
   const isAdmin = isPlatformAdmin(session?.user?.email);

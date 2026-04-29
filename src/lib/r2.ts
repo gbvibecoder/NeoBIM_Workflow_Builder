@@ -32,8 +32,10 @@ const PUBLIC_URL = process.env.R2_PUBLIC_URL ?? ""; // e.g. https://files.yourdo
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB cap for PDFs/XLSX
 const MAX_IFC_SIZE = 100 * 1024 * 1024; // 100MB cap for IFC files
+const MAX_BRIEF_SIZE = 50 * 1024 * 1024; // 50MB cap for Brief-to-Renders inputs (PDF/DOCX)
 const CLEANUP_DAYS_FILES = 25; // PDFs & XLSX
 const CLEANUP_DAYS_IFC = 3;   // IFC files (session-like, short-lived)
+const CLEANUP_DAYS_BRIEFS = 25; // Uploaded briefs — same retention as files/
 
 // ─── Client ────────────────────────────────────────────────────────────────
 
@@ -313,6 +315,65 @@ export async function uploadIFCToR2(
   }
 }
 
+// ─── Brief Upload (Brief-to-Renders pipeline) ─────────────────────────────
+
+/**
+ * Upload a brief document (PDF or DOCX) to R2 under the `briefs/` prefix.
+ *
+ * - Cap: 50 MB (vs `uploadToR2`'s 5 MB cap, which is intentional for the
+ *   existing PDF/XLSX export path — DO NOT raise that cap).
+ * - Retention: 25 days, swept by the `cleanupOldFiles` cron.
+ * - Key format: `briefs/YYYY/MM/DD/<uuid12>-<filename>`.
+ *
+ * Returns the same `{ url, key, size }` shape as `uploadToR2` on
+ * success, or an error envelope on failure.
+ */
+export async function uploadBriefToR2(
+  fileBuffer: Buffer | Uint8Array,
+  filename: string,
+  contentType: string,
+): Promise<UploadResult | UploadError> {
+  const client = getClient();
+  if (!client) {
+    return { success: false, error: "R2 not configured" };
+  }
+
+  const buf = fileBuffer instanceof Buffer ? fileBuffer : Buffer.from(fileBuffer);
+
+  if (buf.length > MAX_BRIEF_SIZE) {
+    return {
+      success: false,
+      error: `File exceeds ${MAX_BRIEF_SIZE / 1024 / 1024}MB limit`,
+    };
+  }
+
+  const now = new Date();
+  const datePath = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+  const uniqueId = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  const key = `briefs/${datePath}/${uniqueId}-${filename}`;
+
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: buf,
+        ContentType: contentType,
+        Metadata: { "uploaded-at": now.toISOString() },
+      }),
+    );
+
+    const url = PUBLIC_URL
+      ? `${PUBLIC_URL}/${key}`
+      : `https://${BUCKET_NAME}.${ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
+
+    return { success: true, url, key, size: buf.length };
+  } catch (err) {
+    console.error("[R2] Brief upload failed:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
 // ─── Building Assets Upload (GLB + IFC + Metadata) ────────────────────────
 
 export interface BuildingAssetUrls {
@@ -382,17 +443,19 @@ export async function uploadBuildingAssets(
 interface CleanupResult {
   filesDeleted: number;
   ifcDeleted: number;
+  briefsDeleted: number;
   errors: number;
 }
 
 /**
  * Cleanup R2 storage:
- * - `files/` prefix: delete files older than 25 days (PDFs, XLSX)
- * - `ifc/` prefix: delete files older than 3 days
+ * - `files/` prefix:  delete files older than 25 days (PDFs, XLSX)
+ * - `ifc/` prefix:    delete files older than 3 days
+ * - `briefs/` prefix: delete files older than 25 days (Brief-to-Renders inputs)
  */
 export async function cleanupOldFiles(): Promise<CleanupResult> {
   const client = getClient();
-  if (!client) return { filesDeleted: 0, ifcDeleted: 0, errors: 0 };
+  if (!client) return { filesDeleted: 0, ifcDeleted: 0, briefsDeleted: 0, errors: 0 };
 
   const fileCutoff = new Date();
   fileCutoff.setDate(fileCutoff.getDate() - CLEANUP_DAYS_FILES);
@@ -400,8 +463,12 @@ export async function cleanupOldFiles(): Promise<CleanupResult> {
   const ifcCutoff = new Date();
   ifcCutoff.setDate(ifcCutoff.getDate() - CLEANUP_DAYS_IFC);
 
+  const briefsCutoff = new Date();
+  briefsCutoff.setDate(briefsCutoff.getDate() - CLEANUP_DAYS_BRIEFS);
+
   let filesDeleted = 0;
   let ifcDeleted = 0;
+  let briefsDeleted = 0;
   let errors = 0;
 
   // Helper to clean a prefix with a given cutoff
@@ -456,7 +523,12 @@ export async function cleanupOldFiles(): Promise<CleanupResult> {
   ifcDeleted = ifcResult.deleted;
   errors += ifcResult.errors;
 
-  return { filesDeleted, ifcDeleted, errors };
+  // Clean Brief-to-Renders inputs (25 days)
+  const briefsResult = await cleanPrefix("briefs/", briefsCutoff);
+  briefsDeleted = briefsResult.deleted;
+  errors += briefsResult.errors;
+
+  return { filesDeleted, ifcDeleted, briefsDeleted, errors };
 }
 
 // ─── CORS Configuration ───────────────────────────────────────────────────
@@ -693,6 +765,7 @@ export async function deleteManyFromR2(keys: string[]): Promise<{ deleted: numbe
 interface StorageInfo {
   files: { count: number; sizeMB: string };
   ifc: { count: number; sizeMB: string };
+  briefs: { count: number; sizeMB: string };
   totalSizeMB: string;
 }
 
@@ -729,14 +802,16 @@ export async function getStorageInfo(): Promise<StorageInfo | null> {
     return { count, sizeBytes };
   }
 
-  const [filesInfo, ifcInfo] = await Promise.all([
+  const [filesInfo, ifcInfo, briefsInfo] = await Promise.all([
     countPrefix("files/"),
     countPrefix("ifc/"),
+    countPrefix("briefs/"),
   ]);
 
   return {
     files: { count: filesInfo.count, sizeMB: (filesInfo.sizeBytes / 1024 / 1024).toFixed(2) },
     ifc: { count: ifcInfo.count, sizeMB: (ifcInfo.sizeBytes / 1024 / 1024).toFixed(2) },
-    totalSizeMB: ((filesInfo.sizeBytes + ifcInfo.sizeBytes) / 1024 / 1024).toFixed(2),
+    briefs: { count: briefsInfo.count, sizeMB: (briefsInfo.sizeBytes / 1024 / 1024).toFixed(2) },
+    totalSizeMB: ((filesInfo.sizeBytes + ifcInfo.sizeBytes + briefsInfo.sizeBytes) / 1024 / 1024).toFixed(2),
   };
 }

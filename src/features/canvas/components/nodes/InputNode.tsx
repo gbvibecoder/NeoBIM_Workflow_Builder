@@ -1177,7 +1177,7 @@ export const InputNodeContent = memo(function InputNodeContent({ nodeId, data }:
     case "IN-001":
       return <TextPromptInput nodeId={nodeId} data={data} />;
     case "IN-002":
-      return <FileUploadInput nodeId={nodeId} data={data} accept=".pdf" label="a PDF" maxMB={20} />;
+      return <FileUploadInput nodeId={nodeId} data={data} accept=".pdf,.docx" label="a PDF or DOCX" maxMB={20} />;
     case "IN-003":
       return <FileUploadInput nodeId={nodeId} data={data} accept=".png,.jpg,.jpeg,.webp" label="an image" maxMB={10} showPreview />;
     case "IN-004":
