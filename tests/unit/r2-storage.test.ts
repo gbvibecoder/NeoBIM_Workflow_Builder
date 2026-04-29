@@ -1,6 +1,6 @@
 /**
  * Comprehensive R2 Storage Integration Tests
- * 50 scenarios covering all edge cases, fallbacks, and safety guarantees.
+ * 58 scenarios covering all edge cases, fallbacks, and safety guarantees.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -58,7 +58,7 @@ async function freshImportNoEnv() {
 
 // ─── Tests ────────────────────────────────────────────────────────────────
 
-describe("R2 Storage — 50 Scenarios", () => {
+describe("R2 Storage — 58 Scenarios", () => {
   beforeEach(() => {
     sendMock.mockReset();
     setR2Env();
@@ -374,7 +374,8 @@ describe("R2 Storage — 50 Scenarios", () => {
       sendMock
         .mockResolvedValueOnce({ Contents: [{ Key: "files/old.pdf", LastModified: old }], IsTruncated: false })
         .mockResolvedValueOnce({}) // delete
-        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // ifc list
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }) // ifc list
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // briefs list
       const { cleanupOldFiles } = await freshImport();
       const r = await cleanupOldFiles();
       expect(r.filesDeleted).toBe(1);
@@ -384,7 +385,8 @@ describe("R2 Storage — 50 Scenarios", () => {
       const recent = new Date(); recent.setDate(recent.getDate() - 10);
       sendMock
         .mockResolvedValueOnce({ Contents: [{ Key: "files/new.pdf", LastModified: recent }], IsTruncated: false })
-        .mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }) // ifc
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // briefs
       const { cleanupOldFiles } = await freshImport();
       const r = await cleanupOldFiles();
       expect(r.filesDeleted).toBe(0);
@@ -395,7 +397,8 @@ describe("R2 Storage — 50 Scenarios", () => {
       sendMock
         .mockResolvedValueOnce({ Contents: [], IsTruncated: false }) // files
         .mockResolvedValueOnce({ Contents: [{ Key: "ifc/old.ifc", LastModified: old }], IsTruncated: false })
-        .mockResolvedValueOnce({}); // delete
+        .mockResolvedValueOnce({}) // delete
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // briefs
       const { cleanupOldFiles } = await freshImport();
       const r = await cleanupOldFiles();
       expect(r.ifcDeleted).toBe(1);
@@ -405,7 +408,8 @@ describe("R2 Storage — 50 Scenarios", () => {
       const recent = new Date(); recent.setDate(recent.getDate() - 1);
       sendMock
         .mockResolvedValueOnce({ Contents: [], IsTruncated: false })
-        .mockResolvedValueOnce({ Contents: [{ Key: "ifc/new.ifc", LastModified: recent }], IsTruncated: false });
+        .mockResolvedValueOnce({ Contents: [{ Key: "ifc/new.ifc", LastModified: recent }], IsTruncated: false })
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // briefs
       const { cleanupOldFiles } = await freshImport();
       const r = await cleanupOldFiles();
       expect(r.ifcDeleted).toBe(0);
@@ -420,7 +424,8 @@ describe("R2 Storage — 50 Scenarios", () => {
           { Key: "files/new.pdf", LastModified: fresh },
         ], IsTruncated: false })
         .mockResolvedValueOnce({}) // delete old
-        .mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }) // ifc
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // briefs
       const { cleanupOldFiles } = await freshImport();
       const r = await cleanupOldFiles();
       expect(r.filesDeleted).toBe(1);
@@ -431,6 +436,7 @@ describe("R2 Storage — 50 Scenarios", () => {
       const r = await cleanupOldFiles();
       expect(r.filesDeleted).toBe(0);
       expect(r.ifcDeleted).toBe(0);
+      expect(r.briefsDeleted).toBe(0);
       expect(r.errors).toBe(0);
     });
 
@@ -439,7 +445,8 @@ describe("R2 Storage — 50 Scenarios", () => {
       sendMock
         .mockResolvedValueOnce({ Contents: [{ Key: "files/old.pdf", LastModified: old }], IsTruncated: false })
         .mockRejectedValueOnce(new Error("del fail"))
-        .mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }) // ifc
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // briefs
       const { cleanupOldFiles } = await freshImport();
       const r = await cleanupOldFiles();
       expect(r.filesDeleted).toBe(0);
@@ -453,7 +460,8 @@ describe("R2 Storage — 50 Scenarios", () => {
         .mockResolvedValueOnce({}) // delete a
         .mockResolvedValueOnce({ Contents: [{ Key: "files/b.pdf", LastModified: old }], IsTruncated: false })
         .mockResolvedValueOnce({}) // delete b
-        .mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }) // ifc
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // briefs
       const { cleanupOldFiles } = await freshImport();
       const r = await cleanupOldFiles();
       expect(r.filesDeleted).toBe(2);
@@ -470,7 +478,7 @@ describe("R2 Storage — 50 Scenarios", () => {
       expect(await getStorageInfo()).toBeNull();
     });
 
-    it("Scenario 48: Correct split between files and ifc", async () => {
+    it("Scenario 48: Correct split between files, ifc, and briefs", async () => {
       sendMock
         .mockResolvedValueOnce({ Contents: [
           { Key: "files/a.pdf", Size: 1024 * 1024 },
@@ -478,22 +486,29 @@ describe("R2 Storage — 50 Scenarios", () => {
         ], IsTruncated: false })
         .mockResolvedValueOnce({ Contents: [
           { Key: "ifc/m.ifc", Size: 5 * 1024 * 1024 },
+        ], IsTruncated: false })
+        .mockResolvedValueOnce({ Contents: [
+          { Key: "briefs/x.pdf", Size: 2 * 1024 * 1024 },
         ], IsTruncated: false });
       const { getStorageInfo } = await freshImport();
       const r = await getStorageInfo();
       expect(r!.files.count).toBe(2);
       expect(r!.ifc.count).toBe(1);
-      expect(parseFloat(r!.totalSizeMB)).toBeCloseTo(6.5, 0);
+      expect(r!.briefs.count).toBe(1);
+      // 1 MB + 0.5 MB (files) + 5 MB (ifc) + 2 MB (briefs) ≈ 8.5 MB
+      expect(parseFloat(r!.totalSizeMB)).toBeCloseTo(8.5, 0);
     });
 
     it("Scenario 49: Returns zeros for empty bucket", async () => {
       sendMock
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false })
         .mockResolvedValueOnce({ Contents: [], IsTruncated: false })
         .mockResolvedValueOnce({ Contents: [], IsTruncated: false });
       const { getStorageInfo } = await freshImport();
       const r = await getStorageInfo();
       expect(r!.files.count).toBe(0);
       expect(r!.ifc.count).toBe(0);
+      expect(r!.briefs.count).toBe(0);
       expect(r!.totalSizeMB).toBe("0.00");
     });
 
@@ -503,12 +518,112 @@ describe("R2 Storage — 50 Scenarios", () => {
           { Key: "files/a.pdf", Size: 1024 },
           { Key: "files/b.pdf", Size: undefined },
         ], IsTruncated: false })
-        .mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }) // ifc
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }); // briefs
       const { getStorageInfo } = await freshImport();
       const r = await getStorageInfo();
       expect(r!.files.count).toBe(2);
       // Only first file contributes size
       expect(parseFloat(r!.files.sizeMB)).toBeCloseTo(0.001, 2);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GROUP 7: uploadBriefToR2 — Brief-to-Renders inputs (Scenarios 51-58)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("Group 7: uploadBriefToR2 — Brief-to-Renders Inputs", () => {
+    it("Scenario 51: Successfully uploads a small PDF brief", async () => {
+      sendMock.mockResolvedValueOnce({});
+      const { uploadBriefToR2 } = await freshImport();
+      const result = await uploadBriefToR2(
+        Buffer.from("%PDF-1.7\n..."),
+        "marx12.pdf",
+        "application/pdf",
+      );
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.url).toContain("briefs/");
+        expect(result.url).toContain("marx12.pdf");
+      }
+    });
+
+    it("Scenario 52: Successfully uploads a DOCX brief", async () => {
+      sendMock.mockResolvedValueOnce({});
+      const { uploadBriefToR2 } = await freshImport();
+      const result = await uploadBriefToR2(
+        Buffer.from("PK\x03\x04..."),
+        "marx12.docx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      );
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.key).toMatch(/^briefs\/\d{4}\/\d{2}\/\d{2}\/.+-marx12\.docx$/);
+      }
+    });
+
+    it("Scenario 53: Accepts brief at exactly 50 MB", async () => {
+      sendMock.mockResolvedValueOnce({});
+      const { uploadBriefToR2 } = await freshImport();
+      const result = await uploadBriefToR2(
+        Buffer.alloc(50 * 1024 * 1024),
+        "max.pdf",
+        "application/pdf",
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it("Scenario 54: Rejects brief over 50 MB", async () => {
+      const { uploadBriefToR2 } = await freshImport();
+      const result = await uploadBriefToR2(
+        Buffer.alloc(50 * 1024 * 1024 + 1),
+        "huge.pdf",
+        "application/pdf",
+      );
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toContain("50MB");
+    });
+
+    it("Scenario 55: Returns error when R2 not configured", async () => {
+      const { uploadBriefToR2 } = await freshImportNoEnv();
+      const result = await uploadBriefToR2(
+        Buffer.from("test"),
+        "t.pdf",
+        "application/pdf",
+      );
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toContain("not configured");
+    });
+
+    it("Scenario 56: Returns error when S3 send throws", async () => {
+      sendMock.mockRejectedValueOnce(new Error("Network timeout"));
+      const { uploadBriefToR2 } = await freshImport();
+      const result = await uploadBriefToR2(
+        Buffer.from("test"),
+        "t.pdf",
+        "application/pdf",
+      );
+      expect(result.success).toBe(false);
+    });
+
+    it("Scenario 57: Generates unique keys for same filename", async () => {
+      sendMock.mockResolvedValue({});
+      const { uploadBriefToR2 } = await freshImport();
+      const r1 = await uploadBriefToR2(Buffer.from("a"), "brief.pdf", "application/pdf");
+      const r2 = await uploadBriefToR2(Buffer.from("b"), "brief.pdf", "application/pdf");
+      expect(r1.success && r2.success).toBe(true);
+      if (r1.success && r2.success) expect(r1.key).not.toBe(r2.key);
+    });
+
+    it("Scenario 58: Accepts Uint8Array input", async () => {
+      sendMock.mockResolvedValueOnce({});
+      const { uploadBriefToR2 } = await freshImport();
+      const result = await uploadBriefToR2(
+        new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), // %PDF-
+        "small.pdf",
+        "application/pdf",
+      );
+      expect(result.success).toBe(true);
     });
   });
 });

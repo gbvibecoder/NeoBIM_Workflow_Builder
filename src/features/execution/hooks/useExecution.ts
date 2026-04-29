@@ -84,8 +84,12 @@ interface APIErrorResponse {
   details?: string;
 }
 
-// Input node IDs whose user-supplied value should pass through directly
-const INPUT_NODE_IDS = new Set(["IN-001", "IN-002", "IN-003", "IN-004", "IN-005", "IN-006", "IN-008"]);
+// Input node IDs whose user-supplied value should pass through directly.
+// IN-007 (DXF/DWG Upload) was previously missing here while present in
+// BaseNode.tsx's INPUT_NODE_IDS — its uploaded file silently fell through
+// to the mock executor. Adding it threads the CAD file through the same
+// `inputFileStore` → base64 path used by every other file input.
+const INPUT_NODE_IDS = new Set(["IN-001", "IN-002", "IN-003", "IN-004", "IN-005", "IN-006", "IN-007", "IN-008"]);
 
 // Demo-allowed node IDs (routed to /api/demo/execute)
 const DEMO_NODE_IDS = new Set(["TR-003", "GN-003"]);

@@ -1,39 +1,10 @@
 /**
- * Client-side feature flag hook.
- * Fetches /api/config/feature-flags once on mount, caches result.
+ * Floor-plan local re-export of the cross-cutting `useFeatureFlags`.
+ *
+ * Kept as a re-export so existing call sites in this feature don't have
+ * to change paths. New consumers (and any cross-feature code) should
+ * import from `@/hooks/useFeatureFlags` directly.
  */
 
-import { useState, useEffect } from "react";
-
-interface FeatureFlags {
-  vipJobsEnabled: boolean;
-}
-
-const DEFAULT_FLAGS: FeatureFlags = { vipJobsEnabled: false };
-
-let cachedFlags: FeatureFlags | null = null;
-
-export function useFeatureFlags(): FeatureFlags {
-  const [flags, setFlags] = useState<FeatureFlags>(cachedFlags ?? DEFAULT_FLAGS);
-
-  useEffect(() => {
-    if (cachedFlags) return; // Already fetched
-
-    let cancelled = false;
-    fetch("/api/config/feature-flags")
-      .then((r) => (r.ok ? r.json() : DEFAULT_FLAGS))
-      .then((data: FeatureFlags) => {
-        if (!cancelled) {
-          cachedFlags = data;
-          setFlags(data);
-        }
-      })
-      .catch(() => {
-        // Feature flags fetch failed — default to all off (safe)
-      });
-
-    return () => { cancelled = true; };
-  }, []);
-
-  return flags;
-}
+export { useFeatureFlags } from "@/hooks/useFeatureFlags";
+export type { FeatureFlags } from "@/hooks/useFeatureFlags";

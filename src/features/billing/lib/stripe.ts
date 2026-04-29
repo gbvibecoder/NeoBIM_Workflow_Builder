@@ -10,6 +10,13 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_placeholde
 export const VIDEO_NODES = new Set(['GN-009']);
 export const MODEL_3D_NODES = new Set(['GN-007', 'GN-008', 'GN-010']);
 export const RENDER_NODES = new Set(['GN-003']);
+// Brief-to-Renders runs through its own API surface (`/api/brief-renders`),
+// not through `/api/execute-node`, so this set is intentionally empty.
+// Quota enforcement is wired in the brief-renders POST route via
+// `getBriefRendersMonthlyLimit` reading the per-plan `briefRendersPerMonth`
+// limit. The export exists so the metered-features family stays complete
+// and exhaustively listed in one place.
+export const BRIEF_RENDER_NODES = new Set<string>();
 
 // ── Stripe pricing configuration (INR for India market) ────────────────────
 export const STRIPE_PLANS = {
@@ -31,6 +38,11 @@ export const STRIPE_PLANS = {
       videoPerMonth: 0,
       modelsPerMonth: 0,
       rendersPerMonth: 1,
+      // Brief-to-Renders: ~$3/run, so FREE gets 1 lifetime run as a try.
+      // Tracked per calendar month for parity with the other metered
+      // limits; the actual enforcement reads the count of jobs whose
+      // createdAt falls in the current month.
+      briefRendersPerMonth: 1,
     },
   },
   MINI: {
@@ -52,6 +64,7 @@ export const STRIPE_PLANS = {
       videoPerMonth: 0,
       modelsPerMonth: 0,
       rendersPerMonth: 3,
+      briefRendersPerMonth: 2,
     },
   },
   STARTER: {
@@ -76,6 +89,7 @@ export const STRIPE_PLANS = {
       videoPerMonth: 3,
       modelsPerMonth: 3,
       rendersPerMonth: 10,
+      briefRendersPerMonth: 5,
     },
   },
   PRO: {
@@ -99,6 +113,7 @@ export const STRIPE_PLANS = {
       videoPerMonth: 7,
       modelsPerMonth: 10,
       rendersPerMonth: 30,
+      briefRendersPerMonth: 20,
     },
   },
   TEAM: {
@@ -124,9 +139,32 @@ export const STRIPE_PLANS = {
       videoPerMonth: 15,
       modelsPerMonth: 30,
       rendersPerMonth: -1,
+      briefRendersPerMonth: -1,
     },
   },
 } as const;
+
+/**
+ * Per-plan monthly cap for Brief-to-Renders runs. Returns -1 for
+ * unlimited (TEAM_ADMIN / PLATFORM_ADMIN). Centralised here so the
+ * brief-renders POST route, the dashboard usage widget, and any
+ * future cron-based reconciliation share a single source of truth.
+ */
+export function getBriefRendersMonthlyLimit(role: string): number {
+  switch (role) {
+    case 'PLATFORM_ADMIN':
+    case 'TEAM_ADMIN':
+      return STRIPE_PLANS.TEAM.limits.briefRendersPerMonth;
+    case 'PRO':
+      return STRIPE_PLANS.PRO.limits.briefRendersPerMonth;
+    case 'STARTER':
+      return STRIPE_PLANS.STARTER.limits.briefRendersPerMonth;
+    case 'MINI':
+      return STRIPE_PLANS.MINI.limits.briefRendersPerMonth;
+    default:
+      return STRIPE_PLANS.FREE.limits.briefRendersPerMonth;
+  }
+}
 
 // Helper to get plan by price ID (returns Prisma UserRole enum)
 // Uses both cached STRIPE_PLANS and runtime env var re-read as fallback

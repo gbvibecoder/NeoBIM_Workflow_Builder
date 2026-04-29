@@ -76,6 +76,17 @@ const optionalSchema = z.object({
    *  "true" switches GN-009 to the new path; "false" (default) preserves the
    *  legacy client-side polling behavior. */
   VIDEO_BG_JOBS: z.enum(["true", "false"]).optional().default("false"),
+  /** Master switch for the Brief-to-Renders pipeline. "true" makes the
+   *  feature potentially visible to allowlisted users; absent/"false" keeps
+   *  it invisible to everyone. Read by `shouldUserSeeBriefRenders`. */
+  PIPELINE_BRIEF_RENDERS: z.enum(["true", "false"]).optional().default("false"),
+  /** Comma-separated emails that get Brief-to-Renders when the master switch
+   *  is on. Case-insensitive. Empty = nobody (even with flag on). */
+  BRIEF_RENDERS_BETA_EMAILS: z.string().optional(),
+  /** Platform admin emails that ALWAYS see Brief-to-Renders when the master
+   *  switch is on (regardless of BRIEF_RENDERS_BETA_EMAILS). For production
+   *  testing. */
+  BRIEF_RENDERS_ADMIN_OVERRIDE_EMAILS: z.string().optional(),
 });
 
 // Razorpay env vars are validated by validateRazorpayEnv() (runs inside

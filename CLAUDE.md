@@ -53,7 +53,7 @@ This project uses a feature-based folder structure. Every developer (human or AI
 **Example:** A new shared date formatter → `src/lib/format-date.ts`
 **Example:** A new IFC parsing service → `src/features/ifc/services/ifc-parser-v2.ts`
 
-### The 17 feature folders
+### The 18 feature folders
 
 ```
 src/features/
@@ -62,6 +62,7 @@ src/features/
   ai/            — AI services (OpenAI, Claude), prompt handling, AI chat
   billing/       — Stripe, Razorpay, subscriptions, pricing
   boq/           — BOQ visualizer, cost estimation, quantity corrections
+  brief-renders/ — Brief-to-Renders pipeline (PDF/DOCX → photoreal renders + editorial PDF)
   canvas/        — React Flow canvas, nodes, edges, panels, toolbar
   community/     — Community marketplace, video sharing
   dashboard/     — Dashboard home, sidebar, header, hero scenes
@@ -91,7 +92,7 @@ These files are imported by 15-75+ files. They stay where they are:
 
 ```
 src/lib/db.ts, auth.ts, rate-limit.ts, user-errors.ts, utils.ts, r2.ts, logger.ts, i18n.ts, validation.ts
-src/hooks/useLocale.ts, useAvatar.ts
+src/hooks/useLocale.ts, useAvatar.ts, useFeatureFlags.ts
 src/types/workflow.ts, execution.ts, nodes.ts, floor-plan-cad.ts
 src/constants/limits.ts, design-tokens.ts
 ```
@@ -171,6 +172,51 @@ If unsure, default to the feature folder. It's easier to move something to share
 
 **Rate limiting:** Upstash Redis sliding window — 5/month (FREE), 10/month (MINI), 30/month (STARTER), 100/month (PRO). TEAM_ADMIN/PLATFORM_ADMIN bypass limits. Admin emails bypass limits. Per-node-type metered limits (video, 3D, render) use atomic Redis INCR with monthly auto-expiry. Logic in `src/lib/rate-limit.ts`.
 
+**Brief-to-Renders pipeline (`src/features/brief-renders/`):**
+A self-contained PDF/DOCX → photoreal-renders + editorial PDF flow that
+deliberately bypasses the canvas. Mounted at `/dashboard/brief-renders`
+(server component, canary-gated) and lives under its own API namespace
+`/api/brief-renders/`.
+
+- **Stages** (one orchestrator file each, names mirror VIP):
+  1. `stage-1-spec-extract.ts` — Anthropic Sonnet 4.6 `tool_use` parses
+     the brief into a strict-faithfulness-contracted `BriefSpec`. Every
+     leaf is nullable; the prompt forbids invention.
+  2. `stage-2-prompt-gen.ts` — Pure deterministic. No `Math.random` /
+     `Date.now`. Empty source → empty fragment, never a placeholder.
+  3. `stage-3-image-gen.ts` — Per-shot worker. Mutex via Upstash Redis
+     SET-NX-EX with Lua-script value-matched release. Calls
+     `images.edit()` with `input_fidelity:"high"` when reference
+     images are present. Atomic `jsonb_set` on the shots array
+     (avoids lost-update races). Adaptive 5/15/45 s backoff schedule.
+  4. `stage-4-pdf-compile.ts` — Editorial layout via `jspdf`. Inter
+     font with Helvetica fallback. Cover + per-shot pages.
+     Deterministic R2 key `briefs-pdfs-{jobId}.pdf`.
+- **State machine:** QUEUED → RUNNING (`spec_extracting`) →
+  AWAITING_APPROVAL → RUNNING (`rendering` → `awaiting_compile` →
+  `compiling`) → COMPLETED. Cancel transitions to CANCELLED from any
+  non-terminal state via conditional `updateMany`.
+- **Canary rollout:** `services/brief-pipeline/canary.ts` — pure
+  function `shouldUserSeeBriefRenders(email, userId)` reads
+  `PIPELINE_BRIEF_RENDERS=true` (master), `BRIEF_RENDERS_BETA_EMAILS`,
+  and `BRIEF_RENDERS_ADMIN_OVERRIDE_EMAILS`. Surfaced to the client
+  via `GET /api/config/feature-flags`. Sidebar entry, templates promo
+  card, and the dashboard page are all gated on the same boolean.
+- **Quota:** `getBriefRendersMonthlyLimit(role)` in
+  `src/features/billing/lib/stripe.ts`. FREE=1, MINI=2, STARTER=5,
+  PRO=20, TEAM/PLATFORM_ADMIN=unlimited. Enforced server-side in
+  `POST /api/brief-renders` (returns 402 on exceed).
+- **Idempotency:** `crypto.randomUUID()` minted client-side in
+  `useBriefRenderUpload`, persisted to localStorage so a refresh
+  during upload retries with the same key. Cleared on success.
+- **R2 keys (deterministic, idempotency-safe):**
+  - Briefs: `briefs/<date-prefixed>/<random>.pdf`
+  - Shots: `briefs-shots-{jobId}-{ai}-{si}.png`
+  - PDFs:  `briefs-pdfs-{jobId}.pdf`
+- **Rollback:** flip `PIPELINE_BRIEF_RENDERS` off — every nav entry,
+  promo card, and API route hides immediately for everyone except
+  emergency admin overrides.
+
 ### Source Layout
 
 > Phase 3 reorganized the codebase into feature folders. The authoritative
@@ -193,14 +239,16 @@ src/
 │       ├── parse-ifc/                  # BIM file parsing
 │       ├── ai-chat/                    # OpenAI chat
 │       ├── stripe/                     # Billing webhooks & checkout
+│       ├── brief-renders/               # Brief→Renders pipeline endpoints + workers
 │       └── user/                       # Profile/settings
 │
-├── features/                           # 17 feature folders (see rules above)
+├── features/                           # 18 feature folders (see rules above)
 │   ├── 3d-render/    {constants, lib, services}
 │   ├── admin/        {components}
 │   ├── ai/           {components, services}
 │   ├── billing/      {lib}                                  # stripe, razorpay
 │   ├── boq/          {components, constants, lib, services} # BOQ visualizer + costing
+│   ├── brief-renders/{components, hooks, services/brief-pipeline} # Brief→Renders flow
 │   ├── canvas/       {components/{artifacts,edges,modals,nodes,panels,toolbar}}
 │   ├── community/    {components}
 │   ├── dashboard/    {components}                           # hero scenes, sidebar, header
