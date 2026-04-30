@@ -11,7 +11,6 @@ import type { WorkflowTemplate } from "@/types/workflow";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
 import { awardXP } from "@/lib/award-xp";
-import { BriefRendersTemplateCard } from "@/features/brief-renders/components/BriefRendersTemplateCard";
 
 /* ── Lazy-loaded 3D scenes — three + @react-three/fiber are ~750KB,
        so split them out of the templates initial chunk. ── */
@@ -828,11 +827,6 @@ export default function TemplatesPage() {
             </motion.div>
           </motion.div>
         </div>
-
-        {/* ════════════════════════════ BRIEF → RENDERS BETA CARD ═══════════════
-            Canary-gated promo for the Brief-to-Renders flow. Renders nothing
-            for non-allowlisted users (the component itself owns the gate). */}
-        <BriefRendersTemplateCard />
 
         {/* ════════════════════════════ FILTER BAR ════════════════════════════ */}
         {/* Phase 5.2: sticky at top:0 (no chrome strip exists anymore — it

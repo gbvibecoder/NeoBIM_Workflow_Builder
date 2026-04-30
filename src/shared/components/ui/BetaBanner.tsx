@@ -41,7 +41,10 @@ export function BetaBanner() {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 8px clamp(12px, 3vw, 20px);
+          /* Right padding reserves the floating UserMenu avatar zone
+             (fixed at top:12 right:16, 32px plate + 16px buffer ≈ 64px)
+             so the dismiss button is not occluded by the avatar. */
+          padding: 8px 72px 8px clamp(12px, 3vw, 20px);
           background: linear-gradient(90deg, rgba(0,245,255,0.08) 0%, rgba(108,92,231,0.06) 100%);
           border-bottom: 1px solid rgba(0,245,255,0.18);
           color: var(--text-primary);
@@ -124,8 +127,10 @@ export function BetaBanner() {
             flex-direction: column;
             align-items: stretch;
             gap: 8px;
-            /* Reserve ~60px on the left for the fixed mobile hamburger (44 + 12 + 4) */
-            padding: 10px 42px 10px 64px;
+            /* Reserve ~60px on the left for the fixed mobile hamburger (44 + 12 + 4)
+               and ~88px on the right to clear the floating UserMenu avatar
+               (right:16 + 32px plate) plus the absolutely-positioned dismiss button. */
+            padding: 10px 88px 10px 64px;
             font-size: 12px;
             line-height: 1.35;
           }
@@ -145,7 +150,9 @@ export function BetaBanner() {
           .beta-banner__dismiss {
             position: absolute;
             top: 8px;
-            right: 10px;
+            /* Sit to the left of the floating UserMenu avatar
+               (avatar covers viewport right 16-48). */
+            right: 56px;
             width: 26px;
             height: 26px;
           }
