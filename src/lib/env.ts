@@ -76,16 +76,16 @@ const optionalSchema = z.object({
    *  "true" switches GN-009 to the new path; "false" (default) preserves the
    *  legacy client-side polling behavior. */
   VIDEO_BG_JOBS: z.enum(["true", "false"]).optional().default("false"),
-  /** Master switch for the Brief-to-Renders pipeline. "true" makes the
-   *  feature potentially visible to allowlisted users; absent/"false" keeps
-   *  it invisible to everyone. Read by `shouldUserSeeBriefRenders`. */
-  PIPELINE_BRIEF_RENDERS: z.enum(["true", "false"]).optional().default("false"),
-  /** Comma-separated emails that get Brief-to-Renders when the master switch
-   *  is on. Case-insensitive. Empty = nobody (even with flag on). */
+  /** Kill switch for the Brief-to-Renders pipeline. Default-on as of GA —
+   *  set to the literal string "false" to instantly disable the feature
+   *  for every user. Any other value (including unset) keeps it enabled.
+   *  Read by `shouldUserSeeBriefRenders`. */
+  PIPELINE_BRIEF_RENDERS: z.enum(["true", "false"]).optional().default("true"),
+  /** Legacy canary cohort allowlist. Retained for re-gating without code
+   *  churn; not consulted by `shouldUserSeeBriefRenders` post-GA. */
   BRIEF_RENDERS_BETA_EMAILS: z.string().optional(),
-  /** Platform admin emails that ALWAYS see Brief-to-Renders when the master
-   *  switch is on (regardless of BRIEF_RENDERS_BETA_EMAILS). For production
-   *  testing. */
+  /** Legacy admin override allowlist. Retained for parity with the beta
+   *  list; not consulted by `shouldUserSeeBriefRenders` post-GA. */
   BRIEF_RENDERS_ADMIN_OVERRIDE_EMAILS: z.string().optional(),
 });
 

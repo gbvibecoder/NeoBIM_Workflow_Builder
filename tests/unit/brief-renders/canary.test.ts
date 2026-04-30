@@ -34,28 +34,28 @@ afterEach(() => {
   _resetBriefRendersCanaryCache();
 });
 
-describe("Brief-to-Renders canary — master gate", () => {
-  it("returns false when PIPELINE_BRIEF_RENDERS is unset", () => {
-    expect(isBriefRendersMasterEnabled()).toBe(false);
+describe("Brief-to-Renders canary — master kill switch", () => {
+  it("returns true when PIPELINE_BRIEF_RENDERS is unset (default-on)", () => {
+    expect(isBriefRendersMasterEnabled()).toBe(true);
   });
 
-  it("returns false when PIPELINE_BRIEF_RENDERS is 'false'", () => {
+  it("returns false when PIPELINE_BRIEF_RENDERS is exactly 'false'", () => {
     process.env.PIPELINE_BRIEF_RENDERS = "false";
     expect(isBriefRendersMasterEnabled()).toBe(false);
   });
 
-  it("returns true only when PIPELINE_BRIEF_RENDERS is exactly 'true'", () => {
+  it("returns true when PIPELINE_BRIEF_RENDERS is 'true'", () => {
     process.env.PIPELINE_BRIEF_RENDERS = "true";
     expect(isBriefRendersMasterEnabled()).toBe(true);
   });
 
-  it("rejects truthy-looking values that aren't the literal string 'true'", () => {
+  it("treats every non-'false' value as enabled", () => {
     process.env.PIPELINE_BRIEF_RENDERS = "1";
-    expect(isBriefRendersMasterEnabled()).toBe(false);
+    expect(isBriefRendersMasterEnabled()).toBe(true);
     process.env.PIPELINE_BRIEF_RENDERS = "TRUE";
-    expect(isBriefRendersMasterEnabled()).toBe(false);
-    process.env.PIPELINE_BRIEF_RENDERS = "yes";
-    expect(isBriefRendersMasterEnabled()).toBe(false);
+    expect(isBriefRendersMasterEnabled()).toBe(true);
+    process.env.PIPELINE_BRIEF_RENDERS = "";
+    expect(isBriefRendersMasterEnabled()).toBe(true);
   });
 });
 
@@ -106,49 +106,32 @@ describe("Brief-to-Renders canary — admin override", () => {
 });
 
 describe("Brief-to-Renders canary — composite shouldUserSeeBriefRenders", () => {
-  it("returns false for everyone when master switch is off", () => {
+  it("returns false for everyone when the kill switch is flipped to 'false'", () => {
+    process.env.PIPELINE_BRIEF_RENDERS = "false";
     process.env.BRIEF_RENDERS_BETA_EMAILS = "alice@example.com";
     process.env.BRIEF_RENDERS_ADMIN_OVERRIDE_EMAILS = "admin@example.com";
     _resetBriefRendersCanaryCache();
     expect(shouldUserSeeBriefRenders("alice@example.com", "u-1")).toBe(false);
     expect(shouldUserSeeBriefRenders("admin@example.com", "u-2")).toBe(false);
-  });
-
-  it("returns false when master switch is on but user is not on either list", () => {
-    process.env.PIPELINE_BRIEF_RENDERS = "true";
-    process.env.BRIEF_RENDERS_BETA_EMAILS = "alice@example.com";
-    _resetBriefRendersCanaryCache();
     expect(shouldUserSeeBriefRenders("eve@example.com", "u-3")).toBe(false);
+    expect(shouldUserSeeBriefRenders(null, "u-anon")).toBe(false);
   });
 
-  it("returns true when master is on and user is in the beta allowlist", () => {
+  it("returns true for any user when the kill switch is unset (GA default)", () => {
+    expect(shouldUserSeeBriefRenders("alice@example.com", "u-1")).toBe(true);
+    expect(shouldUserSeeBriefRenders("eve@example.com", "u-2")).toBe(true);
+    expect(shouldUserSeeBriefRenders(null, "u-anon")).toBe(true);
+    expect(shouldUserSeeBriefRenders(undefined, "")).toBe(true);
+  });
+
+  it("returns true regardless of allowlist membership when enabled", () => {
     process.env.PIPELINE_BRIEF_RENDERS = "true";
     process.env.BRIEF_RENDERS_BETA_EMAILS = "alice@example.com";
-    _resetBriefRendersCanaryCache();
-    expect(shouldUserSeeBriefRenders("alice@example.com", "u-1")).toBe(true);
-  });
-
-  it("returns true when master is on and user is in the admin override list", () => {
-    process.env.PIPELINE_BRIEF_RENDERS = "true";
     process.env.BRIEF_RENDERS_ADMIN_OVERRIDE_EMAILS = "admin@example.com";
     _resetBriefRendersCanaryCache();
+    // Allowlists are no longer consulted post-GA — every user sees it.
+    expect(shouldUserSeeBriefRenders("alice@example.com", "u-1")).toBe(true);
     expect(shouldUserSeeBriefRenders("admin@example.com", "u-2")).toBe(true);
-  });
-
-  it("returns false for null email even when master is on", () => {
-    process.env.PIPELINE_BRIEF_RENDERS = "true";
-    process.env.BRIEF_RENDERS_BETA_EMAILS = "alice@example.com";
-    _resetBriefRendersCanaryCache();
-    expect(shouldUserSeeBriefRenders(null, "u-anon")).toBe(false);
-    expect(shouldUserSeeBriefRenders(undefined, "u-anon")).toBe(false);
-  });
-
-  it("Phase 1 default (no env vars set) — every user gets false", () => {
-    // Phase 1 ships with the master switch off and empty allowlists.
-    // The expected behavior in this state is "feature is invisible
-    // to absolutely everyone, including admins."
-    expect(shouldUserSeeBriefRenders("alice@example.com", "u-1")).toBe(false);
-    expect(shouldUserSeeBriefRenders("admin@example.com", "u-2")).toBe(false);
-    expect(shouldUserSeeBriefRenders(null, "")).toBe(false);
+    expect(shouldUserSeeBriefRenders("eve@example.com", "u-3")).toBe(true);
   });
 });
