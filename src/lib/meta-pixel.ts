@@ -4,18 +4,17 @@ import { pushToDataLayer } from "./gtm";
 
 const META_PIXEL_ID = "2072969213494487";
 
-type FbqAction = "init" | "track" | "trackCustom" | "consent";
 type FbqParams = Record<string, string | number | boolean | undefined>;
 type FbqOptions = { eventID?: string };
 
 declare global {
   interface Window {
-    fbq: (
-      action: FbqAction,
-      eventOrId: string,
-      params?: FbqParams,
-      options?: FbqOptions
-    ) => void;
+    fbq: {
+      (action: "init", pixelId: string, params?: FbqParams): void;
+      (action: "track" | "trackCustom", event: string, params?: FbqParams, options?: FbqOptions): void;
+      (action: "consent", state: "grant" | "revoke"): void;
+      (action: "dataProcessingOptions", options: string[], country?: number, state?: number): void;
+    };
     _fbq: typeof window.fbq;
   }
 }

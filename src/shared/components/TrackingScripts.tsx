@@ -9,14 +9,18 @@ const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
 const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 
 /**
- * Load marketing tags unconditionally — Consent Mode v2 handles privacy.
+ * Load marketing tags unconditionally so verifiers can detect them.
  *
  * Google Consent Mode v2 defaults to all-denied in layout.tsx before these
- * scripts load; cookie-consent.ts fires `consent update` + `fbq consent grant`
- * on accept. Loading tags at denied-default is required for:
- *   - Google / Meta tag verifiers to detect the pixel on the page
- *   - Cookieless pings that power Google's conversion modeling
- *   - Meta's limited-data-use signal
+ * scripts load; cookie-consent.ts pushes a `consent update` on accept,
+ * which lets Google's cookieless pings power conversion modeling.
+ *
+ * Meta Pixel intentionally does NOT use `fbq('consent', 'revoke')` as a
+ * default state — that call hard-blocks every event (including PageView)
+ * until grant, which makes Meta's pixel verifier report "A pixel wasn't
+ * detected on this website". Instead we init + fire PageView immediately
+ * and use `fbq('dataProcessingOptions', ['LDU'])` so events still ship to
+ * Meta but signal Limited Data Use; cookie-consent.ts clears LDU on accept.
  */
 export function TrackingScripts() {
   return (
@@ -34,7 +38,10 @@ export function TrackingScripts() {
         </Script>
       )}
 
-      {/* Meta Pixel (Facebook) — revoke consent by default, cookie-consent.ts grants on accept */}
+      {/* Meta Pixel (Facebook) — init + PageView fire IMMEDIATELY so the
+          verifier and Meta Pixel Helper can detect a real network hit.
+          Privacy gating uses Limited Data Use (LDU) instead of consent
+          revoke; cookie-consent.ts clears LDU when the user accepts. */}
       <Script id="meta-pixel" strategy="afterInteractive">
         {`
           !function(f,b,e,v,n,t,s)
@@ -45,8 +52,8 @@ export function TrackingScripts() {
           t.src=v;s=b.getElementsByTagName(e)[0];
           s.parentNode.insertBefore(t,s)}(window, document,'script',
           'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('consent', 'revoke');
           fbq('init', '${META_PIXEL_ID}');
+          fbq('dataProcessingOptions', ['LDU'], 0, 0);
           fbq('track', 'PageView');
         `}
       </Script>

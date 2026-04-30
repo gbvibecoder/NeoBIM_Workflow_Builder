@@ -9,11 +9,16 @@ export function CookieConsent() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    if (getTrackingConsent() === null) {
+    const stored = getTrackingConsent();
+    if (stored === null) {
       // Small delay so banner doesn't flash on page load
       const timer = setTimeout(() => setShow(true), 1500);
       return () => clearTimeout(timer);
     }
+    // Returning visitor — re-apply their stored choice so Google Consent
+    // Mode v2 and Meta LDU pick it up on every page load. Without this,
+    // tags stay at the denied / LDU defaults forever for returning users.
+    setTrackingConsent(stored);
   }, []);
 
   if (!show) return null;

@@ -23,8 +23,12 @@ export function setTrackingConsent(value: "accepted" | "rejected") {
     ad_personalization: granted ? "granted" : "denied",
   });
 
-  // Meta Pixel granular consent — matches the revoke-by-default in TrackingScripts
-  window.fbq?.("consent", granted ? "grant" : "revoke");
+  // Meta Pixel privacy — toggle Limited Data Use instead of revoking the
+  // pixel entirely. `consent revoke` would hard-block every event and
+  // make Meta's pixel verifier report "A pixel wasn't detected"; LDU keeps
+  // events flowing while signaling reduced data processing rights. Accept
+  // clears LDU (full data use); reject keeps LDU on.
+  window.fbq?.("dataProcessingOptions", granted ? [] : ["LDU"], 0, 0);
 
   window.dispatchEvent(new CustomEvent("cookie-consent-change", { detail: value }));
 }

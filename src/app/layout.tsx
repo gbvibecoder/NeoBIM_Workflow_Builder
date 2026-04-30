@@ -10,6 +10,7 @@ import { SessionProvider } from "@/shared/components/providers/SessionProvider";
 import { TrackingScripts } from "@/shared/components/TrackingScripts";
 import { CookieConsent } from "@/shared/components/CookieConsent";
 import { UTMCapture } from "@/shared/components/UTMCapture";
+import { META_PIXEL_ID } from "@/lib/meta-pixel";
 import "./globals.css";
 import "@/lib/env-check";
 
@@ -283,6 +284,20 @@ export default function RootLayout({
             />
           </noscript>
         )}
+        {/* Meta Pixel <noscript> fallback — part of Meta's official install
+            snippet. Lets crawlers and no-JS clients register a PageView even
+            when fbevents.js can't load. next/image can't be used inside
+            <noscript> (ships a JS runtime) and adds no value for a 1x1 hit. */}
+        <noscript>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            height="1"
+            width="1"
+            style={{ display: "none" }}
+            src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+            alt=""
+          />
+        </noscript>
         {/* Skip-to-content link for keyboard/screen reader accessibility (#39) */}
         <a
           href="#main-content"
