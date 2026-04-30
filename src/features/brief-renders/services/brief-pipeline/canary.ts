@@ -1,26 +1,23 @@
 /**
- * Brief-to-Renders canary rollout — allowlist-based access control.
- *
- * Mirrors the VIP canary pattern (`src/features/floor-plan/lib/vip-pipeline/canary.ts`)
- * so every pipeline in this codebase has the same single-flag kill switch.
+ * Brief-to-Renders feature gate — public release with kill switch.
  *
  * Pure function. No DB calls. Only reads env vars.
  *
- * Master switch:
- *   PIPELINE_BRIEF_RENDERS=true       → feature is potentially visible
- *   PIPELINE_BRIEF_RENDERS unset/false → feature is invisible to everyone
+ * Master switch (kill switch only):
+ *   PIPELINE_BRIEF_RENDERS unset / any value other than "false" → ENABLED
+ *   PIPELINE_BRIEF_RENDERS="false"                              → DISABLED
  *
- * Access hierarchy when the master switch is on:
- *   1. BRIEF_RENDERS_ADMIN_OVERRIDE_EMAILS  — always sees the feature
- *   2. BRIEF_RENDERS_BETA_EMAILS            — canary cohort
- *   3. Everyone else                        — no access
+ * Default behaviour: visible to every signed-in user. The allowlist
+ * cohort gating (`BRIEF_RENDERS_BETA_EMAILS`,
+ * `BRIEF_RENDERS_ADMIN_OVERRIDE_EMAILS`) was retired when the feature
+ * went GA. The two helpers `isUserInBriefRendersBeta` and
+ * `isBriefRendersAdminOverride` are still exported because the same env
+ * vars can be re-introduced as a re-gate without code churn — but they
+ * are no longer consulted by `shouldUserSeeBriefRenders`.
  *
- * Phase 6 wires this into:
- *   • the dashboard page server component (404 unknown users)
- *   • the sidebar nav (hide entry from non-canary users)
- *   • the templates page (hide promo card from non-canary users)
- * Existing read sites: `/api/config/feature-flags`, all
- * `/api/brief-renders/**` routes (returns 403 on miss).
+ * Read sites: dashboard page (`/dashboard/brief-renders`), sidebar nav,
+ * templates promo card, `/api/config/feature-flags`, every
+ * `/api/brief-renders/**` route.
  */
 
 function parseEmailList(envVar: string | undefined): Set<string> {
@@ -58,32 +55,34 @@ export function isBriefRendersAdminOverride(email: string | null | undefined): b
   return getAdminEmails().has(email.toLowerCase());
 }
 
-/** Master gate — true only if PIPELINE_BRIEF_RENDERS is explicitly "true". */
+/**
+ * Master gate — kill-switch semantics. Returns true unless
+ * PIPELINE_BRIEF_RENDERS is explicitly the string "false".
+ * Default-on so the feature is live without any env config; flip to
+ * "false" for an instant production-wide disable.
+ */
 export function isBriefRendersMasterEnabled(): boolean {
-  return process.env.PIPELINE_BRIEF_RENDERS === "true";
+  return process.env.PIPELINE_BRIEF_RENDERS !== "false";
 }
 
 /**
  * Should this user see Brief-to-Renders?
  *
+ * Public surface as of GA: every authenticated caller passes through.
+ * Per-route auth checks (session?.user?.id) remain the gate against
+ * unauthenticated access — this function only governs whether the
+ * feature itself is enabled.
+ *
  * Pure function — no DB calls, no side effects, safe to call from any
  * runtime (edge, node, browser via `/api/config/feature-flags`).
  */
 export function shouldUserSeeBriefRenders(
-  email: string | null | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _email: string | null | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _userId: string,
 ): boolean {
-  // Master switch must be on
-  if (!isBriefRendersMasterEnabled()) return false;
-
-  // Admin override — always sees the feature when master switch on
-  if (isBriefRendersAdminOverride(email)) return true;
-
-  // Beta allowlist
-  if (isUserInBriefRendersBeta(email)) return true;
-
-  // Everyone else — invisible
-  return false;
+  return isBriefRendersMasterEnabled();
 }
 
 /** Reset cached email lists. Test-only. */
