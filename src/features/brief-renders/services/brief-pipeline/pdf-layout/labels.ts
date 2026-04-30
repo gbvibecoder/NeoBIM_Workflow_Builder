@@ -51,7 +51,12 @@ export function numberToWord(n: number): string {
 
 // ─── Chrome strings ─────────────────────────────────────────────────
 
-export const LABEL_HERO_SHOT = "◆ HERO SHOT";
+// HERO_SHOT is rendered as a filled gold square + the label "HERO SHOT".
+// We don't ship the diamond glyph in the label string itself because
+// U+25C6 (◆) is outside WinAnsi, so it falls back to "%Æ" or worse on
+// jspdf's bundled Helvetica when Inter TTFs are missing. The glyph is
+// drawn as geometry by `per-shot-page.ts` instead.
+export const LABEL_HERO_SHOT = "HERO SHOT";
 
 export function LABEL_SHOT_N_OF_M(n: number, m: number): string {
   return `Shot ${n} of ${m}`;

@@ -108,7 +108,12 @@ describe("Static label snapshots", () => {
   // Changing any of these is a load-bearing visual change; the test
   // forces explicit acknowledgement.
   it("static chrome labels match the reference layout exactly", () => {
-    expect(LABEL_HERO_SHOT).toBe("◆ HERO SHOT");
+    // The diamond glyph was dropped from the label string because
+    // U+25C6 falls outside WinAnsi (Helvetica fallback) and rendered
+    // as garbage when Inter TTFs were missing. The visual diamond is
+    // now drawn as geometry by per-shot-page.ts; the label carries
+    // only the text.
+    expect(LABEL_HERO_SHOT).toBe("HERO SHOT");
     expect(LABEL_ROOM_AREA).toBe("ROOM AREA");
     expect(LABEL_ASPECT).toBe("ASPECT");
     expect(LABEL_LIGHTING).toBe("LIGHTING");

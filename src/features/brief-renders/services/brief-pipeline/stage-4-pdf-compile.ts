@@ -25,7 +25,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { jsPDF } from "jspdf";
 
 import { JobNotFoundError } from "./orchestrator";
-import { uploadBase64ToR2 } from "@/lib/r2";
+import { isR2Configured, uploadEditorialPdfToR2 } from "@/lib/r2";
 import type { BriefRenderLogger } from "./logger";
 import { registerInterFont } from "./pdf-fonts";
 import {
@@ -230,7 +230,7 @@ export async function runStage4PdfCompile(
   }
 
   // 4. Build the PDF.
-  let pdfBase64DataUri: string;
+  let pdfBuffer: Buffer;
   let pageCount: number;
   try {
     const doc = new jsPDF({
@@ -292,43 +292,57 @@ export async function runStage4PdfCompile(
     }
 
     // Backfill page numbers across every page.
-    backfillPageNumbers(doc, { version: PDF_VERSION });
+    backfillPageNumbers(doc);
 
     pageCount = doc.getNumberOfPages();
-    pdfBase64DataUri = doc.output("datauristring");
+    // arraybuffer → Buffer skips the base64 round-trip and gives us the
+    // exact byte size for the cap check + the upload.
+    const arrayBuffer = doc.output("arraybuffer");
+    pdfBuffer = Buffer.from(arrayBuffer);
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown jspdf error";
     logger.endStage(4, "failed", undefined, `pdf_render_failed: ${message}`);
     return { status: "failed", error: `PDF render failed: ${message}` };
   }
 
-  // 5. Upload to R2 with deterministic key.
+  const pdfSizeBytes = pdfBuffer.length;
+
+  // 5. Upload to R2 with deterministic key. Specific-errors rule: the
+  // failure envelope from `uploadEditorialPdfToR2` already explains
+  // exactly why (cap exceeded, R2 unconfigured, S3 PutObject error) —
+  // pass it through to the caller and the stage log so the failure
+  // banner reads as something diagnosable, never "r2_unconfigured" when
+  // the real reason was a 12 MB file hitting a 5 MB cap.
   const pdfKey = `briefs-pdfs-${jobId}.pdf`;
   let uploadedUrl: string;
   try {
-    uploadedUrl = await uploadBase64ToR2(
-      pdfBase64DataUri,
-      pdfKey,
-      "application/pdf",
-    );
-    if (!uploadedUrl || uploadedUrl.startsWith("data:")) {
+    if (!isR2Configured()) {
       logger.endStage(4, "failed", undefined, "r2_unconfigured");
       return {
         status: "failed",
-        error: "R2 not configured — cannot persist PDF.",
+        error:
+          "R2 storage is not configured. Set R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY before retrying.",
       };
     }
+    const upload = await uploadEditorialPdfToR2(pdfBuffer, pdfKey);
+    if (!upload.success) {
+      const reason = upload.error;
+      logger.endStage(4, "failed", undefined, `r2_upload_failed: ${reason}`);
+      return {
+        status: "failed",
+        error: `R2 upload failed: ${reason} (pdfSize=${(pdfSizeBytes / 1024 / 1024).toFixed(2)} MB)`,
+      };
+    }
+    uploadedUrl = upload.url;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown r2 error";
-    logger.endStage(4, "failed", undefined, `r2_upload_failed: ${message}`);
-    return { status: "failed", error: `R2 upload failed: ${message}` };
+    const message =
+      err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    logger.endStage(4, "failed", undefined, `r2_upload_threw: ${message}`);
+    return {
+      status: "failed",
+      error: `R2 upload threw: ${message} (pdfSize=${(pdfSizeBytes / 1024 / 1024).toFixed(2)} MB)`,
+    };
   }
-
-  // 6. Compute size from data-URI prefix-stripped base64.
-  const base64Body = pdfBase64DataUri.includes(",")
-    ? pdfBase64DataUri.split(",", 2)[1] ?? ""
-    : pdfBase64DataUri;
-  const pdfSizeBytes = Math.floor((base64Body.length * 3) / 4);
 
   // 7. Atomic terminal flip — RUNNING + compiling → COMPLETED. The
   //    conditional where-clause means a concurrent cancel during the

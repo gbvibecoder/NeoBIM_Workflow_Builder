@@ -84,16 +84,64 @@ export function renderCoverPage(
   // Top confidentiality strip.
   drawPageHeader(doc);
 
-  let cursorY = MARGIN_TOP_MM;
+  // Masthead vertical offset: push the title block down so it sits in
+  // the upper third of the page with breathing room above (matches the
+  // editorial deck reference). Without this the cover anchored at the
+  // top margin and felt cramped.
+  const MASTHEAD_TOP_OFFSET_MM = 40;
+  let cursorY = MARGIN_TOP_MM + MASTHEAD_TOP_OFFSET_MM;
+  const pageCenterX = PAGE_WIDTH_MM / 2;
 
-  // ── Project title ──────────────────────────────────────────────
+  // ── Project title (split at first comma so long addresses don't overflow)
+  // The brief frequently sets `projectTitle` to a full address line:
+  //   "Marxstraße 12, 76571 Gaggenau — EG (ground floor)"
+  // At 22pt that's ~58 chars × ~3.4 mm/char = 197 mm, blowing the
+  // 174 mm content width and clipping at the right edge. We split at
+  // the first comma so the building name becomes the title and the
+  // remainder folds into the subtitle. If there's no comma, falls back
+  // to splitTextToSize wrapping across multiple lines.
   if (presentString(spec.projectTitle)) {
+    const { title: titleText, tail } = splitTitleAtFirstComma(
+      spec.projectTitle,
+    );
     doc.setFont(fontFamily, "bold");
     doc.setFontSize(FONT_SIZE_PROJECT_TITLE);
     doc.setTextColor(COLOR_TEXT_PRIMARY);
+    const titleLines = doc.splitTextToSize(titleText, CONTENT_WIDTH_MM);
     cursorY += FONT_SIZE_PROJECT_TITLE * 0.4;
-    doc.text(spec.projectTitle.trim(), MARGIN_LEFT_MM, cursorY);
+    const titleLineArray: string[] = Array.isArray(titleLines)
+      ? titleLines
+      : [titleText];
+    // Title is centered horizontally for a proper editorial-deck
+    // masthead (matches the reference layout). Body content below
+    // the masthead reverts to left-alignment.
+    for (let i = 0; i < titleLineArray.length; i++) {
+      doc.text(titleLineArray[i], pageCenterX, cursorY, { align: "center" });
+      if (i < titleLineArray.length - 1) {
+        cursorY += FONT_SIZE_PROJECT_TITLE * 0.45;
+      }
+    }
     cursorY += SPACING_BLOCK_MM;
+
+    // If the title carried a tail after the first comma, render it as
+    // the leading subtitle so the address details aren't lost.
+    if (tail.length > 0) {
+      doc.setFont(fontFamily, "normal");
+      doc.setFontSize(FONT_SIZE_PROJECT_SUBTITLE);
+      doc.setTextColor(COLOR_TEXT_SECONDARY);
+      cursorY += FONT_SIZE_PROJECT_SUBTITLE * 0.4;
+      const tailLines = doc.splitTextToSize(tail, CONTENT_WIDTH_MM);
+      const tailLineArray: string[] = Array.isArray(tailLines)
+        ? tailLines
+        : [tail];
+      for (let i = 0; i < tailLineArray.length; i++) {
+        doc.text(tailLineArray[i], pageCenterX, cursorY, { align: "center" });
+        if (i < tailLineArray.length - 1) {
+          cursorY += FONT_SIZE_PROJECT_SUBTITLE * 0.5;
+        }
+      }
+      cursorY += SPACING_BLOCK_MM;
+    }
   }
 
   // ── Project subtitle (location + type, joined null-safely) ─────
@@ -103,9 +151,13 @@ export function renderCoverPage(
     doc.setFontSize(FONT_SIZE_PROJECT_SUBTITLE);
     doc.setTextColor(COLOR_TEXT_SECONDARY);
     cursorY += FONT_SIZE_PROJECT_SUBTITLE * 0.4;
-    doc.text(subtitle, MARGIN_LEFT_MM, cursorY);
+    doc.text(subtitle, pageCenterX, cursorY, { align: "center" });
     cursorY += SPACING_BLOCK_MM;
   }
+
+  // After the masthead, add a small visual gap before content reverts
+  // to left-aligned body sections.
+  cursorY += SPACING_BLOCK_MM * 2;
 
   // ── "N PHOTOREALISTIC INTERIOR RENDERINGS" ─────────────────────
   doc.setFont(fontFamily, "bold");
@@ -119,18 +171,29 @@ export function renderCoverPage(
   );
   cursorY += SPACING_BLOCK_MM;
 
-  // ── Body paragraph (closest schema match: baseline.additionalNotes) ──
+  // ── Body paragraph — short summary of brief.additionalNotes ──
+  // The raw `additionalNotes` field on a real brief is a long
+  // shot-list mandate (200+ words: positive list, negative list,
+  // file naming convention, source plan reference). Dumping it on
+  // the cover makes the page look like a draft, not a client deck.
+  // We trim it to the first 1-2 sentences (≤ COVER_BODY_CHAR_BUDGET
+  // chars), preserving the "Audience / Source" preamble that's
+  // genuinely useful to a client reader.
+  const COVER_BODY_CHAR_BUDGET = 220;
   if (presentString(spec.baseline.additionalNotes)) {
-    doc.setFont(fontFamily, "normal");
-    doc.setFontSize(FONT_SIZE_BODY);
-    doc.setTextColor(COLOR_TEXT_SECONDARY);
-    const wrapped = doc.splitTextToSize(
-      spec.baseline.additionalNotes.trim(),
-      CONTENT_WIDTH_MM,
+    const summary = summariseForCover(
+      spec.baseline.additionalNotes,
+      COVER_BODY_CHAR_BUDGET,
     );
-    cursorY += SPACING_BLOCK_MM;
-    doc.text(wrapped, MARGIN_LEFT_MM, cursorY);
-    cursorY += wrapped.length * (FONT_SIZE_BODY * 0.5) + SPACING_BLOCK_MM;
+    if (summary.length > 0) {
+      doc.setFont(fontFamily, "normal");
+      doc.setFontSize(FONT_SIZE_BODY);
+      doc.setTextColor(COLOR_TEXT_SECONDARY);
+      const wrapped = doc.splitTextToSize(summary, CONTENT_WIDTH_MM);
+      cursorY += SPACING_BLOCK_MM;
+      doc.text(wrapped, MARGIN_LEFT_MM, cursorY);
+      cursorY += wrapped.length * (FONT_SIZE_BODY * 0.5) + SPACING_BLOCK_MM;
+    }
   }
 
   // ── Apartment summary table ────────────────────────────────────
@@ -187,6 +250,57 @@ function composeLayoutCell(apt: ApartmentSpec): string {
 function composeAreaCell(apt: ApartmentSpec): string {
   if (!presentNumber(apt.totalAreaSqm)) return "";
   return `${apt.totalAreaSqm} m²`;
+}
+
+/**
+ * Split a `projectTitle` at the first comma, returning the left half
+ * as `title` and the rest (sans the comma) as `tail`. A title with
+ * no comma returns `tail = ""`.
+ *
+ * Example:
+ *   "Marxstraße 12, 76571 Gaggenau — EG (ground floor)"
+ *     → { title: "Marxstraße 12", tail: "76571 Gaggenau — EG (ground floor)" }
+ */
+function splitTitleAtFirstComma(raw: string): { title: string; tail: string } {
+  const trimmed = raw.trim();
+  const idx = trimmed.indexOf(",");
+  if (idx < 0) return { title: trimmed, tail: "" };
+  const title = trimmed.slice(0, idx).trim();
+  const tail = trimmed.slice(idx + 1).trim();
+  return { title, tail };
+}
+
+/**
+ * Trim a long brief paragraph down to a cover-friendly summary.
+ *
+ * Strategy:
+ *   1. Pull complete sentences off the front until adding the next
+ *      sentence would exceed `maxChars`.
+ *   2. If even the first sentence is too long, hard-cut at a word
+ *      boundary near `maxChars` and append "…".
+ *   3. Strict-faithfulness preserved: empty input returns `""`, never
+ *      a synthesised "Untitled" / "N/A" / etc.
+ */
+function summariseForCover(raw: string, maxChars: number): string {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return "";
+  if (trimmed.length <= maxChars) return trimmed;
+
+  // Sentence-by-sentence accumulator.
+  const sentences = trimmed.split(/(?<=[.!?])\s+/);
+  let acc = "";
+  for (const s of sentences) {
+    const candidate = acc.length === 0 ? s : `${acc} ${s}`;
+    if (candidate.length > maxChars) break;
+    acc = candidate;
+  }
+  if (acc.length > 0) return acc;
+
+  // First sentence already over budget — hard-cut near a word boundary.
+  const slice = trimmed.slice(0, maxChars);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > maxChars * 0.6 ? slice.slice(0, lastSpace) : slice;
+  return `${cut.trim()}…`;
 }
 
 // ─── Apartment table ────────────────────────────────────────────────
@@ -306,31 +420,33 @@ function drawBaselineBlock(
 
   let cursorY = startY + SPACING_BLOCK_MM;
 
-  // Compose the multi-line baseline body from non-null leaves. Each
-  // labelled line keeps the source's intent visible to a human reader
-  // (contractor, designer) without inventing punctuation when fields
-  // are silent.
-  const lines: string[] = [];
-  const pushLine = (label: string, value: string | null | undefined) => {
+  // Collapse all baseline leaves into ONE compact paragraph instead
+  // of the prior labelled-line dump (which read like a draft brief
+  // instead of a client deck — see the resres.pdf comparison). Each
+  // present field becomes a short sentence prefixed with its label;
+  // null fields are silently dropped.
+  const sentences: string[] = [];
+  const pushSentence = (label: string, value: string | null | undefined) => {
     if (presentString(value)) {
-      lines.push(`${label}  ${value.trim()}`);
+      const cleaned = value.trim().replace(/\.+$/, "");
+      sentences.push(`${label} ${cleaned}.`);
     }
   };
-  pushLine("Visual style:", baseline.visualStyle);
-  pushLine("Material palette:", baseline.materialPalette);
-  pushLine("Lighting baseline:", baseline.lightingBaseline);
-  pushLine("Camera baseline:", baseline.cameraBaseline);
-  pushLine("Quality target:", baseline.qualityTarget);
+  pushSentence("Visual style —", baseline.visualStyle);
+  pushSentence("Material palette —", baseline.materialPalette);
+  pushSentence("Lighting —", baseline.lightingBaseline);
+  pushSentence("Camera —", baseline.cameraBaseline);
+  pushSentence("Quality —", baseline.qualityTarget);
 
-  if (lines.length > 0) {
+  if (sentences.length > 0) {
+    const paragraph = sentences.join(" ");
     doc.setFont(fontFamily, "normal");
     doc.setFontSize(FONT_SIZE_BODY);
     doc.setTextColor(COLOR_TEXT_PRIMARY);
-    for (const line of lines) {
-      const wrapped = doc.splitTextToSize(line, CONTENT_WIDTH_MM);
-      doc.text(wrapped, MARGIN_LEFT_MM, cursorY);
-      cursorY += wrapped.length * (FONT_SIZE_BODY * 0.5) + SPACING_LINE_MM;
-    }
+    const wrapped = doc.splitTextToSize(paragraph, CONTENT_WIDTH_MM);
+    doc.text(wrapped, MARGIN_LEFT_MM, cursorY);
+    const lineCount = Array.isArray(wrapped) ? wrapped.length : 1;
+    cursorY += lineCount * (FONT_SIZE_BODY * 0.5) + SPACING_LINE_MM;
   }
 
   return cursorY;
