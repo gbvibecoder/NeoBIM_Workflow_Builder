@@ -50,7 +50,8 @@ export function PdfDownloadButton({
       className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded font-medium text-sm"
       data-testid="pdf-download-button"
     >
-      Download editorial PDF
+      <span aria-hidden>⬇</span>
+      Get PDF
     </a>
   );
 }

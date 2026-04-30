@@ -27,6 +27,10 @@ const {
   jspdfGetNumberOfPagesMock,
   jspdfAddFileToVFSMock,
   jspdfAddFontMock,
+  jspdfSetFillColorMock,
+  jspdfRectMock,
+  jspdfLinesMock,
+  jspdfGetTextWidthMock,
 } = vi.hoisted(() => ({
   uploadR2Mock: vi.fn(),
   jspdfCtorMock: vi.fn(),
@@ -45,10 +49,18 @@ const {
   jspdfGetNumberOfPagesMock: vi.fn(),
   jspdfAddFileToVFSMock: vi.fn(),
   jspdfAddFontMock: vi.fn(),
+  jspdfSetFillColorMock: vi.fn(),
+  jspdfRectMock: vi.fn(),
+  jspdfLinesMock: vi.fn(),
+  // Deterministic stub — real jspdf measures from font metrics; spy
+  // returns a non-zero number so per-shot-page.ts can place the hero
+  // badge icon to the left of the label.
+  jspdfGetTextWidthMock: vi.fn((s: string) => s.length * 1.5),
 }));
 
 vi.mock("@/lib/r2", () => ({
-  uploadBase64ToR2: (...args: unknown[]) => uploadR2Mock(...args),
+  isR2Configured: () => true,
+  uploadEditorialPdfToR2: (...args: unknown[]) => uploadR2Mock(...args),
 }));
 
 vi.mock("jspdf", () => {
@@ -71,6 +83,10 @@ vi.mock("jspdf", () => {
     getNumberOfPages = jspdfGetNumberOfPagesMock;
     addFileToVFS = jspdfAddFileToVFSMock;
     addFont = jspdfAddFontMock;
+    setFillColor = jspdfSetFillColorMock;
+    rect = jspdfRectMock;
+    lines = jspdfLinesMock;
+    getTextWidth = jspdfGetTextWidthMock;
   }
   return { jsPDF: MockJsPDF };
 });
@@ -193,12 +209,26 @@ beforeEach(() => {
   jspdfAddImageMock.mockReset();
   jspdfSetPageMock.mockReset();
   jspdfSplitTextToSizeMock.mockReset().mockImplementation((t: string) => [t]);
-  jspdfOutputMock.mockReset().mockReturnValue(
-    "data:application/pdf;base64,QUFBQQ==",
-  );
+  // Stage 4 calls `doc.output("arraybuffer")` — return a small fake
+  // ArrayBuffer so `Buffer.from(arrayBuffer)` works in the production
+  // code path. The legacy "datauristring" mode is preserved as a
+  // fallback for any older test that calls output() with no arg.
+  jspdfOutputMock.mockReset().mockImplementation((mode?: string) => {
+    if (mode === "arraybuffer") {
+      // 4 bytes is enough — the cap check passes, real bytes irrelevant.
+      return new ArrayBuffer(4);
+    }
+    return "data:application/pdf;base64,QUFBQQ==";
+  });
   jspdfGetNumberOfPagesMock.mockReset().mockReturnValue(13);
   jspdfAddFileToVFSMock.mockReset();
   jspdfAddFontMock.mockReset();
+  jspdfSetFillColorMock.mockReset();
+  jspdfRectMock.mockReset();
+  jspdfLinesMock.mockReset();
+  jspdfGetTextWidthMock
+    .mockReset()
+    .mockImplementation((s: string) => s.length * 1.5);
 
   // Default: fetch returns a small PNG buffer. Return a FRESH Response
   // per call (Response bodies are single-consumption — re-using the
@@ -215,7 +245,15 @@ beforeEach(() => {
     ),
   );
 
-  uploadR2Mock.mockResolvedValue("https://r2.example/briefs-pdfs-job-1.pdf");
+  // New uploader returns the success/error envelope shape, not a
+  // bare URL. Tests that need to simulate failure override this with
+  // `{ success: false, error: "..." }`.
+  uploadR2Mock.mockResolvedValue({
+    success: true,
+    url: "https://r2.example/briefs-pdfs-job-1.pdf",
+    key: "briefs-pdfs-job-1.pdf",
+    size: 4,
+  });
 });
 
 // ─── Happy path ────────────────────────────────────────────────────
@@ -245,9 +283,11 @@ describe("runStage4PdfCompile — happy path", () => {
     }
 
     expect(uploadR2Mock).toHaveBeenCalledTimes(1);
-    const [, pdfKey, mime] = uploadR2Mock.mock.calls[0];
+    // New uploader signature: (Buffer, key) — no longer accepts a
+    // contentType argument because it always uploads as application/pdf.
+    const [pdfBuffer, pdfKey] = uploadR2Mock.mock.calls[0];
+    expect(Buffer.isBuffer(pdfBuffer)).toBe(true);
     expect(pdfKey).toBe("briefs-pdfs-job-1.pdf");
-    expect(mime).toBe("application/pdf");
 
     // Terminal flip uses status filter on RUNNING + compiling.
     const terminalCall = m.updateMany.mock.calls.find(
@@ -444,10 +484,13 @@ describe("runStage4PdfCompile — image fetch", () => {
 // ─── R2 upload failures ────────────────────────────────────────────
 
 describe("runStage4PdfCompile — R2 upload", () => {
-  it("uploadBase64ToR2 returns data: URI (R2 unconfigured) → failed", async () => {
+  it("uploader returns success:false envelope (cap exceeded) → failed with specific error", async () => {
     const m = makePrismaMock();
     m.findUnique.mockResolvedValueOnce(makeJob());
-    uploadR2Mock.mockResolvedValueOnce("data:application/pdf;base64,QUFBQQ==");
+    uploadR2Mock.mockResolvedValueOnce({
+      success: false,
+      error: "Editorial PDF size 32.45 MB exceeds 30 MB cap",
+    });
 
     const result = await runStage4PdfCompile({
       jobId: "job-1",
@@ -455,9 +498,14 @@ describe("runStage4PdfCompile — R2 upload", () => {
       prisma: m.prisma,
     });
     expect(result.status).toBe("failed");
+    if (result.status === "failed") {
+      // Specific-errors rule: caller-facing text must explain why.
+      expect(result.error).toContain("32.45 MB exceeds 30 MB cap");
+      expect(result.error).toContain("pdfSize=");
+    }
   });
 
-  it("uploadBase64ToR2 throws → failed", async () => {
+  it("uploader throws → failed with specific error", async () => {
     const m = makePrismaMock();
     m.findUnique.mockResolvedValueOnce(makeJob());
     uploadR2Mock.mockRejectedValueOnce(new Error("boom"));
@@ -468,6 +516,10 @@ describe("runStage4PdfCompile — R2 upload", () => {
       prisma: m.prisma,
     });
     expect(result.status).toBe("failed");
+    if (result.status === "failed") {
+      expect(result.error).toContain("boom");
+      expect(result.error).toContain("pdfSize=");
+    }
   });
 
   it("uses deterministic key briefs-pdfs-{jobId}.pdf", async () => {

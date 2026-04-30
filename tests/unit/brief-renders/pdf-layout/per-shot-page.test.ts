@@ -31,6 +31,9 @@ interface ShotSpyDoc {
   fontStyles: Array<{ family: string; style: string }>;
   fontSizes: number[];
   textColors: string[];
+  fillColors: string[];
+  rects: Array<{ x: number; y: number; w: number; h: number; style: string }>;
+  diamonds: Array<{ x: number; y: number; style: string; closed: boolean }>;
   images: AddImageCall[];
   splitTextToSize: (text: string, w: number) => string[];
   text: (
@@ -43,8 +46,19 @@ interface ShotSpyDoc {
   setFontSize: (size: number) => void;
   setTextColor: (color: string) => void;
   setDrawColor: (color: string) => void;
+  setFillColor: (color: string) => void;
   setLineWidth: (w: number) => void;
   line: (...args: number[]) => void;
+  rect: (x: number, y: number, w: number, h: number, style?: string) => void;
+  lines: (
+    segments: Array<[number, number]>,
+    x: number,
+    y: number,
+    scale: [number, number],
+    style?: string,
+    closed?: boolean,
+  ) => void;
+  getTextWidth: (text: string) => number;
   addImage: (
     data: string,
     format: string,
@@ -61,6 +75,9 @@ function makeShotSpyDoc(): ShotSpyDoc {
     fontStyles: [],
     fontSizes: [],
     textColors: [],
+    fillColors: [],
+    rects: [],
+    diamonds: [],
     images: [],
     splitTextToSize: (text: string, _w: number) =>
       text.length === 0 ? [""] : [text],
@@ -78,8 +95,23 @@ function makeShotSpyDoc(): ShotSpyDoc {
       doc.textColors.push(c);
     },
     setDrawColor() {},
+    setFillColor(c) {
+      doc.fillColors.push(c);
+    },
     setLineWidth() {},
     line() {},
+    rect(x, y, w, h, style = "") {
+      doc.rects.push({ x, y, w, h, style });
+    },
+    lines(_segments, x, y, _scale, style = "", closed = false) {
+      doc.diamonds.push({ x, y, style, closed });
+    },
+    // Rough char-width estimate; jspdf's real implementation uses font
+    // metrics, but for spy purposes any deterministic positive number
+    // gives the hero badge its layout offset.
+    getTextWidth(text: string) {
+      return text.length * 1.5;
+    },
     addImage(data, format, x, y, width, height) {
       doc.images.push({ data, format, x, y, width, height });
     },
@@ -120,7 +152,7 @@ const COMMON_RENDER_ARGS = {
 // ─── Hero badge gating ────────────────────────────────────────────
 
 describe("renderShotPage — hero badge gating", () => {
-  it("renders '◆ HERO SHOT' when shotIndexInApartment === 0", () => {
+  it("renders 'HERO SHOT' label + filled gold diamond when shotIndexInApartment === 0", () => {
     const doc = makeShotSpyDoc();
     renderShotPage(doc as unknown as Parameters<typeof renderShotPage>[0], {
       ...COMMON_RENDER_ARGS,
@@ -128,7 +160,13 @@ describe("renderShotPage — hero badge gating", () => {
       shot: NULL_SHOT,
       shotIndexInApartment: 0,
     });
-    expect(doc.texts).toContain("◆ HERO SHOT");
+    // Diamond glyph dropped — rendered as geometry now (closed
+    // 4-vertex filled polygon via doc.lines with the gold colour).
+    expect(doc.texts).toContain("HERO SHOT");
+    expect(doc.fillColors).toContain("#B8893D");
+    expect(
+      doc.diamonds.some((d) => d.style === "F" && d.closed === true),
+    ).toBe(true);
   });
 
   it("does NOT render hero badge for shotIndexInApartment > 0", () => {
@@ -139,7 +177,9 @@ describe("renderShotPage — hero badge gating", () => {
       shot: NULL_SHOT,
       shotIndexInApartment: 1,
     });
-    expect(doc.texts).not.toContain("◆ HERO SHOT");
+    expect(doc.texts).not.toContain("HERO SHOT");
+    // Non-hero pages have no diamond polygon either.
+    expect(doc.diamonds.length).toBe(0);
   });
 });
 

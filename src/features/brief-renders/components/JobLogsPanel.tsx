@@ -67,7 +67,9 @@ interface ForceKickResponse {
     status: string | null;
     currentStage: string | null;
     costUsd: number | null;
-    shotCounts: Record<string, number> | null;
+    shotCounts?: Record<string, number> | null;
+    progress?: number | null;
+    pdfUrl?: string | null;
   };
   error?: string;
   message?: string;
@@ -141,6 +143,9 @@ export function JobLogsPanel({ job, visible }: JobLogsPanelProps) {
   const [kickInFlight, setKickInFlight] = useState(false);
   const [kickResult, setKickResult] = useState<ForceKickResponse | null>(null);
   const [kickError, setKickError] = useState<string | null>(null);
+  const [retryInFlight, setRetryInFlight] = useState(false);
+  const [retryResult, setRetryResult] = useState<ForceKickResponse | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   const stageLog = useMemo<BriefStageLogEntry[]>(() => {
     if (!Array.isArray(job.stageLog)) return [];
@@ -165,6 +170,14 @@ export function JobLogsPanel({ job, visible }: JobLogsPanelProps) {
     hasPendingShot &&
     !hasRunningShot &&
     job.currentStage === "rendering";
+
+  // S4 retry button: surface when the job is stuck mid-compile (most
+  // commonly when Stage 4 returned `failed` and the worker exited
+  // without flipping to FAILED — `retries: 0` means QStash never re-fires).
+  const showRetryCompile =
+    job.status === "RUNNING" &&
+    (job.currentStage === "compiling" ||
+      job.currentStage === "awaiting_compile");
 
   const handleForceKick = useCallback(async () => {
     setKickInFlight(true);
@@ -199,6 +212,42 @@ export function JobLogsPanel({ job, visible }: JobLogsPanelProps) {
       setKickError(err instanceof Error ? err.message : String(err));
     } finally {
       setKickInFlight(false);
+    }
+  }, [job.id]);
+
+  const handleRetryCompile = useCallback(async () => {
+    setRetryInFlight(true);
+    setRetryError(null);
+    try {
+      const res = await fetch(
+        `/api/brief-renders/${job.id}/admin-retry-compile`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}",
+        },
+      );
+      const text = await res.text();
+      let parsed: ForceKickResponse | null = null;
+      try {
+        parsed = text ? (JSON.parse(text) as ForceKickResponse) : null;
+      } catch {
+        parsed = null;
+      }
+      if (!res.ok) {
+        setRetryError(
+          parsed?.error ??
+            parsed?.message ??
+            `HTTP ${res.status}: ${text.slice(0, 200)}`,
+        );
+        setRetryResult(parsed);
+      } else {
+        setRetryResult(parsed);
+      }
+    } catch (err) {
+      setRetryError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRetryInFlight(false);
     }
   }, [job.id]);
 
@@ -380,6 +429,20 @@ export function JobLogsPanel({ job, visible }: JobLogsPanelProps) {
               result={kickResult}
               error={kickError}
               onClick={handleForceKick}
+            />
+          )}
+
+          {/* ─── Retry compile admin button ───
+              Surface when stuck in compile. Stage 4 failures (e.g. PDF
+              over R2 cap, R2 creds drifted, jspdf font load) leave the
+              job in RUNNING+compiling with QStash retries disabled —
+              this is the manual unstick. */}
+          {showRetryCompile && (
+            <RetryCompilePanel
+              inFlight={retryInFlight}
+              result={retryResult}
+              error={retryError}
+              onClick={handleRetryCompile}
             />
           )}
 
@@ -772,6 +835,149 @@ function ForceKickPanel({
                   {k}: {v}
                 </span>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RetryCompilePanel({
+  inFlight,
+  result,
+  error,
+  onClick,
+}: {
+  inFlight: boolean;
+  result: ForceKickResponse | null;
+  error: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      data-testid="job-logs-retry-compile"
+      style={{
+        padding: 12,
+        borderRadius: 8,
+        background: "rgba(251,191,36,0.06)",
+        border: "1px solid rgba(251,191,36,0.3)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={inFlight}
+          data-testid="retry-compile-button"
+          style={{
+            padding: "8px 14px",
+            borderRadius: 6,
+            background: inFlight ? "rgba(251,191,36,0.25)" : "#d97706",
+            color: "#fff",
+            border: "1px solid rgba(251,191,36,0.5)",
+            fontFamily: "inherit",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: inFlight ? "wait" : "pointer",
+            letterSpacing: "0.3px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {inFlight ? "▸ Compiling PDF…" : "▶ Retry compile"}
+        </button>
+        <div
+          style={{
+            color: "rgba(255,255,255,0.6)",
+            fontSize: 11,
+            lineHeight: 1.45,
+          }}
+        >
+          PDF compile is stuck. Re-runs Stage 4 synchronously
+          (≈30 s for 12 shots). On success the job flips to COMPLETED
+          and the &quot;Get PDF&quot; button appears.
+        </div>
+      </div>
+
+      {error && (
+        <div
+          role="alert"
+          style={{
+            padding: 10,
+            borderRadius: 6,
+            background: "rgba(248,113,113,0.1)",
+            border: "1px solid rgba(248,113,113,0.4)",
+            color: "#FCA5A5",
+            fontSize: 11,
+            wordBreak: "break-word",
+          }}
+        >
+          <strong>Retry compile failed:</strong> {error}
+        </div>
+      )}
+
+      {result && (
+        <div
+          style={{
+            padding: 10,
+            borderRadius: 6,
+            background: "rgba(0,0,0,0.35)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            fontSize: 11,
+            color: "rgba(255,255,255,0.75)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+          }}
+          data-testid="retry-compile-result"
+        >
+          <div>
+            <span style={{ color: "rgba(255,255,255,0.45)" }}>gate: </span>
+            <code style={{ color: "#FBBF24" }}>{result.gate}</code>
+          </div>
+          {result.result && (
+            <div>
+              <span style={{ color: "rgba(255,255,255,0.45)" }}>result: </span>
+              <code
+                style={{
+                  color:
+                    result.result.status === "success"
+                      ? "#34D399"
+                      : result.result.status === "failed"
+                        ? "#F87171"
+                        : "#22D3EE",
+                }}
+              >
+                {result.result.status}
+              </code>
+              {result.result.reason && (
+                <span style={{ color: "rgba(255,255,255,0.55)" }}>
+                  {" "}
+                  reason: {result.result.reason}
+                </span>
+              )}
+              {result.result.error && (
+                <div
+                  style={{
+                    color: "#FCA5A5",
+                    marginTop: 4,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  error: {result.result.error}
+                </div>
+              )}
+            </div>
+          )}
+          {result.job && (
+            <div>
+              <span style={{ color: "rgba(255,255,255,0.45)" }}>job now: </span>
+              status={result.job.status} · stage={result.job.currentStage}
+              {result.job.progress !== null &&
+                ` · ${result.job.progress}%`}
             </div>
           )}
         </div>

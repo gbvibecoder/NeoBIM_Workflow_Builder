@@ -74,16 +74,6 @@ export interface PageFooterOptions {
   totalPages?: number;
 }
 
-/**
- * Token written by the first pass and overwritten by `backfillPageNumbers`.
- * Picked so it never appears in real chrome text.
- */
-const PAGE_NUMBER_PLACEHOLDER_PREFIX = "​__PG__​";
-
-function placeholderToken(): string {
-  return PAGE_NUMBER_PLACEHOLDER_PREFIX;
-}
-
 export function drawPageFooter(
   doc: jsPDF,
   opts: PageFooterOptions,
@@ -97,22 +87,29 @@ export function drawPageFooter(
   // Left text — confidentiality.
   doc.text(LABEL_FOOTER_LEFT, MARGIN_LEFT_MM, baselineY);
 
-  // Centre — page number, either real or placeholder.
-  const centerX = PAGE_WIDTH_MM / 2;
+  // Centre — page number. ONLY drawn when real values are supplied.
+  //
+  // Why: jspdf's `text()` is additive — calling it on top of an
+  // existing string layers both glyphs into the page, it does not
+  // overwrite. Older versions of this file wrote a "__PG__" placeholder
+  // on the first pass and let `backfillPageNumbers` overlay the real
+  // "Page X of Y" — both ended up baked in, surfacing as e.g.
+  // `Page▸G of 13` in the rendered PDF.
+  // The fix: only the backfill pass (which knows totalPages) draws the
+  // page-number text. The first pass leaves the slot empty.
   if (
     typeof opts.pageNumber === "number" &&
     typeof opts.totalPages === "number" &&
     opts.pageNumber > 0 &&
     opts.totalPages > 0
   ) {
+    const centerX = PAGE_WIDTH_MM / 2;
     doc.text(
       `Page ${opts.pageNumber} of ${opts.totalPages}`,
       centerX,
       baselineY,
       { align: "center" },
     );
-  } else {
-    doc.text(placeholderToken(), centerX, baselineY, { align: "center" });
   }
 
   // Right text — version.
@@ -145,24 +142,29 @@ export function addPageWithChrome(
 }
 
 /**
- * Walk every page and overwrite the placeholder page-number with the
- * real `Page X of Y` value. Mirrors `pdf-report.ts:1051-1062`.
+ * Walk every page and write the `Page X of Y` value into the centre of
+ * the footer. Called once after content + chrome are finalised so the
+ * total page count is accurate.
+ *
+ * Draws ONLY the page-number text, not the whole footer — left/right
+ * footer slots are already populated by `drawPageFooter` from the first
+ * pass. Re-drawing the full footer here would layer the same text on
+ * top of itself (jspdf is additive), thickening the glyphs.
  */
-export function backfillPageNumbers(
-  doc: jsPDF,
-  opts: { version: string },
-): void {
+export function backfillPageNumbers(doc: jsPDF): void {
   const totalPages = doc.getNumberOfPages();
+  const centerX = PAGE_WIDTH_MM / 2;
+  const baselineY = PAGE_HEIGHT_MM - MARGIN_BOTTOM_MM + 6;
+
   for (let pageIndex = 1; pageIndex <= totalPages; pageIndex++) {
     doc.setPage(pageIndex);
-    // Re-draw the footer with real numbers — overwrites the placeholder.
-    // The text is rendered on top of the existing placeholder; both are
-    // anchored to the same coordinate, so the new draw effectively
-    // replaces the placeholder visually.
-    drawPageFooter(doc, {
-      version: opts.version,
-      pageNumber: pageIndex,
-      totalPages,
-    });
+    doc.setFontSize(FONT_SIZE_FOOTER);
+    doc.setTextColor(COLOR_TEXT_TERTIARY);
+    doc.text(
+      `Page ${pageIndex} of ${totalPages}`,
+      centerX,
+      baselineY,
+      { align: "center" },
+    );
   }
 }

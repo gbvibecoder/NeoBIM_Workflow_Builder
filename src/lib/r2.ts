@@ -33,6 +33,11 @@ const PUBLIC_URL = process.env.R2_PUBLIC_URL ?? ""; // e.g. https://files.yourdo
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB cap for PDFs/XLSX
 const MAX_IFC_SIZE = 100 * 1024 * 1024; // 100MB cap for IFC files
 const MAX_BRIEF_SIZE = 50 * 1024 * 1024; // 50MB cap for Brief-to-Renders inputs (PDF/DOCX)
+// 30 MB cap for the Brief-to-Renders editorial PDF output.
+// Empirically a 12-shot PDF lands at 8-15 MB after jspdf compression — the
+// generic 5 MB cap on `uploadToR2` was a hard blocker (the upload silently
+// failed-open to a data URI, which Stage 4 then rejected as "r2_unconfigured").
+const MAX_EDITORIAL_PDF_SIZE = 30 * 1024 * 1024;
 const CLEANUP_DAYS_FILES = 25; // PDFs & XLSX
 const CLEANUP_DAYS_IFC = 3;   // IFC files (session-like, short-lived)
 const CLEANUP_DAYS_BRIEFS = 25; // Uploaded briefs — same retention as files/
@@ -44,7 +49,6 @@ let _client: S3Client | null = null;
 function getClient(): S3Client | null {
   if (!ACCOUNT_ID || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) return null;
   if (!_client) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     _client = new S3Client({
       region: "auto",
       endpoint: `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -56,6 +60,7 @@ function getClient(): S3Client | null {
       // Disable default CRC32 checksum — R2 doesn't support x-amz-sdk-checksum-algorithm
       requestChecksumCalculation: "WHEN_REQUIRED",
       responseChecksumValidation: "WHEN_REQUIRED",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
   }
   return _client;
@@ -371,6 +376,69 @@ export async function uploadBriefToR2(
   } catch (err) {
     console.error("[R2] Brief upload failed:", err);
     return { success: false, error: String(err) };
+  }
+}
+
+// ─── Editorial PDF Upload (Brief-to-Renders pipeline output) ─────────────
+
+/**
+ * Upload the compiled editorial PDF (cover + 12 shot pages) to R2 under
+ * the `briefs-pdfs/` flat key. Cap: 30 MB (empirically 12 photoreal
+ * shots after jspdf compression land at 8-15 MB).
+ *
+ * Why a dedicated function:
+ *   • The generic `uploadToR2` enforces a 5 MB cap, which silently
+ *     failed-open in `uploadBase64ToR2` and made Stage 4 think R2 was
+ *     unconfigured. See the failing case in
+ *     `src/features/brief-renders/services/brief-pipeline/stage-4-pdf-compile.ts`.
+ *   • An explicit success/error envelope (no graceful fallback to a data
+ *     URI) lets the caller surface the *real* reason for failure to the
+ *     user, satisfying the project-wide specific-errors rule.
+ *
+ * Idempotency: callers pass a deterministic `briefs-pdfs-{jobId}.pdf` key,
+ * so re-running the compile overwrites in place. No date-prefixed path.
+ */
+export async function uploadEditorialPdfToR2(
+  pdfBuffer: Buffer | Uint8Array,
+  key: string,
+): Promise<UploadResult | UploadError> {
+  const client = getClient();
+  if (!client) {
+    return { success: false, error: "R2 not configured" };
+  }
+
+  const buf = pdfBuffer instanceof Buffer ? pdfBuffer : Buffer.from(pdfBuffer);
+
+  if (buf.length > MAX_EDITORIAL_PDF_SIZE) {
+    return {
+      success: false,
+      error: `Editorial PDF size ${(buf.length / 1024 / 1024).toFixed(2)} MB exceeds ${MAX_EDITORIAL_PDF_SIZE / 1024 / 1024} MB cap`,
+    };
+  }
+
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: buf,
+        ContentType: "application/pdf",
+        Metadata: { "uploaded-at": new Date().toISOString() },
+      }),
+    );
+
+    const url = PUBLIC_URL
+      ? `${PUBLIC_URL}/${key}`
+      : `https://${BUCKET_NAME}.${ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
+
+    return { success: true, url, key, size: buf.length };
+  } catch (err) {
+    console.error("[R2] Editorial PDF upload failed:", err);
+    return {
+      success: false,
+      error:
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    };
   }
 }
 
