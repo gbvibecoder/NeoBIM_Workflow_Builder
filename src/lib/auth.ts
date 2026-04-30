@@ -160,7 +160,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // login attempt. Helps diagnose the canonical "I can't login" cases
         // without having to add ad-hoc logging each time:
         //   no-password-given / no-identifier / phone-bad-format / user-not-found
-        //   / no-password-on-account (Google-only) / password-mismatch / ok
+        //   / no-password-on-account (Google-only) / password-mismatch / db-error / ok
         const tag = (reason: string, detail?: string) =>
           console.warn(`[auth] credentials reject — ${reason}${detail ? ` :: ${detail}` : ""}`);
 
@@ -185,9 +185,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             tag("phone-bad-format", String(phone));
             return null;
           }
-          user = await prisma.user.findUnique({
-            where: { phoneNumber: normalizedPhone },
-          });
+          try {
+            user = await prisma.user.findUnique({
+              where: { phoneNumber: normalizedPhone },
+            });
+          } catch (dbErr) {
+            // DB unreachable / DNS failure / Prisma init error. Re-throw so
+            // NextAuth surfaces ?error=Configuration and the login UI maps
+            // that to a service-unavailable message — never "wrong password".
+            const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+            tag("db-error", `phone=${normalizedPhone} :: ${msg}`);
+            throw dbErr;
+          }
           if (!user) {
             tag("user-not-found", `phone=${normalizedPhone}`);
             return null;
@@ -198,9 +207,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         } else {
           const normalizedEmail = (email as string).trim().toLowerCase();
-          user = await prisma.user.findUnique({
-            where: { email: normalizedEmail },
-          });
+          try {
+            user = await prisma.user.findUnique({
+              where: { email: normalizedEmail },
+            });
+          } catch (dbErr) {
+            // DB unreachable / DNS failure / Prisma init error. Re-throw so
+            // NextAuth surfaces ?error=Configuration and the login UI maps
+            // that to a service-unavailable message — never "wrong password".
+            const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+            tag("db-error", `email=${normalizedEmail} :: ${msg}`);
+            throw dbErr;
+          }
           if (!user) {
             tag("user-not-found", `email=${normalizedEmail}`);
             return null;
@@ -211,10 +229,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
 
-        const passwordsMatch = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
+        let passwordsMatch: boolean;
+        try {
+          passwordsMatch = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          );
+        } catch (bcryptErr) {
+          const msg = bcryptErr instanceof Error ? bcryptErr.message : String(bcryptErr);
+          tag("bcrypt-error", `id=${user.id} :: ${msg}`);
+          throw bcryptErr;
+        }
 
         if (!passwordsMatch) {
           tag("password-mismatch", `id=${user.id} email=${user.email ?? "-"} phone=${user.phoneNumber ?? "-"}`);

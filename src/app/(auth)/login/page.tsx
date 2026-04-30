@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Mail, Lock, Chrome, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
+import type { TranslationKey } from "@/lib/i18n";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
 import { trackLogin } from "@/lib/meta-pixel";
@@ -16,6 +17,56 @@ function detectIdentifierType(value: string): "email" | "phone" {
   return value.includes("@") ? "email" : "phone";
 }
 
+/**
+ * Map a NextAuth v5 error code (from `?error=...` URL param or `signIn()`'s
+ * `res.error` field) to a user-visible message. Critical that this distinguishes:
+ *   - "CredentialsSignin"     → user typed the wrong password
+ *   - "Configuration"         → server-side error (DB unreachable, JWT signing fail,
+ *                               authorize() threw). NEVER show "wrong password" here —
+ *                               that misled users for the entire DNS-down incident.
+ *   - "AccessDenied"          → signIn callback rejected the user
+ *   - "Verification"          → magic-link expired/invalid
+ *   - OAuth* codes            → Google sign-in failures
+ *   - anything else           → surface the raw code so we can diagnose, never silently fall through
+ *
+ * `t` is the i18n function; we accept it as a parameter so the same mapper
+ * works in both the URL-param branch (mount time) and the form-submit branch.
+ */
+function mapAuthErrorToMessage(
+  errCode: string | null | undefined,
+  t: (key: TranslationKey) => string,
+): string {
+  if (!errCode) return "";
+  switch (errCode) {
+    case "CredentialsSignin":
+      return t('auth.invalidCredentials');
+    case "Configuration":
+    case "CallbackRouteError":
+    case "AdapterError":
+    case "JWTSessionError":
+    case "SessionTokenError":
+      return t('auth.serviceUnavailable');
+    case "AccessDenied":
+      return "Access denied — your account is not allowed to sign in. Contact support if you believe this is an error.";
+    case "Verification":
+      return "Sign-in link is invalid or expired. Request a new one.";
+    case "OAuthAccountNotLinked":
+      return t('auth.oauthAccountNotLinked');
+    case "OAuthCallback":
+    case "OAuthCallbackError":
+      return t('auth.oauthCallback');
+    case "OAuthSignin":
+    case "OAuthSignInError":
+      return t('auth.oauthSignin');
+    case "MissingCSRF":
+      return "Sign-in failed: CSRF token missing or expired. Refresh the page and try again.";
+    default:
+      // Surface the raw code so the user/dev can see what NextAuth actually
+      // returned instead of a generic "something went wrong" sink.
+      return `Sign-in failed (code: ${errCode}). Please try again, and if the problem persists check your network connection.`;
+  }
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,25 +74,16 @@ function LoginForm() {
   const { t } = useLocale();
   const identifierInputRef = useRef<HTMLInputElement>(null);
 
-  // Map NextAuth error codes to user-friendly messages
+  // Map NextAuth error codes to user-friendly messages. The mapper handles
+  // every NextAuth v5 error type explicitly — no silent fall-through to a
+  // generic "something went wrong" message. Critical for the DB-unreachable
+  // case, which previously surfaced as "Invalid credentials" and sent users
+  // chasing the wrong fix.
   const authErrorParam = searchParams.get("error");
   const expiredParam = searchParams.get("expired");
-  const authErrorMessages: Record<string, string> = {
-    OAuthAccountNotLinked: t('auth.oauthAccountNotLinked'),
-    OAuthCallback: t('auth.oauthCallback'),
-    OAuthSignin: t('auth.oauthSignin'),
-    // Map the credentials-failure code (was missing — fell through to "Default"
-    // which obscures what's actually wrong). Server-side logs in auth.ts now
-    // tag the exact reason (user-not-found / no-password-on-account /
-    // password-mismatch) so the dev terminal disambiguates.
-    CredentialsSignin: "Email/phone or password is incorrect. If you signed up with Google, use 'Continue with Google' instead.",
-    Default: t('auth.defaultAuthError'),
-  };
   const initialError = expiredParam === "true"
     ? t('auth.sessionExpired')
-    : authErrorParam
-      ? authErrorMessages[authErrorParam] ?? authErrorMessages.Default
-      : "";
+    : mapAuthErrorToMessage(authErrorParam, t);
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -141,22 +183,25 @@ function LoginForm() {
       try {
         res = await signIn("credentials", credentials);
       } catch (signInErr) {
-        // NextAuth v5 beta can throw CredentialsSignin instead of returning it
-        // when the authorize function returns null. Distinguish that from any
-        // other thrown error so the dev terminal + browser console show why.
-        const errName = (signInErr instanceof Error ? signInErr.name : "") || "";
-        const errMsg  = (signInErr instanceof Error ? signInErr.message : String(signInErr));
-        if (/credentials/i.test(errName) || /credentials/i.test(errMsg)) {
-          setError("Invalid email/phone or password. If you signed up with Google, use 'Continue with Google' instead.");
-        } else {
-          console.error("[login] signIn threw an unexpected error:", signInErr);
-          setError(`Sign-in failed: ${errMsg.slice(0, 200) || "unknown error"}`);
-        }
+        // NextAuth v5 beta can throw CredentialsSignin (or other AuthError
+        // subclasses) instead of returning them. Pull the error name (which
+        // matches the static `type` on the AuthError class — e.g.
+        // "CredentialsSignin", "CallbackRouteError") and route through the
+        // shared mapper so DB-unreachable errors don't get reported as
+        // wrong-password.
+        const errName = signInErr instanceof Error ? signInErr.name : "";
+        const errMsg  = signInErr instanceof Error ? signInErr.message : String(signInErr);
+        console.error(`[login] signIn threw — name=${errName} msg=${errMsg}`);
+        setError(mapAuthErrorToMessage(errName || "Default", t));
         return;
       }
 
       if (res?.error) {
-        setError("Invalid email/phone or password. If you signed up with Google, use 'Continue with Google' instead.");
+        // res.error is the NextAuth error type string (e.g. "CredentialsSignin"
+        // when authorize() returned null, or "Configuration" when it threw —
+        // including the DB-unreachable case the DNS incident exposed).
+        console.error(`[login] signIn returned error=${res.error}`);
+        setError(mapAuthErrorToMessage(res.error, t));
         return;
       }
 

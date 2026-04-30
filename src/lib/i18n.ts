@@ -43,7 +43,7 @@ const en = {
   'auth.startBuilding': 'Start building amazing AEC workflows',
   'auth.noAccount': "Don't have an account?",
   'auth.hasAccount': 'Already have an account?',
-  'auth.invalidCredentials': 'Invalid email or password. Please try again.',
+  'auth.invalidCredentials': "Email/phone or password is incorrect. If you signed up with Google, use 'Continue with Google' instead.",
   'auth.enterPassword': 'Please enter your password',
   'auth.genericError': 'Something went wrong. Please try again.',
   'auth.googleError': 'Google sign-in failed. Please try again.',
@@ -2039,6 +2039,7 @@ const en = {
   'auth.oauthSignin': 'Could not start Google sign-in. Please try again.',
   'auth.defaultAuthError': 'An authentication error occurred. Please try again.',
   'auth.sessionExpired': 'Your session has expired. Please log in again.',
+  'auth.serviceUnavailable': "We couldn't complete sign-in — the server hit an internal error reaching the database or auth provider. Check your network connection and try again.",
 
   // ===== AUTH LAYOUT =====
   'auth.aecAutomation': 'AEC WORKFLOW AUTOMATION',
@@ -2913,7 +2914,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'auth.startBuilding': 'Erstellen Sie beeindruckende AEC-Workflows',
   'auth.noAccount': 'Noch kein Konto?',
   'auth.hasAccount': 'Bereits ein Konto?',
-  'auth.invalidCredentials': 'E-Mail oder Passwort ungültig. Bitte versuchen Sie es erneut.',
+  'auth.invalidCredentials': 'E-Mail/Telefon oder Passwort ist falsch. Wenn Sie sich mit Google registriert haben, verwenden Sie stattdessen „Mit Google fortfahren".',
   'auth.enterPassword': 'Bitte geben Sie Ihr Passwort ein',
   'auth.genericError': 'Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.',
   'auth.googleError': 'Google-Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.',
@@ -4906,6 +4907,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'auth.oauthSignin': 'Google-Anmeldung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.',
   'auth.defaultAuthError': 'Ein Authentifizierungsfehler ist aufgetreten. Bitte versuchen Sie es erneut.',
   'auth.sessionExpired': 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+  'auth.serviceUnavailable': 'Anmeldung konnte nicht abgeschlossen werden — der Server hatte einen internen Fehler beim Zugriff auf die Datenbank oder den Auth-Anbieter. Überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.',
 
   // ===== AUTH LAYOUT =====
   'auth.aecAutomation': 'AEC-WORKFLOW-AUTOMATISIERUNG',
