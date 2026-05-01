@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
         id: `artifact-${index}`,
         type: (result.type as string) ?? "json",
         data: (result.data as Record<string, unknown>) ?? result,
-        metadata: {},
+        metadata: (result.metadata as Record<string, unknown>) ?? {},
         tileInstanceId: (result.nodeId as string) ?? `node-${index}`,
         nodeId: (result.nodeId as string) ?? `node-${index}`,
         nodeLabel: (result.nodeLabel as string) ?? null,

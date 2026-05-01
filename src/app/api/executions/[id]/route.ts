@@ -45,7 +45,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       type: (result.type as string) ?? "json",
       title: (result.title as string) ?? (result.nodeLabel as string) ?? "Result",
       data: (result.data as Record<string, unknown>) ?? result,
-      metadata: {},
+      metadata: (result.metadata as Record<string, unknown>) ?? {},
       createdAt: (result.createdAt as string) ?? execution.startedAt?.toISOString() ?? new Date().toISOString(),
     }));
 

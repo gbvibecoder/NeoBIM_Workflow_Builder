@@ -1853,6 +1853,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
               type: artifact.type,
               title: String(artifact.type),
               data: artifact.data,
+              metadata: artifact.metadata,
             }),
           }).catch((err) => { console.error("[useExecution] Failed to persist artifact:", err); });
         }

@@ -30,13 +30,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json(formatErrorResponse({ title: "Not found", message: "Execution not found.", code: "NODE_001" }), { status: 404 });
     }
 
-    const { nodeId, nodeLabel, type, title, data } = await req.json();
+    const { nodeId, nodeLabel, type, title, data, metadata } = await req.json();
 
     // Append artifact entry to tileResults JSON array
     const existing = Array.isArray(execution.tileResults) ? execution.tileResults : [];
     const updated = [
       ...existing,
-      { nodeId, nodeLabel, type, title, data, createdAt: new Date().toISOString() },
+      { nodeId, nodeLabel, type, title, data, metadata, createdAt: new Date().toISOString() },
     ];
 
     const updatedExecution = await prisma.execution.update({
