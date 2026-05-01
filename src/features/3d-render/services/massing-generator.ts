@@ -757,19 +757,31 @@ function generateRectangularInterior(
   }
 
   // ── Structural columns (grid) ──
+  // Inset perimeter columns inside the wall envelope so they don't poke
+  // outside the building as visible "stripes" at corners. Wall is 250mm
+  // centered on footprint line → outer face is at +125mm. A 400mm-radius
+  // column centered on the corner used to extend ~275mm beyond the outer
+  // wall face. Now: 300mm radius + 500mm inset = column sits fully behind
+  // the wall.
   const colSpacing = Math.max(6, Math.min(bW / 3, 8)); // 6-8m grid
   const colSpacingY = Math.max(6, Math.min(bD / 3, 8));
   const numColsX = Math.max(2, Math.floor(bW / colSpacing) + 1);
   const numColsY = Math.max(2, Math.floor(bD / colSpacingY) + 1);
-  const stepX = bW / (numColsX - 1);
-  const stepY = bD / (numColsY - 1);
+  const colRadius = 0.3;        // 300mm column (was 400mm)
+  const colInset = 0.5;         // wallThickness/2 (0.125) + colRadius (0.3) + 75mm slack
+  const innerMinX = bounds.minX + colInset;
+  const innerMaxX = bounds.maxX - colInset;
+  const innerMinY = bounds.minY + colInset;
+  const innerMaxY = bounds.maxY - colInset;
+  const stepX = numColsX > 1 ? (innerMaxX - innerMinX) / (numColsX - 1) : 0;
+  const stepY = numColsY > 1 ? (innerMaxY - innerMinY) / (numColsY - 1) : 0;
   let colIdx = 0;
 
   for (let ix = 0; ix < numColsX; ix++) {
     for (let iy = 0; iy < numColsY; iy++) {
-      const cx = bounds.minX + ix * stepX;
-      const cy = bounds.minY + iy * stepY;
-      elements.push(createColumnElement(cx, cy, elevation, floorHeight, 0.4, storeyIndex, colIdx));
+      const cx = innerMinX + ix * stepX;
+      const cy = innerMinY + iy * stepY;
+      elements.push(createColumnElement(cx, cy, elevation, floorHeight, colRadius, storeyIndex, colIdx));
       colIdx++;
     }
   }
@@ -936,8 +948,10 @@ function generateWindowsForWall(
     spacing = wallLength; // one panel per wall segment
   } else if (/office/i.test(type)) {
     winWidth = 1.8; winHeight = 2.2; sillHeight = 0.8; spacing = 2.7;
-  } else if (/residential|apartment/i.test(type)) {
-    winWidth = 1.2; winHeight = 1.5; sillHeight = 0.9; spacing = 3.0;
+  } else if (/residential|apartment|housing/i.test(type)) {
+    // 1.4m × 1.5m sliding windows at 2.5m centers — every bedroom + living
+    // room gets its own window, matching Indian 2BHK/3BHK reality.
+    winWidth = 1.4; winHeight = 1.5; sillHeight = 0.9; spacing = 2.5;
   } else if (/hotel/i.test(type)) {
     winWidth = 1.4; winHeight = 1.8; sillHeight = 0.8; spacing = 3.2;
   } else if (/warehouse|industrial/i.test(type)) {
@@ -1018,6 +1032,55 @@ function generateWindowsForWall(
         area: winWidth * winHeight,
       },
     });
+
+    // Chajja (sun-shade ledge above window head) — Indian residential staple.
+    // Skipped for curtain-wall facades (those get spandrel panels instead).
+    if (/residential|apartment|housing/i.test(type) && !isCurtainWall) {
+      const chHW = (winWidth + 0.4) / 2;     // 200mm overhang each side
+      const chThick = 0.08;                  // 80mm concrete slab
+      const chBaseZ = baseZ + winHeight;     // sits flush with window head
+      const chTopZ = chBaseZ + chThick;
+      const niX = -dirY * 0.125;             // inner edge at wall outer face
+      const niY = dirX * 0.125;
+      const noX = -dirY * 0.725;             // 600mm beyond wall outer face
+      const noY = dirX * 0.725;
+
+      const cVerts: Vertex[] = [
+        { x: cx - dirX * chHW + niX, y: cy - dirY * chHW + niY, z: chBaseZ },
+        { x: cx + dirX * chHW + niX, y: cy + dirY * chHW + niY, z: chBaseZ },
+        { x: cx + dirX * chHW + noX, y: cy + dirY * chHW + noY, z: chBaseZ },
+        { x: cx - dirX * chHW + noX, y: cy - dirY * chHW + noY, z: chBaseZ },
+        { x: cx - dirX * chHW + niX, y: cy - dirY * chHW + niY, z: chTopZ },
+        { x: cx + dirX * chHW + niX, y: cy + dirY * chHW + niY, z: chTopZ },
+        { x: cx + dirX * chHW + noX, y: cy + dirY * chHW + noY, z: chTopZ },
+        { x: cx - dirX * chHW + noX, y: cy - dirY * chHW + noY, z: chTopZ },
+      ];
+      const cFaces: Face[] = [
+        { vertices: [4, 5, 6, 7] }, // top
+        { vertices: [0, 3, 2, 1] }, // bottom
+        { vertices: [0, 1, 5, 4] }, // wall side
+        { vertices: [2, 3, 7, 6] }, // outer edge
+        { vertices: [1, 2, 6, 5] }, // right cap
+        { vertices: [3, 0, 4, 7] }, // left cap
+      ];
+
+      windows.push({
+        id: `chajja-s${storeyIndex}-w${wallIndex}-${i}`,
+        type: "canopy",
+        vertices: cVerts,
+        faces: cFaces,
+        ifcType: "IfcCovering",
+        properties: {
+          name: `Chajja S${storeyIndex + 1}-W${wallIndex + 1}-${i + 1}`,
+          storeyIndex,
+          width: winWidth + 0.4,
+          length: 0.6,
+          thickness: chThick,
+          area: (winWidth + 0.4) * 0.6,
+          volume: (winWidth + 0.4) * 0.6 * chThick,
+        },
+      });
+    }
   }
 
   return windows;
@@ -1521,6 +1584,23 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
     }
   }
 
+  // Enforce sensible per-storey minimums by typology — prevents pencil-tower
+  // proportions when the brief parser under-extracts (e.g. residential brief
+  // missing footprint → tiny fallback × 10 floors = pencil).
+  const typeLowerForFP = buildingType.toLowerCase();
+  const MIN_FOOTPRINT_BY_TYPE: Array<[RegExp, number]> = [
+    [/residential|apartment|housing/i, 200],
+    [/hotel/i, 250],
+    [/office|commercial|retail/i, 300],
+    [/warehouse|industrial/i, 400],
+  ];
+  for (const [re, minArea] of MIN_FOOTPRINT_BY_TYPE) {
+    if (re.test(typeLowerForFP) && footprintArea < minArea) {
+      footprintArea = minArea;
+      break;
+    }
+  }
+
   const gfa = input.total_gfa_m2 ?? input.gfa ?? Math.round(floors * footprintArea * 0.95);
 
   // Generate footprint polygon — pass content so shape detection works
@@ -1682,9 +1762,13 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
         elements.push(...doorElements);
       }
 
-      // Generate balconies (residential/hotel, floor 1+, every other wall+floor)
+      // One balcony per floor — off the longest wall (main facade) only.
+      // The previous condition (alternating walls × alternating floors) emitted
+      // a 360° cantilever band on every floor, producing the cartoon-pencil
+      // look. Real residential has a single balcony per unit off the living-
+      // room wall.
       const typeLC = buildingType.toLowerCase();
-      if (i > 0 && (i % 2 === 1 || w % 2 === 0) &&
+      if (i > 0 && w === longestWallIdx &&
           (/residential|apartment|hotel|housing/i.test(typeLC))) {
         const balconyEls = generateBalconyElements(activeFootprint[w], activeFootprint[nextW], elevation, i, w);
         elements.push(...balconyEls);
@@ -1759,6 +1843,54 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
     parapetWall.properties.name = `Parapet Wall R-W${w + 1}`;
     parapetWall.properties.discipline = "architectural";
     roofElements.push(parapetWall);
+  }
+
+  // Elevator overrun penthouse — 2.5m × 2.5m × 3m service box on roof.
+  // Sits directly above the elevator shaft so the lift can terminate at the
+  // top floor with proper machine clearance. Eliminates the "topmost storey
+  // looks oversized" reading by giving the roofline a deliberate silhouette.
+  {
+    const xs = footprint.map(p => p.x);
+    const ys = footprint.map(p => p.y);
+    const bWroof = Math.max(...xs) - Math.min(...xs);
+    const bDroof = Math.max(...ys) - Math.min(...ys);
+    if (bWroof >= 6 && bDroof >= 6) {
+      const shaftW = 2.5, shaftD = 2.5, ohrHeight = 3.0;
+      let sx: number, sy: number;
+      if (isCircularFootprint(footprint)) {
+        const c = centroid(footprint);
+        sx = c.x - shaftW / 2 + 1.5;
+        sy = c.y - shaftD / 2;
+      } else {
+        sx = Math.min(...xs) + bWroof * 0.15 + 3.5;
+        sy = Math.min(...ys) + bDroof / 2 - shaftD / 2;
+      }
+      const ohrCorners: [FootprintPoint, FootprintPoint][] = [
+        [{ x: sx, y: sy }, { x: sx + shaftW, y: sy }],
+        [{ x: sx + shaftW, y: sy }, { x: sx + shaftW, y: sy + shaftD }],
+        [{ x: sx + shaftW, y: sy + shaftD }, { x: sx, y: sy + shaftD }],
+        [{ x: sx, y: sy + shaftD }, { x: sx, y: sy }],
+      ];
+      for (let sw = 0; sw < 4; sw++) {
+        const ohrWall = createWallElement(
+          ohrCorners[sw][0], ohrCorners[sw][1],
+          roofElevation, ohrHeight, 0.2, floors, 200 + sw,
+        );
+        ohrWall.properties.name = `Elevator Overrun Wall ${sw + 1}`;
+        ohrWall.properties.discipline = "architectural";
+        roofElements.push(ohrWall);
+      }
+      const ohrFootprint: FootprintPoint[] = [
+        { x: sx, y: sy }, { x: sx + shaftW, y: sy },
+        { x: sx + shaftW, y: sy + shaftD }, { x: sx, y: sy + shaftD },
+      ];
+      const ohrCap = createSlabElement(
+        ohrFootprint, roofElevation + ohrHeight, slabThickness, floors, false,
+      );
+      ohrCap.properties.name = "Elevator Overrun Cap";
+      ohrCap.properties.discipline = "structural";
+      roofElements.push(ohrCap);
+    }
   }
 
   storeys.push({
