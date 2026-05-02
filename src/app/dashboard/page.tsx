@@ -8,7 +8,7 @@ import {
   ArrowRight, Play, Plus, Zap, ChevronDown,
   Type, FileText, Image as ImageIcon, Box, Sliders, MapPin,
   Sparkles, Palette, Building2, FileSpreadsheet, X, ChevronRight,
-  Layers, Trophy, Crown, Calendar,
+  Layers, Trophy, Crown, Calendar, Grid3x3, Video,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
@@ -16,6 +16,9 @@ import { useLocale } from "@/hooks/useLocale";
 import { toast } from "sonner";
 import type { TranslationKey } from "@/lib/i18n";
 import type { WorkflowTemplate } from "@/types/workflow";
+import { DASHBOARD_CHANGELOG } from "@/constants/dashboard-changelog";
+import type { ChangelogEntry } from "@/constants/dashboard-changelog";
+import s from "./page.module.css";
 
 // Lazy-load 3D scenes
 const WorldCanvas = lazy(() => import("@/features/dashboard/components/WorldCanvas").then((m) => ({ default: m.WorldCanvas })));
@@ -44,9 +47,28 @@ interface DashboardData {
   recentWorkflows: Array<{
     id: string;
     name: string;
+    category: string | null;
     updatedAt: string;
     nodeCount: number;
     executionCount: number;
+  }>;
+  recentOutputs?: Array<{
+    id: string;
+    type: string;
+    dataUri: string | null;
+    createdAt: string;
+    workflowId: string;
+    workflowName: string;
+    workflowCategory: string | null;
+  }>;
+  recentActivity?: Array<{
+    id: string;
+    status: string;
+    createdAt: string;
+    completedAt: string | null;
+    workflowId: string;
+    workflowName: string;
+    workflowCategory: string | null;
   }>;
 }
 
@@ -167,6 +189,9 @@ export default function DashboardPage() {
     }
   }, [videoInView]);
 
+  // ── Theme: "light" is the Render Studio default. "dark" preserves the original. ──
+  const [theme] = useState<"light" | "dark">("light");
+
   // ── Derived values ──
   const role = data.userRole ?? "FREE";
   const effectiveLimit = (PLAN_LIMITS[role] ?? 5) + (data.referralBonus ?? 0);
@@ -186,10 +211,12 @@ export default function DashboardPage() {
     { ...DEMO_VIDEOS[2], titleKey: "landing.demoVideo1Title" as TranslationKey, subKey: "landing.demoVideo1Subtitle" as TranslationKey, nodes: ["landing.demoVideo1Node1" as TranslationKey, "landing.demoVideo1Node2" as TranslationKey, "landing.demoVideo1Node3" as TranslationKey], duration: "1:32" },
   ];
 
-  // ── Scroll tracking for 3D world ──
+  // ── Scroll tracking for 3D world (dark theme only) ──
   const mainRef = useRef<HTMLElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: heroScroll } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
+  const { scrollYProgress: heroScroll } = useScroll(
+    theme === "dark" ? { target: heroRef, offset: ["start start", "end start"] } : undefined,
+  );
   const heroOpacity = useTransform(heroScroll, [0, 0.7], [1, 0]);
   const heroScale = useTransform(heroScroll, [0, 0.7], [1, 0.96]);
 
@@ -208,7 +235,10 @@ export default function DashboardPage() {
   // ═════════════════════════════════════════════════════════════════════════════
   // RENDER
   // ═════════════════════════════════════════════════════════════════════════════
-  return (
+
+  if (theme === "dark") {
+    /* ────── DARK THEME — original markup preserved exactly ────── */
+    return (
     <div style={{ height: "100%", overflow: "hidden", position: "relative" }}>
       {/* ═══ PERSISTENT 3D WORLD — Behind all content ═══ */}
       <div aria-hidden style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: 0 }}>
@@ -1384,6 +1414,448 @@ export default function DashboardPage() {
           }
         }
       `}</style>
+    </div>
+    );
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     LIGHT THEME — Render Studio design system (Phase Z.2.1)
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const firstName = data.userName?.split(" ")[0] || "there";
+  const planLabel = role === "PLATFORM_ADMIN" ? "Admin" : role === "TEAM_ADMIN" ? "Team" : role.charAt(0) + role.slice(1).toLowerCase();
+  const outputsCount = (data.recentOutputs ?? []).length;
+
+  function formatDateTime(d: Date): string {
+    const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
+    const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+    return `${weekday} \u00b7 ${time}`;
+  }
+
+  function formatRelativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "Just now";
+    if (min < 60) return `${min} min ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} hr ago`;
+    const days = Math.floor(hr / 24);
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    return new Date(iso).toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+  }
+
+  function getStatusLabel(status: string): string {
+    if (status === "SUCCESS" || status === "PARTIAL") return "Done";
+    if (status === "RUNNING" || status === "PENDING") return "Running";
+    return "Failed";
+  }
+
+  function getActivityVerb(category: string | null): string {
+    if (!category) return "Ran workflow";
+    const c = category.toLowerCase();
+    if (c.includes("floor") || c.includes("plan")) return "Generated floor plan";
+    if (c.includes("render") || c.includes("video") || c.includes("3d") || c.includes("walkthrough") || c.includes("cinematic")) return "Rendered output";
+    if (c.includes("ifc") || c.includes("bim")) return "Processed BIM model";
+    if (c.includes("boq") || c.includes("cost") || c.includes("estimate")) return "Exported BOQ";
+    if (c.includes("concept") || c.includes("design") || c.includes("brief")) return "Ran pipeline";
+    return "Ran workflow";
+  }
+
+  function inferCategory(wf: { category?: string | null; name?: string | null }): string {
+    if (wf.category) return wf.category;
+    const h = (wf.name ?? "").toLowerCase();
+    if (h.includes("floor plan") || h.includes("floor-plan") || h.includes("layout")) return "Floor Plan";
+    if (h.includes("ifc") || h.includes("bim") || h.includes("revit")) return "BIM Model";
+    if (h.includes("render") || h.includes("walkthrough") || h.includes("walk through") || h.includes("video") || h.includes("cinematic") || h.includes("photoreal")) return "Video Render";
+    if (h.includes("boq") || h.includes("cost") || h.includes("estimate") || h.includes("quantity") || h.includes("budget")) return "Cost Estimate";
+    if (h.includes("concept") || h.includes("design") || h.includes("brief")) return "Concept Design";
+    return "Workflow";
+  }
+
+  function getContinueIllustration(wf: { category?: string | null; name?: string | null }): React.ReactNode {
+    const haystack = `${wf.category ?? ""} ${wf.name ?? ""}`.toLowerCase();
+
+    if (haystack.includes("floor plan") || haystack.includes("floor-plan") || haystack.includes("floorplan") || haystack.includes("layout")) {
+      return (
+        <svg className={s.illuFloor} viewBox="0 0 280 140" fill="none">
+          <g stroke="var(--rs-ink)" strokeWidth="1.6" fill="none" opacity="0.7">
+            <rect x="40" y="20" width="200" height="100" /><line x1="140" y1="20" x2="140" y2="70" />
+            <line x1="80" y1="70" x2="240" y2="70" /><line x1="140" y1="70" x2="140" y2="120" />
+          </g>
+          <g stroke="var(--rs-blueprint)" strokeWidth="1.4" fill="rgba(26,77,92,0.15)"><path d="M 100 20 A 14 14 0 0 1 114 34 L 100 34 Z" /></g>
+          <g stroke="var(--rs-burnt)" strokeWidth="1.6"><line x1="160" y1="20" x2="200" y2="20" /><line x1="40" y1="40" x2="40" y2="70" /></g>
+          <g fontFamily="JetBrains Mono, monospace" fontSize="6" fill="var(--rs-text)" letterSpacing="1">
+            <text x="84" y="48">LIVING</text><text x="180" y="48">KITCHEN</text><text x="84" y="100">BEDROOM</text><text x="178" y="100">BATH</text>
+          </g>
+        </svg>
+      );
+    }
+
+    if (haystack.includes("ifc") || haystack.includes("bim") || haystack.includes("model") || haystack.includes("revit")) {
+      return (
+        <svg className={s.illuBim} viewBox="0 0 280 140" fill="none">
+          <g stroke="rgba(229,168,120,0.85)" strokeWidth="1.4" fill="none">
+            <polygon points="80,110 140,80 200,110 140,130" /><polygon points="80,50 140,20 200,50 140,80" />
+            <line x1="80" y1="110" x2="80" y2="50" /><line x1="200" y1="110" x2="200" y2="50" />
+            <line x1="140" y1="130" x2="140" y2="80" /><line x1="140" y1="80" x2="140" y2="20" />
+            <line x1="80" y1="90" x2="200" y2="90" strokeOpacity="0.5" strokeDasharray="2,3" />
+            <line x1="80" y1="70" x2="200" y2="70" strokeOpacity="0.5" strokeDasharray="2,3" />
+          </g>
+          <g fill="rgba(229,168,120,0.5)">
+            <circle cx="80" cy="110" r="2" /><circle cx="200" cy="110" r="2" /><circle cx="80" cy="50" r="2" />
+            <circle cx="200" cy="50" r="2" /><circle cx="140" cy="20" r="2" /><circle cx="140" cy="130" r="2" />
+          </g>
+        </svg>
+      );
+    }
+
+    if (haystack.includes("render") || haystack.includes("video") || haystack.includes("walkthrough") || haystack.includes("walk through") || haystack.includes("visualization") || haystack.includes("photoreal") || haystack.includes("cinematic")) {
+      return (
+        <svg className={s.illuRender} viewBox="0 0 280 140" fill="none">
+          <defs><linearGradient id="cRenderSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(229,168,120,0.65)" /><stop offset="100%" stopColor="rgba(194,106,59,0.35)" /></linearGradient></defs>
+          <rect width="280" height="140" fill="url(#cRenderSky)" />
+          <path d="M0 95 L30 95 L30 75 L60 75 L60 90 L100 90 L100 60 L140 60 L140 85 L180 85 L180 70 L220 70 L220 92 L280 92 L280 140 L0 140 Z" fill="rgba(15,24,34,0.72)" />
+        </svg>
+      );
+    }
+
+    if (haystack.includes("boq") || haystack.includes("cost") || haystack.includes("estimate") || haystack.includes("quantity") || haystack.includes("budget")) {
+      return (
+        <svg className={s.illuBoq} viewBox="0 0 280 140" fill="none">
+          <rect x="60" y="20" width="160" height="100" rx="8" fill="var(--rs-paper)" stroke="var(--rs-rule)" strokeWidth="1" />
+          <text x="80" y="42" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="var(--rs-text-mute)" letterSpacing="1.5">TOTAL COST</text>
+          <text x="80" y="65" fontFamily="Georgia, serif" fontSize="22" fill="var(--rs-ink)" letterSpacing="-0.5"><tspan fill="var(--rs-blueprint)" fontStyle="italic">{"\u20B9"}9.03</tspan> Cr</text>
+          <line x1="80" y1="76" x2="200" y2="76" stroke="var(--rs-rule)" strokeWidth="0.8" />
+          <text x="80" y="90" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="var(--rs-ink-soft)">Concrete</text>
+          <text x="180" y="90" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="var(--rs-ink-soft)" textAnchor="end">3.42</text>
+          <text x="80" y="104" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="var(--rs-ink-soft)">Brick</text>
+          <text x="180" y="104" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="var(--rs-ink-soft)" textAnchor="end">1.18</text>
+        </svg>
+      );
+    }
+
+    // Default: visible geometric pattern
+    return (
+      <svg className={s.illuDefault} viewBox="0 0 280 140" fill="none">
+        <g stroke="var(--rs-ink-soft)" strokeWidth="1.6" fill="none" opacity="0.6">
+          <rect x="30" y="30" width="60" height="40" rx="4" /><rect x="110" y="20" width="60" height="60" rx="4" /><rect x="190" y="40" width="50" height="30" rx="4" />
+          <line x1="90" y1="50" x2="110" y2="50" strokeWidth="1.2" /><line x1="170" y1="50" x2="190" y2="55" strokeWidth="1.2" />
+          <circle cx="70" cy="105" r="14" strokeWidth="1.2" opacity="0.5" /><circle cx="160" cy="110" r="10" strokeWidth="1.2" opacity="0.5" /><circle cx="225" cy="100" r="6" strokeWidth="1.2" opacity="0.5" />
+        </g>
+      </svg>
+    );
+  }
+
+  function getGalleryBgClass(type: string): string {
+    if (type === "IMAGE") return s.giRender;
+    if (type === "THREE_D") return s.gi3d;
+    if (type === "VIDEO") return s.giVideo;
+    if (type === "FILE") return s.giBoq;
+    return s.giImage;
+  }
+
+  return (
+    <div className={s.page} data-theme="light">
+
+      {/* ════════════════════════ SECTION 1: HERO ════════════════════════ */}
+      <section className={s.hero}>
+        <div className={s.heroInner}>
+          <div className={s.heroLeft}>
+            <div className={s.heroEyebrowRow}>
+              <div className={s.heroTimePill}>
+                <div className={s.heroTimeDot} />
+                <span>{formatDateTime(new Date())}</span>
+              </div>
+              <span className={s.heroGreeting}>Welcome back</span>
+            </div>
+            <h1 className={s.heroTitle}>
+              Hello, <em className={s.heroTitleEm}>{firstName}.</em>
+            </h1>
+            <p className={s.heroLead}>
+              You have <strong>{data.workflowCount} workflow{data.workflowCount !== 1 ? "s" : ""}</strong> in your workspace
+              {outputsCount > 0 && <> and <strong>{outputsCount} output{outputsCount !== 1 ? "s" : ""}</strong> ready to review</>}.
+            </p>
+            <div className={s.heroCtaRow}>
+              {data.recentWorkflows.length > 0 ? (
+                <Link href={`/dashboard/canvas?id=${data.recentWorkflows[0].id}`} className={s.ctaPrimary}>
+                  <ArrowRight size={14} />
+                  Continue last workflow
+                </Link>
+              ) : (
+                <Link href="/dashboard/canvas?new=1" className={s.ctaPrimary}>
+                  <Plus size={14} />
+                  New blank workflow
+                </Link>
+              )}
+              <Link href="/dashboard/canvas?new=1" className={s.ctaSecondary}>
+                New blank workflow
+              </Link>
+              <Link href="/dashboard/templates" className={s.ctaSecondary}>
+                Browse templates
+              </Link>
+            </div>
+          </div>
+
+          {/* ── Personal stats panel ── */}
+          <div className={s.heroStatsPanel}>
+            <div className={s.heroStatsHead}>
+              <div className={s.heroStatsTitle}>Your workspace</div>
+              <Link href="/dashboard/workflows" className={s.heroStatsLink}>
+                View all <ArrowRight size={12} />
+              </Link>
+            </div>
+            <div className={s.heroStatsGrid}>
+              <div>
+                <div className={s.hpStatNum}><span className={s.hpStatNumEm}>{data.workflowCount}</span></div>
+                <div className={s.hpStatLabel}>Workflows</div>
+              </div>
+              <div>
+                <div className={s.hpStatNum}><span className={s.hpStatNumEm}>{data.executionCount}</span></div>
+                <div className={s.hpStatLabel}>Executions</div>
+              </div>
+              <div>
+                <div className={s.hpStatNum}><span className={s.hpStatNumEm}>{outputsCount}</span></div>
+                <div className={s.hpStatLabel}>Outputs</div>
+              </div>
+              <div>
+                <div className={s.hpStatNum}>L<span className={s.hpStatNumEm}>{data.level}</span></div>
+                <div className={s.hpStatLabel}>XP Level</div>
+              </div>
+            </div>
+            <div className={s.heroPlanStrip}>
+              <div className={s.heroPlan}>
+                <span className={s.heroPlanBadge}>
+                  <Crown size={11} /> {planLabel}
+                </span>
+                <span className={s.heroPlanLabel}>{planLabel} plan</span>
+              </div>
+              <div className={s.heroPlanMeta}>{used}/{effectiveLimit} runs</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════ SECTION 2: CONTINUE WHERE YOU LEFT OFF ════════════════════════ */}
+      {data.recentWorkflows.length > 0 && (
+        <section className={s.section}>
+          <div className={s.sectionHead}>
+            <div>
+              <div className={s.sectionEyebrow}><span className={s.sectionEyebrowNum}>01 &ndash;</span> Pick up where you left off</div>
+              <h2 className={s.sectionTitle}>Your <em>recent workflows.</em></h2>
+              <p className={s.sectionSub}>Projects with unfinished business.</p>
+            </div>
+            <Link href="/dashboard/workflows" className={s.sectionLink}>
+              View all {data.workflowCount} <ArrowRight size={13} />
+            </Link>
+          </div>
+          <div className={s.continueGrid}>
+            {data.recentWorkflows.slice(0, 3).map((wf) => {
+              // isDark matches the illustration priority: floor/boq = light, bim/render = dark
+              const h = `${wf.category ?? ""} ${wf.name ?? ""}`.toLowerCase();
+              const isFloorOrBoq = h.includes("floor plan") || h.includes("floor-plan") || h.includes("floorplan") || h.includes("layout") || h.includes("boq") || h.includes("cost") || h.includes("estimate") || h.includes("quantity") || h.includes("budget");
+              const isBimOrRender = h.includes("ifc") || h.includes("bim") || h.includes("model") || h.includes("revit") || h.includes("render") || h.includes("video") || h.includes("walkthrough") || h.includes("visualization") || h.includes("photoreal") || h.includes("cinematic");
+              const isDark = !isFloorOrBoq && isBimOrRender;
+              return (
+                <Link key={wf.id} href={`/dashboard/canvas?id=${wf.id}`} className={s.continueCard}>
+                  <div className={s.continueThumb}>
+                    <div className={`${s.continueThumbBg} ${isDark ? s.continueThumbDark : ""}`}>
+                      {getContinueIllustration(wf)}
+                    </div>
+                    <div className={`${s.continueThumbTag} ${isDark ? s.continueThumbTagDark : ""}`}>
+                      <span className={s.continueThumbTagDot} />
+                      {wf.nodeCount} nodes
+                    </div>
+                  </div>
+                  <div className={s.continueMeta}>
+                    <div className={s.continueName}>{wf.name}</div>
+                    <div className={s.continueInfo}>{wf.executionCount} run{wf.executionCount !== 1 ? "s" : ""}</div>
+                    <div className={s.continueStats}>
+                      <span className={s.continueTime}>{formatRelativeTime(wf.updatedAt)}</span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ════════════════════════ SECTION 3: QUICK ACTIONS ════════════════════════ */}
+      <section className={s.section}>
+        <div className={s.sectionHead}>
+          <div>
+            <div className={s.sectionEyebrow}><span className={s.sectionEyebrowNum}>02 &ndash;</span> Jump in</div>
+            <h2 className={s.sectionTitle}>Start <em>something new.</em></h2>
+            <p className={s.sectionSub}>Four product surfaces, one tap away.</p>
+          </div>
+        </div>
+        <div className={s.quickGrid}>
+          <Link href="/dashboard/canvas?mode=prompt" className={s.quickCard}>
+            <div className={s.quickIcon}><Sparkles size={20} /></div>
+            <div className={s.quickEyebrow}>Workflow Builder</div>
+            <div className={s.quickTitle}>New from <em className={s.quickTitleEm}>prompt</em></div>
+            <div className={s.quickDesc}>Describe a workflow in plain English. AI builds the node graph for you.</div>
+            <div className={s.quickArrow}>Start <ArrowRight size={13} /></div>
+          </Link>
+          <Link href="/dashboard/floor-plan" className={s.quickCard} data-accent="floor">
+            <div className={s.quickIcon}><Layers size={20} /></div>
+            <div className={s.quickEyebrow}>Floor Plan</div>
+            <div className={s.quickTitle}>Sketch a <em className={s.quickTitleEm}>home</em></div>
+            <div className={s.quickDesc}>Type a brief, get an editable CAD floor plan with BOQ in 30 seconds.</div>
+            <div className={s.quickArrow}>Open editor <ArrowRight size={13} /></div>
+          </Link>
+          <Link href="/dashboard/ifc-viewer" className={s.quickCard} data-accent="ifc">
+            <div className={s.quickIcon}><Building2 size={20} /></div>
+            <div className={s.quickEyebrow}>IFC Viewer</div>
+            <div className={s.quickTitle}>Open a <em className={s.quickTitleEm}>BIM model</em></div>
+            <div className={s.quickDesc}>Browser-native IFC viewer up to 500 MB. No installs.</div>
+            <div className={s.quickArrow}>Upload IFC <ArrowRight size={13} /></div>
+          </Link>
+          <Link href="/dashboard/3d-render" className={s.quickCard} data-accent="render">
+            <div className={s.quickIcon}><Palette size={20} /></div>
+            <div className={s.quickEyebrow}>3D Video Render</div>
+            <div className={s.quickTitle}>Cinematic <em className={s.quickTitleEm}>walkthrough</em></div>
+            <div className={s.quickDesc}>Turn any plan into a 15s photoreal video walkthrough. Cloud-rendered.</div>
+            <div className={s.quickArrow}>Render <ArrowRight size={13} /></div>
+          </Link>
+        </div>
+      </section>
+
+      {/* ════════════════════════ SECTION 4: RECENT OUTPUTS GALLERY ════════════════════════ */}
+      <section className={s.section}>
+        <div className={s.sectionHead}>
+          <div>
+            <div className={s.sectionEyebrow}><span className={s.sectionEyebrowNum}>03 &ndash;</span> Latest outputs</div>
+            <h2 className={s.sectionTitle}>What you&apos;ve <em>made.</em></h2>
+            <p className={s.sectionSub}>Last six deliverables across all your workflows.</p>
+          </div>
+        </div>
+        <div className={s.galleryStrip}>
+          {(data.recentOutputs ?? []).slice(0, 6).map((o) => (
+            <div key={o.id} className={s.galleryItem}>
+              <div className={`${s.galleryItemBg} ${getGalleryBgClass(o.type)}`}>
+                {o.type === "IMAGE" && (
+                  <svg className={s.illuRender} viewBox="0 0 60 60" fill="none"><circle cx="30" cy="25" r="8" stroke="#fff" strokeWidth="1" opacity="0.4" /><path d="M10 45 L25 32 L35 40 L50 28" stroke="#fff" strokeWidth="1" opacity="0.3" /></svg>
+                )}
+                {o.type === "THREE_D" && (
+                  <svg className={s.illuBim} viewBox="0 0 60 60" fill="none"><path d="M30 10 L50 22 L50 42 L30 54 L10 42 L10 22 Z" stroke="#fff" strokeWidth="1" opacity="0.3" /><line x1="30" y1="10" x2="30" y2="54" stroke="#fff" strokeWidth="0.5" opacity="0.2" /></svg>
+                )}
+                {o.type === "VIDEO" && (
+                  <svg className={s.illuRender} viewBox="0 0 60 60" fill="none"><polygon points="24,18 44,30 24,42" stroke="#fff" strokeWidth="1.2" opacity="0.4" fill="none" /></svg>
+                )}
+                {o.type === "FILE" && (
+                  <svg className={s.illuBoq} viewBox="0 0 60 60" fill="none"><rect x="15" y="12" width="30" height="38" rx="2" stroke="currentColor" strokeWidth="1" opacity="0.3" /><line x1="20" y1="22" x2="40" y2="22" stroke="currentColor" strokeWidth="0.8" opacity="0.2" /><line x1="20" y1="28" x2="35" y2="28" stroke="currentColor" strokeWidth="0.8" opacity="0.2" /><line x1="20" y1="34" x2="38" y2="34" stroke="currentColor" strokeWidth="0.8" opacity="0.2" /></svg>
+                )}
+              </div>
+              <div className={o.type === "IMAGE" || o.type === "VIDEO" || o.type === "THREE_D" ? s.galleryMeta : s.galleryMetaLight}>
+                <div className={s.galleryName}>{o.workflowName}</div>
+                <div className={s.galleryTime}>{formatRelativeTime(o.createdAt)}</div>
+              </div>
+            </div>
+          ))}
+          {(data.recentOutputs ?? []).length === 0 && (
+            <div className={s.galleryEmpty}>
+              No outputs yet. Run a workflow to see results here.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ════════════════════════ SECTION 5: WHAT'S NEW ════════════════════════ */}
+      <section className={s.section}>
+        <div className={s.sectionHead}>
+          <div>
+            <div className={s.sectionEyebrow}><span className={s.sectionEyebrowNum}>04 &ndash;</span> What&apos;s new</div>
+            <h2 className={s.sectionTitle}>Updates since you <em>last logged in.</em></h2>
+            <p className={s.sectionSub}>Three things shipped while you were away.</p>
+          </div>
+        </div>
+        <div className={s.whatsnewGrid}>
+          {DASHBOARD_CHANGELOG.slice(0, 3).map((entry: ChangelogEntry) => (
+            <div key={entry.id} className={s.newsCard}>
+              <div className={s.newsTagRow}>
+                <span className={s.newsTag} data-type={entry.type}>
+                  <span className={s.newsTagDot} />
+                  {entry.type}
+                </span>
+                <span className={s.newsDate}>{new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+              </div>
+              <div className={s.newsTitle}>{entry.title}</div>
+              <div className={s.newsDesc}>{entry.description}</div>
+              <Link href={entry.cta.href} className={s.newsLink}>
+                {entry.cta.label} <ArrowRight size={12} />
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ════════════════════════ SECTION 6: ACTIVITY LEDGER ════════════════════════ */}
+      <section className={s.section}>
+        <div className={s.sectionHead}>
+          <div>
+            <div className={s.sectionEyebrow}><span className={s.sectionEyebrowNum}>05 &ndash;</span> Activity</div>
+            <h2 className={s.sectionTitle}>Your <em>working log.</em></h2>
+            <p className={s.sectionSub}>Every run, export, and upload from the past week.</p>
+          </div>
+        </div>
+        <div className={s.activityBlock}>
+          {(data.recentActivity ?? []).slice(0, 6).map((act) => {
+            const actCat = inferCategory({ category: act.workflowCategory, name: act.workflowName });
+            const catL = actCat.toLowerCase();
+            const iconType = act.status === "FAILED" ? "failed"
+              : (catL.includes("video") || catL.includes("render")) ? "video"
+              : (catL.includes("floor")) ? "floor"
+              : (catL.includes("bim") || catL.includes("ifc")) ? "ifc"
+              : (catL.includes("cost") || catL.includes("boq")) ? "export"
+              : undefined;
+            return (
+              <div key={act.id} className={s.activityRow}>
+                <div className={s.activityIcon} data-type={iconType}>
+                  {iconType === "failed" && <X size={16} />}
+                  {iconType === "video" && <Video size={16} />}
+                  {iconType === "floor" && <Grid3x3 size={16} />}
+                  {iconType === "ifc" && <Box size={16} />}
+                  {iconType === "export" && <FileSpreadsheet size={16} />}
+                  {!iconType && <Zap size={16} />}
+                </div>
+                <div className={s.activityBody}>
+                  <div className={s.activityTitle}>
+                    {getActivityVerb(actCat)} <span className={s.activityTitleEm}>&mdash; {act.workflowName}</span>
+                  </div>
+                  <div className={s.activityMeta}>{actCat}</div>
+                </div>
+                <span className={s.activityStatus} data-status={act.status}>
+                  {getStatusLabel(act.status)}
+                </span>
+                <span className={s.activityTime}>{formatRelativeTime(act.createdAt)}</span>
+              </div>
+            );
+          })}
+          {(data.recentActivity ?? []).length === 0 && (
+            <div className={s.activityEmpty}>
+              No activity yet. Start a workflow to see it here.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ════════════════════════ SECTION 7: CLOSER ════════════════════════ */}
+      <section style={{ padding: "0 56px", maxWidth: 1280, margin: "0 auto" }}>
+        <div className={s.closer}>
+          <div className={s.closerBody}>
+            <div className={s.closerEyebrow}>Resources for builders</div>
+            <h3 className={s.closerTitle}>
+              Got a workflow we should <em>build next?</em>
+            </h3>
+          </div>
+          <Link href="/dashboard/feedback" className={s.closerBtn}>
+            Suggest a workflow <ArrowRight size={14} />
+          </Link>
+        </div>
+      </section>
+
     </div>
   );
 }

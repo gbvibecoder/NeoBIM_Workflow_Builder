@@ -46,7 +46,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     const { id } = await params;
     const body = await req.json();
-    const { name, description, tags, tileGraph } = body;
+    const { name, description, tags, tileGraph, category } = body;
 
     const existing = await prisma.workflow.findFirst({
       where: { id, ownerId: session.user.id, deletedAt: null },
@@ -119,6 +119,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         ...(description !== undefined && { description }),
         ...(tags !== undefined && { tags }),
         ...(tileGraph !== undefined && { tileGraph }),
+        ...(category !== undefined && { category }),
         version: { increment: 1 },
       },
     });

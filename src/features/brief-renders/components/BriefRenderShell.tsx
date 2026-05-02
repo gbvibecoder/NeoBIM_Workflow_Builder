@@ -22,14 +22,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 
+import s from "@/app/dashboard/brief-renders/page.module.css";
 import { BriefUploader } from "@/features/brief-renders/components/BriefUploader";
 import { CancelJobButton } from "@/features/brief-renders/components/CancelJobButton";
+import { CompleteHero } from "@/features/brief-renders/components/CompleteHero";
 import { DetailedLogsSection } from "@/features/brief-renders/components/DetailedLogsSection";
 import { JobCancelledBanner } from "@/features/brief-renders/components/JobCancelledBanner";
 import { JobErrorBanner } from "@/features/brief-renders/components/JobErrorBanner";
 import { JobLogsPanel } from "@/features/brief-renders/components/JobLogsPanel";
 import { JobStatusBanner } from "@/features/brief-renders/components/JobStatusBanner";
-import { PdfDownloadButton } from "@/features/brief-renders/components/PdfDownloadButton";
 import { RecentJobsDrawer } from "@/features/brief-renders/components/RecentJobsDrawer";
 import { ShotGrid } from "@/features/brief-renders/components/ShotGrid";
 import { SpecReviewGate } from "@/features/brief-renders/components/SpecReviewGate";
@@ -61,15 +62,22 @@ function writeJobIdToUrl(id: string | null): void {
   window.history.replaceState(null, "", url.toString());
 }
 
+function formatElapsed(ms: number): string {
+  if (ms <= 0) return "—";
+  const m = Math.floor(ms / 60_000);
+  const sec = Math.floor((ms % 60_000) / 1_000);
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+type HeaderState = "idle" | "running" | "approval" | "generating" | "complete";
+
 export function BriefRenderShell() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [recentlyRegen, setRecentlyRegen] = useState(false);
   const [showDetailedLogs, setShowDetailedLogs] = useState(false);
-  const detailedLogsRef = useRef<HTMLElement | null>(null);
+  const detailedLogsRef = useRef<HTMLDivElement | null>(null);
   const { data: session } = useSession();
-  // Admin-only debug surface. Permissive: either env-based platform-admin
-  // allowlist or a privileged DB role unlocks the JobLogsPanel. Beta
-  // testers can use whichever mechanism is easier to set up.
   const sessionUser = session?.user as { role?: string } | undefined;
   const isAdmin =
     isPlatformAdmin(session?.user?.email) ||
@@ -78,8 +86,6 @@ export function BriefRenderShell() {
 
   const handleViewLogs = useCallback(() => {
     setShowDetailedLogs(true);
-    // Defer scroll to next tick so the DetailedLogsSection has a chance
-    // to render and attach the ref before we measure its position.
     requestAnimationFrame(() => {
       detailedLogsRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -88,7 +94,6 @@ export function BriefRenderShell() {
     });
   }, []);
 
-  // Hydrate jobId from URL on mount so refresh + share work.
   useEffect(() => {
     const fromUrl = readJobIdFromUrl();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot URL hydration
@@ -100,9 +105,6 @@ export function BriefRenderShell() {
     enabled: jobId !== null,
   });
 
-  // When a regen lands successfully on the server, we briefly suppress
-  // the PDF download button until the shot transitions back to success.
-  // Listening to job.status flips back to RUNNING is the natural signal.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mirroring polled status into a transient UI flag
     if (status === "RUNNING") setRecentlyRegen(true);
@@ -115,11 +117,6 @@ export function BriefRenderShell() {
   }, []);
 
   const handleStartOver = useCallback(() => {
-    // Clear the localStorage idempotency key so the next upload mints
-    // a fresh `requestId` on the server — without this, the
-    // create-job route's idempotency cache would replay the previous
-    // (terminal-failure) row even though the user has explicitly
-    // chosen to start over.
     resetBriefRenderUploadIdempotencyKey();
     setJobId(null);
     writeJobIdToUrl(null);
@@ -130,141 +127,318 @@ export function BriefRenderShell() {
     writeJobIdToUrl(selected);
   }, []);
 
+  // Derived state for header
+  const headerState: HeaderState = !job
+    ? "idle"
+    : job.status === "AWAITING_APPROVAL"
+      ? "approval"
+      : job.status === "COMPLETED"
+        ? "complete"
+        : job.status === "RUNNING" && job.currentStage === "rendering"
+          ? "generating"
+          : job.status === "RUNNING" || job.status === "QUEUED"
+            ? "running"
+            : "idle";
+
+  const shots = Array.isArray(job?.shots) ? (job.shots as ShotResult[]) : [];
+  const spec = job?.specResult as BriefSpec | null;
+  const totalShots = shots.length || 12;
+  const completedShots = shots.filter(
+    (sh) => sh.status === "success",
+  ).length;
+
+  const elapsed =
+    job?.completedAt && job?.startedAt
+      ? new Date(job.completedAt).getTime() -
+        new Date(job.startedAt).getTime()
+      : 0;
+
   return (
-    <div className="space-y-6 p-6 max-w-6xl mx-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-zinc-100">
-            Brief → Renders
-          </h1>
-          <p className="text-sm text-zinc-400">
-            Upload an architectural brief; review the spec we extract; approve
-            to render twelve photoreal interior shots and the editorial PDF.
-            <span className="ml-2 px-2 py-0.5 text-[10px] uppercase tracking-wider bg-amber-900/40 text-amber-300 rounded">
-              Beta
-            </span>
-          </p>
-        </div>
-        {isAdmin && jobId && job && (
-          <button
-            type="button"
-            onClick={handleViewLogs}
-            data-testid="view-logs-button"
-            className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded border border-cyan-700/40 bg-cyan-950/30 hover:bg-cyan-900/40 text-xs font-medium text-cyan-300"
-          >
-            <span aria-hidden>📋</span>
-            View Logs
-          </button>
-        )}
-      </header>
+    <>
+      {/* In-page beta banner */}
+      <div className={s.betaBanner}>
+        <div className={s.betaBannerDot} />
+        <span>
+          <strong>You&apos;re using BuildFlow Beta.</strong> Workflows are
+          improving daily. Some outputs are AI-generated estimates — always
+          verify before production use.
+        </span>
+        <div className={s.betaBannerSpacer} />
+        <a href="/dashboard/feedback" className={s.betaBannerLink}>
+          Give feedback
+        </a>
+        <a href="/blog" className={s.betaBannerLink}>
+          What&apos;s new
+        </a>
+      </div>
 
-      <RecentJobsDrawer activeJobId={jobId} onSelect={handleSelectJob} />
+      {/* Page header */}
+      <header className={s.pageHead}>
+        <div className={s.pageHeadInner}>
+          <div className={s.pageHeadLeft}>
+            <div className={s.pageEyebrowRow}>
+              <div className={s.pageEyebrow} data-state={headerState}>
+                <div className={s.pageEyebrowDot} />
+                {headerState === "idle" && "Brief → Renders"}
+                {headerState === "running" && "Reading your brief"}
+                {headerState === "approval" && "Awaiting approval"}
+                {headerState === "generating" &&
+                  `Generating · ${completedShots} / ${totalShots}`}
+                {headerState === "complete" &&
+                  `Complete · ${totalShots}/${totalShots} renders`}
+              </div>
+              <span className={s.pageBetaPill}>Beta</span>
+            </div>
 
-      {!jobId && <BriefUploader onJobCreated={handleJobCreated} />}
+            <h1 className={s.pageTitle}>
+              {headerState === "idle" && (
+                <>
+                  From brief to{" "}
+                  <em className={s.pageTitleEm}>magazine,</em> in one upload.
+                </>
+              )}
+              {headerState === "running" && (
+                <>
+                  Reading your <em className={s.pageTitleEm}>brief.</em>
+                </>
+              )}
+              {headerState === "approval" && (
+                <>
+                  Spec extracted.{" "}
+                  <em className={s.pageTitleEm}>Your turn.</em>
+                </>
+              )}
+              {headerState === "generating" && (
+                <>
+                  Building your{" "}
+                  <em className={s.pageTitleEm}>magazine,</em> shot by shot.
+                </>
+              )}
+              {headerState === "complete" && (
+                <>
+                  {spec?.projectTitle ?? "Your project"}.{" "}
+                  <em className={s.pageTitleEm}>Ready to send.</em>
+                </>
+              )}
+            </h1>
 
-      {jobId && pollError && !job && (
-        <div
-          role="alert"
-          className="bg-red-950 border border-red-700 text-red-100 px-4 py-3 rounded text-sm"
-        >
-          Failed to load job: {pollError}
-        </div>
-      )}
+            <p className={s.pageLead}>
+              {headerState === "idle" &&
+                "Drop an architectural brief in PDF or DOCX. We read it, extract the spec, surface every shot for review, and render twelve photoreal interiors plus the editorial PDF."}
+              {headerState === "running" &&
+                "Extracting spec via Claude Sonnet. This usually takes 1–2 minutes."}
+              {headerState === "approval" &&
+                "Every field below was extracted directly from your brief. Empty fields mean the source was silent. Approve to begin generating renders."}
+              {headerState === "generating" &&
+                "~46 seconds per shot. Tab can stay backgrounded — we'll keep rendering."}
+              {headerState === "complete" &&
+                `${totalShots + 1}-page editorial PDF + ${totalShots} standalone 4K renders. Total: $${job?.costUsd.toFixed(3) ?? "—"} · ${formatElapsed(elapsed)}.`}
+            </p>
+          </div>
 
-      {jobId && isLoading && !job && (
-        <div className="text-sm text-zinc-400" role="status" aria-live="polite">
-          Loading job…
-        </div>
-      )}
-
-      {jobId && job && (
-        <>
-          {/* ─── Status pill ──────────────────────────────────────────
-              Always at top so users (admin + non-admin) can read job
-              state without scrolling. Compact — doesn't compete with
-              the primary content below. */}
-          <JobStatusBanner job={job} />
-
-          {/* ─── Cancel button (TOP-of-content, prominent) ──────────
-              Sits right under the status pill so users can abort
-              from any non-terminal state without scrolling past 12
-              tiles. Styled as a red destructive button per the
-              user's "looks like a button" feedback. Hidden on
-              terminal states — there's nothing to cancel. */}
-          {(status === "QUEUED" ||
-            status === "RUNNING" ||
-            status === "AWAITING_APPROVAL") && (
-            <CancelJobButton jobId={jobId} />
-          )}
-
-          {/* ─── PRIMARY content ──────────────────────────────────────
-              `AWAITING_APPROVAL` → SpecReviewGate (the user's action
-              surface — they MUST review before approving, no images
-              exist yet).
-              Everything else → ShotGrid (the 12 image tiles, where
-              the visual progress lives). */}
-          {status === "AWAITING_APPROVAL" && <SpecReviewGate jobId={jobId} />}
-
-          {status !== "AWAITING_APPROVAL" && job.specResult && job.shots && (
-            <ShotGrid
-              jobId={jobId}
-              spec={job.specResult as BriefSpec}
-              shots={job.shots as ShotResult[]}
-              busy={status === "FAILED" || status === "CANCELLED"}
-              onAnyRegen={() => setRecentlyRegen(true)}
-            />
-          )}
-
-          {/* ─── Terminal-state CTAs / banners ───────────────────────
-              Sit immediately after the primary content so the user's
-              eye reaches them naturally after scanning the grid /
-              spec. Pre-Phase-6.x had these mixed in with the admin
-              panel which buried the Approve / Download buttons. */}
-          {status === "COMPLETED" && (
-            <div className="flex items-center gap-3">
-              <PdfDownloadButton
-                pdfUrl={job.pdfUrl}
-                disabled={recentlyRegen}
-              />
+          <div className={s.pageActions}>
+            {isAdmin && jobId && job && (
               <button
                 type="button"
-                onClick={handleStartOver}
-                className="text-sm text-zinc-400 hover:text-zinc-200"
+                onClick={handleViewLogs}
+                data-testid="view-logs-button"
+                className={s.btnGhost}
               >
-                Start a new brief
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                View Logs
               </button>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+      </header>
 
-          {status === "FAILED" && (
-            <JobErrorBanner job={job} onDismiss={handleStartOver} />
-          )}
-          {status === "CANCELLED" && (
-            <JobCancelledBanner job={job} onDismiss={handleStartOver} />
-          )}
+      {/* Content area */}
+      <div
+        className={s.section}
+        key={`${jobId ?? "idle"}-${job?.status ?? "none"}-${job?.currentStage ?? ""}`}
+      >
+        {/* ─── No active job ─── */}
+        {!jobId && (
+          <>
+            <BriefUploader onJobCreated={handleJobCreated} />
+            <RecentJobsDrawer
+              activeJobId={jobId}
+              onSelect={handleSelectJob}
+            />
+          </>
+        )}
 
-          {/* ─── Pipeline · Admin (mid-page) ─────────────────────────
-              Compact admin debug strip. Sits BELOW the primary content
-              so users / admins focus on the renders first, then drop
-              into pipeline detail if they need to. Renders null for
-              non-admins (so non-admin layout collapses to just the
-              primary content + CTA). */}
-          <JobLogsPanel job={job} visible={isAdmin} />
+        {/* ─── Loading / error ─── */}
+        {jobId && pollError && !job && (
+          <div className={s.errorAlert} role="alert">
+            Failed to load job: {pollError}
+          </div>
+        )}
 
-          {/* ─── Detailed logs (always last, admin-only) ─────────────
-              Hidden until the user clicks "View Logs" in the page
-              header (which smooth-scrolls here). Comprehensive
-              snapshot of every piece of state — full prompts, raw
-              stageLog JSON, per-shot lifecycle, cost breakdown.
-              Renders null when `visible=false`. */}
-          <DetailedLogsSection
-            ref={detailedLogsRef}
-            job={job}
-            visible={isAdmin && showDetailedLogs}
-            onClose={() => setShowDetailedLogs(false)}
-          />
-        </>
-      )}
-    </div>
+        {jobId && isLoading && !job && (
+          <p style={{ color: "var(--rs-text-mute)", fontSize: 14 }}>
+            Loading job…
+          </p>
+        )}
+
+        {/* ─── Active job ─── */}
+        {jobId && job && (
+          <>
+            {/* Status banner + cancel for spec_extracting / queued */}
+            {(status === "QUEUED" ||
+              (status === "RUNNING" &&
+                job.currentStage === "spec_extracting")) && (
+              <>
+                <JobStatusBanner job={job} />
+                <CancelJobButton jobId={jobId} />
+              </>
+            )}
+
+            {/* Awaiting approval */}
+            {status === "AWAITING_APPROVAL" && (
+              <>
+                <JobStatusBanner job={job} variant="compact" />
+                <SpecReviewGate jobId={jobId} />
+              </>
+            )}
+
+            {/* Generating images */}
+            {status === "RUNNING" && job.currentStage === "rendering" && (
+              <>
+                <JobStatusBanner job={job} variant="rendering" />
+                {spec && (
+                  <ShotGrid
+                    jobId={jobId}
+                    spec={spec}
+                    shots={shots}
+                    busy={false}
+                    onAnyRegen={() => setRecentlyRegen(true)}
+                  />
+                )}
+                <div className={s.cancelRow}>
+                  <CancelJobButton jobId={jobId} />
+                </div>
+              </>
+            )}
+
+            {/* Awaiting compile / compiling */}
+            {status === "RUNNING" &&
+              (job.currentStage === "awaiting_compile" ||
+                job.currentStage === "compiling") && (
+              <>
+                <JobStatusBanner job={job} variant="compiling" />
+                {spec && (
+                  <ShotGrid
+                    jobId={jobId}
+                    spec={spec}
+                    shots={shots}
+                    busy={false}
+                  />
+                )}
+              </>
+            )}
+
+            {/* Complete */}
+            {status === "COMPLETED" && (
+              <>
+                <CompleteHero job={job} onStartNew={handleStartOver} />
+                {spec && (
+                  <ShotGrid
+                    jobId={jobId}
+                    spec={spec}
+                    shots={shots}
+                    busy={false}
+                    onAnyRegen={() => setRecentlyRegen(true)}
+                    regenDisabled={recentlyRegen}
+                  />
+                )}
+              </>
+            )}
+
+            {/* Failed */}
+            {status === "FAILED" && (
+              <>
+                {spec && (
+                  <ShotGrid
+                    jobId={jobId}
+                    spec={spec}
+                    shots={shots}
+                    busy={true}
+                  />
+                )}
+                <JobErrorBanner job={job} onDismiss={handleStartOver} />
+              </>
+            )}
+
+            {/* Cancelled */}
+            {status === "CANCELLED" && (
+              <>
+                {spec && (
+                  <ShotGrid
+                    jobId={jobId}
+                    spec={spec}
+                    shots={shots}
+                    busy={true}
+                  />
+                )}
+                <JobCancelledBanner job={job} onDismiss={handleStartOver} />
+              </>
+            )}
+
+            {/* Admin panels — diagnostics dock */}
+            {isAdmin && (
+              <div className={s.diagDock}>
+                <button
+                  type="button"
+                  onClick={() => setShowDetailedLogs((v) => !v)}
+                  className={s.diagHead}
+                >
+                  <div className={s.diagHeadLabel}>
+                    <div
+                      className={s.diagHeadDot}
+                      data-status={
+                        job.status === "RUNNING"
+                          ? undefined
+                          : job.status === "COMPLETED"
+                            ? "complete"
+                            : "idle"
+                      }
+                    />
+                    Pipeline · Admin
+                  </div>
+                  <span className={s.diagHeadCollapse}>
+                    {showDetailedLogs ? "▼ Collapse" : "▸ Expand"}
+                  </span>
+                </button>
+                {showDetailedLogs && (
+                  <div className={s.diagContent} ref={detailedLogsRef}>
+                    <JobLogsPanel job={job} visible={true} />
+                    <DetailedLogsSection
+                      job={job}
+                      visible={true}
+                      onClose={() => setShowDetailedLogs(false)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
   );
 }

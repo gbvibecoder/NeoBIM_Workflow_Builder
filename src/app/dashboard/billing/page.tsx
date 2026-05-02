@@ -14,6 +14,12 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useLocale } from "@/hooks/useLocale";
 import { PaymentErrorModal } from "@/features/billing/components/PaymentErrorModal";
+import { CityscapeHero } from "@/features/billing/components/CityscapeHero";
+import { AecElevationFooter } from "@/features/billing/components/AecElevationFooter";
+import { PlanBuildingOutline } from "@/features/billing/components/PlanBuildingOutline";
+import { BackdropFloaters } from "@/features/billing/components/BackdropFloaters";
+import type { PlanTier } from "@/features/billing/components/PlanBuildingOutline";
+import s from "@/features/billing/components/billing.module.css";
 // trackPurchase moved to /thank-you/subscription page
 
 interface UsageStats {
@@ -21,18 +27,6 @@ interface UsageStats {
   limit: number;
   resetDate: string;
 }
-
-/* ── Blueprint grid SVG pattern (AEC aesthetic) ── */
-const BlueprintGrid = ({ color, opacity = 0.04 }: { color: string; opacity?: number }) => (
-  <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <pattern id={`bp-${color.replace('#','')}`} width="40" height="40" patternUnits="userSpaceOnUse">
-        <path d="M 40 0 L 0 0 0 40" fill="none" stroke={color} strokeWidth="0.5" opacity={opacity} />
-      </pattern>
-    </defs>
-    <rect width="100%" height="100%" fill={`url(#bp-${color.replace('#','')})`} />
-  </svg>
-);
 
 const TIER_ORDER = ["Free", "Mini", "Starter", "Pro", "Team"];
 
@@ -47,6 +41,15 @@ class RazorpayCheckoutError extends Error {
     this.name = "RazorpayCheckoutError";
   }
 }
+
+/* Small dimension-line SVG used in plan price annotations */
+const DimLine = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" strokeWidth="1" />
+    <line x1="1" y1="3" x2="1" y2="9" stroke="currentColor" strokeWidth="1" />
+    <line x1="11" y1="3" x2="11" y2="9" stroke="currentColor" strokeWidth="1" />
+  </svg>
+);
 
 export default function BillingPage() {
   const { t } = useLocale();
@@ -137,7 +140,7 @@ export default function BillingPage() {
       return;
     }
     fetch('/api/stripe/subscription')
-      .then(res => res.json())
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
       .then(data => {
         setHasActiveSubscription(data.hasActiveSubscription === true);
       })
@@ -292,7 +295,7 @@ export default function BillingPage() {
             email: data.email || session?.user?.email || '',
             name: data.name || session?.user?.name || '',
           },
-          theme: { color: '#4F8AFF' },
+          theme: { color: '#1A4D5C' },
           handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
             // Step 3: Verify payment on server
             try {
@@ -432,10 +435,11 @@ export default function BillingPage() {
       ctaDisabled: currentPlan === "Mini",
       isDowngrade: _isDowngrade("Mini"),
       highlighted: false,
-      color: "#F59E0B",
-      colorRgb: "245,158,11",
-      gradient: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
-      planType: "MINI",
+      planType: "MINI" as const,
+      draftNum: "01",
+      tierIndex: 1,
+      annotation: t('billing.miniAnnotation'),
+      creditsTotal: "02",
     },
     {
       name: t('billing.starter'),
@@ -461,10 +465,11 @@ export default function BillingPage() {
       ctaDisabled: currentPlan === "Starter",
       isDowngrade: _isDowngrade("Starter"),
       highlighted: false,
-      color: "#10B981",
-      colorRgb: "16,185,129",
-      gradient: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
-      planType: "STARTER",
+      planType: "STARTER" as const,
+      draftNum: "02",
+      tierIndex: 2,
+      annotation: t('billing.starterAnnotation'),
+      creditsTotal: "15",
     },
     {
       name: t('billing.pro'),
@@ -491,11 +496,12 @@ export default function BillingPage() {
       ctaDisabled: currentPlan === "Pro",
       isDowngrade: _isDowngrade("Pro"),
       highlighted: true,
-      color: "#4F8AFF",
-      colorRgb: "79,138,255",
-      gradient: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
       badge: t('billing.mostPopular'),
-      planType: "PRO",
+      planType: "PRO" as const,
+      draftNum: "03",
+      tierIndex: 3,
+      annotation: t('billing.proAnnotation'),
+      creditsTotal: "45",
     },
     {
       name: t('billing.team'),
@@ -521,463 +527,357 @@ export default function BillingPage() {
       ctaDisabled: currentPlan === "Team",
       isDowngrade: _isDowngrade("Team"),
       highlighted: false,
-      color: "#8B5CF6",
-      colorRgb: "139,92,246",
-      gradient: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)",
-      planType: "TEAM_ADMIN",
+      planType: "TEAM_ADMIN" as const,
+      draftNum: "04",
+      tierIndex: 4,
+      annotation: t('billing.teamAnnotation'),
+      creditsTotal: "\u221E",
     },
   ];}, [currentPlan, currentIndex, t]);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <main className="flex-1 overflow-y-auto p-6 space-y-8">
+    <div className={s.billingPage}>
+      <BackdropFloaters />
+
+      <div className={s.container}>
+
+        {/* ── Active Subscription Banner — Team / Platform Admin ── */}
+        {(userRole === "TEAM_ADMIN" || userRole === "PLATFORM_ADMIN") && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className={s.banner}
+          >
+            <div className={s.bannerIcon}>
+              <Zap size={26} fill="white" />
+            </div>
+            <div className={s.bannerBody}>
+              <div className={s.bannerTag}>{t('billing.activeSubscription')}</div>
+              <div className={s.bannerTitle}>
+                {t('billing.currentPlanLabel')} <em>{currentPlan}</em>
+              </div>
+              <div className={s.bannerSub}>{t('billing.teamPlanDescription')}</div>
+            </div>
+            <button onClick={handleManageSubscription} className={s.bannerCta}>
+              <CreditCard size={15} /> {t('billing.manageBilling')}
+            </button>
+          </motion.div>
+        )}
 
         {/* ── Launch Offer Banner — FREE users only ── */}
         {userRole === "FREE" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative rounded-[16px] border-2 border-[#F59E0B] bg-gradient-to-r from-[#F59E0B15] via-[#EF444415] to-[#F59E0B15] p-6 overflow-hidden"
+            className={s.launchOffer}
           >
-            <motion.div
-              animate={{
-                background: [
-                  "radial-gradient(circle at 20% 50%, rgba(245,158,11,0.15), transparent 50%)",
-                  "radial-gradient(circle at 80% 50%, rgba(239,68,68,0.15), transparent 50%)",
-                  "radial-gradient(circle at 20% 50%, rgba(245,158,11,0.15), transparent 50%)",
-                ],
-              }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute inset-0"
-            />
-            <div className="relative z-10 flex items-center gap-5 billing-hackathon-inner">
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="w-16 h-16 rounded-[14px] bg-gradient-to-br from-[#F59E0B] to-[#EF4444] flex items-center justify-center shadow-[0_8px_24px_rgba(245,158,11,0.4)]"
-              >
-                <Sparkles size={28} className="text-white" />
-              </motion.div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold text-[#F0F0F5]">{t('billing.launchOffer')}</h3>
-                  <motion.span
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="px-3 py-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white text-xs font-bold shadow-[0_4px_12px_rgba(245,158,11,0.4)]"
-                  >
-                    {t('billing.earlyBird')}
-                  </motion.span>
-                </div>
-                <p className="text-sm text-[#C0C0D0]">{t('billing.launchOfferDesc')}</p>
-              </div>
-              <button
-                onClick={() => handleUpgrade('MINI')}
-                disabled={upgradingTo === 'MINI'}
-                className="px-7 py-3 rounded-[10px] bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white font-bold text-sm hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {upgradingTo === 'MINI' ? (
-                  <><Loader2 size={16} className="animate-spin" />{t('billing.processing')}</>
-                ) : (
-                  <><Zap size={16} fill="currentColor" />{t('billing.startAt99')}</>
-                )}
-              </button>
+            <div className={s.launchOfferIcon}>
+              <Sparkles size={24} />
             </div>
+            <div className={s.launchOfferBody}>
+              <div className={s.launchOfferTitle}>
+                {t('billing.launchOffer')}
+                <span className={s.launchOfferBadge}>{t('billing.earlyBird')}</span>
+              </div>
+              <p className={s.launchOfferSub}>{t('billing.launchOfferDesc')}</p>
+            </div>
+            <button
+              onClick={() => handleUpgrade('MINI')}
+              disabled={upgradingTo === 'MINI'}
+              className={s.launchOfferCta}
+            >
+              {upgradingTo === 'MINI' ? (
+                <><Loader2 size={16} className="animate-spin" />{t('billing.processing')}</>
+              ) : (
+                <><Zap size={16} fill="currentColor" />{t('billing.startAt99')}</>
+              )}
+            </button>
           </motion.div>
         )}
 
-        {/* ── Current Usage Card ── */}
+        {/* ── Current Usage Card — non-Team users ── */}
         {(userRole === "FREE" || userRole === "MINI" || userRole === "STARTER" || userRole === "PRO") && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="relative rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[#111120] p-6 overflow-hidden"
+            className={s.usageCard}
           >
-            <BlueprintGrid color="#4F8AFF" opacity={0.03} />
-            <div className="relative z-10">
-              <div className="flex items-start justify-between mb-5">
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="text-lg font-bold text-[#F0F0F5]">{t('billing.currentPlanLabel')}: {currentPlan}</h3>
-                    {userRole !== "FREE" && (
-                      <button
-                        onClick={handleManageSubscription}
-                        className="px-3 py-1 rounded-lg text-xs font-medium text-[#9898B0] bg-[#16162A] hover:bg-[#2A2A3E] border border-[rgba(255,255,255,0.05)] transition-colors"
-                      >
-                        {t('billing.manageBilling')}
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-sm text-[#7C7C96]">
-                    {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 3} ${userRole === "FREE" ? "free runs used" : t('billing.runsUsed')}`}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-[#4F8AFF]">
-                    {loading ? "\u2014" : `${usage?.used || 0}/${usage?.limit || 3}`}
-                  </div>
-                  <div className="text-xs text-[#7C7C96] mt-1">
-                    {loading ? "" : usage?.resetDate ? `${t('billing.resets')} ${new Date(usage.resetDate).toLocaleDateString()}` : "Lifetime limit"}
-                  </div>
-                </div>
-              </div>
-
-              {!loading && usage && (
-                <div className="space-y-3">
-                  <div className="h-3 bg-[#16162A] rounded-full overflow-hidden relative">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((usage.used / usage.limit) * 100, 100)}%` }}
-                      transition={{ duration: 0.8, ease: "easeOut" }}
-                      className="h-full bg-gradient-to-r from-[#4F8AFF] to-[#8B5CF6] relative"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-                    </motion.div>
-                  </div>
-                  {usage.used >= usage.limit && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)]">
-                      <Zap size={16} className="text-[#EF4444]" />
-                      <p className="text-sm text-[#EF4444] flex-1">{t('billing.monthlyLimit')}</p>
-                    </div>
+            <div className={s.usageCardHead}>
+              <div>
+                <div className={s.usageCardTitle}>
+                  {t('billing.currentPlanLabel')} {currentPlan}
+                  {userRole !== "FREE" && (
+                    <button onClick={handleManageSubscription} className={s.usageCardManage}>
+                      {t('billing.manageBilling')}
+                    </button>
                   )}
                 </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── Team Current Plan ── */}
-        {(userRole === "TEAM_ADMIN" || userRole === "PLATFORM_ADMIN") && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="rounded-[16px] border border-[rgba(79,138,255,0.3)] bg-gradient-to-r from-[#4F8AFF15] to-[#8B5CF615] p-6"
-          >
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-[12px] bg-gradient-to-br from-[#4F8AFF] to-[#8B5CF6] flex items-center justify-center shadow-[0_8px_24px_rgba(79,138,255,0.3)]">
-                <Zap size={28} className="text-white" fill="white" />
+                <p className={s.usageCardSub}>
+                  {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 3} ${userRole === "FREE" ? "free runs used" : t('billing.runsUsed')}`}
+                </p>
               </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-[#F0F0F5] mb-1">{t('billing.currentPlanTeam')}</h3>
-                <p className="text-sm text-[#C0C0D0]">{t('billing.unlimitedRuns')}</p>
+              <div style={{ textAlign: "right" }}>
+                <div className={s.usageCardBig}>
+                  {loading ? "\u2014" : `${usage?.used || 0}/${usage?.limit || 3}`}
+                </div>
+                <div className={s.usageCardLabel}>
+                  {loading ? "" : usage?.resetDate ? `${t('billing.resets')} ${new Date(usage.resetDate).toLocaleDateString()}` : "Lifetime limit"}
+                </div>
               </div>
-              <button
-                onClick={handleManageSubscription}
-                className="px-6 py-3 rounded-[10px] bg-[#16162A] text-[#F0F0F5] font-semibold text-sm hover:bg-[#2A2A3E] transition-colors border border-[rgba(255,255,255,0.05)]"
-              >
-                {t('billing.manageBilling')}
-              </button>
             </div>
-          </motion.div>
-        )}
 
-        {/* ── Pricing Section ── */}
-        <div>
-          {/* Section header with free tier note */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-center mb-8"
-          >
-            <h2 className="text-2xl font-bold text-[#F0F0F5] mb-2">{t('billing.choosePlan')}</h2>
-            <p className="text-sm text-[#7C7C96] mb-3">{t('billing.moneyBack')}</p>
-            {/* Free tier mention */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#16162A] border border-[rgba(255,255,255,0.05)]">
-              <Shield size={14} className="text-[#7C7C96]" />
-              <span className="text-xs text-[#9898B0]">
-                {t('billing.freeTierNote')}
-              </span>
-            </div>
-          </motion.div>
-
-          {/* ── 4-column pricing grid ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {plans.map((plan, index) => {
-              const isActive = plan.ctaDisabled;
-              const isHovered = hoveredPlan === plan.tier;
-
-              return (
-                <motion.div
-                  key={plan.tier}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 + index * 0.1, type: "spring", stiffness: 200, damping: 20 }}
-                  onMouseEnter={() => setHoveredPlan(plan.tier)}
-                  onMouseLeave={() => setHoveredPlan(null)}
-                  className="relative rounded-[20px] border overflow-hidden transition-all duration-300 flex flex-col h-full"
-                  style={{
-                    borderColor: isActive
-                      ? plan.color
-                      : isHovered
-                      ? `rgba(${plan.colorRgb},0.9)`
-                      : plan.highlighted
-                      ? `rgba(${plan.colorRgb},0.4)`
-                      : "rgba(255,255,255,0.06)",
-                    borderWidth: isActive || plan.highlighted ? 2 : 1,
-                    background: "#0D0D1A",
-                    transform: isHovered ? "translateY(-6px)" : "translateY(0)",
-                    boxShadow: isActive
-                      ? `0 8px 40px rgba(${plan.colorRgb},0.15), 0 0 0 1px rgba(${plan.colorRgb},0.1)`
-                      : isHovered
-                      ? `0 0 0 1px rgba(${plan.colorRgb},0.6), 0 16px 36px rgba(0,0,0,0.4)`
-                      : "0 4px 20px rgba(0,0,0,0.2)",
-                  }}
-                >
-                  {/* Blueprint grid overlay */}
-                  <BlueprintGrid color={plan.color} opacity={isHovered ? 0.06 : 0.03} />
-
-                  {/* Top accent line */}
-                  <div
-                    className="absolute top-0 left-0 right-0 h-[3px]"
-                    style={{ background: plan.gradient }}
-                  />
-
-                  {/* Animated glow on hover */}
-                  <AnimatePresence>
-                    {isHovered && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="absolute inset-0 pointer-events-none"
-                        style={{
-                          background: `radial-gradient(ellipse at 50% 0%, rgba(${plan.colorRgb},0.08) 0%, transparent 60%)`,
-                        }}
-                      />
-                    )}
-                  </AnimatePresence>
-
-                  {/* Badge */}
-                  {isActive ? (
-                    <motion.div
-                      initial={{ scale: 0, y: -10 }}
-                      animate={{ scale: 1, y: 0 }}
-                      transition={{ delay: 0.4 + index * 0.1, type: "spring", stiffness: 300 }}
-                      className="absolute -top-[1px] left-1/2 -translate-x-1/2 z-20"
-                    >
-                      <div
-                        className="px-4 py-1.5 rounded-b-lg text-white text-[11px] font-bold tracking-[0.15em] uppercase flex items-center gap-1.5"
-                        style={{ background: plan.gradient }}
-                      >
-                        <CheckCircle2 size={11} />
-                        {t('billing.activePlan').toUpperCase()}
-                      </div>
-                    </motion.div>
-                  ) : plan.badge ? (
-                    <motion.div
-                      initial={{ scale: 0, y: -10 }}
-                      animate={{ scale: 1, y: 0 }}
-                      transition={{ delay: 0.4 + index * 0.1, type: "spring", stiffness: 300 }}
-                      className="absolute -top-[1px] left-1/2 -translate-x-1/2 z-20"
-                    >
-                      <div
-                        className="px-4 py-1.5 rounded-b-lg text-white text-[11px] font-bold tracking-[0.15em] uppercase flex items-center gap-1.5"
-                        style={{ background: plan.gradient }}
-                      >
-                        <Sparkles size={11} />
-                        {plan.badge}
-                      </div>
-                    </motion.div>
-                  ) : null}
-
-                  {/* Card content */}
-                  <div className="relative z-10 p-6 pt-7 flex-1 flex flex-col">
-                    {/* Plan icon + name */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <motion.div
-                        animate={isActive ? { rotate: [0, 5, -5, 0] } : {}}
-                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{
-                          background: `linear-gradient(135deg, rgba(${plan.colorRgb},0.15) 0%, rgba(${plan.colorRgb},0.05) 100%)`,
-                          border: `1px solid rgba(${plan.colorRgb},0.2)`,
-                        }}
-                      >
-                        <span style={{ color: plan.color }}>{plan.icon}</span>
-                      </motion.div>
-                      <div>
-                        <h3 className="text-lg font-bold text-[#F0F0F5]">{plan.name}</h3>
-                        <p className="text-xs text-[#7C7C96]">{plan.description}</p>
-                      </div>
-                    </div>
-
-                    {/* Price */}
-                    <div className="mb-5">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[13px] font-medium text-[#7C7C96]">₹</span>
-                        <motion.span
-                          className="text-4xl font-extrabold text-[#F0F0F5] tracking-tight"
-                          style={isActive ? { color: plan.color } : {}}
-                        >
-                          {plan.price}
-                        </motion.span>
-                        <span className="text-xs text-[#55556A] ml-1">/ {t('billing.perMonthShort')}</span>
-                      </div>
-                      {plan.savings && (
-                        <motion.div
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.6 }}
-                          className="mt-1.5 text-xs font-semibold"
-                          style={{ color: plan.color }}
-                        >
-                          {plan.savings}
-                        </motion.div>
-                      )}
-                    </div>
-
-                    {/* AI Credits */}
-                    <div
-                      className="mb-5 p-3 rounded-xl"
-                      style={{
-                        background: `linear-gradient(135deg, rgba(${plan.colorRgb},0.04) 0%, rgba(${plan.colorRgb},0.01) 100%)`,
-                        border: `1px solid rgba(${plan.colorRgb},0.08)`,
-                      }}
-                    >
-                      <div className="text-[11px] font-bold text-[#5C5C78] mb-2.5 uppercase tracking-[0.12em]">
-                        {t('billing.aiCredits')}
-                      </div>
-                      <div className="space-y-2">
-                        {plan.nodeCredits.map((credit, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5 text-[#9898B0]">
-                              {credit.icon}
-                              <span>{credit.label}</span>
-                            </div>
-                            <span
-                              className="font-bold"
-                              style={{
-                                color: credit.value === "0"
-                                  ? "#3A3A50"
-                                  : credit.value === "\u221E"
-                                  ? "#10B981"
-                                  : plan.color,
-                              }}
-                            >
-                              {credit.value === "0" ? "\u2014" : credit.value}
-                              {credit.value !== "0" && credit.value !== "\u221E" ? `/${t('billing.perMonthShort')}` : ""}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Features */}
-                    <ul className="space-y-2.5 mb-6">
-                      {plan.features.map((feature, idx) => (
-                        <motion.li
-                          key={idx}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.35 + index * 0.1 + idx * 0.04 }}
-                          className="flex items-start gap-2.5 text-xs"
-                        >
-                          <div
-                            className="w-4 h-4 rounded-full flex items-center justify-center mt-0.5 flex-shrink-0"
-                            style={{ background: `rgba(${plan.colorRgb},0.12)` }}
-                          >
-                            <Check size={10} style={{ color: plan.color }} strokeWidth={3} />
-                          </div>
-                          <span className="text-[#C0C0D0]">{feature}</span>
-                        </motion.li>
-                      ))}
-                    </ul>
-
-                    {/* CTA Button — mt-auto pushes the button to the bottom so all cards
-                        align on the same horizontal line. Lower-tier plans are disabled and faded. */}
-                    <div className="mt-auto">
-                      <motion.button
-                        whileHover={
-                          !isActive && !plan.isDowngrade && upgradingTo === null
-                            ? {
-                                scale: 1.02,
-                                boxShadow: plan.highlighted
-                                  ? `0 0 0 1px rgba(${plan.colorRgb},0.95), 0 4px 14px rgba(0,0,0,0.35)`
-                                  : `0 0 0 1px rgba(${plan.colorRgb},0.9), 0 3px 10px rgba(0,0,0,0.3)`,
-                              }
-                            : {}
-                        }
-                        whileTap={!isActive && !plan.isDowngrade && upgradingTo === null ? { scale: 0.98 } : {}}
-                        disabled={isActive || plan.isDowngrade || upgradingTo !== null}
-                        onClick={() => plan.planType && handleUpgrade(plan.planType as 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN')}
-                        className="w-full py-3.5 rounded-xl font-extrabold text-[15px] leading-none transition-all flex items-center justify-center gap-2"
-                        style={
-                          isActive
-                            ? {
-                                background: plan.color,
-                                color: "#fff",
-                                cursor: "default",
-                                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.18), 0 6px 20px rgba(${plan.colorRgb},0.5)`,
-                                letterSpacing: "0.02em",
-                              }
-                            : plan.isDowngrade
-                            ? {
-                                background: "#13132A",
-                                color: "#55556A",
-                                border: "1px solid rgba(255,255,255,0.04)",
-                                cursor: "not-allowed",
-                                opacity: 0.5,
-                              }
-                            : plan.highlighted && upgradingTo === null
-                            ? {
-                                background: plan.color,
-                                color: "#fff",
-                                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.2), 0 0 0 1px rgba(${plan.colorRgb},0.5), 0 10px 28px rgba(${plan.colorRgb},0.6)`,
-                                letterSpacing: "0.02em",
-                              }
-                            : {
-                                background: plan.color,
-                                color: "#fff",
-                                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.18), 0 6px 18px rgba(${plan.colorRgb},0.45)`,
-                                letterSpacing: "0.02em",
-                              }
-                        }
-                      >
-                        {upgradingTo === plan.planType ? (
-                          <><Loader2 size={18} className="animate-spin" />{t('billing.processing')}</>
-                        ) : isActive ? (
-                          <><CheckCircle2 size={18} strokeWidth={2.5} />{plan.cta}</>
-                        ) : plan.isDowngrade ? (
-                          <>{plan.cta}</>
-                        ) : (
-                          <>
-                            {plan.cta}
-                            <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />
-                          </>
-                        )}
-                      </motion.button>
-                    </div>
+            {!loading && usage && (
+              <div>
+                <div className={s.usageCardBar}>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min((usage.used / usage.limit) * 100, 100)}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className={s.usageCardBarFill}
+                  >
+                    <div className={s.usageCardBarShimmer} />
+                  </motion.div>
+                </div>
+                {usage.used >= usage.limit && (
+                  <div className={s.usageCardWarn}>
+                    <Zap size={16} />
+                    <p style={{ flex: 1 }}>{t('billing.monthlyLimit')}</p>
                   </div>
-                </motion.div>
-              );
-            })}
+                )}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── Hero with Cityscape ── */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className={s.hero}
+        >
+          <CityscapeHero />
+          <div className={s.heroContent}>
+            <div className={s.heroEyebrow}>
+              <span className={s.heroEyebrowDot} />
+              {t('billing.eyebrowBillingPlans')}
+            </div>
+            <h1 className={s.heroTitle}>
+              {t('billing.heroTitlePart1')} <em>{t('billing.heroTitleScope')}</em>.
+            </h1>
+            <p className={s.heroSub}>{t('billing.heroSub')}</p>
+            <div className={s.heroTrustRow}>
+              <div className={s.heroTrust}>
+                <Shield size={13} />
+                <span><strong>14-day</strong> {t('billing.moneyBack')}</span>
+              </div>
+              <div className={s.heroTrustDivider} />
+              <div className={s.heroTrust}>
+                <CheckCircle2 size={13} />
+                <span><strong>{t('billing.freeTier')}</strong> · {t('billing.freeTierDesc')}</span>
+              </div>
+              <div className={s.heroTrustDivider} />
+              <div className={s.heroTrust}>
+                <Zap size={13} />
+                <span><strong>{t('billing.subSecond')}</strong> {t('billing.aiExecution')}</span>
+              </div>
+            </div>
           </div>
+        </motion.div>
+
+        {/* ── Scale Divider ── */}
+        <div className={s.scaleDivider}>
+          <div className={s.scaleDividerLine} />
+          <div className={s.scaleDividerTag}>
+            <Ruler size={12} /> {t('billing.scaleTag')}
+          </div>
+          <div className={s.scaleDividerLine} />
         </div>
 
-        {/* ── Built for AEC section ── */}
+        {/* ── Plan Grid ── */}
+        <div className={s.plans}>
+          {plans.map((plan, index) => {
+            const isActive = plan.ctaDisabled;
+            const tierKey = plan.tier.toLowerCase() as PlanTier;
+
+            return (
+              <motion.div
+                key={plan.tier}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + index * 0.1, type: "spring", stiffness: 200, damping: 20 }}
+                onMouseEnter={() => setHoveredPlan(plan.tier)}
+                onMouseLeave={() => setHoveredPlan(null)}
+                className={s.plan}
+                data-tier={tierKey}
+                data-state={isActive ? "active" : plan.highlighted ? "highlighted" : "default"}
+              >
+                {/* Most Popular flag */}
+                {plan.highlighted && !isActive && (
+                  <div className={s.popularFlag}>
+                    <Sparkles size={10} />
+                    {plan.badge}
+                  </div>
+                )}
+
+                {/* Active pin */}
+                {isActive && (
+                  <div className={s.activePin}>
+                    <span className={s.activePinDot} />
+                    {t('billing.activePlan')}
+                  </div>
+                )}
+
+                {/* Drafting strip header */}
+                <div className={s.draftStrip}>
+                  <div className={s.draftStripLeft}>
+                    <span className={s.draftStripNum}>FB-{plan.draftNum}</span>
+                    <span>{plan.name} &middot; Tier {plan.tierIndex}</span>
+                  </div>
+                  <div className={s.draftStripRight}>
+                    <span className={s.draftStripTick}>A</span>
+                  </div>
+                </div>
+
+                {/* Faint building outline */}
+                <PlanBuildingOutline tier={tierKey} />
+
+                {/* Card body */}
+                <div className={s.cardBody}>
+                  {/* Plan icon + name */}
+                  <div className={s.planHead}>
+                    <div className={s.planIconWrap}>
+                      <div className={s.planIcon}>{plan.icon}</div>
+                    </div>
+                    <div className={s.planHeadInfo}>
+                      <div className={s.planName}>{plan.name}</div>
+                      <div className={s.planTagline}>{plan.description}</div>
+                    </div>
+                  </div>
+
+                  {/* Price */}
+                  <div className={s.planPrice}>
+                    <div className={s.planPriceRow}>
+                      <span className={s.planPriceCurrency}>₹</span>
+                      <span className={s.planPriceAmount}>{plan.price}</span>
+                      <span className={s.planPriceSuffix}>/ {t('billing.perMonthShort')}</span>
+                    </div>
+                    <div className={s.priceAnnotation}>
+                      <DimLine />
+                      <span>{plan.annotation}</span>
+                    </div>
+                    {plan.savings && (
+                      <div className={s.planSavingsTag}>
+                        <Zap size={12} /> {plan.savings}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AI Credits */}
+                  <div className={s.credits}>
+                    <div className={s.creditsHead}>
+                      <span>{t('billing.aiCredits')}</span>
+                      <em>{plan.creditsTotal}</em>
+                    </div>
+                    <div className={s.creditsBody}>
+                      {plan.nodeCredits.map((credit, idx) => (
+                        <div key={idx} className={s.creditRow}>
+                          <div className={s.creditLabel}>
+                            <span className={s.creditLabelIcon}>{credit.icon}</span>
+                            <span>{credit.label}</span>
+                          </div>
+                          <span className={
+                            credit.value === "0"
+                              ? s.creditValueZero
+                              : credit.value === "\u221E"
+                              ? s.creditValueInfinity
+                              : s.creditValue
+                          }>
+                            {credit.value === "0" ? "\u2014" : credit.value}
+                            {credit.value !== "0" && credit.value !== "\u221E" && (
+                              <span className={s.creditValueSuffix}>/{t('billing.perMonthShort')}</span>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <ul className={s.features}>
+                    {plan.features.map((feature, idx) => (
+                      <motion.li
+                        key={idx}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 + index * 0.1 + idx * 0.04 }}
+                        className={s.feature}
+                      >
+                        <div className={s.featureMark}>
+                          <Check size={10} strokeWidth={3} />
+                        </div>
+                        <span>{feature}</span>
+                      </motion.li>
+                    ))}
+                  </ul>
+
+                  {/* CTA Button — logic UNCHANGED */}
+                  <motion.button
+                    whileHover={
+                      !isActive && !plan.isDowngrade && upgradingTo === null
+                        ? { scale: 1.02 }
+                        : {}
+                    }
+                    whileTap={!isActive && !plan.isDowngrade && upgradingTo === null ? { scale: 0.98 } : {}}
+                    disabled={isActive || plan.isDowngrade || upgradingTo !== null}
+                    onClick={() => plan.planType && handleUpgrade(plan.planType as 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN')}
+                    className={s.planCta}
+                    data-variant={
+                      isActive ? "active" :
+                      plan.isDowngrade ? "downgrade" :
+                      upgradingTo === plan.planType ? "processing" :
+                      "upgrade"
+                    }
+                  >
+                    {upgradingTo === plan.planType ? (
+                      <><Loader2 size={18} className="animate-spin" />{t('billing.processing')}</>
+                    ) : isActive ? (
+                      <><CheckCircle2 size={18} strokeWidth={2.5} />{plan.cta}</>
+                    ) : plan.isDowngrade ? (
+                      <>{t('billing.lowerThanCurrentPlan')}</>
+                    ) : (
+                      <>
+                        {plan.cta}
+                        <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* ── AEC Footer with Elevation ── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="relative rounded-[16px] border border-[rgba(255,255,255,0.04)] bg-[#0D0D1A] p-8 overflow-hidden"
+          className={s.aec}
         >
-          <BlueprintGrid color="#4F8AFF" opacity={0.025} />
-          <div className="relative z-10 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(79,138,255,0.08)] border border-[rgba(79,138,255,0.15)] mb-4">
-              <Building2 size={12} className="text-[#4F8AFF]" />
-              <span className="text-[11px] font-bold text-[#4F8AFF] uppercase tracking-wider">{t('billing.aecSubtitle')}</span>
-            </div>
-            <h3 className="text-lg font-bold text-[#F0F0F5] mb-2">{t('billing.builtForAec')}</h3>
-            <p className="text-sm text-[#7C7C96] max-w-lg mx-auto">
-              {t('billing.builtForAecDesc')}
-            </p>
+          <div className={s.aecEyebrow}>
+            <Building2 size={12} />
+            <span>{t('billing.aecSubtitle')}</span>
           </div>
+          <div className={s.aecTitle}>
+            {t('billing.builtForAec')}
+          </div>
+          <div className={s.aecSub}>{t('billing.builtForAecDesc')}</div>
+          <AecElevationFooter />
         </motion.div>
-      </main>
+      </div>
 
       {/* ── Plan Change Confirmation Modal ── */}
       <AnimatePresence>
@@ -986,94 +886,69 @@ export default function BillingPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+            className={s.modalBackdrop}
             onClick={() => setConfirmModal(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#111120] p-8 shadow-2xl"
+              className={s.modalCard}
             >
-              <button
-                onClick={() => setConfirmModal(null)}
-                className="absolute top-4 right-4 p-1 rounded-lg text-[#7C7C96] hover:text-[#F0F0F5] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
-              >
+              <button onClick={() => setConfirmModal(null)} className={s.modalClose}>
                 <X size={18} />
               </button>
 
-              <div className="text-center mb-6">
-                <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                  style={{
-                    background: confirmModal.type === 'upgrade'
-                      ? 'linear-gradient(135deg, rgba(79,138,255,0.15), rgba(99,102,241,0.15))'
-                      : 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.15))',
-                    border: confirmModal.type === 'upgrade'
-                      ? '1px solid rgba(79,138,255,0.2)'
-                      : '1px solid rgba(245,158,11,0.2)',
-                  }}
-                >
+              <div className={s.modalHead}>
+                <div className={confirmModal.type === 'upgrade' ? s.modalHeadIconUpgrade : s.modalHeadIconDowngrade}>
                   {confirmModal.type === 'upgrade'
-                    ? <ArrowUpRight size={24} className="text-[#4F8AFF]" />
-                    : <ArrowDownRight size={24} className="text-[#F59E0B]" />
+                    ? <ArrowUpRight size={24} />
+                    : <ArrowDownRight size={24} />
                   }
                 </div>
-                <h3 className="text-xl font-bold text-[#F0F0F5] mb-2">
+                <h3 className={s.modalHeadTitle}>
                   {confirmModal.type === 'upgrade' ? t('billing.confirmUpgrade') : t('billing.confirmDowngrade')}
                 </h3>
-                <p className="text-sm text-[#9898B0]">
-                  {currentPlan} → <strong className="text-[#4F8AFF]">{confirmModal.planName}</strong>
+                <p className={s.modalHeadSub}>
+                  {currentPlan} → <strong>{confirmModal.planName}</strong>
                 </p>
               </div>
 
-              {/* Proration info */}
               {confirmModal.type === 'upgrade' && (
-                <div className="rounded-xl bg-[rgba(79,138,255,0.04)] border border-[rgba(79,138,255,0.1)] p-4 mb-6">
+                <div className={s.prorationCardUpgrade}>
                   {confirmModal.loading ? (
-                    <div className="flex items-center justify-center gap-2 text-sm text-[#9898B0]">
+                    <div className={s.prorationSpin}>
                       <Loader2 size={14} className="animate-spin" />
                       {t('billing.calculatingProration')}
                     </div>
                   ) : (
-                    <div className="text-center">
-                      <div className="text-xs text-[#7C7C96] mb-1">{t('billing.immediateCharge')}</div>
-                      <div className="text-2xl font-bold text-[#F0F0F5]">
+                    <>
+                      <div className={s.prorationLabel}>{t('billing.immediateCharge')}</div>
+                      <div className={s.prorationValue}>
                         ₹{(confirmModal.prorationAmount || 0).toFixed(2)}
                       </div>
-                      <div className="text-xs text-[#55556A] mt-1">{t('billing.proratedAmount')}</div>
-                    </div>
+                      <div className={s.prorationNote}>{t('billing.proratedAmount')}</div>
+                    </>
                   )}
                 </div>
               )}
 
               {confirmModal.type === 'downgrade' && (
-                <div className="rounded-xl bg-[rgba(245,158,11,0.04)] border border-[rgba(245,158,11,0.1)] p-4 mb-6">
-                  <p className="text-xs text-[#9898B0] text-center">
-                    {t('billing.downgradeNote')}
-                  </p>
+                <div className={s.prorationCardDowngrade}>
+                  <p className={s.downgradeNote}>{t('billing.downgradeNote')}</p>
                 </div>
               )}
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setConfirmModal(null)}
-                  className="flex-1 py-3 rounded-xl text-sm font-semibold text-[#9898B0] bg-[#16162A] hover:bg-[#1E1E34] border border-[rgba(255,255,255,0.06)] transition-colors"
-                >
+              <div className={s.modalActions}>
+                <button onClick={() => setConfirmModal(null)} className={s.modalBtnSecondary}>
                   {t('billing.cancel')}
                 </button>
                 <button
                   onClick={handleConfirmPlanChange}
                   disabled={confirmModal.loading}
-                  className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
-                  style={{
-                    background: confirmModal.type === 'upgrade'
-                      ? 'linear-gradient(135deg, #4F8AFF, #6366F1)'
-                      : 'linear-gradient(135deg, #F59E0B, #EF4444)',
-                  }}
+                  className={confirmModal.type === 'upgrade' ? s.modalBtnUpgrade : s.modalBtnDowngrade}
                 >
                   {confirmModal.type === 'upgrade' ? t('billing.confirmUpgradeBtn') : t('billing.confirmDowngradeBtn')}
                 </button>
@@ -1090,82 +965,72 @@ export default function BillingPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+            className={s.modalBackdrop}
             onClick={() => setPaymentMethodModal(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#111120] p-8 shadow-2xl"
+              className={s.modalCard}
             >
-              <button
-                onClick={() => setPaymentMethodModal(null)}
-                className="absolute top-4 right-4 p-1 rounded-lg text-[#7C7C96] hover:text-[#F0F0F5] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
-              >
+              <button onClick={() => setPaymentMethodModal(null)} className={s.modalClose}>
                 <X size={18} />
               </button>
 
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-bold text-[#F0F0F5] mb-2">
+              <div className={s.modalHead}>
+                <h3 className={s.modalHeadTitle}>
                   {t('billing.choosePaymentMethod')}
                 </h3>
-                <p className="text-sm text-[#9898B0]">
-                  {t('billing.subscribeTo')} <strong className="text-[#4F8AFF]">{paymentMethodModal.planName}</strong>
+                <p className={s.modalHeadSub}>
+                  {t('billing.subscribeTo')} <strong>{paymentMethodModal.planName}</strong>
                 </p>
               </div>
 
-              <div className="space-y-3">
-                {/* UPI / Google Pay / PhonePe (Razorpay) — shown first as preferred for India */}
+              <div className={s.payOptions}>
                 <button
                   onClick={() => handleRazorpayCheckout(paymentMethodModal.planKey)}
                   disabled={upgradingTo !== null}
-                  className="w-full p-4 rounded-xl border-2 border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.04)] hover:bg-[rgba(16,185,129,0.08)] transition-all text-left flex items-center gap-4 group disabled:opacity-50"
+                  className={s.payOptionRazorpay}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#10B981] to-[#059669] flex items-center justify-center flex-shrink-0">
-                    <Smartphone size={22} className="text-white" />
+                  <div className={s.payOptionIconRazorpay}>
+                    <Smartphone size={22} />
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-bold text-[#F0F0F5]">UPI / Google Pay / PhonePe</span>
-                      <span className="px-2 py-0.5 rounded-full bg-[rgba(16,185,129,0.15)] text-[11px] font-bold text-[#10B981]">
-                        {t('billing.recommended')}
-                      </span>
+                  <div className={s.payOptionBody}>
+                    <div className={s.payOptionName}>
+                      UPI / Google Pay / PhonePe
+                      <span className={s.payOptionRec}>{t('billing.recommended')}</span>
                     </div>
-                    <p className="text-xs text-[#7C7C96]">{t('billing.razorpayDesc')}</p>
+                    <p className={s.payOptionDesc}>{t('billing.razorpayDesc')}</p>
                   </div>
-                  <ArrowRight size={16} className="text-[#7C7C96] group-hover:text-[#10B981] transition-colors" />
+                  <ArrowRight size={16} className={s.payOptionArrow} />
                 </button>
 
-                {/* International Cards (Stripe) */}
                 <button
                   onClick={() => handleStripeCheckout(paymentMethodModal.planKey)}
                   disabled={upgradingTo !== null}
-                  className="w-full p-4 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#16162A] hover:bg-[#1E1E34] transition-all text-left flex items-center gap-4 group disabled:opacity-50"
+                  className={s.payOptionStripe}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6366F1] to-[#4F8AFF] flex items-center justify-center flex-shrink-0">
-                    <CreditCard size={22} className="text-white" />
+                  <div className={s.payOptionIconStripe}>
+                    <CreditCard size={22} />
                   </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-bold text-[#F0F0F5] mb-0.5">{t('billing.internationalCards')}</div>
-                    <p className="text-xs text-[#7C7C96]">{t('billing.stripeDesc')}</p>
+                  <div className={s.payOptionBody}>
+                    <div className={s.payOptionName}>{t('billing.internationalCards')}</div>
+                    <p className={s.payOptionDesc}>{t('billing.stripeDesc')}</p>
                   </div>
-                  <ArrowRight size={16} className="text-[#7C7C96] group-hover:text-[#4F8AFF] transition-colors" />
+                  <ArrowRight size={16} className={s.payOptionArrow} />
                 </button>
               </div>
 
-              <p className="text-center text-[11px] text-[#55556A] mt-4">
-                {t('billing.securePayment')}
-              </p>
+              <p className={s.modalFooterSecure}>{t('billing.securePayment')}</p>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Graceful payment error modal — replaces red toast for checkout failures */}
+      {/* Graceful payment error modal */}
       <PaymentErrorModal
         open={!!paymentError}
         onClose={() => setPaymentError(null)}
@@ -1176,16 +1041,6 @@ export default function BillingPage() {
 
       {/* Razorpay checkout.js script */}
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
-
-      <style jsx global>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        .animate-shimmer {
-          animation: shimmer 2s infinite;
-        }
-      `}</style>
     </div>
   );
 }

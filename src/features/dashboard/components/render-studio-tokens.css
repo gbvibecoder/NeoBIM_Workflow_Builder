@@ -1,0 +1,48 @@
+/* BuildFlow shared design tokens — Render Studio system.
+   Imported by feature CSS modules. Do not mutate per-feature.
+   Source of truth: PHASE_X redesign 2026-04-28. */
+
+:root {
+  /* Light surfaces */
+  --rs-bone: #F6F4EE;
+  --rs-paper: #FFFFFF;
+
+  /* Text */
+  --rs-ink: #0E1218;
+  --rs-ink-soft: #2A3142;
+  --rs-text: #5A6478;
+  --rs-text-mute: #9AA1B0;
+
+  /* Rules / borders */
+  --rs-rule: rgba(14, 18, 24, 0.07);
+  --rs-rule-strong: rgba(14, 18, 24, 0.14);
+
+  /* Brand accent — blueprint teal */
+  --rs-blueprint: #1A4D5C;
+  --rs-blueprint-2: #2C7B8F;
+  --rs-blueprint-glow: rgba(26, 77, 92, 0.15);
+
+  /* Secondary accents */
+  --rs-burnt: #C26A3B;
+  --rs-sage: #4A6B4D;
+
+  /* Dark surfaces (render canvas, video player) */
+  --rs-carbon: #0A0E14;
+  --rs-charcoal: #131922;
+  --rs-phantom: #1E2531;
+  --rs-phantom-2: #27303F;
+  --rs-cream: #F5F2EC;
+  --rs-dim: #8B95A8;
+  --rs-dim-2: #5C667A;
+  --rs-rule-d: rgba(255, 255, 255, 0.07);
+  --rs-rule-d-strong: rgba(255, 255, 255, 0.14);
+  --rs-ember: #E5A878;
+  --rs-ember-2: #F4C089;
+  --rs-ember-glow: rgba(229, 168, 120, 0.20);
+  --rs-teal-d: #5DAFC0;
+
+  /* Easings */
+  --rs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --rs-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --rs-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}

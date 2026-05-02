@@ -76,6 +76,8 @@ analytics-logs/
 *_VALIDATION.md
 *_AUDIT.md
 *_REQUIREMENTS.md
+PHASE_*.md
+docs/white-theme-*.md
 *.pyc
 __pycache__/
 *.egg-info/

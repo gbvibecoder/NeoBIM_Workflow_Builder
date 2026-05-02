@@ -8,8 +8,29 @@ export type WorkflowSummary = {
   isPublished: boolean;
   createdAt: string;
   updatedAt: string;
+  thumbnail: string | null;
+  category: string | null;
   _count: { executions: number };
+  executions: Array<{
+    id: string;
+    status: string;
+    completedAt: string | null;
+  }>;
 };
+
+export type WorkflowLastRun = {
+  status: "SUCCESS" | "FAILED" | "PARTIAL" | "RUNNING" | null;
+  completedAt: string | null;
+};
+
+export function getLastRun(wf: WorkflowSummary): WorkflowLastRun {
+  const last = wf.executions[0];
+  if (!last) return { status: null, completedAt: null };
+  return {
+    status: last.status as WorkflowLastRun["status"],
+    completedAt: last.completedAt,
+  };
+}
 
 export type WorkflowDetail = {
   id: string;
@@ -86,8 +107,18 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   workflows: {
-    list: () =>
-      apiFetch<{ workflows: WorkflowSummary[] }>("/api/workflows"),
+    list: (options?: { page?: number; limit?: number }) => {
+      const params = new URLSearchParams();
+      if (options?.page) params.set("page", String(options.page));
+      if (options?.limit) params.set("limit", String(options.limit));
+      const query = params.toString();
+      return apiFetch<{
+        workflows: WorkflowSummary[];
+        total: number;
+        page: number;
+        totalPages: number;
+      }>(`/api/workflows${query ? `?${query}` : ""}`);
+    },
 
     get: (id: string) =>
       apiFetch<{ workflow: WorkflowDetail }>(`/api/workflows/${id}`),

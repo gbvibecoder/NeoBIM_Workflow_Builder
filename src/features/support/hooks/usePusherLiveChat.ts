@@ -25,13 +25,12 @@ export function usePusherLiveChat(userId: string | undefined | null) {
     const userChannel = pusher.subscribe(userChannelName);
 
     userChannel.bind("pusher:subscription_succeeded", () => {
-      console.log("[live-chat] subscribed to", userChannelName);
+      if (process.env.NODE_ENV === "development") console.log("[live-chat] subscribed to", userChannelName);
     });
     userChannel.bind("pusher:subscription_error", (err: unknown) => {
       console.error("[live-chat] subscription error on", userChannelName, err);
     });
     userChannel.bind("message:reply", (data: unknown) => {
-      console.log("[live-chat] received message:reply", data);
       store._receiveAdminReply(data as Parameters<typeof store._receiveAdminReply>[0]);
     });
     userChannel.bind("conversation:closed", store._receiveConversationClosed);

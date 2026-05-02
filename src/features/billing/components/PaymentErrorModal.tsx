@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wrench, X, ArrowRight, Mail, RefreshCw } from "lucide-react";
 import { CONTACT_EMAIL } from "@/constants/contact";
-import { colors } from "@/constants/design-tokens";
 
 /**
  * Codes the modal renders specific copy for. Anything else falls through to
@@ -177,8 +176,8 @@ export function PaymentErrorModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-          style={{ background: "rgba(0,0,0,0.7)" }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(14,18,24,0.4)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
           onClick={onClose}
         >
           <motion.div
@@ -192,52 +191,99 @@ export function PaymentErrorModal({
             exit={{ y: 16, opacity: 0 }}
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#111120] p-8 shadow-2xl"
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: "440px",
+              borderRadius: "20px",
+              background: "#fff",
+              border: "1px solid rgba(14,18,24,0.07)",
+              padding: "32px",
+              boxShadow: "0 24px 48px rgba(14,18,24,0.12), 0 0 0 1px rgba(14,18,24,0.04)",
+            }}
           >
             <button
               onClick={onClose}
               aria-label="Close"
-              className="absolute top-4 right-4 p-1 rounded-lg text-[#7C7C96] hover:text-[#F0F0F5] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+              style={{
+                position: "absolute",
+                top: "16px",
+                right: "16px",
+                padding: "4px",
+                borderRadius: "8px",
+                background: "none",
+                border: "none",
+                color: "#9AA1B0",
+                cursor: "pointer",
+              }}
             >
               <X size={18} />
             </button>
 
-            <div className="text-center mb-6">
+            <div style={{ textAlign: "center", marginBottom: "24px" }}>
               <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
                 style={{
-                  background: `linear-gradient(135deg, ${colors.warning}26, ${colors.warning}1A)`,
-                  border: `1px solid ${colors.warning}40`,
+                  width: "52px",
+                  height: "52px",
+                  borderRadius: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  background: "rgba(184,118,45,0.08)",
+                  border: "1px solid rgba(184,118,45,0.15)",
+                  color: "#B8762D",
                 }}
               >
-                <Wrench size={24} style={{ color: colors.warning }} />
+                <Wrench size={24} />
               </div>
               <h3
                 id="payment-error-headline"
-                className="text-xl font-bold text-[#F0F0F5] mb-2"
+                style={{
+                  fontFamily: "var(--font-display, Georgia, serif)",
+                  fontSize: "20px",
+                  fontWeight: 600,
+                  color: "#0E1218",
+                  marginBottom: "6px",
+                }}
               >
                 {copy.headline}
               </h3>
               <p
                 id="payment-error-body"
-                className="text-sm text-[#9898B0] leading-relaxed"
+                style={{
+                  fontSize: "13px",
+                  color: "#5A6478",
+                  lineHeight: "1.6",
+                }}
               >
                 {copy.body}
               </p>
               {planName && (
-                <p className="mt-3 text-xs text-[#7C7C96]">
-                  Plan: <strong className="text-[#C0C0D0]">{planName}</strong>
+                <p style={{ marginTop: "12px", fontSize: "12px", color: "#9AA1B0" }}>
+                  Plan: <strong style={{ color: "#2A3142" }}>{planName}</strong>
                 </p>
               )}
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button
                 onClick={handlePrimary}
-                className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all flex items-center justify-center gap-2"
                 style={{
-                  background: `linear-gradient(135deg, ${colors.warning}, #FBBF24)`,
-                  boxShadow: `inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 18px ${colors.warning}59`,
+                  width: "100%",
+                  padding: "12px 0",
+                  borderRadius: "12px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#fff",
+                  background: "linear-gradient(135deg, #B8762D, #D89139)",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 4px 14px rgba(184,118,45,0.22)",
                 }}
               >
                 {copy.primaryAction === "refresh" ? (
@@ -251,7 +297,21 @@ export function PaymentErrorModal({
               <a
                 href={supportHref}
                 onClick={onClose}
-                className="w-full py-3 rounded-xl text-sm font-semibold text-[#9898B0] bg-[#16162A] hover:bg-[#1E1E34] border border-[rgba(255,255,255,0.06)] transition-colors flex items-center justify-center gap-2"
+                style={{
+                  width: "100%",
+                  padding: "12px 0",
+                  borderRadius: "12px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#5A6478",
+                  background: "#F6F4EE",
+                  border: "1px solid rgba(14,18,24,0.07)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  textDecoration: "none",
+                }}
               >
                 <Mail size={14} />
                 Contact support
@@ -259,7 +319,15 @@ export function PaymentErrorModal({
             </div>
 
             {errorCode && (
-              <p className="mt-4 text-center text-[10px] text-[#55556A] font-mono uppercase tracking-wider">
+              <p style={{
+                marginTop: "16px",
+                textAlign: "center",
+                fontSize: "10px",
+                color: "#B7BCC8",
+                fontFamily: "var(--font-jetbrains, monospace)",
+                textTransform: "uppercase",
+                letterSpacing: "0.12em",
+              }}>
                 ref: {errorCode}
               </p>
             )}
