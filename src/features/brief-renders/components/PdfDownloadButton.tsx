@@ -7,11 +7,12 @@
  *
  * `disabled` is honoured for the regen-induced re-compile window: when
  * the parent knows a regeneration is in flight, the link is suppressed
- * to keep the user from downloading a stale PDF whose hash no longer
- * matches the latest shots.
+ * to keep the user from downloading a stale PDF.
  */
 
 "use client";
+
+import s from "@/app/dashboard/brief-renders/page.module.css";
 
 export interface PdfDownloadButtonProps {
   pdfUrl: string | null;
@@ -32,7 +33,7 @@ export function PdfDownloadButton({
       <button
         type="button"
         disabled
-        className="bg-zinc-800 text-zinc-500 cursor-not-allowed px-4 py-2 rounded font-medium text-sm"
+        className={s.btnPdfDisabled}
         data-testid="pdf-download-disabled"
         aria-label="Download is unavailable while a regeneration is in flight"
       >
@@ -47,11 +48,24 @@ export function PdfDownloadButton({
       download={fileName}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded font-medium text-sm"
+      className={s.btnPdf}
       data-testid="pdf-download-button"
     >
-      <span aria-hidden>⬇</span>
-      Get PDF
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+      Get the PDF
     </a>
   );
 }

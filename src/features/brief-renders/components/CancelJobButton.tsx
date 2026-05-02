@@ -11,6 +11,8 @@
 
 import { useCallback, useState } from "react";
 
+import s from "@/app/dashboard/brief-renders/page.module.css";
+
 export interface CancelJobButtonProps {
   jobId: string;
   /** Disabled in terminal states (parent decides). */
@@ -26,7 +28,12 @@ export function CancelJobButton({
 
   const handleClick = useCallback(async () => {
     if (busy || disabled) return;
-    if (typeof window !== "undefined" && !window.confirm("Cancel this job? Already-generated shots will be kept but no new work will run.")) {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Cancel this job? Already-generated shots will be kept but no new work will run.",
+      )
+    ) {
       return;
     }
     setBusy(true);
@@ -48,25 +55,21 @@ export function CancelJobButton({
   }, [jobId, busy, disabled]);
 
   return (
-    <div className="flex items-center gap-3">
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <button
         type="button"
         onClick={handleClick}
         disabled={disabled || busy}
         data-testid="cancel-job-button"
-        className={[
-          "inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold",
-          "border border-red-700/60 bg-red-950/40 text-red-200",
-          "hover:bg-red-900/60 hover:text-red-100 hover:border-red-600",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
-          "transition-colors",
-        ].join(" ")}
+        className={s.btnCancel}
       >
-        <span aria-hidden>✕</span>
-        {busy ? "Cancelling…" : "Cancel job"}
+        ✕ {busy ? "Cancelling…" : "Cancel job"}
       </button>
       {error && (
-        <span role="alert" className="text-xs text-red-400">
+        <span
+          role="alert"
+          style={{ fontSize: 12, color: "#b44" }}
+        >
           {error}
         </span>
       )}

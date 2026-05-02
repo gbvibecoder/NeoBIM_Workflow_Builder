@@ -7,6 +7,7 @@
 
 "use client";
 
+import s from "@/app/dashboard/brief-renders/page.module.css";
 import type { BriefRenderJobView } from "@/features/brief-renders/hooks/useBriefRenderJob";
 
 export interface JobCancelledBannerProps {
@@ -20,18 +21,18 @@ export function JobCancelledBanner({ job, onDismiss }: JobCancelledBannerProps) 
   return (
     <div
       role="status"
-      className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 space-y-3"
+      className={s.cancelledBanner}
       data-testid="job-cancelled-banner"
     >
-      <div className="text-sm text-zinc-100 font-semibold">Job cancelled</div>
-      <div className="text-sm text-zinc-400">
+      <div className={s.cancelledBannerTitle}>Job cancelled</div>
+      <div className={s.cancelledBannerMsg}>
         You cancelled this job. Any partially generated images stay on file
         for 30 days, but no new work will run on it.
       </div>
       <button
         type="button"
         onClick={onDismiss}
-        className="text-xs underline text-zinc-300 hover:text-white"
+        className={s.cancelledBannerLink}
       >
         Start a new brief
       </button>

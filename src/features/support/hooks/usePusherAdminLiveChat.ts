@@ -18,18 +18,15 @@ export function usePusherAdminLiveChat() {
     const channel = pusher.subscribe("private-livechat-admin");
 
     channel.bind("pusher:subscription_succeeded", () => {
-      console.log("[admin-live-chat] subscribed to private-livechat-admin");
       store.fetchConversations();
     });
     channel.bind("pusher:subscription_error", (err: unknown) => {
       console.error("[admin-live-chat] subscription error:", err);
     });
     channel.bind("message:new", (data: unknown) => {
-      console.log("[admin-live-chat] message:new", data);
       store._receiveNewMessage(data as Parameters<typeof store._receiveNewMessage>[0]);
     });
     channel.bind("message:reply", (data: unknown) => {
-      console.log("[admin-live-chat] message:reply", data);
       store._receiveReply(data as Parameters<typeof store._receiveReply>[0]);
     });
     channel.bind("status:changed", store._receiveStatusChange);
