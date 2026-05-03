@@ -1,121 +1,136 @@
 /**
- * Regression test for Fix #2 — Geometry fallback in TR-007.
+ * Regression test for Fix #2 + Fix #2.1 — Geometry fallback in TR-007.
  *
  * When IFC elements have grossArea=0 and volume=0 (common with text-parser
- * fallback or IfcFacetedBrep geometry), TR-007 now estimates area/volume from
+ * fallback or IfcFacetedBrep geometry), TR-007 estimates area AND volume from
  * element type × count using standard Indian construction dimensions.
  *
- * Tests the exported estimateGeometryFromType() helper directly.
- * Full TR-007 handler integration is impractical to mock (requires web-ifc WASM).
+ * Fix #2.1 upgraded the fallback to dual-output: elements like walls now emit
+ * BOTH estArea (for plaster/paint/formwork) AND estVolume (for RCC/rebar),
+ * fixing the 45-qty bug where TR-008 saw zero volume for estimated walls.
  */
 import { describe, it, expect } from "vitest";
 import { estimateGeometryFromType } from "@/app/api/execute-node/handlers/tr-007";
 
-describe("Fix #2 — Geometry fallback from element type", () => {
-  // ── Case 1: Wall with zero area + zero volume + count=45 ──
-  it("Wall: 45 × 18m² = 810 m²", () => {
-    const result = estimateGeometryFromType("IfcWall", 45);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(810);
-    expect(result!.unit).toBe("m²");
+describe("Fix #2.1 — Dual-output geometry fallback", () => {
+  // ── 1. Wall: BOTH area and volume ──
+  it("Wall count=45 → primaryQty=810 m², estArea=810, estVolume=186.30", () => {
+    const r = estimateGeometryFromType("IfcWall", 45)!;
+    expect(r).not.toBeNull();
+    expect(r.primaryQty).toBe(810);
+    expect(r.unit).toBe("m²");
+    expect(r.estArea).toBe(810);
+    expect(r.estVolume).toBe(186.3);  // 45 × 4.14
   });
 
-  // ── Case 2: Slab with zero area + zero volume + count=10 ──
-  it("Slab: 10 × 36m² = 360 m²", () => {
-    const result = estimateGeometryFromType("IfcSlab", 10);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(360);
-    expect(result!.unit).toBe("m²");
+  // ── 2. Slab: BOTH area and volume ──
+  it("Slab count=10 → primaryQty=360 m², estArea=360, estVolume=54", () => {
+    const r = estimateGeometryFromType("IfcSlab", 10)!;
+    expect(r.primaryQty).toBe(360);
+    expect(r.unit).toBe("m²");
+    expect(r.estArea).toBe(360);
+    expect(r.estVolume).toBe(54);  // 10 × 5.4
   });
 
-  // ── Case 3: Column with zero area + zero volume + count=20 ──
-  it("Column: 20 × 0.48m³ = 9.6 m³", () => {
-    const result = estimateGeometryFromType("IfcColumn", 20);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(9.6);
-    expect(result!.unit).toBe("m³");
+  // ── 3. Column: BOTH area and volume ──
+  it("Column count=20 → primaryQty=9.6 m³, estArea=96, estVolume=9.6", () => {
+    const r = estimateGeometryFromType("IfcColumn", 20)!;
+    expect(r.primaryQty).toBe(9.6);
+    expect(r.unit).toBe("m³");
+    expect(r.estArea).toBe(96);     // 20 × 4.80
+    expect(r.estVolume).toBe(9.6);  // 20 × 0.48
   });
 
-  // ── Case 4: Door with zero area + count=29 → matches user's observed value ──
-  it("Door: 29 × 1.89m² = 54.81 m² (matches user's observed Excel value)", () => {
-    const result = estimateGeometryFromType("IfcDoor", 29);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(54.81);
-    expect(result!.unit).toBe("m²");
+  // ── 4. Beam: BOTH area and volume ──
+  it("Beam count=30 → primaryQty=20.25 m³, estArea=225, estVolume=20.25", () => {
+    const r = estimateGeometryFromType("IfcBeam", 30)!;
+    expect(r.primaryQty).toBe(20.25);
+    expect(r.unit).toBe("m³");
+    expect(r.estArea).toBe(225);      // 30 × 7.5
+    expect(r.estVolume).toBe(20.25);  // 30 × 0.675
   });
 
-  // ── Case 5: Wall with REAL area → fallback not called (handled by cascade) ──
-  // This tests that the function itself doesn't guard against real data —
-  // the cascade in TR-007 only calls estimateGeometryFromType when area=0 AND volume=0.
-  it("function returns estimate regardless (cascade guards the call)", () => {
-    // estimateGeometryFromType doesn't know about real area — it's the
-    // cascade that decides when to call it. This test just confirms the
-    // math for a wall with count=45 is always 810.
-    const result = estimateGeometryFromType("IfcWall", 45);
-    expect(result!.quantity).toBe(810);
+  // ── 5. Footing: volume only (underground, no plaster surface) ──
+  it("Footing count=12 → primaryQty=8.1 m³, estArea=undefined, estVolume=8.1", () => {
+    const r = estimateGeometryFromType("IfcFooting", 12)!;
+    expect(r.primaryQty).toBe(8.1);
+    expect(r.unit).toBe("m³");
+    expect(r.estArea).toBeUndefined();
+    expect(r.estVolume).toBe(8.1);  // 12 × 0.675
   });
 
-  // ── Case 6: IfcFlowTerminal → null (no fallback, count is correct unit) ──
-  it("IfcFlowTerminal: returns null (MEP terminals stay as EA count)", () => {
-    const result = estimateGeometryFromType("IfcFlowTerminal", 16);
-    expect(result).toBeNull();
+  // ── 6. Door: area only (no concrete volume) ──
+  it("Door count=29 → primaryQty=54.81 m², estArea=54.81, estVolume=undefined", () => {
+    const r = estimateGeometryFromType("IfcDoor", 29)!;
+    expect(r.primaryQty).toBe(54.81);
+    expect(r.unit).toBe("m²");
+    expect(r.estArea).toBe(54.81);
+    expect(r.estVolume).toBeUndefined();
   });
 
-  // ── Case 7: IfcBuildingElementProxy → null (no fallback) ──
-  it("IfcBuildingElementProxy: returns null (proxies stay as EA count)", () => {
-    const result = estimateGeometryFromType("IfcBuildingElementProxy", 3);
-    expect(result).toBeNull();
+  // ── 7. CurtainWall: area only ──
+  it("CurtainWall count=675 → primaryQty=3037.5 m², estArea=3037.5, estVolume=undefined", () => {
+    const r = estimateGeometryFromType("IfcCurtainWall", 675)!;
+    expect(r.primaryQty).toBe(3037.5);
+    expect(r.unit).toBe("m²");
+    expect(r.estArea).toBe(3037.5);
+    expect(r.estVolume).toBeUndefined();
   });
 
-  // ── Case 8: Unknown type → null ──
-  it("Unknown IFC type: returns null", () => {
-    const result = estimateGeometryFromType("IfcSpaceBoundary", 5);
-    expect(result).toBeNull();
+  // ── 8. IfcFlowTerminal: null (no fallback) ──
+  it("IfcFlowTerminal → null (stays as EA count)", () => {
+    expect(estimateGeometryFromType("IfcFlowTerminal", 16)).toBeNull();
   });
 
-  // ── Beam and Footing volume checks ──
-  it("Beam: 50 × 0.675m³ = 33.75 m³", () => {
-    const result = estimateGeometryFromType("IfcBeam", 50);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(33.75);
-    expect(result!.unit).toBe("m³");
+  // ── 9. IfcBuildingElementProxy: null ──
+  it("IfcBuildingElementProxy → null (stays as EA count)", () => {
+    expect(estimateGeometryFromType("IfcBuildingElementProxy", 3)).toBeNull();
   });
 
-  it("Footing: 75 × 0.675m³ = 50.63 m³", () => {
-    const result = estimateGeometryFromType("IfcFooting", 75);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(50.63);
-    expect(result!.unit).toBe("m³");
+  // ── 10. Unknown type: null ──
+  it("Unknown IFC type → null", () => {
+    expect(estimateGeometryFromType("IfcSpaceBoundary", 5)).toBeNull();
   });
 
-  // ── Stair and CurtainWall ──
-  it("StairFlight: 3 × 4.8m² = 14.4 m²", () => {
-    const result = estimateGeometryFromType("IfcStairFlight", 3);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(14.4);
-    expect(result!.unit).toBe("m²");
+  // ── Additional: StairFlight gets both ──
+  it("StairFlight count=3 → area=14.4, volume=2.16", () => {
+    const r = estimateGeometryFromType("IfcStairFlight", 3)!;
+    expect(r.primaryQty).toBe(14.4);
+    expect(r.unit).toBe("m²");
+    expect(r.estArea).toBe(14.4);
+    expect(r.estVolume).toBe(2.16);  // 3 × 0.72
   });
 
-  it("CurtainWall: 675 × 4.5m² = 3037.5 m²", () => {
-    const result = estimateGeometryFromType("IfcCurtainWall", 675);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(3037.5);
-    expect(result!.unit).toBe("m²");
+  // ── Window: area only ──
+  it("Window count=23 → 41.4 m², no volume", () => {
+    const r = estimateGeometryFromType("IfcWindow", 23)!;
+    expect(r.primaryQty).toBe(41.4);
+    expect(r.estArea).toBe(41.4);
+    expect(r.estVolume).toBeUndefined();
   });
 
-  // ── Window matches text-parser constant ──
-  it("Window: 23 × 1.8m² = 41.4 m² (matches user's observed value)", () => {
-    const result = estimateGeometryFromType("IfcWindow", 23);
-    expect(result).not.toBeNull();
-    expect(result!.quantity).toBe(41.4);
-    expect(result!.unit).toBe("m²");
+  // ── WallStandardCase same as IfcWall ──
+  it("WallStandardCase: same factors as IfcWall", () => {
+    const w = estimateGeometryFromType("IfcWall", 10)!;
+    const ws = estimateGeometryFromType("IfcWallStandardCase", 10)!;
+    expect(w.primaryQty).toBe(ws.primaryQty);
+    expect(w.estArea).toBe(ws.estArea);
+    expect(w.estVolume).toBe(ws.estVolume);
   });
 
-  // ── WallStandardCase uses same factor as IfcWall ──
-  it("WallStandardCase: same factor as IfcWall", () => {
-    const wall = estimateGeometryFromType("IfcWall", 10);
-    const wallStd = estimateGeometryFromType("IfcWallStandardCase", 10);
-    expect(wall!.quantity).toBe(wallStd!.quantity);
-    expect(wall!.unit).toBe(wallStd!.unit);
+  // ── Covering: area only, no volume ──
+  it("Covering count=86 → 86 m², no volume", () => {
+    const r = estimateGeometryFromType("IfcCovering", 86)!;
+    expect(r.primaryQty).toBe(86);
+    expect(r.unit).toBe("m²");
+    expect(r.estArea).toBe(86);
+    expect(r.estVolume).toBeUndefined();
+  });
+
+  // ── Roof: same factors as slab ──
+  it("Roof count=1 → area=36, volume=5.4", () => {
+    const r = estimateGeometryFromType("IfcRoof", 1)!;
+    expect(r.estArea).toBe(36);
+    expect(r.estVolume).toBe(5.4);
   });
 });

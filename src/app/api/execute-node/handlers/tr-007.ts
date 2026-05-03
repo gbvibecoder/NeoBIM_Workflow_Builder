@@ -11,30 +11,45 @@ import {
  * Type-aware geometric fallback for IFC elements with no extractable area/volume.
  * Standard Indian construction dimensions. Returns null for types where count
  * is the correct unit (IfcFlowTerminal, IfcBuildingElementProxy, etc.).
+ *
+ * Dual-output: many element types need BOTH area (for plaster/paint/formwork)
+ * AND volume (for RCC/rebar). The previous single-output version only emitted
+ * one, leaving TR-008 with zero for the other → broken derived quantities.
  */
-const GEOMETRY_FALLBACKS: Record<string, { factor: number; unit: string }> = {
-  IfcWall:              { factor: 18,    unit: "m²" },  // 3m height × 6m avg length
-  IfcWallStandardCase:  { factor: 18,    unit: "m²" },
-  IfcSlab:              { factor: 36,    unit: "m²" },  // 6m × 6m avg floor plate per element
-  IfcRoof:              { factor: 36,    unit: "m²" },
-  IfcColumn:            { factor: 0.48,  unit: "m³" },  // 0.4m × 0.4m × 3m
-  IfcBeam:              { factor: 0.675, unit: "m³" },  // 0.3m × 0.45m × 5m
-  IfcFooting:           { factor: 0.675, unit: "m³" },  // 1.5m × 1.5m × 0.3m
-  IfcStair:             { factor: 4.8,   unit: "m²" },  // 1.2m × 4m flight
-  IfcStairFlight:       { factor: 4.8,   unit: "m²" },
-  IfcCovering:          { factor: 1,     unit: "m²" },  // 1m × 1m default
-  IfcCurtainWall:       { factor: 4.5,   unit: "m²" },  // 1.5m × 3m panel
-  IfcDoor:              { factor: 1.89,  unit: "m²" },  // 0.9m × 2.1m standard
-  IfcWindow:            { factor: 1.8,   unit: "m²" },  // 1.5m × 1.2m standard
+interface GeometryFallback {
+  areaFactor?: number;    // m² per element (face/surface area)
+  volumeFactor?: number;  // m³ per element (concrete/material volume)
+  primaryUnit: "m²" | "m³";
+}
+
+const GEOMETRY_FALLBACKS: Record<string, GeometryFallback> = {
+  IfcWall:              { areaFactor: 18,   volumeFactor: 4.14,  primaryUnit: "m²" },  // 3m×6m face; 3×6×0.23m brick
+  IfcWallStandardCase:  { areaFactor: 18,   volumeFactor: 4.14,  primaryUnit: "m²" },
+  IfcSlab:              { areaFactor: 36,   volumeFactor: 5.4,   primaryUnit: "m²" },  // 6m×6m; ×0.15m thick
+  IfcRoof:              { areaFactor: 36,   volumeFactor: 5.4,   primaryUnit: "m²" },
+  IfcColumn:            { areaFactor: 4.8,  volumeFactor: 0.48,  primaryUnit: "m³" },  // 4×0.4×3m surface; 0.4²×3m vol
+  IfcBeam:              { areaFactor: 7.5,  volumeFactor: 0.675, primaryUnit: "m³" },  // 2(0.45×5)+0.3×5 surface; 0.3×0.45×5m
+  IfcFooting:           {                   volumeFactor: 0.675, primaryUnit: "m³" },  // underground, no plaster surface
+  IfcStair:             { areaFactor: 4.8,  volumeFactor: 0.72,  primaryUnit: "m²" },  // 1.2m×4m flight; ×0.15m avg
+  IfcStairFlight:       { areaFactor: 4.8,  volumeFactor: 0.72,  primaryUnit: "m²" },
+  IfcCovering:          { areaFactor: 1,                         primaryUnit: "m²" },  // finish layer, no volume
+  IfcCurtainWall:       { areaFactor: 4.5,                       primaryUnit: "m²" },  // glass/aluminum panel
+  IfcDoor:              { areaFactor: 1.89,                      primaryUnit: "m²" },  // 0.9m × 2.1m
+  IfcWindow:            { areaFactor: 1.8,                       primaryUnit: "m²" },  // 1.5m × 1.2m
 };
+
+const r2 = (v: number) => Math.round(v * 100) / 100;
 
 export function estimateGeometryFromType(
   elementType: string,
   count: number,
-): { quantity: number; unit: string } | null {
+): { primaryQty: number; unit: string; estArea?: number; estVolume?: number } | null {
   const fb = GEOMETRY_FALLBACKS[elementType];
   if (!fb) return null;
-  return { quantity: Math.round(count * fb.factor * 100) / 100, unit: fb.unit };
+  const estArea = fb.areaFactor ? r2(count * fb.areaFactor) : undefined;
+  const estVolume = fb.volumeFactor ? r2(count * fb.volumeFactor) : undefined;
+  const primaryQty = fb.primaryUnit === "m²" ? (estArea ?? estVolume!) : (estVolume ?? estArea!);
+  return { primaryQty, unit: fb.primaryUnit, estArea, estVolume };
 }
 
 /**
@@ -238,13 +253,13 @@ export const handleTR007: NodeHandler = async (ctx) => {
         } else {
           const fb = estimateGeometryFromType(agg.elementType, agg.count);
           if (fb) {
-            primaryQty = fb.quantity; unit = fb.unit; estimatedFromCount = true;
+            primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
           } else {
             primaryQty = agg.count; unit = "EA";
           }
         }
-        const estArea = estimatedFromCount && unit === "m²" ? primaryQty : undefined;
-        const estVolume = estimatedFromCount && unit === "m³" ? primaryQty : undefined;
+        const estArea = estimatedFromCount ? estimateGeometryFromType(agg.elementType, agg.count)?.estArea : undefined;
+        const estVolume = estimatedFromCount ? estimateGeometryFromType(agg.elementType, agg.count)?.estVolume : undefined;
         rows.push([agg.divisionName, description, (agg.grossArea || estArea || 0).toFixed(2), agg.openingArea.toFixed(2), agg.netArea.toFixed(2), (agg.volume || estVolume || 0).toFixed(2), primaryQty.toFixed(2), unit]);
         elements.push({
           description, category: agg.divisionName, quantity: primaryQty, unit,
@@ -389,15 +404,15 @@ export const handleTR007: NodeHandler = async (ctx) => {
         } else {
           const fb = estimateGeometryFromType(agg.elementType, agg.count);
           if (fb) {
-            primaryQty = fb.quantity; unit = fb.unit; estimatedFromCount = true;
+            primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
           } else {
             primaryQty = agg.count;
             unit = "EA";
           }
         }
 
-        const estArea = estimatedFromCount && unit === "m²" ? primaryQty : undefined;
-        const estVolume = estimatedFromCount && unit === "m³" ? primaryQty : undefined;
+        const estArea = estimatedFromCount ? estimateGeometryFromType(agg.elementType, agg.count)?.estArea : undefined;
+        const estVolume = estimatedFromCount ? estimateGeometryFromType(agg.elementType, agg.count)?.estVolume : undefined;
 
         rows.push([
           agg.divisionName, description,
