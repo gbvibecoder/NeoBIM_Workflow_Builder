@@ -32,10 +32,7 @@ export {
 } from "@/lib/workflow-logger";
 export { uploadBase64ToR2 } from "@/lib/r2";
 export {
-  findUnitRate,
-  applyRegionalFactor,
   calculateTotalCost,
-  calculateLineItemCost,
   calculateEscalation,
   detectProjectType,
   COST_DISCLAIMERS,

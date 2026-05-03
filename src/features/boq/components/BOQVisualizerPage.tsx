@@ -327,6 +327,8 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
             benchmarkHigh={data.benchmark.benchmarkHigh}
             recalculated={recalculated}
             costRange={data.costRange}
+            projectDate={(data as unknown as Record<string, unknown>)._projectDate as string | undefined}
+            stalenessWarning={(data as unknown as Record<string, unknown>)._stalenessWarning as { severity: string; years: number; message: string } | undefined}
           />
         </ErrorBoundary>
 

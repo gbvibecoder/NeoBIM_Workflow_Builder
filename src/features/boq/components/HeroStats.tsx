@@ -16,6 +16,8 @@ interface HeroStatsProps {
   benchmarkHigh: number;
   recalculated: boolean;
   costRange?: { totalLow: number; totalHigh: number; uncertaintyPercent: number };
+  projectDate?: string;
+  stalenessWarning?: { severity: string; years: number; message: string };
 }
 
 function getCostPerM2Color(value: number, low: number, high: number): string {
@@ -169,6 +171,7 @@ const cardVariants = {
 export function HeroStats({
   totalCost, costPerM2, hardCosts, ifcQualityScore,
   benchmarkLow, benchmarkHigh, recalculated, costRange,
+  projectDate, stalenessWarning,
 }: HeroStatsProps) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-30px" });
@@ -178,6 +181,34 @@ export function HeroStats({
 
   return (
     <div ref={ref} className="px-6">
+      {/* Project date + escalation banner */}
+      {projectDate && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: stalenessWarning?.severity === "critical" ? "rgba(220,38,38,0.06)" : stalenessWarning?.severity === "warning" ? "rgba(217,119,6,0.06)" : "rgba(13,148,136,0.04)",
+            borderLeft: `3px solid ${stalenessWarning?.severity === "critical" ? "#DC2626" : stalenessWarning?.severity === "warning" ? "#D97706" : "#0D9488"}`,
+            fontSize: 12,
+            color: "#374151",
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>
+            Estimate for construction starting {new Date(projectDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+          </span>
+          {stalenessWarning && (
+            <span style={{ display: "block", marginTop: 3, fontSize: 11, color: stalenessWarning.severity === "critical" ? "#991B1B" : "#92400E" }}>
+              {stalenessWarning.message}
+            </span>
+          )}
+          {!stalenessWarning && (
+            <span style={{ display: "block", marginTop: 3, fontSize: 11, color: "#6B7280" }}>
+              Rate library: CPWD DSR 2025-26 (baseline April 2026)
+            </span>
+          )}
+        </div>
+      )}
       {/* Row 1: Total Cost — big hero card */}
       <motion.div
         variants={cardVariants} custom={0}

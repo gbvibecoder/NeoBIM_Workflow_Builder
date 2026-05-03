@@ -316,9 +316,13 @@ async function executeNode(
 
     let res: Response;
     try {
-      const inputData = {
+      // Import workflow store to read project date for BOQ escalation
+      const { projectDate } = (await import("@/features/workflows/stores/workflow-store")).useWorkflowStore.getState();
+
+      const inputData: Record<string, unknown> = {
         ...(previousArtifact?.data as Record<string, unknown> ?? { prompt: inputValue ?? "" }),
         ...nodeConfig,
+        _projectDate: projectDate,
       };
 
       // Apply user quantity overrides from TR-007 → TR-008 flow

@@ -55,6 +55,10 @@ interface WorkflowState {
   // Creation mode
   creationMode: CreationMode;
 
+  // Project date for BOQ cost escalation (ISO YYYY-MM-DD)
+  projectDate: string;
+  setProjectDate: (date: string) => void;
+
   // Actions
   setCurrentWorkflow: (workflow: Workflow | null) => void;
   loadFromTemplate: (template: WorkflowTemplate) => void;
@@ -108,6 +112,14 @@ export const useWorkflowStore = create<WorkflowState>()(
     isSaveModalOpen: false,
     pendingSaveName: "",
     creationMode: "manual",
+
+    // Project date for BOQ escalation: default = today + 6 months
+    projectDate: (() => {
+      const d = new Date();
+      d.setMonth(d.getMonth() + 6);
+      return d.toISOString().split("T")[0];
+    })(),
+    setProjectDate: (date: string) => set({ projectDate: date, isDirty: true }),
 
     // Undo/Redo
     _history: [],
@@ -441,6 +453,7 @@ export const useWorkflowStore = create<WorkflowState>()(
         nodes: state.nodes,
         edges: state.edges,
         creationMode: state.creationMode,
+        projectDate: state.projectDate,
       }),
     }
   )

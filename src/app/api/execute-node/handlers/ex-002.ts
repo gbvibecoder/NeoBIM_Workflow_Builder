@@ -717,7 +717,11 @@ export const handleEX002: NodeHandler = async (ctx) => {
     [""],
     ["Estimate Class:", `AACE ${String(inputData?._aaceClass ?? "Class 4")} (${String(inputData?._aaceAccuracy ?? "±25-30%")})`],
     ["Confidence:", String(pricingInfo?.confidence ?? "MEDIUM")],
-    isINR ? ["Rate Basis:", `IS 1200 / CPWD DSR 2023-24 + ${pricingInfo?.statePWD ?? "State"} PWD SOR + AI market intelligence`] : ["Rate Basis:", "CSI MasterFormat + regional factors"],
+    isINR ? ["Rate Basis:", `IS 1200 / CPWD DSR 2025-26 + ${pricingInfo?.statePWD ?? "State"} PWD SOR + AI market intelligence`] : ["Rate Basis:", "IS 1200 / CPWD DSR 2025-26"],
+    ...((inputData as Record<string, unknown>)?._projectDate ? [["Project Date:", String((inputData as Record<string, unknown>)._projectDate)]] : []) as string[][],
+    ...((inputData as Record<string, unknown>)?._stalenessWarning ? [
+      ["Rate Escalation:", `${String(((inputData as Record<string, unknown>)._stalenessWarning as Record<string, unknown>)?.years ?? "")} years from baseline — ${String(((inputData as Record<string, unknown>)._stalenessWarning as Record<string, unknown>)?.severity ?? "ok")}`],
+    ] : []) as string[][],
     [""],
     ["Total Cost:", `${currencySymbol}${Math.round(Number(inputData?._totalCost ?? 0) || (boqData?.grandTotal ?? 0)).toLocaleString()} ${currencyCode}`],
     ["Cost/m² GFA:", `${currencySymbol}${Math.round((Number(inputData?._totalCost ?? 0) || hardTotal) / Math.max(1, Number(inputData?._gfa ?? 100))).toLocaleString()}`],

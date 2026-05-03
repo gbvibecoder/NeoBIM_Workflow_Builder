@@ -235,7 +235,7 @@ export function estimateMEPCosts(
     : cityTier === "tier-2" ? 1.00
     : 0.85; // tier-3 and below
 
-  const fx = isINR ? 1 : 1 / 83.5;
+  const fx = 1; // Indian-only product — always INR
   const sums: ProvisionalSum[] = [];
 
   // Plumbing
@@ -420,12 +420,23 @@ export function validateBenchmark(
   cityTier: string,
   /** Dynamic benchmark from market agent — overrides static ranges when present */
   dynamicBenchmark?: { rangeLow?: number; rangeHigh?: number; minFloor?: number },
+  /** Project construction date — used to escalate benchmark ranges from their baseline */
+  projectDate?: Date,
 ): BenchmarkResult {
   const costPerM2 = totalGFA > 0 ? totalProjectCost / totalGFA : 0;
   const btLower = buildingType.toLowerCase();
 
+  // Escalate benchmark ranges from their baseline (2024-06) to the project date
+  let benchEscFactor = 1;
+  if (projectDate) {
+    try {
+      const { getEscalationFactor, BENCHMARK_BASELINE } = require("@/features/boq/lib/dated-rate");
+      benchEscFactor = getEscalationFactor("construction-cpi-india", BENCHMARK_BASELINE, projectDate);
+    } catch { /* Non-fatal: if module unavailable, use raw ranges */ }
+  }
+
   // Find matching benchmark range
-  const range = BENCHMARK_RANGES[btLower]
+  const rawRange = BENCHMARK_RANGES[btLower]
     ?? (btLower.includes("wellness") || btLower.includes("spa") ? BENCHMARK_RANGES["wellness"]
     : btLower.includes("hospital") || btLower.includes("clinic") ? BENCHMARK_RANGES["healthcare"]
     : btLower.includes("hotel") || btLower.includes("resort") ? BENCHMARK_RANGES["hospitality"]
@@ -435,10 +446,12 @@ export function validateBenchmark(
     : btLower.includes("lab") ? BENCHMARK_RANGES["laboratory"]
     : btLower.includes("retail") || btLower.includes("mall") ? BENCHMARK_RANGES["retail"]
     : BENCHMARK_RANGES["commercial"]); // default
+  const range = { low: Math.round(rawRange.low * benchEscFactor), high: Math.round(rawRange.high * benchEscFactor) };
 
   const cityFactor = BENCHMARK_CITY_FACTORS[cityTier] ?? 1.0;
   // Apply city factor but enforce minimum floor — no building type can go below its floor
-  const staticMinFloor = MINIMUM_COST_FLOORS[btLower] ?? MINIMUM_COST_FLOORS["commercial"] ?? 22000;
+  const rawStaticMinFloor = MINIMUM_COST_FLOORS[btLower] ?? MINIMUM_COST_FLOORS["commercial"] ?? 22000;
+  const staticMinFloor = Math.round(rawStaticMinFloor * benchEscFactor);
   const minFloor = (dynamicBenchmark?.minFloor && dynamicBenchmark.minFloor > 10000) ? dynamicBenchmark.minFloor : staticMinFloor;
 
   // FIX 7: Use dynamic benchmark from market agent when available, else static ranges
@@ -546,7 +559,7 @@ export function estimateFoundationCosts(
     }
   }
 
-  const fx = isINR ? 1 : 1 / 83.5;
+  const fx = 1; // Indian-only product — always INR
   const soilNote = soilType ? ` [soil: ${soilType.replace("_", " ")}]` : "";
 
   return [
@@ -592,7 +605,7 @@ export function estimateExternalWorksCosts(
   const openArea = plotArea - footprint;
   const perimeter = Math.sqrt(plotArea) * 4; // rough square plot
   const tierMult = cityTier === "metro" ? 1.15 : cityTier === "tier-2" ? 0.95 : 0.80;
-  const fx = isINR ? 1 : 1 / 83.5;
+  const fx = 1; // Indian-only product — always INR
 
   return [
     {

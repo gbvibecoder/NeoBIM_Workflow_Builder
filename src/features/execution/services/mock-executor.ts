@@ -6,7 +6,19 @@
 import type { ExecutionArtifact, ArtifactType } from "@/types/execution";
 import type { FloorPlanGeometry, FloorPlanRoom } from "@/features/floor-plan/types/floor-plan";
 import { generateId } from "@/lib/utils";
-import { calculateBOQ } from "@/features/boq/constants/unit-rates";
+// calculateBOQ was removed with the USD rate library (Phase B — Indian-only product).
+// Mock BOQ uses a simple inline stub instead.
+const calculateBOQ = (elements: Array<Record<string, unknown>>) => ({
+  lines: elements.map((e, i) => ({
+    division: "03", csiCode: `03-${i}`, description: String(e.type ?? "Element"),
+    unit: "m²", quantity: Number(e.area ?? e.grossArea ?? e.volume ?? 100),
+    materialCost: 50000, laborCost: 25000, equipmentCost: 5000, totalCost: 80000,
+  })),
+  subtotalMaterial: elements.length * 50000,
+  subtotalLabor: elements.length * 25000,
+  subtotalEquipment: elements.length * 5000,
+  grandTotal: elements.length * 80000,
+});
 import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
 
 const ARCHITECTURAL_IMAGES = [

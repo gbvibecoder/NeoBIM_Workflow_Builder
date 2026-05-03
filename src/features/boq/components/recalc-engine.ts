@@ -3,23 +3,28 @@
 
 import type { BOQLineItem, PriceOverrides, RateOverride } from "@/features/boq/components/types";
 
-// Default base prices (used to compute deltas)
+// Default base prices — CPWD DSR 2025-26 baseline (April 2026).
+// These are used as starting positions for the client-side price sliders.
+// Baseline date: 2026-04-01. When the project date is far ahead,
+// the BOQ visualizer should derive defaults from the TR-008 artifact
+// (which includes escalated market rates). These are fallbacks only.
 export const DEFAULT_PRICES: PriceOverrides = {
-  steel: 72000, // ₹/tonne
-  cement: 390,  // ₹/bag
-  mason: 800,   // ₹/day
-  bricks: 8,    // ₹/nos
-  sand: 80,     // ₹/cft
-  timber: 1200, // ₹/m²
+  steel: 72000, // ₹/tonne — baseline 2025 market avg
+  cement: 390,  // ₹/bag — baseline 2025 market avg
+  mason: 800,   // ₹/day — baseline CPWD DSR 2025-26
+  bricks: 8,    // ₹/nos — baseline 2025 market avg
+  sand: 80,     // ₹/cft — baseline 2025 market avg
+  timber: 1200, // ₹/m² — baseline 2025 market avg
 };
 
+// Slider ranges — widened to accommodate 4-year escalation (×1.3 max)
 export const PRICE_RANGES = {
-  steel:  { min: 50000, max: 80000, step: 500,  unit: "₹/tonne" },
-  cement: { min: 300,   max: 550,   step: 5,    unit: "₹/bag" },
-  mason:  { min: 400,   max: 1400,  step: 25,   unit: "₹/day" },
-  bricks: { min: 5,     max: 15,    step: 0.5,  unit: "₹/nos" },
-  sand:   { min: 40,    max: 150,   step: 5,    unit: "₹/cft" },
-  timber: { min: 800,   max: 2000,  step: 50,   unit: "₹/m²" },
+  steel:  { min: 50000, max: 120000, step: 500,  unit: "₹/tonne" },
+  cement: { min: 300,   max: 700,    step: 5,    unit: "₹/bag" },
+  mason:  { min: 400,   max: 2000,   step: 25,   unit: "₹/day" },
+  bricks: { min: 5,     max: 20,     step: 0.5,  unit: "₹/nos" },
+  sand:   { min: 40,    max: 200,    step: 5,    unit: "₹/cft" },
+  timber: { min: 800,   max: 2500,   step: 50,   unit: "₹/m²" },
 } as const;
 
 // ─── Sensitivity Computation ────────────────────────────────────────────────
