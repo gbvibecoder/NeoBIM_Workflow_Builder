@@ -4,13 +4,14 @@ import { AlertTriangle } from "lucide-react";
 
 interface ModelCompletenessWarningProps {
   elementCoverage: number; // 0-100 — % of elements with extractable geometry
+  estimatedFromCount?: number; // how many element groups used geometry fallback
 }
 
 /**
  * Shows a warning banner when IFC model completeness is below 30%.
  * Different from staleness warning (different cause: model quality, not rate age).
  */
-export function ModelCompletenessWarning({ elementCoverage }: ModelCompletenessWarningProps) {
+export function ModelCompletenessWarning({ elementCoverage, estimatedFromCount }: ModelCompletenessWarningProps) {
   if (elementCoverage >= 30) return null;
 
   return (
@@ -40,8 +41,13 @@ export function ModelCompletenessWarning({ elementCoverage }: ModelCompletenessW
       </div>
       <p style={{ fontSize: 12, color: "#78350F", lineHeight: 1.6, margin: 0 }}>
         Most elements in this IFC model lack extractable geometry data. Walls, slabs, and columns
-        were estimated from element counts using standard Indian construction dimensions. For a more
-        accurate estimate, upload an IFC with full geometric quantities (BaseQuantities / Qto_*).
+        were estimated from element counts using standard Indian construction dimensions.
+        {estimatedFromCount && estimatedFromCount > 0 && (
+          <span style={{ display: "block", marginTop: 4, fontStyle: "italic" }}>
+            {estimatedFromCount} element groups used standard-dimension fallback (Wall: 18m²/element, Slab: 36m²/element, Column: 0.48m³/element).
+          </span>
+        )}
+        For a more accurate estimate, upload an IFC with full geometric quantities (BaseQuantities / Qto_*).
       </p>
     </div>
   );
