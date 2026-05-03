@@ -308,6 +308,64 @@ export const handleTR008: NodeHandler = async (ctx) => {
     return cached;
   }
 
+  // ── Auto-fire TR-015 (Market Intelligence) if not provided upstream ──
+  // Phase C: live market data is primary, escalated static is secondary.
+  let marketDataConfidence: "live" | "cached" | "escalated" | "static" = "static";
+  let marketDataSource: "ai-search" | "redis" | "postgres" | "fallback" = "fallback";
+  let marketDataAgeDays = 0;
+  let marketDataStrikes = 0;
+
+  if (!inputData._marketData && isIndianProject) {
+    const miCity = locationData?.city ?? "";
+    const miState = locationData?.state ?? "";
+    try {
+      const { getStrikeCount, isBlocked: isStrikeBlocked, recordStrike, clearStrikes } = await import("@/features/boq/services/market-intelligence-strike");
+      marketDataStrikes = await getStrikeCount(ctx.userId, miCity);
+
+      if (!isStrikeBlocked(marketDataStrikes)) {
+        const { fetchMarketPrices } = await import("@/features/boq/services/market-intelligence");
+        const marketResult = await fetchMarketPrices(miCity || "national-baseline", miState, buildingDescription, diag);
+        inputData._marketData = marketResult;
+
+        if (marketResult.agent_status === "success" && marketResult.search_count > 0) {
+          marketDataConfidence = "live";
+          marketDataSource = "ai-search";
+          await clearStrikes(ctx.userId, miCity);
+        } else if (marketResult.agent_status === "success" && marketResult.search_count === 0) {
+          marketDataConfidence = "cached";
+          marketDataSource = "redis";
+        } else if (marketResult.agent_status === "partial") {
+          marketDataConfidence = "cached";
+          marketDataSource = "postgres";
+        } else {
+          marketDataConfidence = "static";
+          marketDataSource = "fallback";
+          const strike = await recordStrike(ctx.userId, miCity);
+          marketDataStrikes = strike.count;
+        }
+
+        if (marketResult.fetched_at) {
+          marketDataAgeDays = Math.round((Date.now() - new Date(marketResult.fetched_at).getTime()) / 86400000);
+        }
+
+        addLog(diag, "tr-008-cost", "info", `Auto-fired TR-015: ${marketDataConfidence} (${marketDataSource}, ${marketDataAgeDays}d old, strikes: ${marketDataStrikes})`, {});
+      } else {
+        addLog(diag, "tr-008-cost", "warn", `TR-015 blocked: ${marketDataStrikes} strikes in last hour — using static rates`, {});
+      }
+    } catch (autoFireErr) {
+      addLog(diag, "tr-008-cost", "error", `Auto-fire failed: ${autoFireErr instanceof Error ? autoFireErr.message : String(autoFireErr)}`, {});
+      try {
+        const { recordStrike } = await import("@/features/boq/services/market-intelligence-strike");
+        const strike = await recordStrike(ctx.userId, locationData?.city ?? "");
+        marketDataStrikes = strike.count;
+      } catch { /* non-fatal */ }
+    }
+  } else if (inputData._marketData) {
+    marketDataConfidence = "live";
+    marketDataSource = "ai-search";
+    addLog(diag, "tr-008-cost", "info", "Market data provided by upstream TR-015 node", {});
+  }
+
   // Expand elements with material layers into separate line items per layer
   const expandedElements: typeof elements = [];
   for (const elem of elements) {
@@ -1546,11 +1604,13 @@ export const handleTR008: NodeHandler = async (ctx) => {
   // ── Rate staleness check ──
   const staleness = getStalenessLevel(IS1200_BASELINE, projectDate);
   if (staleness.severity === "critical") {
-    // Downgrade AACE class for expired rates
     aaceInfo.class = "Class 5";
     aaceInfo.accuracy = "±40-60%";
     aaceInfo.confidence = "LOW";
   }
+
+  // ── Hard-stop check: rates expired AND no live data ──
+  const hardStop = staleness.severity === "critical" && marketDataConfidence === "static" && marketDataStrikes >= 3;
 
   finalizeDiagnostics(diag);
 
@@ -1586,6 +1646,11 @@ export const handleTR008: NodeHandler = async (ctx) => {
       _aaceAccuracy: aaceInfo.accuracy,
       _projectDate: projectDate.toISOString().split("T")[0],
       ...(staleness.severity !== "ok" && { _stalenessWarning: { severity: staleness.severity, years: staleness.years, message: staleness.message } }),
+      _marketDataConfidence: marketDataConfidence,
+      _marketDataSource: marketDataSource,
+      _marketDataAgeDays: marketDataAgeDays,
+      _marketDataStrikes: marketDataStrikes,
+      ...(hardStop && { _hardStop: true, _hardStopReason: staleness.severity === "critical" ? "Rate library baseline expired (>4 years) and live market data unavailable" : "Live market data unavailable for 3 consecutive attempts" }),
       content: nlSummaryWithDiag,
       _pricingMetadata: pricingMetadata,
       _modelQualityReport: modelQualityReport,

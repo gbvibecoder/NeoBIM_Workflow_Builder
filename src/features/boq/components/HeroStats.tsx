@@ -18,7 +18,15 @@ interface HeroStatsProps {
   costRange?: { totalLow: number; totalHigh: number; uncertaintyPercent: number };
   projectDate?: string;
   stalenessWarning?: { severity: string; years: number; message: string };
+  marketDataConfidence?: "live" | "cached" | "escalated" | "static";
 }
+
+const CONFIDENCE_BADGE: Record<string, { label: string; color: string; bg: string; tooltip: string }> = {
+  live:      { label: "LIVE",      color: "#059669", bg: "rgba(5,150,105,0.08)",  tooltip: "Market prices from AI web search — freshest available" },
+  cached:    { label: "CACHED",    color: "#D97706", bg: "rgba(217,119,6,0.08)",  tooltip: "Recent market prices from cache (≤7 days old)" },
+  escalated: { label: "ESCALATED", color: "#EA580C", bg: "rgba(234,88,12,0.08)",  tooltip: "Baseline rates escalated by inflation curves — no live market data" },
+  static:    { label: "STATIC",    color: "#DC2626", bg: "rgba(220,38,38,0.08)",  tooltip: "Using CPWD DSR baseline rates — live market data unavailable" },
+};
 
 function getCostPerM2Color(value: number, low: number, high: number): string {
   if (low === 0 && high === 0) return "#1A1A1A";
@@ -171,7 +179,7 @@ const cardVariants = {
 export function HeroStats({
   totalCost, costPerM2, hardCosts, ifcQualityScore,
   benchmarkLow, benchmarkHigh, recalculated, costRange,
-  projectDate, stalenessWarning,
+  projectDate, stalenessWarning, marketDataConfidence,
 }: HeroStatsProps) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-30px" });
@@ -194,8 +202,27 @@ export function HeroStats({
             color: "#374151",
           }}
         >
-          <span style={{ fontWeight: 600 }}>
-            Estimate for construction starting {new Date(projectDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+          <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 600 }}>
+              Estimate for construction starting {new Date(projectDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+            {marketDataConfidence && (() => {
+              const badge = CONFIDENCE_BADGE[marketDataConfidence] ?? CONFIDENCE_BADGE.static;
+              return (
+                <span
+                  title={badge.tooltip}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "2px 8px", borderRadius: 9999,
+                    fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                    color: badge.color, background: badge.bg,
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: badge.color }} />
+                  {badge.label}
+                </span>
+              );
+            })()}
           </span>
           {stalenessWarning && (
             <span style={{ display: "block", marginTop: 3, fontSize: 11, color: stalenessWarning.severity === "critical" ? "#991B1B" : "#92400E" }}>

@@ -722,6 +722,9 @@ export const handleEX002: NodeHandler = async (ctx) => {
     ...((inputData as Record<string, unknown>)?._stalenessWarning ? [
       ["Rate Escalation:", `${String(((inputData as Record<string, unknown>)._stalenessWarning as Record<string, unknown>)?.years ?? "")} years from baseline — ${String(((inputData as Record<string, unknown>)._stalenessWarning as Record<string, unknown>)?.severity ?? "ok")}`],
     ] : []) as string[][],
+    ...((inputData as Record<string, unknown>)?._marketDataConfidence ? [
+      ["Market Data:", `${String((inputData as Record<string, unknown>)._marketDataConfidence).toUpperCase()} (source: ${String((inputData as Record<string, unknown>)._marketDataSource ?? "N/A")}, age: ${String((inputData as Record<string, unknown>)._marketDataAgeDays ?? "N/A")}d)`],
+    ] : []) as string[][],
     [""],
     ["Total Cost:", `${currencySymbol}${Math.round(Number(inputData?._totalCost ?? 0) || (boqData?.grandTotal ?? 0)).toLocaleString()} ${currencyCode}`],
     ["Cost/m² GFA:", `${currencySymbol}${Math.round((Number(inputData?._totalCost ?? 0) || hardTotal) / Math.max(1, Number(inputData?._gfa ?? 100))).toLocaleString()}`],
