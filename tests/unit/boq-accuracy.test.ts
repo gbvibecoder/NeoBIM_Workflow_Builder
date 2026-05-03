@@ -330,15 +330,9 @@ describe("Location Resolution", () => {
     expect(loc.cityTier).toBe("metro");
   });
 
-  it("USA resolves with USD currency", () => {
-    const loc = resolveProjectLocation("USA", "California", "San Francisco");
-    expect(loc.currency).toBe("USD");
-    expect(loc.cityTier).toBe("metro");
-  });
-
-  it("India factor < USA factor (lower construction costs)", () => {
-    const india = resolveProjectLocation("India", "Maharashtra", "Mumbai");
-    const usa = resolveProjectLocation("USA", "California", "San Francisco");
-    expect(india.countryFactor).toBeLessThan(usa.countryFactor);
+  it("India resolves with INR currency (Indian-only product)", () => {
+    const loc = resolveProjectLocation("India", "Maharashtra", "Mumbai");
+    expect(loc.currency).toBe("INR");
+    expect(loc.countryFactor).toBe(1.0);
   });
 });

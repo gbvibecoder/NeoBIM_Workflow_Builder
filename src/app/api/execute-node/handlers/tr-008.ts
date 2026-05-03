@@ -924,7 +924,12 @@ export const handleTR008: NodeHandler = async (ctx) => {
     const el = e as Record<string, unknown>;
     return sum + (String(el.description ?? "").toLowerCase().includes("slab") ? Number(el.grossArea ?? 0) : 0);
   }, 0) || 500;
-  const floorCountForProv = new Set(elements.map((e: unknown) => (e as Record<string, unknown>).storey).filter(Boolean)).size || 1;
+  // Filter non-occupied storeys (basement, roof, mechanical) before counting for foundation type
+  const NON_OCCUPIED_STOREY = /^-\d|\b(found|footing|basement|roof|terrace|mechan|service|plant)/i;
+  const occupiedStoreys = new Set(
+    elements.map((e: unknown) => (e as Record<string, unknown>).storey as string).filter((s: string) => s && !NON_OCCUPIED_STOREY.test(s))
+  );
+  const floorCountForProv = occupiedStoreys.size || 1;
   const cityTierForProv = indianPricing?.cityTier ?? "city";
   const hasStructuralFoundation = !!(inputData?._hasStructuralFoundation);
   const hasMEPData = !!(inputData?._hasMEPData);
