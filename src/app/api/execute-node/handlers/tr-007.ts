@@ -242,24 +242,32 @@ export const handleTR007: NodeHandler = async (ctx) => {
         let primaryQty: number;
         let unit: string;
         let estimatedFromCount = false;
+
+        // Sparse-geometry sanity check: if extracted area/volume per element is
+        // unreasonably small (< 20% of fallback estimate), the geometry is likely
+        // partial — only a few elements had extractable geometry while most didn't.
+        // In this case, use the fallback estimate for the FULL count instead of
+        // the tiny extracted total. This is the root cause of the "qty=45" bug.
+        const fb = GEOMETRY_FALLBACKS[agg.elementType] ? estimateGeometryFromType(agg.elementType, agg.count) : null;
+        const areaIsSparse = fb?.estArea && agg.grossArea > 0 && agg.count > 1 && (agg.grossArea / agg.count) < (fb.estArea / agg.count * 0.2);
+        const volumeIsSparse = fb?.estVolume && agg.volume > 0 && agg.count > 1 && (agg.volume / agg.count) < (fb.estVolume / agg.count * 0.2);
+        const useGeometryFallback = (agg.grossArea === 0 && agg.volume === 0) || (areaIsSparse && volumeIsSparse);
+
         if (LINEAR_TYPES_P.has(agg.elementType) && agg.length > 0.5) {
           primaryQty = agg.length; unit = "Rmt";
         } else if (LINEAR_TYPES_P.has(agg.elementType) && agg.count > 0) {
           primaryQty = agg.count * (agg.elementType === "IfcRailing" ? 3.0 : 4.0); unit = "Rmt";
-        } else if (agg.grossArea > 0) {
+        } else if (!useGeometryFallback && agg.grossArea > 0) {
           primaryQty = agg.grossArea; unit = "m²";
-        } else if (agg.volume > 0) {
+        } else if (!useGeometryFallback && agg.volume > 0) {
           primaryQty = agg.volume; unit = "m³";
+        } else if (fb) {
+          primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
         } else {
-          const fb = estimateGeometryFromType(agg.elementType, agg.count);
-          if (fb) {
-            primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
-          } else {
-            primaryQty = agg.count; unit = "EA";
-          }
+          primaryQty = agg.count; unit = "EA";
         }
-        const estArea = estimatedFromCount ? estimateGeometryFromType(agg.elementType, agg.count)?.estArea : undefined;
-        const estVolume = estimatedFromCount ? estimateGeometryFromType(agg.elementType, agg.count)?.estVolume : undefined;
+        const estArea = estimatedFromCount ? fb?.estArea : undefined;
+        const estVolume = estimatedFromCount ? fb?.estVolume : undefined;
         rows.push([agg.divisionName, description, (agg.grossArea || estArea || 0).toFixed(2), agg.openingArea.toFixed(2), agg.netArea.toFixed(2), (agg.volume || estVolume || 0).toFixed(2), primaryQty.toFixed(2), unit]);
         elements.push({
           description, category: agg.divisionName, quantity: primaryQty, unit,
@@ -388,31 +396,34 @@ export const handleTR007: NodeHandler = async (ctx) => {
         let primaryQty: number;
         let unit: string;
         let estimatedFromCount = false;
+
+        // Sparse-geometry sanity check (same as Mode 1 — see comment there)
+        const fb = GEOMETRY_FALLBACKS[agg.elementType] ? estimateGeometryFromType(agg.elementType, agg.count) : null;
+        const areaIsSparse = fb?.estArea && agg.grossArea > 0 && agg.count > 1 && (agg.grossArea / agg.count) < (fb.estArea / agg.count * 0.2);
+        const volumeIsSparse = fb?.estVolume && agg.volume > 0 && agg.count > 1 && (agg.volume / agg.count) < (fb.estVolume / agg.count * 0.2);
+        const useGeometryFallback = (agg.grossArea === 0 && agg.volume === 0) || (areaIsSparse && volumeIsSparse);
+
         if (LINEAR_TYPES.has(agg.elementType) && agg.length > 0.5) {
           primaryQty = agg.length;
           unit = "Rmt";
         } else if (LINEAR_TYPES.has(agg.elementType) && agg.count > 0) {
-          // No usable length — estimate: 3m per railing, 4m per member
           primaryQty = agg.count * (agg.elementType === "IfcRailing" ? 3.0 : 4.0);
           unit = "Rmt";
-        } else if (agg.grossArea > 0) {
+        } else if (!useGeometryFallback && agg.grossArea > 0) {
           primaryQty = agg.grossArea;
           unit = "m²";
-        } else if (agg.volume > 0) {
+        } else if (!useGeometryFallback && agg.volume > 0) {
           primaryQty = agg.volume;
           unit = "m³";
+        } else if (fb) {
+          primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
         } else {
-          const fb = estimateGeometryFromType(agg.elementType, agg.count);
-          if (fb) {
-            primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
-          } else {
-            primaryQty = agg.count;
-            unit = "EA";
-          }
+          primaryQty = agg.count;
+          unit = "EA";
         }
 
-        const estArea = estimatedFromCount ? estimateGeometryFromType(agg.elementType, agg.count)?.estArea : undefined;
-        const estVolume = estimatedFromCount ? estimateGeometryFromType(agg.elementType, agg.count)?.estVolume : undefined;
+        const estArea = estimatedFromCount ? fb?.estArea : undefined;
+        const estVolume = estimatedFromCount ? fb?.estVolume : undefined;
 
         rows.push([
           agg.divisionName, description,
