@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { razorpay, verifyWebhookSignature, getRoleByRazorpayPlanId } from '@/features/billing/lib/razorpay';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { invalidateUserRoleCache } from '@/lib/auth';
 import { formatErrorResponse } from '@/lib/user-errors';
@@ -200,6 +201,7 @@ async function activateSubscription(subscription: {
     return;
   }
 
+  const isRoleChange = previousRole !== newRole;
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -208,9 +210,16 @@ async function activateSubscription(subscription: {
       razorpayPlanId: planId || null,
       paymentGateway: 'razorpay',
       stripeCurrentPeriodEnd: currentPeriodEnd,
+      // Only clear legacy limits when the role actually changes (upgrade/downgrade).
+      // Renewals (same role) must preserve legacyLimits so grandfathered users keep
+      // their pre-migration limits.
+      ...(isRoleChange && {
+        legacyLimits: Prisma.DbNull,
+        legacyLimitsSetAt: null,
+      }),
     },
   });
-  invalidateUserRoleCache(user.id);
+  if (isRoleChange) invalidateUserRoleCache(user.id);
 
   console.info('[RAZORPAY_WEBHOOK] Subscription activated:', {
     userId: user.id,
@@ -277,6 +286,7 @@ async function cancelSubscription(subscription: { id: string }) {
   }
 
   const previousRole = user.role;
+  const isRoleChange = previousRole !== 'FREE';
 
   await prisma.user.update({
     where: { id: user.id },
@@ -286,6 +296,10 @@ async function cancelSubscription(subscription: { id: string }) {
       razorpayPlanId: null,
       stripeCurrentPeriodEnd: null,
       paymentGateway: null,
+      ...(isRoleChange && {
+        legacyLimits: Prisma.DbNull,
+        legacyLimitsSetAt: null,
+      }),
     },
   });
   invalidateUserRoleCache(user.id);

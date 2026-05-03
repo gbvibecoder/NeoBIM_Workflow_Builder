@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import type { WorkflowSummary } from "@/lib/api";
 import { getLastRun } from "@/lib/api";
 import { toast } from "sonner";
-import { STRIPE_PLANS } from "@/features/billing/lib/stripe";
+import { STRIPE_PLANS } from "@/features/billing/lib/plan-data";
 import { sortWorkflows, type SortKey } from "@/features/workflows/lib/sort";
 import {
   resolveCategory,

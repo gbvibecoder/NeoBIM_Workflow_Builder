@@ -1,5 +1,5 @@
 import { Zap, ArrowRight } from "lucide-react";
-import { STRIPE_PLANS } from "@/features/billing/lib/stripe";
+import { STRIPE_PLANS } from "@/features/billing/lib/plan-data";
 import s from "./page.module.css";
 
 interface Props {
@@ -10,8 +10,8 @@ interface Props {
 }
 
 const PERKS = [
-  { icon: "\u267E\uFE0F", text: "Unlimited workflows (Pro)" },
-  { icon: "\u26A1", text: "Up to 100 runs per month" },
+  { icon: "\u267E\uFE0F", text: `Up to ${STRIPE_PLANS.PRO.limits.maxWorkflows} workflows (Pro)` },
+  { icon: "\u26A1", text: `Up to ${STRIPE_PLANS.PRO.limits.runsPerMonth} runs per month` },
   { icon: "\u{1F3AC}", text: "AI video walkthroughs" },
   { icon: "\u{1F9CA}", text: "3D model generation" },
 ];

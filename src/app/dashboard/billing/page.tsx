@@ -13,6 +13,8 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useLocale } from "@/hooks/useLocale";
+import { STRIPE_PLANS } from "@/features/billing/lib/plan-data";
+import { formatPlanLimit, getPlanCreditsTotal, interpolatePlanString } from "@/features/billing/lib/plan-helpers";
 import { PaymentErrorModal } from "@/features/billing/components/PaymentErrorModal";
 import { CityscapeHero } from "@/features/billing/components/CityscapeHero";
 import { AecElevationFooter } from "@/features/billing/components/AecElevationFooter";
@@ -110,24 +112,26 @@ export default function BillingPage() {
         const completed = executions.filter(e => e.status === "SUCCESS" || e.status === "PARTIAL");
         const now = new Date();
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const planConfig = STRIPE_PLANS[userRole as keyof typeof STRIPE_PLANS] ?? STRIPE_PLANS.FREE;
+        const planLimit = planConfig.limits.runsPerMonth;
         if (userRole === "FREE") {
-          // FREE tier: 3 lifetime executions (not monthly)
-          setUsage({ used: completed.length, limit: 3, resetDate: "" });
+          // FREE tier: lifetime executions (not monthly)
+          setUsage({ used: completed.length, limit: planLimit, resetDate: "" });
         } else {
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
           const monthCompleted = completed.filter(e => new Date(e.startedAt) >= monthStart);
-          const limitMap: Record<string, number> = { MINI: 10, STARTER: 30, PRO: 100 };
-          setUsage({ used: monthCompleted.length, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
+          setUsage({ used: monthCompleted.length, limit: planLimit < 0 ? 1000 : planLimit, resetDate: nextMonth.toISOString() });
         }
       })
       .catch(() => {
         const now = new Date();
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const planConfig = STRIPE_PLANS[userRole as keyof typeof STRIPE_PLANS] ?? STRIPE_PLANS.FREE;
+        const planLimit = planConfig.limits.runsPerMonth;
         if (userRole === "FREE") {
-          setUsage({ used: 0, limit: 3, resetDate: "" });
+          setUsage({ used: 0, limit: planLimit, resetDate: "" });
         } else {
-          const limitMap: Record<string, number> = { MINI: 10, STARTER: 30, PRO: 100 };
-          setUsage({ used: 0, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
+          setUsage({ used: 0, limit: planLimit < 0 ? 1000 : planLimit, resetDate: nextMonth.toISOString() });
         }
       })
       .finally(() => setLoading(false));
@@ -420,16 +424,16 @@ export default function BillingPage() {
       description: t('billing.miniDesc'),
       icon: <Ruler size={20} />,
       features: [
-        t('billing.miniFeature1'),
-        t('billing.miniFeature2'),
+        interpolatePlanString(t('billing.miniFeature1'), "MINI"),
+        interpolatePlanString(t('billing.miniFeature2'), "MINI"),
         t('billing.miniFeature3'),
-        t('billing.miniFeature4'),
+        interpolatePlanString(t('billing.miniFeature4'), "MINI"),
         t('billing.miniFeature5'),
       ],
       nodeCredits: [
-        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: "0" },
-        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "0" },
-        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "2" },
+        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: formatPlanLimit(STRIPE_PLANS.MINI.limits.videoPerMonth) },
+        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: formatPlanLimit(STRIPE_PLANS.MINI.limits.modelsPerMonth) },
+        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: formatPlanLimit(STRIPE_PLANS.MINI.limits.rendersPerMonth) },
       ],
       cta: currentPlan === "Mini" ? t('billing.currentPlan') : t('billing.upgradeToMini'),
       ctaDisabled: currentPlan === "Mini",
@@ -439,7 +443,7 @@ export default function BillingPage() {
       draftNum: "01",
       tierIndex: 1,
       annotation: t('billing.miniAnnotation'),
-      creditsTotal: "02",
+      creditsTotal: getPlanCreditsTotal("MINI"),
     },
     {
       name: t('billing.starter'),
@@ -449,17 +453,17 @@ export default function BillingPage() {
       description: t('billing.starterDesc'),
       icon: <Building2 size={20} />,
       features: [
-        t('billing.starterFeature1'),
-        t('billing.starterFeature2'),
+        interpolatePlanString(t('billing.starterFeature1'), "STARTER"),
+        interpolatePlanString(t('billing.starterFeature2'), "STARTER"),
         t('billing.starterFeature3'),
         t('billing.starterFeature4'),
         t('billing.starterFeature5'),
         t('billing.starterFeature6'),
       ],
       nodeCredits: [
-        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: "2" },
-        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "3" },
-        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "10" },
+        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: formatPlanLimit(STRIPE_PLANS.STARTER.limits.videoPerMonth) },
+        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: formatPlanLimit(STRIPE_PLANS.STARTER.limits.modelsPerMonth) },
+        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: formatPlanLimit(STRIPE_PLANS.STARTER.limits.rendersPerMonth) },
       ],
       cta: currentPlan === "Starter" ? t('billing.currentPlan') : t('billing.upgradeToStarter'),
       ctaDisabled: currentPlan === "Starter",
@@ -469,7 +473,7 @@ export default function BillingPage() {
       draftNum: "02",
       tierIndex: 2,
       annotation: t('billing.starterAnnotation'),
-      creditsTotal: "15",
+      creditsTotal: getPlanCreditsTotal("STARTER"),
     },
     {
       name: t('billing.pro'),
@@ -480,17 +484,17 @@ export default function BillingPage() {
       icon: <Crown size={20} />,
       savings: t('billing.proHighlight'),
       features: [
-        t('billing.proFeature1'),
-        t('billing.proFeature2'),
+        interpolatePlanString(t('billing.proFeature1'), "PRO"),
+        interpolatePlanString(t('billing.proFeature2'), "PRO"),
         t('billing.proFeature3'),
         t('billing.proFeature4'),
         t('billing.proFeature5'),
         t('billing.proFeature6'),
       ],
       nodeCredits: [
-        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: "5" },
-        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "10" },
-        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "30" },
+        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: formatPlanLimit(STRIPE_PLANS.PRO.limits.videoPerMonth) },
+        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: formatPlanLimit(STRIPE_PLANS.PRO.limits.modelsPerMonth) },
+        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: formatPlanLimit(STRIPE_PLANS.PRO.limits.rendersPerMonth) },
       ],
       cta: currentPlan === "Pro" ? t('billing.currentPlan') : t('billing.upgradeToPro'),
       ctaDisabled: currentPlan === "Pro",
@@ -501,7 +505,7 @@ export default function BillingPage() {
       draftNum: "03",
       tierIndex: 3,
       annotation: t('billing.proAnnotation'),
-      creditsTotal: "45",
+      creditsTotal: getPlanCreditsTotal("PRO"),
     },
     {
       name: t('billing.team'),
@@ -515,13 +519,13 @@ export default function BillingPage() {
         t('billing.teamFeature2'),
         t('billing.teamFeature3'),
         t('billing.teamFeature4'),
-        t('billing.teamFeature5'),
+        interpolatePlanString(t('billing.teamFeature5'), "TEAM"),
         t('billing.teamFeature6'),
       ],
       nodeCredits: [
-        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: "15" },
-        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "30" },
-        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "\u221E" },
+        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: formatPlanLimit(STRIPE_PLANS.TEAM.limits.videoPerMonth) },
+        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: formatPlanLimit(STRIPE_PLANS.TEAM.limits.modelsPerMonth) },
+        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: formatPlanLimit(STRIPE_PLANS.TEAM.limits.rendersPerMonth) },
       ],
       cta: currentPlan === "Team" ? t('billing.currentPlan') : t('billing.upgradeToTeam'),
       ctaDisabled: currentPlan === "Team",
@@ -531,7 +535,7 @@ export default function BillingPage() {
       draftNum: "04",
       tierIndex: 4,
       annotation: t('billing.teamAnnotation'),
-      creditsTotal: "\u221E",
+      creditsTotal: getPlanCreditsTotal("TEAM"),
     },
   ];}, [currentPlan, currentIndex, t]);
 

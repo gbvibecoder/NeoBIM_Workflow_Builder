@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { STRIPE_PLANS } from "@/features/billing/lib/plan-data";
+import { interpolatePlanString } from "@/features/billing/lib/plan-helpers";
 import { PlanCard } from "@/features/onboarding-survey/components/primitives/PlanCard";
 import { ConfettiBurst } from "@/features/onboarding-survey/components/primitives/ConfettiBurst";
 import { ScrollingAvatars } from "@/features/onboarding-survey/components/primitives/ScrollingAvatars";
@@ -36,26 +38,26 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
   }, []);
 
   const miniFeatures = [
-    t("survey.scene4.mini.f1"),
-    t("survey.scene4.mini.f2"),
-    t("survey.scene4.mini.f3"),
-    t("survey.scene4.mini.f4"),
+    interpolatePlanString(t("survey.scene4.mini.f1"), "MINI"),
+    interpolatePlanString(t("survey.scene4.mini.f2"), "MINI"),
+    interpolatePlanString(t("survey.scene4.mini.f3"), "MINI"),
+    interpolatePlanString(t("survey.scene4.mini.f4"), "MINI"),
     t("survey.scene4.mini.f5"),
   ];
 
   const starterFeatures = [
-    t("survey.scene4.starter.f1"),
-    t("survey.scene4.starter.f2"),
-    t("survey.scene4.starter.f3"),
-    t("survey.scene4.starter.f4"),
+    interpolatePlanString(t("survey.scene4.starter.f1"), "STARTER"),
+    interpolatePlanString(t("survey.scene4.starter.f2"), "STARTER"),
+    interpolatePlanString(t("survey.scene4.starter.f3"), "STARTER"),
+    interpolatePlanString(t("survey.scene4.starter.f4"), "STARTER"),
     t("survey.scene4.starter.f5"),
   ];
 
   const proFeatures = [
-    t("survey.scene4.pro.f1"),
-    t("survey.scene4.pro.f2"),
-    t("survey.scene4.pro.f3"),
-    t("survey.scene4.pro.f4"),
+    interpolatePlanString(t("survey.scene4.pro.f1"), "PRO"),
+    interpolatePlanString(t("survey.scene4.pro.f2"), "PRO"),
+    interpolatePlanString(t("survey.scene4.pro.f3"), "PRO"),
+    interpolatePlanString(t("survey.scene4.pro.f4"), "PRO"),
     t("survey.scene4.pro.f5"),
   ];
 
@@ -165,7 +167,7 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
           kind="mini"
           label={t("survey.scene4.mini.label")}
           priceLabel="₹"
-          priceNumeric={99}
+          priceNumeric={STRIPE_PLANS.MINI.price}
           priceSuffix={t("survey.scene4.mini.priceSuffix")}
           tagline={t("survey.scene4.mini.tagline")}
           ctaLabel={t("survey.scene4.mini.cta")}
@@ -181,7 +183,7 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
           kind="starter"
           label={t("survey.scene4.starter.label")}
           priceLabel="₹"
-          priceNumeric={799}
+          priceNumeric={STRIPE_PLANS.STARTER.price}
           priceSuffix={t("survey.scene4.starter.priceSuffix")}
           tagline={t("survey.scene4.starter.tagline")}
           ctaLabel={t("survey.scene4.starter.cta")}
@@ -198,7 +200,7 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
           kind="pro"
           label={t("survey.scene4.pro.label")}
           priceLabel="₹"
-          priceNumeric={1999}
+          priceNumeric={STRIPE_PLANS.PRO.price}
           priceSuffix={t("survey.scene4.pro.priceSuffix")}
           tagline={t("survey.scene4.pro.tagline")}
           ctaLabel={t("survey.scene4.pro.cta")}

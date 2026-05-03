@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { interpolatePlanString } from "@/features/billing/lib/plan-helpers";
 import { ScrollReveal } from "./ScrollReveal";
 import type { TranslationKey } from "@/lib/i18n";
 
 interface Plan {
   tier: string;
+  /** Matches a key in STRIPE_PLANS (used for interpolation). null = skip. */
+  planKey: string | null;
   nameKey: TranslationKey;
   descKey: TranslationKey;
   priceKey: TranslationKey;
@@ -18,6 +21,7 @@ interface Plan {
 const PLANS: Plan[] = [
   {
     tier: "Mini",
+    planKey: "MINI",
     nameKey: "landing.miniTitle",
     descKey: "landing.miniDesc",
     priceKey: "landing.miniPrice",
@@ -26,6 +30,7 @@ const PLANS: Plan[] = [
   },
   {
     tier: "Starter",
+    planKey: "STARTER",
     nameKey: "landing.starterTitle",
     descKey: "landing.starterDesc",
     priceKey: "landing.starterPrice",
@@ -34,6 +39,7 @@ const PLANS: Plan[] = [
   },
   {
     tier: "Pro",
+    planKey: "PRO",
     nameKey: "landing.proTitle",
     descKey: "landing.proDesc",
     priceKey: "landing.proPrice",
@@ -42,6 +48,7 @@ const PLANS: Plan[] = [
   },
   {
     tier: "Team",
+    planKey: "TEAM",
     nameKey: "billing.team",
     descKey: "billing.teamDesc",
     priceKey: "landing.startNow",
@@ -128,8 +135,8 @@ export function LightPricing() {
           {PLANS.map((plan) => {
             const isTeam = plan.tier === "Team";
             const features: readonly string[] = isTeam
-              ? TEAM_FEATURE_KEYS.map((k) => t(k))
-              : tArray(plan.featuresKey);
+              ? TEAM_FEATURE_KEYS.map((k) => interpolatePlanString(t(k), "TEAM"))
+              : tArray(plan.featuresKey).map(s => interpolatePlanString(s, plan.planKey));
             const price = isTeam ? "4,999" : t(plan.priceKey);
 
             return (

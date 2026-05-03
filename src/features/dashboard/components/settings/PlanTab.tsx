@@ -5,16 +5,8 @@ import { useSession } from "next-auth/react";
 import { Crown, ArrowRight, Calendar } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { PLAN_EXEC_LIMITS } from "@/constants/limits";
+import { getPlanLimits, formatPlanLimit } from "@/features/billing/lib/plan-helpers";
 import s from "./settings.module.css";
-
-const PLAN_META: Record<string, { videos: number; threeD: number; renders: number }> = {
-  FREE: { videos: 0, threeD: 0, renders: 0 },
-  MINI: { videos: 1, threeD: 2, renders: 5 },
-  STARTER: { videos: 2, threeD: 5, renders: 15 },
-  PRO: { videos: 5, threeD: 10, renders: 30 },
-  TEAM_ADMIN: { videos: -1, threeD: -1, renders: -1 },
-  PLATFORM_ADMIN: { videos: -1, threeD: -1, renders: -1 },
-};
 
 export function PlanTab() {
   const { t } = useLocale();
@@ -33,7 +25,7 @@ export function PlanTab() {
     userRole === "PLATFORM_ADMIN" ? "Admin" : userRole;
 
   const execLimit = PLAN_EXEC_LIMITS[userRole] ?? 3;
-  const meta = PLAN_META[userRole] ?? PLAN_META.FREE;
+  const limits = getPlanLimits(userRole);
   const isUnlimited = execLimit === -1;
   const isFree = userRole === "FREE";
 
@@ -69,19 +61,19 @@ export function PlanTab() {
               <span className={s.planCardMetaPill}>
                 <strong>{isUnlimited ? "\u221E" : execLimit}</strong> {t("settings.planMetaExecutions")}
               </span>
-              {meta.videos > 0 && (
+              {(limits.videoPerMonth as number) !== 0 && (
                 <span className={s.planCardMetaPill}>
-                  <strong>{meta.videos === -1 ? "\u221E" : meta.videos}</strong> {t("settings.planMetaVideos")}
+                  <strong>{formatPlanLimit(limits.videoPerMonth)}</strong> {t("settings.planMetaVideos")}
                 </span>
               )}
-              {meta.threeD > 0 && (
+              {(limits.modelsPerMonth as number) !== 0 && (
                 <span className={s.planCardMetaPill}>
-                  <strong>{meta.threeD === -1 ? "\u221E" : meta.threeD}</strong> {t("settings.planMeta3d")}
+                  <strong>{formatPlanLimit(limits.modelsPerMonth)}</strong> {t("settings.planMeta3d")}
                 </span>
               )}
-              {meta.renders > 0 && (
+              {(limits.rendersPerMonth as number) !== 0 && (
                 <span className={s.planCardMetaPill}>
-                  <strong>{meta.renders === -1 ? "\u221E" : meta.renders}</strong> {t("settings.planMetaRenders")}
+                  <strong>{formatPlanLimit(limits.rendersPerMonth)}</strong> {t("settings.planMetaRenders")}
                 </span>
               )}
             </div>

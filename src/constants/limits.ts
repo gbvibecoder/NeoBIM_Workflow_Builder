@@ -18,9 +18,17 @@
  */
 export const MAX_REGENERATIONS = 3;
 
-/** Execution limits per plan. FREE is lifetime, others are per month. */
+/** Execution limits per plan. FREE is lifetime, others are per month.
+ *  Derived from STRIPE_PLANS to avoid dual-source-of-truth drift. */
+import { STRIPE_PLANS } from "@/features/billing/lib/plan-data";
+
 export const PLAN_EXEC_LIMITS: Record<string, number> = {
-  FREE: 3, MINI: 10, STARTER: 30, PRO: 100, TEAM_ADMIN: -1, PLATFORM_ADMIN: -1,
+  FREE: STRIPE_PLANS.FREE.limits.runsPerMonth,
+  MINI: STRIPE_PLANS.MINI.limits.runsPerMonth,
+  STARTER: STRIPE_PLANS.STARTER.limits.runsPerMonth,
+  PRO: STRIPE_PLANS.PRO.limits.runsPerMonth,
+  TEAM_ADMIN: STRIPE_PLANS.TEAM.limits.runsPerMonth,
+  PLATFORM_ADMIN: STRIPE_PLANS.TEAM.limits.runsPerMonth,
 };
 
 /** Numeric rank for comparing plan tiers. Higher = more features. */

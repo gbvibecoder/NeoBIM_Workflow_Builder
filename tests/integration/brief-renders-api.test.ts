@@ -178,10 +178,10 @@ beforeEach(() => {
   prismaCountMock.mockReset();
   prismaCreateMock.mockReset();
   prismaUserFindUniqueMock.mockReset();
-  // Default to FREE so rate-limit + quota gates actually fire in tests
-  // that exercise them. Admin-bypass tests override with TEAM_ADMIN /
+  // Default to STARTER so quota gates pass (FREE has briefRendersPerMonth=0
+  // and would block creation). Admin-bypass tests override with TEAM_ADMIN /
   // PLATFORM_ADMIN as needed.
-  prismaUserFindUniqueMock.mockResolvedValue({ role: "FREE" });
+  prismaUserFindUniqueMock.mockResolvedValue({ role: "STARTER" });
   isPlatformAdminMock.mockReset();
   isPlatformAdminMock.mockReturnValue(false);
   prismaUpdateMock.mockReset();

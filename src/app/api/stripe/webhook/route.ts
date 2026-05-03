@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, getPlanByPriceId } from '@/features/billing/lib/stripe';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import Stripe from 'stripe';
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
@@ -217,6 +218,7 @@ async function updateUserSubscription(
     const terminalStatuses: string[] = ['canceled', 'incomplete_expired', 'unpaid'];
     const isTerminal = terminalStatuses.includes(subscription.status);
 
+    const isRoleChange = user.role !== 'FREE';
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -225,9 +227,13 @@ async function updateUserSubscription(
         stripeCurrentPeriodEnd: isTerminal ? null : undefined,
         paymentGateway: isTerminal ? null : undefined,
         role: 'FREE',
+        ...(isRoleChange && {
+          legacyLimits: Prisma.DbNull,
+          legacyLimitsSetAt: null,
+        }),
       },
     });
-    invalidateUserRoleCache(user.id);
+    if (isRoleChange) invalidateUserRoleCache(user.id);
 
     // Audit log the cancellation/downgrade
     logAudit(null, "USER_ROLE_CHANGED", "user", user.id, {
@@ -320,6 +326,7 @@ async function updateUserSubscription(
   });
 
   try {
+    const isRoleChange = previousRole !== plan;
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -328,9 +335,13 @@ async function updateUserSubscription(
         stripeCurrentPeriodEnd: new Date(currentPeriodEnd * 1000),
         paymentGateway: 'stripe',
         role: plan,
+        ...(isRoleChange && {
+          legacyLimits: Prisma.DbNull,
+          legacyLimitsSetAt: null,
+        }),
       },
     });
-    invalidateUserRoleCache(user.id);
+    if (isRoleChange) invalidateUserRoleCache(user.id);
 
     console.info('[STRIPE_WEBHOOK] Successfully updated user subscription:', {
       userId: user.id,
@@ -410,6 +421,7 @@ async function cancelUserSubscription(stripeCustomerId: string) {
   }
 
   const previousRole = user.role;
+  const isRoleChange = previousRole !== 'FREE';
 
   await prisma.user.update({
     where: { id: user.id },
@@ -419,6 +431,10 @@ async function cancelUserSubscription(stripeCustomerId: string) {
       stripeCurrentPeriodEnd: null,
       paymentGateway: null,
       role: 'FREE',
+      ...(isRoleChange && {
+        legacyLimits: Prisma.DbNull,
+        legacyLimitsSetAt: null,
+      }),
     },
   });
   invalidateUserRoleCache(user.id);

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "BuildFlow pricing plans. Start free with 3 AI executions, upgrade for more runs, video walkthroughs, and 3D models.",
   openGraph: {
     title: "BuildFlow Pricing — Plans for Every Team",
-    description: "Start free, upgrade when you need more. Pro plan at $29/month with unlimited workflows and priority support.",
+    description: "Start free, upgrade when you need more. Plans from ₹99/month with AI renders, video walkthroughs, and priority support.",
   },
 };
 

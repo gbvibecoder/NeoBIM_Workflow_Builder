@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth, invalidateUserRoleCache } from '@/lib/auth';
 import { razorpay, verifyPaymentSignature, getRoleByRazorpayPlanId } from '@/features/billing/lib/razorpay';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { checkEndpointRateLimit } from '@/lib/rate-limit';
 import { formatErrorResponse, UserErrors } from '@/lib/user-errors';
@@ -140,6 +141,7 @@ export async function POST(req: Request) {
       );
     }
 
+    const isRoleChange = user.role !== newRole;
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -148,9 +150,13 @@ export async function POST(req: Request) {
         razorpayPlanId: planId,
         paymentGateway: 'razorpay',
         stripeCurrentPeriodEnd: currentPeriodEnd, // Reuse this field for period tracking
+        ...(isRoleChange && {
+          legacyLimits: Prisma.DbNull,
+          legacyLimitsSetAt: null,
+        }),
       },
     });
-    invalidateUserRoleCache(session.user.id);
+    if (isRoleChange) invalidateUserRoleCache(session.user.id);
 
     console.info('[razorpay/verify] Subscription activated:', {
       userId: session.user.id,

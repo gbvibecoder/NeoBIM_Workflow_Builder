@@ -228,7 +228,7 @@ export default function RootLayout({
         offers: {
           "@type": "Offer",
           price: "0",
-          priceCurrency: "USD",
+          priceCurrency: "INR",
           description: "Free tier available",
         },
         description: siteDescription,
