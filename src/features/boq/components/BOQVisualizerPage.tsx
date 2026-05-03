@@ -13,7 +13,7 @@ import { IFCQualityCard } from "@/features/boq/components/IFCQualityCard";
 import { BOQTable } from "@/features/boq/components/BOQTable";
 import { NLSummary } from "@/features/boq/components/NLSummary";
 import { BOQFooter } from "@/features/boq/components/BOQFooter";
-import { ModelQualityCard } from "@/features/boq/components/ModelQualityCard";
+import { ModelCompletenessWarning } from "@/features/boq/components/ModelCompletenessWarning";
 import { PricingSourceBanner } from "@/features/boq/components/PricingSourceBanner";
 import { DataSourcesSummary } from "@/features/boq/components/DataSourcesSummary";
 import type { BOQData, PriceOverrides, RateOverride } from "@/features/boq/components/types";
@@ -347,7 +347,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
               <DataSourcesSummary data={data} />
             </ErrorBoundary>
             <div className="flex flex-col gap-4">
-              {data.modelQualityReport && <ModelQualityCard report={data.modelQualityReport} />}
+              <ModelCompletenessWarning elementCoverage={data.ifcQuality?.elementCoverage ?? data.ifcQuality?.score ?? 100} />
               {data.pricingMetadata && <PricingSourceBanner metadata={data.pricingMetadata} />}
             </div>
           </div>

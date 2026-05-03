@@ -1330,6 +1330,31 @@ export const handleTR008: NodeHandler = async (ctx) => {
     projectDate
   );
 
+  // ── Benchmark hard-stop: if cost is far below absolute minimum, refuse to ship ──
+  // 30% grace below floor. If below that, something is genuinely broken.
+  if (benchmarkResult.severity === "critical" && benchmarkResult.costPerM2 > 0) {
+    const floorValue = benchmarkResult.benchmarkLow;
+    const graceFloor = Math.round(floorValue * 0.7);
+    if (benchmarkResult.costPerM2 < graceFloor) {
+      return {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "table",
+        data: {
+          _hardStop: true,
+          _hardStopReason: `Cost estimate ₹${benchmarkResult.costPerM2.toLocaleString("en-IN")}/m² is far below the minimum ₹${floorValue.toLocaleString("en-IN")}/m² for ${projectTypeInfo.type} construction in ${benchmarkResult.cityTier} city. The IFC model may have geometry issues, or the project type detection may be incorrect.`,
+          _projectDate: projectDate.toISOString().split("T")[0],
+          _marketDataConfidence: marketDataConfidence,
+          label: "Bill of Quantities — Hard Stop",
+          content: `Hard stop: cost ₹${benchmarkResult.costPerM2.toLocaleString("en-IN")}/m² below ₹${graceFloor.toLocaleString("en-IN")}/m² grace floor.`,
+        },
+        metadata: { real: true },
+        createdAt: new Date(),
+      };
+    }
+  }
+
   rows.push(["", "", "", "", "", "", "", "", "", ""]);
   rows.push(["SOFT COSTS", "", "", "", "", "", "", "", "", ""]);
 
@@ -1504,6 +1529,17 @@ export const handleTR008: NodeHandler = async (ctx) => {
 
     // Store on line (using the [key: string] index signature pattern)
     (line as Record<string, unknown>).confidence = { score, factors };
+
+    // Per-line provenance: tag with the rate source for trust signals
+    const lineDesc = line.description.toLowerCase();
+    const isSteel = lineDesc.includes("steel") || lineDesc.includes("rebar") || lineDesc.includes("railing");
+    const isProvisional = line.is1200Code === "PROV" || line.division.includes("PROVISIONAL");
+    const lineProvenance: string =
+      isProvisional ? marketDataConfidence  // provisionals inherit overall market confidence
+      : isSteel && steelFromMarket ? (marketDataConfidence === "live" ? "live" : "cached")
+      : hasMarketIntel ? "cached"  // IS1200 rates with market-adjusted PWD
+      : "escalated";  // pure IS1200 static + escalation
+    (line as Record<string, unknown>)._lineProvenance = lineProvenance;
   }
 
   // Count confidence distribution for disclaimer
