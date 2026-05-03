@@ -110,7 +110,10 @@ export function escalateRate(rate: DatedRate, projectDate: Date): ResolvedRate {
     };
   }
 
-  const cagr = ESCALATION_CURVES[rate.escalationCurve] ?? 0;
+  // Read live curves (populated by cron) with hardcoded fallback
+  let liveCurves: Record<string, number> | null = null;
+  try { liveCurves = require("@/features/boq/services/live-cpi").getLiveCurvesCached()?.curves ?? null; } catch { /* non-fatal */ }
+  const cagr = liveCurves?.[rate.escalationCurve] ?? ESCALATION_CURVES[rate.escalationCurve] ?? 0;
   const factor = Math.pow(1 + cagr, years);
   const escalatedValue = Math.round(rate.value * factor * 100) / 100;
 
