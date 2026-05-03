@@ -176,12 +176,14 @@ export const handleTR008: NodeHandler = async (ctx) => {
   // Import regional factors
   const { resolveProjectLocation } = await import("@/features/boq/constants/regional-factors");
 
-  let activeRegion = "USA (baseline)";
+  // Default to India — 95%+ of BuildFlow traffic is Indian AEC.
+  // Non-Indian projects override via the Location node (IN-006) below.
+  let activeRegion = "INDIA · BASELINE";
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let regionWasAutoDetected = true;
   let locationFactor = 1.0;
-  let currencySymbol = "$";
-  let currencyCode = "USD";
+  let currencySymbol = "₹";
+  let currencyCode = "INR";
   let exchangeRate = 1.0;
   let locationLabel = "";
 
@@ -206,16 +208,16 @@ export const handleTR008: NodeHandler = async (ctx) => {
     if (locationData.months != null) escalationMonths = Number(locationData.months);
   } else {
     // Fall back to text-based region detection
-    const regionInput = inputData?.region ?? inputData?.location ?? "USA (baseline)";
+    const regionInput = inputData?.region ?? inputData?.location ?? "INDIA · BASELINE";
     const upstreamNarrative = inputData?.content ?? inputData?.narrative ?? "";
-    const explicitRegion = regionInput !== "USA (baseline)" ? regionInput : "";
+    const explicitRegion = regionInput !== "INDIA · BASELINE" ? regionInput : "";
     const detectedRegion = detectRegionFromText(
       typeof explicitRegion === "string" && explicitRegion
         ? explicitRegion
         : (typeof upstreamNarrative === "string" ? upstreamNarrative : "")
     );
-    activeRegion = (typeof detectedRegion === "string" && detectedRegion) || (typeof regionInput === "string" ? regionInput : "USA (baseline)");
-    regionWasAutoDetected = !detectedRegion && regionInput === "USA (baseline)";
+    activeRegion = (typeof detectedRegion === "string" && detectedRegion) || (typeof regionInput === "string" ? regionInput : "INDIA · BASELINE");
+    regionWasAutoDetected = !detectedRegion && regionInput === "INDIA · BASELINE";
   }
 
   // Detect project type from description
