@@ -150,36 +150,6 @@ export function LightHero() {
           >
             {t("light.heroPrimaryCTA")}
           </Link>
-
-          {/* Ghost CTA — Book Demo */}
-          <Link
-            href="/book-demo"
-            onClick={() => trackCTAClick("Book a Demo", "hero_secondary")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: 48,
-              padding: "0 24px",
-              borderRadius: 8,
-              background: "transparent",
-              color: "var(--light-accent)",
-              fontSize: 16,
-              fontWeight: 600,
-              textDecoration: "none",
-              fontFamily: "var(--font-dm-sans), sans-serif",
-              border: "1px solid var(--light-accent)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background =
-                "rgba(74, 107, 77, 0.06)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "transparent";
-            }}
-          >
-            {t("light.heroSecondaryCTA")}
-          </Link>
         </div>
 
         {/* Trust signals */}
