@@ -25,7 +25,6 @@ export function LightNav() {
   const navLinks = [
     { label: t("landing.features"), href: "#four-surfaces" },
     { label: t("landing.pricing"), href: "#pricing" },
-    { label: t("landing.faqSection"), href: "#faq" },
   ];
 
   return (
