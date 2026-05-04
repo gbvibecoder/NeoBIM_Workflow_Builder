@@ -464,24 +464,8 @@ async function executeNode(
           const rows: string[][] = [];
           const elements: Array<Record<string, unknown>> = [];
 
-          // ── Geometry fallback table (same as tr-007.ts server handler) ──
-          // Standard Indian construction dimensions for elements without extractable geometry.
-          const GEO_FB: Record<string, { areaFactor?: number; volumeFactor?: number; primaryUnit: "m²" | "m³" }> = {
-            IfcWall:              { areaFactor: 18,   volumeFactor: 4.14,  primaryUnit: "m²" },
-            IfcWallStandardCase:  { areaFactor: 18,   volumeFactor: 4.14,  primaryUnit: "m²" },
-            IfcSlab:              { areaFactor: 36,   volumeFactor: 5.4,   primaryUnit: "m²" },
-            IfcRoof:              { areaFactor: 36,   volumeFactor: 5.4,   primaryUnit: "m²" },
-            IfcColumn:            { areaFactor: 4.8,  volumeFactor: 0.48,  primaryUnit: "m³" },
-            IfcBeam:              { areaFactor: 7.5,  volumeFactor: 0.675, primaryUnit: "m³" },
-            IfcFooting:           {                   volumeFactor: 0.675, primaryUnit: "m³" },
-            IfcStair:             { areaFactor: 4.8,  volumeFactor: 0.72,  primaryUnit: "m²" },
-            IfcStairFlight:       { areaFactor: 4.8,  volumeFactor: 0.72,  primaryUnit: "m²" },
-            IfcCovering:          { areaFactor: 1,                         primaryUnit: "m²" },
-            IfcCurtainWall:       { areaFactor: 4.5,                       primaryUnit: "m²" },
-            IfcDoor:              { areaFactor: 1.89,                      primaryUnit: "m²" },
-            IfcWindow:            { areaFactor: 1.8,                       primaryUnit: "m²" },
-          };
-          const r2 = (v: number) => Math.round(v * 100) / 100;
+          // Geometry fallback — imported from shared module (single source of truth)
+          const { estimateGeometryFromType, shouldUseGeometryFallback } = await import("@/features/boq/lib/geometry-fallback");
 
           let estimatedFromCountTotal = 0;
 
@@ -494,29 +478,24 @@ async function executeNode(
             let unit: string;
             let estimatedFromCount = false;
 
-            // Sparse-geometry check + fallback (mirrors tr-007.ts server handler)
-            const fbEntry = GEO_FB[agg.elementType];
-            const estArea = fbEntry?.areaFactor ? r2(agg.count * fbEntry.areaFactor) : undefined;
-            const estVolume = fbEntry?.volumeFactor ? r2(agg.count * fbEntry.volumeFactor) : undefined;
-            const areaIsSparse = estArea && agg.grossArea > 0 && agg.count > 1 && (agg.grossArea / agg.count) < (estArea / agg.count * 0.2);
-            const volumeIsSparse = estVolume && agg.volume > 0 && agg.count > 1 && (agg.volume / agg.count) < (estVolume / agg.count * 0.2);
-            const useGeometryFallback = (agg.grossArea === 0 && agg.volume === 0) || (areaIsSparse && volumeIsSparse);
+            const fb = estimateGeometryFromType(agg.elementType, agg.count);
+            const useFallback = shouldUseGeometryFallback({ elementType: agg.elementType, count: agg.count, grossArea: agg.grossArea, volume: agg.volume });
 
-            if (!useGeometryFallback && agg.grossArea > 0) {
+            if (!useFallback && agg.grossArea > 0) {
               primaryQty = agg.grossArea; unit = "m²";
-            } else if (!useGeometryFallback && agg.volume > 0) {
+            } else if (!useFallback && agg.volume > 0) {
               primaryQty = agg.volume; unit = "m³";
-            } else if (fbEntry) {
-              primaryQty = fbEntry.primaryUnit === "m²" ? (estArea ?? estVolume!) : (estVolume ?? estArea!);
-              unit = fbEntry.primaryUnit;
-              estimatedFromCount = true;
+            } else if (fb) {
+              primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
               estimatedFromCountTotal++;
             } else {
               primaryQty = agg.count; unit = "EA";
             }
 
-            const displayArea = agg.grossArea || (estimatedFromCount ? estArea : undefined) || 0;
-            const displayVolume = agg.volume || (estimatedFromCount ? estVolume : undefined) || 0;
+            const estArea = estimatedFromCount ? fb?.estArea : undefined;
+            const estVolume = estimatedFromCount ? fb?.estVolume : undefined;
+            const displayArea = agg.grossArea || estArea || 0;
+            const displayVolume = agg.volume || estVolume || 0;
 
             rows.push([
               agg.divisionName, `${description} (${agg.count} nr)`,
@@ -529,10 +508,10 @@ async function executeNode(
               description: `${description} (${agg.count} nr)`, category: agg.divisionName,
               ifcType: agg.elementType,
               quantity: primaryQty, unit,
-              grossArea: agg.grossArea || (estimatedFromCount ? estArea : undefined) || undefined,
+              grossArea: agg.grossArea || estArea || undefined,
               netArea: agg.netArea || undefined,
               openingArea: agg.openingArea || undefined,
-              totalVolume: agg.volume || (estimatedFromCount ? estVolume : undefined) || undefined,
+              totalVolume: agg.volume || estVolume || undefined,
               storey: agg.storey, elementCount: agg.count,
               materialLayers: agg.materialLayers,
               estimatedFromCount: estimatedFromCount || undefined,

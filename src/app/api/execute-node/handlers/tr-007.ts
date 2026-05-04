@@ -7,50 +7,14 @@ import {
   type PipelineDiagnostics,
 } from "@/features/boq/services/pipeline-diagnostics";
 
-/**
- * Type-aware geometric fallback for IFC elements with no extractable area/volume.
- * Standard Indian construction dimensions. Returns null for types where count
- * is the correct unit (IfcFlowTerminal, IfcBuildingElementProxy, etc.).
- *
- * Dual-output: many element types need BOTH area (for plaster/paint/formwork)
- * AND volume (for RCC/rebar). The previous single-output version only emitted
- * one, leaving TR-008 with zero for the other → broken derived quantities.
- */
-interface GeometryFallback {
-  areaFactor?: number;    // m² per element (face/surface area)
-  volumeFactor?: number;  // m³ per element (concrete/material volume)
-  primaryUnit: "m²" | "m³";
-}
-
-const GEOMETRY_FALLBACKS: Record<string, GeometryFallback> = {
-  IfcWall:              { areaFactor: 18,   volumeFactor: 4.14,  primaryUnit: "m²" },  // 3m×6m face; 3×6×0.23m brick
-  IfcWallStandardCase:  { areaFactor: 18,   volumeFactor: 4.14,  primaryUnit: "m²" },
-  IfcSlab:              { areaFactor: 36,   volumeFactor: 5.4,   primaryUnit: "m²" },  // 6m×6m; ×0.15m thick
-  IfcRoof:              { areaFactor: 36,   volumeFactor: 5.4,   primaryUnit: "m²" },
-  IfcColumn:            { areaFactor: 4.8,  volumeFactor: 0.48,  primaryUnit: "m³" },  // 4×0.4×3m surface; 0.4²×3m vol
-  IfcBeam:              { areaFactor: 7.5,  volumeFactor: 0.675, primaryUnit: "m³" },  // 2(0.45×5)+0.3×5 surface; 0.3×0.45×5m
-  IfcFooting:           {                   volumeFactor: 0.675, primaryUnit: "m³" },  // underground, no plaster surface
-  IfcStair:             { areaFactor: 4.8,  volumeFactor: 0.72,  primaryUnit: "m²" },  // 1.2m×4m flight; ×0.15m avg
-  IfcStairFlight:       { areaFactor: 4.8,  volumeFactor: 0.72,  primaryUnit: "m²" },
-  IfcCovering:          { areaFactor: 1,                         primaryUnit: "m²" },  // finish layer, no volume
-  IfcCurtainWall:       { areaFactor: 4.5,                       primaryUnit: "m²" },  // glass/aluminum panel
-  IfcDoor:              { areaFactor: 1.89,                      primaryUnit: "m²" },  // 0.9m × 2.1m
-  IfcWindow:            { areaFactor: 1.8,                       primaryUnit: "m²" },  // 1.5m × 1.2m
-};
-
-const r2 = (v: number) => Math.round(v * 100) / 100;
-
-export function estimateGeometryFromType(
-  elementType: string,
-  count: number,
-): { primaryQty: number; unit: string; estArea?: number; estVolume?: number } | null {
-  const fb = GEOMETRY_FALLBACKS[elementType];
-  if (!fb) return null;
-  const estArea = fb.areaFactor ? r2(count * fb.areaFactor) : undefined;
-  const estVolume = fb.volumeFactor ? r2(count * fb.volumeFactor) : undefined;
-  const primaryQty = fb.primaryUnit === "m²" ? (estArea ?? estVolume!) : (estVolume ?? estArea!);
-  return { primaryQty, unit: fb.primaryUnit, estArea, estVolume };
-}
+// Geometry fallback — imported from shared module (single source of truth)
+import {
+  GEOMETRY_FALLBACKS,
+  estimateGeometryFromType,
+  shouldUseGeometryFallback,
+} from "@/features/boq/lib/geometry-fallback";
+// Re-export for tests that import from this handler
+export { estimateGeometryFromType } from "@/features/boq/lib/geometry-fallback";
 
 /**
  * TR-007 — Quantity Extractor (real IFC parsing with net area calculations)
@@ -243,23 +207,16 @@ export const handleTR007: NodeHandler = async (ctx) => {
         let unit: string;
         let estimatedFromCount = false;
 
-        // Sparse-geometry sanity check: if extracted area/volume per element is
-        // unreasonably small (< 20% of fallback estimate), the geometry is likely
-        // partial — only a few elements had extractable geometry while most didn't.
-        // In this case, use the fallback estimate for the FULL count instead of
-        // the tiny extracted total. This is the root cause of the "qty=45" bug.
-        const fb = GEOMETRY_FALLBACKS[agg.elementType] ? estimateGeometryFromType(agg.elementType, agg.count) : null;
-        const areaIsSparse = fb?.estArea && agg.grossArea > 0 && agg.count > 1 && (agg.grossArea / agg.count) < (fb.estArea / agg.count * 0.2);
-        const volumeIsSparse = fb?.estVolume && agg.volume > 0 && agg.count > 1 && (agg.volume / agg.count) < (fb.estVolume / agg.count * 0.2);
-        const useGeometryFallback = (agg.grossArea === 0 && agg.volume === 0) || (areaIsSparse && volumeIsSparse);
+        const fb = estimateGeometryFromType(agg.elementType, agg.count);
+        const useFallback = shouldUseGeometryFallback({ elementType: agg.elementType, count: agg.count, grossArea: agg.grossArea, volume: agg.volume });
 
         if (LINEAR_TYPES_P.has(agg.elementType) && agg.length > 0.5) {
           primaryQty = agg.length; unit = "Rmt";
         } else if (LINEAR_TYPES_P.has(agg.elementType) && agg.count > 0) {
           primaryQty = agg.count * (agg.elementType === "IfcRailing" ? 3.0 : 4.0); unit = "Rmt";
-        } else if (!useGeometryFallback && agg.grossArea > 0) {
+        } else if (!useFallback && agg.grossArea > 0) {
           primaryQty = agg.grossArea; unit = "m²";
-        } else if (!useGeometryFallback && agg.volume > 0) {
+        } else if (!useFallback && agg.volume > 0) {
           primaryQty = agg.volume; unit = "m³";
         } else if (fb) {
           primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
@@ -397,11 +354,8 @@ export const handleTR007: NodeHandler = async (ctx) => {
         let unit: string;
         let estimatedFromCount = false;
 
-        // Sparse-geometry sanity check (same as Mode 1 — see comment there)
-        const fb = GEOMETRY_FALLBACKS[agg.elementType] ? estimateGeometryFromType(agg.elementType, agg.count) : null;
-        const areaIsSparse = fb?.estArea && agg.grossArea > 0 && agg.count > 1 && (agg.grossArea / agg.count) < (fb.estArea / agg.count * 0.2);
-        const volumeIsSparse = fb?.estVolume && agg.volume > 0 && agg.count > 1 && (agg.volume / agg.count) < (fb.estVolume / agg.count * 0.2);
-        const useGeometryFallback = (agg.grossArea === 0 && agg.volume === 0) || (areaIsSparse && volumeIsSparse);
+        const fb = estimateGeometryFromType(agg.elementType, agg.count);
+        const useFallback = shouldUseGeometryFallback({ elementType: agg.elementType, count: agg.count, grossArea: agg.grossArea, volume: agg.volume });
 
         if (LINEAR_TYPES.has(agg.elementType) && agg.length > 0.5) {
           primaryQty = agg.length;
@@ -409,10 +363,10 @@ export const handleTR007: NodeHandler = async (ctx) => {
         } else if (LINEAR_TYPES.has(agg.elementType) && agg.count > 0) {
           primaryQty = agg.count * (agg.elementType === "IfcRailing" ? 3.0 : 4.0);
           unit = "Rmt";
-        } else if (!useGeometryFallback && agg.grossArea > 0) {
+        } else if (!useFallback && agg.grossArea > 0) {
           primaryQty = agg.grossArea;
           unit = "m²";
-        } else if (!useGeometryFallback && agg.volume > 0) {
+        } else if (!useFallback && agg.volume > 0) {
           primaryQty = agg.volume;
           unit = "m³";
         } else if (fb) {
