@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Gift, Users, Zap, Copy, Check, Loader2, Info } from "lucide-react";
+import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
 import s from "./settings.module.css";
 
@@ -22,12 +23,19 @@ export function InviteEarnCard() {
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
+  const fetchStats = () => {
     fetch("/api/referral")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setStats(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStats();
+    const onFocus = () => fetchStats();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
   const referralLink = stats?.code
@@ -39,8 +47,11 @@ export function InviteEarnCard() {
     try {
       await navigator.clipboard.writeText(referralLink);
       setCopied(true);
+      toast.success("Referral link copied");
       setTimeout(() => setCopied(false), 2000);
-    } catch { /* */ }
+    } catch {
+      toast.error("Couldn't copy link");
+    }
   };
 
   const generateCode = async () => {
@@ -154,7 +165,7 @@ export function InviteEarnCard() {
                 <div className={s.recentInvitesEmpty}>{t("referral.recentInvitesEmpty")}</div>
               ) : (
                 <div className={s.recentInvitesEmpty}>
-                  {t("referral.recentInvitesEmpty")}
+                  {t("referral.recentInvitesActive").replace(/\{count\}/g, String(r.totalReferred))}
                 </div>
               )}
             </div>

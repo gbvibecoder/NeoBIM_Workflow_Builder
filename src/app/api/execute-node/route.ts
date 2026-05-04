@@ -92,16 +92,22 @@ export async function POST(req: NextRequest) {
 
       // Hard cap: FREE_TIER_EXECUTIONS lifetime executions for FREE tier
       if (lifetimeCompleted >= FREE_TIER_EXECUTIONS) {
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "Free executions used",
-            message: `You've used all ${FREE_TIER_EXECUTIONS} free workflow executions. Upgrade to a paid plan to keep building amazing things!`,
-            code: "RATE_001",
-            action: "View Plans",
-            actionUrl: "/dashboard/billing",
-          }),
-          { status: 429 }
-        );
+        // Try consuming a referral bonus before rejecting
+        const usedBonus = await consumeReferralBonus(userId);
+        if (!usedBonus) {
+          return NextResponse.json(
+            formatErrorResponse({
+              title: "Free executions used",
+              message: `You've used all ${FREE_TIER_EXECUTIONS} free workflow executions. Upgrade to a paid plan to keep building amazing things!`,
+              code: "RATE_001",
+              action: "View Plans",
+              actionUrl: "/dashboard/billing",
+            }),
+            { status: 429 }
+          );
+        }
+        // Bonus consumed — allow execution to proceed
+        console.log(`[referral] FREE user ${userId} consumed referral bonus to execute`);
       }
 
       // Verification gate: (limit - 1) free without verification, then must verify for the last one

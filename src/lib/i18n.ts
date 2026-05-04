@@ -2820,6 +2820,7 @@ const en = {
   'referral.shareWhatsapp': 'Share on WhatsApp',
   'referral.recentInvitesTitle': 'Recent invites',
   'referral.recentInvitesEmpty': 'No invites yet · Share your link to get started.',
+  'referral.recentInvitesActive': '{count} friends joined via your link · {count} bonuses earned',
   'referral.bonusAvailable': 'bonus available',
 
   // ===== EXIT INTENT =====
@@ -6064,6 +6065,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'referral.shareWhatsapp': 'Auf WhatsApp teilen',
   'referral.recentInvitesTitle': 'Neueste Einladungen',
   'referral.recentInvitesEmpty': 'Noch keine Einladungen · Teile deinen Link, um loszulegen.',
+  'referral.recentInvitesActive': '{count} Freunde sind über deinen Link beigetreten · {count} Boni verdient',
   'referral.bonusAvailable': 'Bonus verfügbar',
 
   // ===== EXIT INTENT =====
@@ -6478,7 +6480,7 @@ const de: Record<keyof typeof en, string | string[]> = {
 const translations: Record<Locale, Record<string, string | readonly string[]>> = { en, de };
 
 export function t(key: TranslationKey, locale: Locale = 'en'): string {
-  const val = translations[locale]?.[key] || translations.en[key] || key;
+  const val = translations[locale]?.[key] ?? translations.en[key] ?? key;
   return typeof val === 'string' ? val : val[0] ?? key;
 }
 
