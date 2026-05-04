@@ -30,6 +30,20 @@ export function trackCTAClick(ctaLabel: string, position: string) {
   fireGtag("cta_click", { cta_label: ctaLabel, position });
 }
 
+export function trackReferralClick(params: {
+  authenticated: boolean;
+  position: string;
+}) {
+  fireFbq("trackCustom", "ReferralCTAClick", {
+    authenticated: params.authenticated ? "yes" : "no",
+    position: params.position,
+  });
+  fireGtag("referral_cta_click", {
+    authenticated: params.authenticated ? "yes" : "no",
+    position: params.position,
+  });
+}
+
 export function trackUseCaseClick(usecase: string) {
   fireFbq("track", "InitiateCheckout", {
     content_name: usecase,

@@ -5,6 +5,7 @@ import { LightTestimonials } from "@/features/landing/components/light/LightTest
 import { LightProductProof } from "@/features/landing/components/light/LightProductProof";
 import { LightFourSurfaces } from "@/features/landing/components/light/LightFourSurfaces";
 import { LightPrebuiltWorkflows } from "@/features/landing/components/light/LightPrebuiltWorkflows";
+import { LightReferral } from "@/features/landing/components/light/LightReferral";
 import { LightPricing } from "@/features/landing/components/light/LightPricing";
 import { LightBottomCTA } from "@/features/landing/components/light/LightBottomCTA";
 import { LightSchema } from "@/features/landing/components/light/LightSchema";
@@ -22,6 +23,7 @@ export default function LightLandingPage() {
         <LightProductProof />
         <LightFourSurfaces />
         <LightPrebuiltWorkflows />
+        <LightReferral />
         <LightPricing />
         <LightBottomCTA />
         <LightSchema />

@@ -167,6 +167,32 @@ export function LightBottomCTA() {
           </Link>
         </div>
 
+        {/* Referral pivot link */}
+        <a
+          href="#refer"
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById("refer")?.scrollIntoView({ behavior: "smooth" });
+          }}
+          style={{
+            display: "block",
+            marginTop: 16,
+            fontSize: 14,
+            fontWeight: 400,
+            color: "var(--light-soft)",
+            textDecoration: "none",
+            fontFamily: "var(--font-dm-sans), sans-serif",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.color = "var(--light-ink)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.color = "var(--light-soft)";
+          }}
+        >
+          {t("light.referral.bottomCtaPivot")}
+        </a>
+
         {/* Checkmarks — same style as hero trust strip */}
         <div
           style={{
