@@ -84,7 +84,7 @@ const schemas = [
     "@context": "https://schema.org",
     "@type": "Service",
     name: "BuildFlow — AI Concept Design",
-    serviceType: "AI-powered architectural design automation",
+    serviceType: "AI-powered architectural design automation: floor plan generation, IFC viewer, concept rendering, 3D walkthrough video, BOQ estimation",
     provider: {
       "@type": "Organization",
       name: "BuildFlow",
