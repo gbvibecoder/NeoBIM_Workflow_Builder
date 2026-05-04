@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { trackLead } from "@/lib/meta-pixel";
-import { getUTMParams } from "@/lib/utm";
 
 // ─── Design tokens (matching landing page) ──────────────────────────────────
 
@@ -271,19 +270,10 @@ export default function BookDemoPage() {
     setSubmitting(true);
 
     try {
-      // Attach UTM attribution from sessionStorage
-      const utms = getUTMParams();
-      const payload = {
-        ...formData,
-        ...(utms?.utm_source && { utmSource: utms.utm_source }),
-        ...(utms?.utm_medium && { utmMedium: utms.utm_medium }),
-        ...(utms?.utm_campaign && { utmCampaign: utms.utm_campaign }),
-      };
-
       const res = await fetch("/api/book-demo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formData),
       });
 
       if (res.ok) {

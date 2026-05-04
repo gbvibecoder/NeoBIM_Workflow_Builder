@@ -136,17 +136,16 @@ async function activateSubscription(subscription: {
   charge_at?: number;
 }) {
   // Find user by subscription ID or notes.userId
-  const utmSelect = { id: true, email: true, name: true, role: true, phoneNumber: true, utmSource: true, utmMedium: true, utmCampaign: true, utmTerm: true, utmContent: true } as const;
   let user = await prisma.user.findFirst({
     where: { razorpaySubscriptionId: subscription.id },
-    select: utmSelect,
+    select: { id: true, email: true, name: true, role: true, phoneNumber: true },
   });
 
   // If not found by sub ID, try notes.userId
   if (!user && subscription.notes?.userId) {
     user = await prisma.user.findUnique({
       where: { id: subscription.notes.userId },
-      select: utmSelect,
+      select: { id: true, email: true, name: true, role: true, phoneNumber: true },
     });
   }
 
@@ -267,18 +266,10 @@ async function activateSubscription(subscription: {
     trackServerPurchase({
       userId: user.id,
       email: user.email,
-      phone: user.phoneNumber,
       firstName: user.name?.split(" ")[0],
       plan: newRole,
       currency: "INR",
       value: getPlanValueINR(newRole),
-      utmData: {
-        utm_source: user.utmSource ?? undefined,
-        utm_medium: user.utmMedium ?? undefined,
-        utm_campaign: user.utmCampaign ?? undefined,
-        utm_term: user.utmTerm ?? undefined,
-        utm_content: user.utmContent ?? undefined,
-      },
     }).catch(err => console.warn("[meta-capi]", err));
   }
 }
