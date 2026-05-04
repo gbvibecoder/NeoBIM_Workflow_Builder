@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import { trackEvent } from "@/lib/analytics";
-import { getReferralBonus } from "@/lib/rate-limit";
+import { getReferralBonus, checkEndpointRateLimit } from "@/lib/rate-limit";
 import { REFERRAL_BONUS_PER_CLAIM } from "@/lib/referral";
 
 export async function GET() {
@@ -18,19 +18,31 @@ export async function GET() {
 
     const userId = session.user.id;
 
-    // Fetch all referral records where this user is the referrer
-    const referrals = await prisma.referral.findMany({
-      where: { referrerId: userId },
-    });
+    // Rate limit: 30 requests / minute per user
+    const rl = await checkEndpointRateLimit(userId, "referral-get", 30, "1 m");
+    if (!rl.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
+    // Fetch referral records + check if user was referred, in parallel
+    const [referrals, wasReferred, bonusRemaining] = await Promise.all([
+      prisma.referral.findMany({ where: { referrerId: userId } }),
+      prisma.referral.findFirst({
+        where: { referredId: userId, status: "completed" },
+        select: { id: true },
+      }),
+      getReferralBonus(userId),
+    ]);
 
     // The original code is the one with status "pending" (the reusable link)
     const codeRecord = referrals.find((r) => r.status === "pending");
     // Completed claims (each has a unique claim code)
     const completed = referrals.filter((r) => r.status === "completed").length;
-    const totalEarned = completed * REFERRAL_BONUS_PER_CLAIM;
 
-    // Get actual remaining bonus from Redis (includes bonuses from being referred)
-    const bonusRemaining = await getReferralBonus(userId);
+    // Bonuses earned: from referring others + from being referred
+    const referrerBonus = completed * REFERRAL_BONUS_PER_CLAIM;
+    const referredBonus = wasReferred ? REFERRAL_BONUS_PER_CLAIM : 0;
+    const totalEarned = referrerBonus + referredBonus;
 
     return NextResponse.json({
       code: codeRecord?.code ?? null,
@@ -61,6 +73,12 @@ export async function POST() {
     }
 
     const userId = session.user.id;
+
+    // Rate limit: 10 requests / hour per user
+    const rl = await checkEndpointRateLimit(userId, "referral-post", 10, "1 h");
+    if (!rl.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
 
     // Check if user already has a referral code (pending = the reusable link)
     const existing = await prisma.referral.findFirst({

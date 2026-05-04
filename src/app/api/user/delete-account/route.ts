@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import { checkEndpointRateLimit, redis } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
@@ -57,6 +57,13 @@ export async function POST(req: Request) {
     await prisma.user.delete({
       where: { id: session.user.id },
     });
+
+    // Clean up Redis referral bonus key (Prisma cascade doesn't touch Redis)
+    try {
+      await redis.del(`referral:bonus:${session.user.id}`);
+    } catch (err) {
+      console.warn("[delete-account] Redis cleanup failed:", err);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

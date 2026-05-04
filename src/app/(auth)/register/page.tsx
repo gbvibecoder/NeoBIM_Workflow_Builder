@@ -166,6 +166,11 @@ function RegisterForm() {
         return;
       }
 
+      // Flag referral claim so PendingReferralClaimer can show a welcome toast
+      if (referralCode) {
+        sessionStorage.setItem("bf_referral_claimed", "1");
+      }
+
       trackCompleteRegistration(
         {
           content_name: isEmail ? "email_signup" : "phone_signup",

@@ -296,18 +296,22 @@ export async function getReferralBonus(userId: string): Promise<number> {
 
 /**
  * Atomically consume one referral bonus execution.
+ * Uses a Lua script to ensure the check-and-decrement is atomic,
+ * preventing race conditions with concurrent requests.
  * Returns true if a bonus was available and consumed, false otherwise.
  */
 export async function consumeReferralBonus(userId: string): Promise<boolean> {
   try {
     const key = `referral:bonus:${userId}`;
-    const newVal = await redis.decrby(key, 1);
-    if (newVal < 0) {
-      // Was already 0 or didn't exist — roll back
-      await redis.incrby(key, 1);
-      return false;
-    }
-    return true;
+    // Atomic: only decrement if current value > 0
+    const result = await redis.eval(
+      `local c = tonumber(redis.call('GET', KEYS[1]) or '0')
+       if c > 0 then redis.call('DECRBY', KEYS[1], 1) return 1
+       else return 0 end`,
+      [key],
+      []
+    );
+    return result === 1;
   } catch {
     return false;
   }
