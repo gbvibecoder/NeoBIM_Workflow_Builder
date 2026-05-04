@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, DM_Sans, JetBrains_Mono } from "next/font/google";
+import { LightCookieConsent } from "@/features/landing/components/light/LightCookieConsent";
 
 import "./globals-light.css";
 
@@ -7,6 +8,7 @@ const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
   variable: "--font-instrument",
   display: "swap",
+  preload: true,
   weight: ["400"],
   style: ["normal", "italic"],
 });
@@ -26,12 +28,15 @@ const jetbrains = JetBrains_Mono({
 });
 
 const siteUrl =
-  process.env.NEXT_PUBLIC_APP_URL || "https://buildflow.vercel.app";
+  process.env.NEXT_PUBLIC_APP_URL || "https://trybuildflow.in";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "BuildFlow — AI Concept Design for Architects",
   description:
-    "Upload a project brief. Get 3D massing, concept renders, and cost estimates in minutes. AI-powered workflows for architects and AEC teams.",
+    "Automate BIM workflows for architects. Generate floor plans, 3D massing, IFC models, and BOQ from a project brief in minutes. Free tier, no coding.",
+  formatDetection: { telephone: false },
+  referrer: "origin-when-cross-origin",
   keywords: [
     "AI architecture tool",
     "concept design automation",
@@ -43,6 +48,11 @@ export const metadata: Metadata = {
   ],
   alternates: {
     canonical: "/light",
+    languages: {
+      "en-US": "/light",
+      "de-DE": "/light",
+      "x-default": "/light",
+    },
   },
   openGraph: {
     type: "website",
@@ -52,22 +62,26 @@ export const metadata: Metadata = {
     title: "BuildFlow — AI Concept Design for Architects",
     description:
       "From brief to building in one workflow. AI-powered concept design for AEC professionals.",
+    // TODO: Replace og-image-light.png with a dedicated light-theme OG image.
+    // Currently a copy of og-image.png — design team should produce a light variant.
     images: [
       {
-        url: `${siteUrl}/og-image.png`,
+        url: `${siteUrl}/og-image-light.png`,
         width: 1200,
         height: 630,
-        alt: "BuildFlow — AI Concept Design for Architects",
+        alt: "BuildFlow — Automate BIM workflows. Brief to building in minutes.",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
+    site: "@buildflow",
+    creator: "@buildflow",
     title: "BuildFlow — AI Concept Design for Architects",
     description:
       "From brief to building in one workflow. AI-powered concept design for AEC professionals.",
-    images: [`${siteUrl}/og-image.png`],
+    images: [`${siteUrl}/og-image-light.png`],
   },
   robots: {
     index: true,
@@ -81,6 +95,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: "#FAFAF7",
+  colorScheme: "light",
 };
 
 // JSON-LD schemas — duplicated from root layout (Google deduplicates)
@@ -144,6 +159,7 @@ export default function LightLayout({
         Skip to main content
       </a>
       {children}
+      <LightCookieConsent />
     </div>
   );
 }

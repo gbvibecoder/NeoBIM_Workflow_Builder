@@ -1,29 +1,62 @@
 "use client";
 
-import { Upload, Layers, Presentation } from "lucide-react";
+import Link from "next/link";
+import { FileSpreadsheet, Building2, LayoutGrid, Image } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import type { TranslationKey } from "@/lib/i18n";
 import { ScrollReveal } from "./ScrollReveal";
+import { trackUseCaseClick } from "./LightTrackingEvents";
+import type { TranslationKey } from "@/lib/i18n";
 
-const STEPS = [
-  { num: "01", icon: Upload, titleKey: "light.step1Title" as TranslationKey, descKey: "light.step1Desc" as TranslationKey },
-  { num: "02", icon: Layers, titleKey: "light.step2Title" as TranslationKey, descKey: "light.step2Desc" as TranslationKey },
-  { num: "03", icon: Presentation, titleKey: "light.step3Title" as TranslationKey, descKey: "light.step3Desc" as TranslationKey },
+const CARDS: {
+  icon: typeof FileSpreadsheet;
+  titleKey: TranslationKey;
+  bodyKey: TranslationKey;
+  href: string;
+  slug: string;
+}[] = [
+  {
+    icon: FileSpreadsheet,
+    titleKey: "light.usecases.card1Title",
+    bodyKey: "light.usecases.card1Body",
+    href: "/register?usecase=ifc-boq",
+    slug: "ifc-boq",
+  },
+  {
+    icon: Building2,
+    titleKey: "light.usecases.card2Title",
+    bodyKey: "light.usecases.card2Body",
+    href: "/register?usecase=brief-massing",
+    slug: "brief-massing",
+  },
+  {
+    icon: LayoutGrid,
+    titleKey: "light.usecases.card3Title",
+    bodyKey: "light.usecases.card3Body",
+    href: "/register?usecase=floor-plan",
+    slug: "floor-plan",
+  },
+  {
+    icon: Image,
+    titleKey: "light.usecases.card4Title",
+    bodyKey: "light.usecases.card4Body",
+    href: "/register?usecase=renders",
+    slug: "renders",
+  },
 ];
 
-export function LightWhatItDoes() {
+export function LightUseCases() {
   const { t } = useLocale();
 
   return (
     <section
-      id="what-it-does"
+      id="use-cases"
       style={{
         padding: "var(--light-section-pad) 24px",
         maxWidth: 1080,
         margin: "0 auto",
       }}
     >
-      {/* Section header */}
+      {/* Section header — matches LightWhatItDoes exactly */}
       <ScrollReveal style={{ textAlign: "center", marginBottom: 64 }}>
         <p
           style={{
@@ -36,7 +69,7 @@ export function LightWhatItDoes() {
             margin: "0 0 16px",
           }}
         >
-          {t("light.howLabel")}
+          {t("light.usecases.label")}
         </p>
         <h2
           style={{
@@ -49,29 +82,36 @@ export function LightWhatItDoes() {
             margin: 0,
           }}
         >
-          {t("light.howTitle")}
+          {t("light.usecases.headline")}
         </h2>
       </ScrollReveal>
 
-      {/* 3-column grid */}
+      {/* 4-card grid — card anatomy matches LightWhatItDoes exactly */}
       <ScrollReveal
         stagger
-        className="light-steps-grid"
+        className="light-usecases-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
+          gridTemplateColumns: "repeat(4, 1fr)",
           gap: 24,
+          alignItems: "stretch",
         }}
       >
-        {STEPS.map((step) => (
-          <div
-            key={step.num}
-            className="light-step-card"
+        {CARDS.map((card) => (
+          <Link
+            key={card.slug}
+            href={card.href}
+            onClick={() => trackUseCaseClick(card.slug)}
+            className="light-usecase-card"
             style={{
+              display: "flex",
+              flexDirection: "column",
+              /* Card anatomy — identical to LightWhatItDoes 3-step cards */
               background: "var(--light-bg)",
               border: "1px solid var(--light-border)",
               borderRadius: 10,
-              padding: "32px 28px",
+              padding: "32px 24px",
+              textDecoration: "none",
               transition:
                 "border-color 200ms ease-out, transform 200ms ease-out, box-shadow 200ms ease-out",
             }}
@@ -89,28 +129,14 @@ export function LightWhatItDoes() {
               el.style.boxShadow = "none";
             }}
           >
-            {/* Step number */}
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: "0.12em",
-                color: "var(--light-ink)",
-                fontFamily: "var(--font-jetbrains), monospace",
-                margin: "0 0 16px",
-              }}
-            >
-              {step.num}
-            </p>
-
-            {/* Icon */}
-            <step.icon
+            {/* Icon — line-art lucide, ink color, matches WhatItDoes icons */}
+            <card.icon
               size={28}
               strokeWidth={1.5}
               style={{ color: "var(--light-ink)", marginBottom: 16 }}
             />
 
-            {/* Title */}
+            {/* Title — DM Sans 600, 20px, matches WhatItDoes h3 */}
             <h3
               style={{
                 fontSize: 20,
@@ -121,10 +147,10 @@ export function LightWhatItDoes() {
                 margin: "0 0 12px",
               }}
             >
-              {t(step.titleKey)}
+              {t(card.titleKey)}
             </h3>
 
-            {/* Description */}
+            {/* Body — 15px, matches WhatItDoes description */}
             <p
               style={{
                 fontSize: 15,
@@ -133,26 +159,32 @@ export function LightWhatItDoes() {
                 color: "var(--light-soft)",
                 fontFamily: "var(--font-dm-sans), sans-serif",
                 margin: 0,
+                flex: 1,
               }}
             >
-              {t(step.descKey)}
+              {t(card.bodyKey)}
             </p>
-          </div>
+          </Link>
         ))}
       </ScrollReveal>
 
       <style>{`
-        @media (max-width: 768px) {
-          #what-it-does > div:first-child {
-            margin-bottom: 40px !important;
+        @media (max-width: 1024px) {
+          .light-usecases-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
           }
-          .light-steps-grid {
+        }
+        @media (max-width: 640px) {
+          .light-usecases-grid {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
           }
+          #use-cases {
+            padding: var(--light-section-pad) 24px !important;
+          }
         }
         @media (max-width: 480px) {
-          #what-it-does {
+          #use-cases {
             padding: var(--light-section-pad) 16px !important;
           }
         }

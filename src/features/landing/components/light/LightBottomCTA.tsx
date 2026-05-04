@@ -3,33 +3,30 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { LightHeroPipeline } from "./LightHeroPipeline";
+import { ScrollReveal } from "./ScrollReveal";
 import { trackCTAClick } from "./LightTrackingEvents";
 import type { TranslationKey } from "@/lib/i18n";
 
-const TRUST_KEYS: TranslationKey[] = [
-  "light.heroTrust1",
-  "light.heroTrust2",
-  "light.heroTrust3",
+const CHECKS: TranslationKey[] = [
+  "light.bottomCta.check1",
+  "light.bottomCta.check2",
+  "light.bottomCta.check3",
 ];
 
-export function LightHero() {
+export function LightBottomCTA() {
   const { t } = useLocale();
 
   return (
     <section
-      aria-label="Hero"
+      aria-label="Call to action"
       style={{
         position: "relative",
         overflow: "hidden",
-        minHeight: "72vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "flex-start",
+        padding: "var(--light-section-pad) 24px",
+        background: "var(--light-bg)",
       }}
     >
-      {/* Dot grid with radial fade mask — full viewport width */}
+      {/* Dot grid with radial fade mask — mirrors hero exactly */}
       <div
         aria-hidden="true"
         style={{
@@ -48,20 +45,16 @@ export function LightHero() {
         }}
       />
 
-      {/* Content — constrained width, above decorative layers */}
-      <div
-        className="light-reveal"
+      <ScrollReveal
         style={{
           position: "relative",
           zIndex: 1,
-          textAlign: "center",
-          maxWidth: 1200,
-          width: "100%",
-          padding: "clamp(48px, 8vh, 96px) 24px var(--light-section-pad)",
+          maxWidth: 720,
           margin: "0 auto",
+          textAlign: "center",
         }}
       >
-        {/* Mono label */}
+        {/* Mono label — same treatment as hero eyebrow */}
         <p
           style={{
             fontSize: 11,
@@ -70,32 +63,29 @@ export function LightHero() {
             textTransform: "uppercase",
             color: "var(--light-soft)",
             fontFamily: "var(--font-jetbrains), monospace",
-            margin: 0,
+            margin: "0 0 16px",
           }}
         >
-          {t("light.heroEyebrow")}
+          {t("light.bottomCta.label")}
         </p>
 
-        {/* h1 — editorial headline with italic emphasis */}
-        <h1
+        {/* H2 — Instrument Serif with italic emphasis on "Today." */}
+        <h2
           style={{
-            fontSize: "clamp(2.5rem, 5vw, 4rem)",
+            fontSize: "clamp(1.8rem, 3.5vw, 2.5rem)",
             fontWeight: 400,
-            lineHeight: 1.1,
+            lineHeight: 1.15,
             letterSpacing: "-0.02em",
             color: "var(--light-ink)",
             fontFamily: "var(--font-instrument), serif",
-            margin: "8px auto 0",
-            maxWidth: 900,
+            margin: "0 0 12px",
           }}
         >
-          {t("light.heroHeadline1")}
-          <br />
-          {t("light.heroHeadline2")}{" "}
-          <em style={{ fontStyle: "italic" }}>{t("light.heroHeadlineEm")}</em>
-        </h1>
+          From brief to building.{" "}
+          <em style={{ fontStyle: "italic" }}>Today.</em>
+        </h2>
 
-        {/* Subtitle */}
+        {/* Subhead — matches hero subhead styling */}
         <p
           style={{
             fontSize: 18,
@@ -103,28 +93,25 @@ export function LightHero() {
             lineHeight: 1.6,
             color: "var(--light-soft)",
             fontFamily: "var(--font-dm-sans), sans-serif",
-            maxWidth: 640,
-            margin: "24px auto 0",
+            margin: "0 0 40px",
           }}
         >
-          {t("light.heroSubhead")}
+          {t("light.bottomCta.subhead")}
         </p>
 
-        {/* CTA pair */}
+        {/* CTA pair — identical to hero CTAs */}
         <div
-          className="light-hero-ctas"
+          className="light-bottom-ctas"
           style={{
-            marginTop: 40,
             display: "flex",
             gap: 12,
             justifyContent: "center",
             flexWrap: "wrap",
           }}
         >
-          {/* Primary CTA */}
           <Link
             href="/register"
-            onClick={() => trackCTAClick("Get Started Free", "hero_primary")}
+            onClick={() => trackCTAClick("Get Started Free", "bottom")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -150,11 +137,9 @@ export function LightHero() {
           >
             {t("light.heroPrimaryCTA")}
           </Link>
-
-          {/* Ghost CTA — Book Demo */}
           <Link
             href="/book-demo"
-            onClick={() => trackCTAClick("Book a Demo", "hero_secondary")}
+            onClick={() => trackCTAClick("Book a Demo", "bottom_secondary")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -182,9 +167,8 @@ export function LightHero() {
           </Link>
         </div>
 
-        {/* Trust signals */}
+        {/* Checkmarks — same style as hero trust strip */}
         <div
-          className="light-hero-trust"
           style={{
             marginTop: 24,
             display: "flex",
@@ -193,7 +177,7 @@ export function LightHero() {
             flexWrap: "wrap",
           }}
         >
-          {TRUST_KEYS.map((key) => (
+          {CHECKS.map((key) => (
             <span
               key={key}
               style={{
@@ -214,32 +198,18 @@ export function LightHero() {
             </span>
           ))}
         </div>
-      </div>
-
-      {/* Animated pipeline visual — hidden on mobile */}
-      <LightHeroPipeline />
+      </ScrollReveal>
 
       <style>{`
-        @media (max-width: 768px) {
-          section[aria-label="Hero"] {
-            min-height: auto !important;
-          }
-          section[aria-label="Hero"] .light-reveal {
-            padding-top: 32px !important;
-          }
-          section[aria-label="Hero"] h1 {
-            font-size: clamp(2rem, 7vw, 2.5rem) !important;
-          }
-        }
         @media (max-width: 480px) {
-          section[aria-label="Hero"] .light-reveal {
-            padding: 32px 16px 48px !important;
+          section[aria-label="Call to action"] {
+            padding: var(--light-section-pad) 16px !important;
           }
-          .light-hero-ctas {
+          .light-bottom-ctas {
             flex-direction: column !important;
             gap: 8px !important;
           }
-          .light-hero-ctas a {
+          .light-bottom-ctas a {
             width: 100% !important;
           }
         }
