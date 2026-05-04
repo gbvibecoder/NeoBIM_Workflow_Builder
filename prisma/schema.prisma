@@ -37,6 +37,15 @@ model User {
   // Gamification
   xp                     Int       @default(0)
   level                  Int       @default(1)
+  // ── Attribution — first-touch UTMs captured at signup ──
+  utmSource              String?
+  utmMedium              String?
+  utmCampaign            String?
+  utmTerm                String?
+  utmContent             String?
+  referrer               String?
+  landingPage            String?
+  acquisitionDate        DateTime?
 
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
@@ -63,6 +72,8 @@ model User {
   videoJobs            VideoJob[]
   briefRenderJobs      BriefRenderJob[]
 
+  @@index([utmSource])
+  @@index([utmCampaign])
   @@map("users")
 }
 

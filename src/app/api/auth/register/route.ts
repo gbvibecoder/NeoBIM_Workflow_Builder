@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, email, password, source, referralCode, phoneNumber: rawPhone, signupEventId } = await req.json();
+    const {
+      name, email, password, source, referralCode, phoneNumber: rawPhone, signupEventId,
+      utmSource, utmMedium, utmCampaign, utmTerm, utmContent, referrer: clientReferrer,
+    } = await req.json();
 
     // Validate required fields
     if (!email || !email.trim()) {
@@ -113,12 +116,23 @@ export async function POST(req: NextRequest) {
     // Hash password and create user
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Sanitize UTM strings: trim, cap at 500 chars, coerce to string | undefined
+    const safeStr = (v: unknown): string | undefined =>
+      typeof v === "string" && v.trim() ? v.trim().slice(0, 500) : undefined;
+
     const user = await prisma.user.create({
       data: {
         name,
         email: normalizedEmail,
         password: hashedPassword,
         ...(normalizedPhone && { phoneNumber: normalizedPhone }),
+        utmSource: safeStr(utmSource),
+        utmMedium: safeStr(utmMedium),
+        utmCampaign: safeStr(utmCampaign),
+        utmTerm: safeStr(utmTerm),
+        utmContent: safeStr(utmContent),
+        referrer: safeStr(clientReferrer),
+        acquisitionDate: new Date(),
       },
       select: { id: true, email: true, name: true },
     });

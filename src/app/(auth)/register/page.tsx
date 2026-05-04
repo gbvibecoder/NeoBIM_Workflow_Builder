@@ -11,6 +11,7 @@ import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
 import { trackAdsConversion, trackCompleteRegistration, trackRegisterPageView } from "@/lib/meta-pixel";
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
+import { getUTMParams } from "@/lib/utm";
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
 
@@ -123,6 +124,15 @@ function RegisterForm() {
       }
       if (referralCode) body.referralCode = referralCode;
 
+      // Attach UTM attribution from sessionStorage (captured on landing)
+      const utms = getUTMParams();
+      if (utms?.utm_source) body.utmSource = utms.utm_source;
+      if (utms?.utm_medium) body.utmMedium = utms.utm_medium;
+      if (utms?.utm_campaign) body.utmCampaign = utms.utm_campaign;
+      if (utms?.utm_term) body.utmTerm = utms.utm_term;
+      if (utms?.utm_content) body.utmContent = utms.utm_content;
+      if (typeof document !== "undefined" && document.referrer) body.referrer = document.referrer;
+
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -187,6 +197,14 @@ function RegisterForm() {
     try {
       if (referralCode) {
         localStorage.setItem("pending_referral_code", referralCode);
+      }
+      // Stash UTMs in a short-lived cookie so auth.ts events.createUser can
+      // persist them on the User row after Google OAuth completes server-side.
+      const pendingUtms = getUTMParams();
+      if (pendingUtms) {
+        try {
+          document.cookie = `bf_pending_utm=${encodeURIComponent(JSON.stringify(pendingUtms))};max-age=600;path=/;samesite=lax`;
+        } catch { /* cookie write failed — UTMs will be null, acceptable */ }
       }
       trackCompleteRegistration({ content_name: "google_signup" });
       // Google Ads conversion + sign_up_complete dataLayer push are DEFERRED
