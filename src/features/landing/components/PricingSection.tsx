@@ -14,6 +14,7 @@ import {
   Box,
   Image as ImageIcon,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useLocale } from "@/hooks/useLocale";
 import { trackViewContent } from "@/lib/meta-pixel";
 import { fadeUp, smoothEase } from "@/features/landing/lib/landing-helpers";
@@ -87,6 +88,8 @@ interface Plan {
 
 export function PricingSection() {
   const { t, tArray } = useLocale();
+  const { data: session } = useSession();
+  const ctaHref = (tier: string) => session ? "/dashboard" : `/register?plan=${tier.toLowerCase()}`;
 
   const plans: Plan[] = [
     {
@@ -107,7 +110,7 @@ export function PricingSection() {
       ],
       features: tArray("landing.miniFeatures").map(s => interpolatePlanString(s, "MINI")),
       cta: t("landing.startNow"),
-      ctaHref: "/dashboard",
+      ctaHref: ctaHref("Mini"),
       ctaTrack: "pricing_cta_mini",
       ctaIsLink: true,
       ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
@@ -133,7 +136,7 @@ export function PricingSection() {
       ],
       features: tArray("landing.starterFeatures").map(s => interpolatePlanString(s, "STARTER")),
       cta: t("landing.startNow"),
-      ctaHref: "/dashboard",
+      ctaHref: ctaHref("Starter"),
       ctaTrack: "pricing_cta_starter",
       ctaIsLink: true,
       ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
@@ -159,7 +162,7 @@ export function PricingSection() {
       ],
       features: tArray("landing.proFeatures").map(s => interpolatePlanString(s, "PRO")),
       cta: t("landing.startNow"),
-      ctaHref: "/dashboard",
+      ctaHref: ctaHref("Pro"),
       ctaTrack: "pricing_cta_pro",
       ctaIsLink: true,
       ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
@@ -192,7 +195,7 @@ export function PricingSection() {
         t("billing.teamFeature6"),
       ],
       cta: t("landing.startNow"),
-      ctaHref: "/dashboard",
+      ctaHref: ctaHref("Team"),
       ctaTrack: "pricing_cta_team",
       ctaIsLink: true,
       ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,

@@ -146,6 +146,12 @@ export const STRIPE_PLANS = {
   },
 } as const;
 
+// ── Free-tier constant — single source of truth ─────────────────────────
+// All user-facing copy that mentions the free execution count MUST reference
+// this constant (or STRIPE_PLANS.FREE.limits.runsPerMonth, which it mirrors).
+// The Redis rate-limiter reads from the env var; keep .env in sync.
+export const FREE_TIER_EXECUTIONS = STRIPE_PLANS.FREE.limits.runsPerMonth;
+
 // ── Helpers that only need STRIPE_PLANS (no Stripe SDK) ──────────────────
 
 export function getBriefRendersMonthlyLimit(role: string): number {

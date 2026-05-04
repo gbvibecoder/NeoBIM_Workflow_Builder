@@ -2,6 +2,7 @@
  * User-friendly error messages for API failures
  * Maps error types to actionable user messages
  */
+import { FREE_TIER_EXECUTIONS } from "@/features/billing/lib/plan-data";
 
 export interface UserError {
   title: string;
@@ -60,7 +61,7 @@ export const UserErrors = {
   // Rate Limiting
   RATE_LIMIT_FREE: (_resetDays?: number): UserError => ({
     title: "Free executions used",
-    message: "You've used all 3 free workflow executions. Upgrade to a paid plan to keep building!",
+    message: `You've used all ${FREE_TIER_EXECUTIONS} free workflow executions. Upgrade to a paid plan to keep building!`,
     action: "Upgrade to Mini",
     actionUrl: "/dashboard/billing",
     code: "RATE_001",

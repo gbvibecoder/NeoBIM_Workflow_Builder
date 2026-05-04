@@ -1,6 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { trackRateLimitHit } from "./analytics";
+import { FREE_TIER_EXECUTIONS } from "@/features/billing/lib/plan-data";
 
 // Initialize Redis client for Upstash
 export let redis: Redis;
@@ -42,7 +43,7 @@ try {
   });
 }
 
-const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_MONTH || "2");
+const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_MONTH || String(FREE_TIER_EXECUTIONS));
 const MINI_TIER_LIMIT = parseInt(process.env.MINI_TIER_EXECUTIONS_PER_MONTH || "6");
 const STARTER_TIER_LIMIT = parseInt(process.env.STARTER_TIER_EXECUTIONS_PER_MONTH || "30");
 const PRO_TIER_LIMIT = parseInt(process.env.PRO_TIER_EXECUTIONS_PER_MONTH || "100");

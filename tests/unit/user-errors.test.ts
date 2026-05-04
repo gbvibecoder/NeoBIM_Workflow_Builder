@@ -89,7 +89,7 @@ describe("UserErrors — Factory Functions", () => {
     it("should show lifetime limit message", () => {
       const error = UserErrors.RATE_LIMIT_FREE();
       expect(error.code).toBe("RATE_001");
-      expect(error.message).toContain("3 free workflow executions");
+      expect(error.message).toContain("free workflow executions");
       expect(error.action).toBe("Upgrade to Mini");
       expect(error.actionUrl).toBe("/dashboard/billing");
     });

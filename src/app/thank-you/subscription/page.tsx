@@ -78,6 +78,13 @@ function Content() {
     const value = getPlanValueINR(planKey);
     const eventID = userId ? getPurchaseEventId(userId, planKey) : undefined;
 
+    // Idempotency guard: skip conversion fires if this purchase was already
+    // tracked in this session (prevents double-fire on page refresh).
+    const fireKey = eventID ? `bf_purchase_fired_${eventID}` : null;
+    if (fireKey && typeof window !== "undefined" && sessionStorage.getItem(fireKey)) {
+      return;
+    }
+
     trackPurchase(
       {
         content_name: `BuildFlow ${plan?.name || "Subscription"}`,
@@ -100,6 +107,11 @@ function Content() {
         currency: "INR",
         ...(eventID && { transaction_id: eventID }),
       });
+    }
+
+    // Mark this purchase as fired so page refresh won't re-trigger
+    if (fireKey && typeof window !== "undefined") {
+      sessionStorage.setItem(fireKey, "1");
     }
   }, [session, plan, userRole, planFromUrl]);
 

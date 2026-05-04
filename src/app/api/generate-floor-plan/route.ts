@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
+import { FREE_TIER_EXECUTIONS } from "@/features/billing/lib/plan-data";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import { generateFloorPlan } from "@/features/ai/services/openai";
 import { logger } from "@/lib/logger";
@@ -253,29 +254,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── FREE tier: 3 lifetime executions (2 unverified + 1 after verification) ──
+    // ── FREE tier: lifetime executions (limit - 1 unverified + 1 after verification) ──
     if (!isAdmin && userRole === "FREE") {
       const lifetimeCompleted = await prisma.execution.count({
         where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
       });
 
-      // Hard cap: 3 lifetime executions
-      if (lifetimeCompleted >= 3) {
+      // Hard cap: FREE_TIER_EXECUTIONS lifetime executions
+      if (lifetimeCompleted >= FREE_TIER_EXECUTIONS) {
         return NextResponse.json(
-          { error: "PLAN_LIMIT", title: "Free executions used", message: "You've used all 3 free executions. Upgrade to keep building amazing floor plans!", action: "View Plans", actionUrl: "/dashboard/billing" },
+          { error: "PLAN_LIMIT", title: "Free executions used", message: `You've used all ${FREE_TIER_EXECUTIONS} free executions. Upgrade to keep building amazing floor plans!`, action: "View Plans", actionUrl: "/dashboard/billing" },
           { status: 429 }
         );
       }
 
-      // Verification gate: after 2, must verify email for the last one
+      // Verification gate: after (limit - 1), must verify email for the last one
       let isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
       if (!isEmailVerified) {
         const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { emailVerified: true } });
         isEmailVerified = !!dbUser?.emailVerified;
       }
-      if (!isEmailVerified && lifetimeCompleted >= 2) {
+      if (!isEmailVerified && lifetimeCompleted >= FREE_TIER_EXECUTIONS - 1) {
         return NextResponse.json(
-          { error: "EMAIL_VERIFY", title: "Verify your email", message: "You've used 2 of your 3 free executions. Verify your email to unlock your final free floor plan!", action: "Verify Email", actionUrl: "/dashboard/settings" },
+          { error: "EMAIL_VERIFY", title: "Verify your email", message: `You've used ${FREE_TIER_EXECUTIONS - 1} of your ${FREE_TIER_EXECUTIONS} free executions. Verify your email to unlock your final free floor plan!`, action: "Verify Email", actionUrl: "/dashboard/settings" },
           { status: 403 }
         );
       }

@@ -2121,7 +2121,7 @@ export default function LandingPage() {
             { value: 12400, decimals: 0, suffix: '', prefix: '', label: t('landing.statDesigned'), color: '#B87333' },
             { value: 847, decimals: 0, suffix: '', prefix: '', label: t('landing.statExecuted'), color: '#00F5FF' },
             { value: 31, decimals: 0, suffix: '', prefix: '', label: t('landing.statNodes'), color: '#FFBF00' },
-            { value: 2.4, decimals: 1, suffix: 'M', prefix: '€', label: t('landing.statEstimated'), color: '#B87333' },
+            { value: 2.4, decimals: 1, suffix: 'M', prefix: '₹', label: t('landing.statEstimated'), color: '#B87333' },
           ].map((stat, i) => (
             <React.Fragment key={stat.label}>
               <motion.div variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.1, ease: smoothEase }} style={{ textAlign: 'center', minWidth: 120 }}>
