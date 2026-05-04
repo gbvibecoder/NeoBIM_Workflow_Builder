@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import Link from "next/link";
 import { Play } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { ScrollReveal } from "./ScrollReveal";
+import { trackCTAClick } from "./LightTrackingEvents";
 
 const VIDEO_URL =
   "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos/text-to-concept-building.mp4";
@@ -179,6 +181,37 @@ export function LightProductProof() {
           >
             {t("light.proofSubtitle")}
           </p>
+
+          {/* Book a Demo CTA — moved here from hero for single-CTA hero */}
+          <Link
+            href="/book-demo"
+            onClick={() => trackCTAClick("Book a Demo", "below_video")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: 44,
+              padding: "0 24px",
+              borderRadius: 8,
+              background: "transparent",
+              color: "var(--light-accent)",
+              fontSize: 15,
+              fontWeight: 600,
+              textDecoration: "none",
+              fontFamily: "var(--font-dm-sans), sans-serif",
+              border: "1px solid var(--light-accent)",
+              marginTop: 20,
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background =
+                "rgba(74, 107, 77, 0.06)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+            }}
+          >
+            {t("light.heroSecondaryCTA")}
+          </Link>
         </div>
       </ScrollReveal>
 
