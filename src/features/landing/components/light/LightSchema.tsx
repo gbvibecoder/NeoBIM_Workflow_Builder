@@ -127,6 +127,74 @@ const schemas = [
     description:
       "Automate BIM workflows for architects. Generate floor plans, 3D massing, IFC models, and BOQ from a project brief in minutes — no coding required.",
   },
+  // ── Product Reviews schema ─────────────────────────────────────────────
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: "BuildFlow",
+    review: [
+      {
+        "@type": "Review",
+        author: {
+          "@type": "Person",
+          name: "Rekha Gupta",
+          jobTitle: "Senior Architect",
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: "Pune",
+            addressCountry: "IN",
+          },
+        },
+        reviewBody:
+          "Earlier my team would spend 2\u20133 days preparing BOQ from drawings. With BuildFlow we upload the IFC and have itemized quantities with INR costs in minutes. Every project this saves us a full work-week.",
+        reviewRating: {
+          "@type": "Rating",
+          ratingValue: "5",
+          bestRating: "5",
+        },
+      },
+      {
+        "@type": "Review",
+        author: {
+          "@type": "Person",
+          name: "Shailesh Kumar",
+          jobTitle: "Principal Architect",
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: "Mumbai",
+            addressCountry: "IN",
+          },
+        },
+        reviewBody:
+          "The 3D rendering and video walkthrough quality is genuinely client-presentation ready. We used to outsource visualizations \u2014 now we generate them in-house from the same brief in 90 seconds.",
+        reviewRating: {
+          "@type": "Rating",
+          ratingValue: "5",
+          bestRating: "5",
+        },
+      },
+      {
+        "@type": "Review",
+        author: {
+          "@type": "Person",
+          name: "Raj Mohite",
+          jobTitle: "Founder, Studio M & Associates",
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: "Nashik",
+            addressCountry: "IN",
+          },
+        },
+        reviewBody:
+          "Drop a project PDF, get back floor plans, 3D massing and renders. Honestly the first AEC tool that actually does what it promises \u2014 start to finish, no jumping between five different software.",
+        reviewRating: {
+          "@type": "Rating",
+          ratingValue: "5",
+          bestRating: "5",
+        },
+      },
+    ],
+  },
 ];
 
 export function LightSchema() {
