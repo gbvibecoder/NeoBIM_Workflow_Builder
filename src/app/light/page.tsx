@@ -1,9 +1,10 @@
 import { LightNav } from "@/features/landing/components/light/LightNav";
 import { LightHero } from "@/features/landing/components/light/LightHero";
 import { LightSocialProof } from "@/features/landing/components/light/LightSocialProof";
+import { LightTestimonials } from "@/features/landing/components/light/LightTestimonials";
 import { LightProductProof } from "@/features/landing/components/light/LightProductProof";
-import { LightUseCases } from "@/features/landing/components/light/LightUseCases";
-import { LightWhatItDoes } from "@/features/landing/components/light/LightWhatItDoes";
+import { LightFourSurfaces } from "@/features/landing/components/light/LightFourSurfaces";
+import { LightPrebuiltWorkflows } from "@/features/landing/components/light/LightPrebuiltWorkflows";
 import { LightPricing } from "@/features/landing/components/light/LightPricing";
 import { LightFAQ } from "@/features/landing/components/light/LightFAQ";
 import { LightBottomCTA } from "@/features/landing/components/light/LightBottomCTA";
@@ -11,7 +12,6 @@ import { LightFAQSchema } from "@/features/landing/components/light/LightFAQSche
 import { LightSchema } from "@/features/landing/components/light/LightSchema";
 import { LightFooter } from "@/features/landing/components/light/LightFooter";
 import { LightTrackingEvents } from "@/features/landing/components/light/LightTrackingEvents";
-import { LightTestimonials } from "@/features/landing/components/light/LightTestimonials";
 
 export default function LightLandingPage() {
   return (
@@ -22,8 +22,8 @@ export default function LightLandingPage() {
         <LightSocialProof />
         <LightTestimonials />
         <LightProductProof />
-        <LightUseCases />
-        <LightWhatItDoes />
+        <LightFourSurfaces />
+        <LightPrebuiltWorkflows />
         <LightPricing />
         <LightFAQ />
         <LightBottomCTA />

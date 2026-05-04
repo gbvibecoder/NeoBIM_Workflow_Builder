@@ -79,7 +79,7 @@ export function LightTestimonials() {
         </h2>
       </ScrollReveal>
 
-      {/* 3-card grid — card anatomy matches LightWhatItDoes exactly */}
+      {/* 3-card grid */}
       <ScrollReveal
         stagger
         className="light-testimonials-grid"

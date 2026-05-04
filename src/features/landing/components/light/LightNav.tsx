@@ -23,7 +23,7 @@ export function LightNav() {
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   const navLinks = [
-    { label: t("landing.features"), href: "#what-it-does" },
+    { label: t("landing.features"), href: "#four-surfaces" },
     { label: t("landing.pricing"), href: "#pricing" },
     { label: t("landing.faqSection"), href: "#faq" },
   ];
