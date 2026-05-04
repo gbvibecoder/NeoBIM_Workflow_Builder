@@ -132,8 +132,22 @@ export async function trackServerPurchase(params: {
   value?: number;
   ip?: string;
   userAgent?: string;
+  /** UTM attribution data — forwarded to Meta CAPI custom_data for campaign attribution. */
+  utmData?: Record<string, string | undefined>;
 }): Promise<void> {
   const eventId = getPurchaseEventId(params.userId, params.plan);
+
+  // Merge UTM data into custom_data so Meta can attribute the purchase to a campaign.
+  const customData: Record<string, unknown> = {
+    content_name: `BuildFlow ${params.plan} Plan`,
+    currency: params.currency || "INR",
+    value: params.value || 0,
+  };
+  if (params.utmData) {
+    for (const [key, value] of Object.entries(params.utmData)) {
+      if (value) customData[key] = value;
+    }
+  }
 
   await sendMetaConversion({
     eventName: "Purchase",
@@ -145,11 +159,7 @@ export async function trackServerPurchase(params: {
       clientIpAddress: params.ip,
       clientUserAgent: params.userAgent,
     },
-    customData: {
-      content_name: `BuildFlow ${params.plan} Plan`,
-      currency: params.currency || "INR",
-      value: params.value || 0,
-    },
+    customData,
     eventSourceUrl: "https://trybuildflow.in/thank-you/subscription",
   });
 }

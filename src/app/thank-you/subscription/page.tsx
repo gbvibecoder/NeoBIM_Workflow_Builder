@@ -12,6 +12,7 @@ import {
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { trackAdsConversion, trackPurchase } from "@/lib/meta-pixel";
 import { getPurchaseEventId, getPlanValueINR } from "@/lib/plan-pricing";
+import { getUTMParams } from "@/lib/utm";
 
 /* ── Plan data ───────────────────────────────────────────────── */
 const PLANS: Record<string, {
@@ -93,11 +94,16 @@ function Content() {
       },
       eventID ? { eventID } : undefined,
     );
+    // Read UTMs from sessionStorage for Google Ads campaign attribution
+    const purchaseUtms = getUTMParams();
     pushToDataLayer("purchase_complete", {
       plan: plan?.name || userRole,
       currency: "INR",
       value,
       ...(eventID && { event_id: eventID }),
+      ...(purchaseUtms?.utm_source && { campaign_source: purchaseUtms.utm_source }),
+      ...(purchaseUtms?.utm_medium && { campaign_medium: purchaseUtms.utm_medium }),
+      ...(purchaseUtms?.utm_campaign && { campaign_name: purchaseUtms.utm_campaign }),
     });
 
     const purchaseAdsLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_PURCHASE_LABEL;
@@ -106,6 +112,8 @@ function Content() {
         value,
         currency: "INR",
         ...(eventID && { transaction_id: eventID }),
+        ...(purchaseUtms?.utm_source && { campaign_source: purchaseUtms.utm_source }),
+        ...(purchaseUtms?.utm_campaign && { campaign_name: purchaseUtms.utm_campaign }),
       });
     }
 

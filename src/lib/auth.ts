@@ -130,6 +130,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           sameSite: "lax",
           secure: process.env.NODE_ENV === "production",
         });
+
+        // Persist first-touch UTMs from the bf_pending_utm cookie set by the
+        // register page before initiating Google OAuth. This is the only window
+        // to capture campaign attribution for OAuth signups.
+        const utmCookie = cookieStore.get("bf_pending_utm");
+        if (utmCookie?.value) {
+          try {
+            const utms = JSON.parse(decodeURIComponent(utmCookie.value)) as Record<string, string>;
+            const safeStr = (v: unknown): string | undefined =>
+              typeof v === "string" && v.trim() ? v.trim().slice(0, 500) : undefined;
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                utmSource: safeStr(utms.utm_source),
+                utmMedium: safeStr(utms.utm_medium),
+                utmCampaign: safeStr(utms.utm_campaign),
+                utmTerm: safeStr(utms.utm_term),
+                utmContent: safeStr(utms.utm_content),
+                acquisitionDate: new Date(),
+              },
+            });
+            // Clear the cookie after successful persistence
+            cookieStore.set("bf_pending_utm", "", { maxAge: 0, path: "/" });
+          } catch (parseErr) {
+            console.warn("[auth] Failed to parse/persist OAuth UTMs:", parseErr);
+          }
+        }
       } catch {
         // Cookie setting can fail outside a request context — fail silent
         // so sign-in is never blocked.

@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
           // Send welcome email (fire-and-forget)
           const checkoutUser = await prisma.user.findFirst({
             where: { stripeCustomerId: customerId },
-            select: { id: true, email: true, name: true, role: true, phoneNumber: true },
+            select: { id: true, email: true, name: true, role: true, phoneNumber: true, utmSource: true, utmMedium: true, utmCampaign: true, utmTerm: true, utmContent: true },
           });
           if (checkoutUser?.email) {
             sendWelcomeEmail(checkoutUser.email, checkoutUser.name, checkoutUser.role).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
@@ -95,6 +95,13 @@ export async function POST(req: NextRequest) {
               plan: checkoutUser.role,
               currency: "INR",
               value: amountTotalINR ?? getPlanValueINR(checkoutUser.role),
+              utmData: {
+                utm_source: checkoutUser.utmSource ?? undefined,
+                utm_medium: checkoutUser.utmMedium ?? undefined,
+                utm_campaign: checkoutUser.utmCampaign ?? undefined,
+                utm_term: checkoutUser.utmTerm ?? undefined,
+                utm_content: checkoutUser.utmContent ?? undefined,
+              },
             }).catch(err => console.warn("[meta-capi]", err));
           }
         }
