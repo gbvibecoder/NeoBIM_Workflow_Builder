@@ -170,7 +170,7 @@ If unsure, default to the feature folder. It's easier to move something to share
 
 **Node catalogue:** `src/features/workflows/constants/node-catalogue.ts` defines all available workflow nodes with categories: input (blue), transform (purple), generate (green), export (amber). IDs follow pattern: `IN-001`, `TR-001`, `GE-001`, `EX-001`.
 
-**Rate limiting:** Upstash Redis sliding window — 5/month (FREE), 10/month (MINI), 30/month (STARTER), 100/month (PRO). TEAM_ADMIN/PLATFORM_ADMIN bypass limits. Admin emails bypass limits. Per-node-type metered limits (video, 3D, render) use atomic Redis INCR with monthly auto-expiry. Logic in `src/lib/rate-limit.ts`.
+**Rate limiting:** Upstash Redis sliding window — 2/month (FREE, controlled by `FREE_TIER_EXECUTIONS_PER_MONTH` env var, canonical constant in `plan-data.ts`), 6/month (MINI), 30/month (STARTER), 100/month (PRO). TEAM_ADMIN/PLATFORM_ADMIN bypass limits. Admin emails bypass limits. Per-node-type metered limits (video, 3D, render) use atomic Redis INCR with monthly auto-expiry. Logic in `src/lib/rate-limit.ts`.
 
 **Brief-to-Renders pipeline (`src/features/brief-renders/`):**
 A self-contained PDF/DOCX → photoreal-renders + editorial PDF flow that
