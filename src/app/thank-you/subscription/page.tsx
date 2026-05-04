@@ -52,6 +52,7 @@ function Content() {
   const [copied, setCopied] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const firedRef = useRef(false);
+  const syncedRef = useRef(false);
 
   const planFromUrl = searchParams.get("plan")?.toUpperCase() || "";
   const userRole = (session?.user as { role?: string })?.role || "FREE";
@@ -103,7 +104,8 @@ function Content() {
   }, [session, plan, userRole, planFromUrl]);
 
   useEffect(() => {
-    if (!session?.user) return;
+    if (!session?.user || syncedRef.current) return;
+    syncedRef.current = true;
     // Safety-net sync: re-query both payment providers in parallel. Whichever
     // reports synced=true wins — e.g. a Razorpay user whose /verify call
     // failed mid-redirect is recovered here without waiting for the webhook.
@@ -130,7 +132,8 @@ function Content() {
   useEffect(() => {
     if (!session?.user) return;
     fetch("/api/referral", { method: "POST" }).then(r => r.json()).then(d => { if (d.code) setReferralCode(d.code); }).catch(() => {});
-  }, [session]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!session?.user]);
 
   const handleCopy = useCallback(() => {
     if (!referralCode) return;
