@@ -11,7 +11,6 @@ import { LightFAQSchema } from "@/features/landing/components/light/LightFAQSche
 import { LightSchema } from "@/features/landing/components/light/LightSchema";
 import { LightFooter } from "@/features/landing/components/light/LightFooter";
 import { LightTrackingEvents } from "@/features/landing/components/light/LightTrackingEvents";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { LightTestimonials } from "@/features/landing/components/light/LightTestimonials";
 
 export default function LightLandingPage() {
@@ -21,15 +20,7 @@ export default function LightLandingPage() {
       <main id="main-content">
         <LightHero />
         <LightSocialProof />
-        {/*
-          TODO(Rutik): UNCOMMENT this once 3 real customer testimonials
-          are sourced. Replace ALL placeholder strings in i18n.ts under
-          light.testimonials.* with real first names, roles, companies,
-          and quotes. Faking testimonials is forbidden — if a prospect
-          cross-references and finds nothing, trust collapses. Either
-          ship real quotes or keep this commented.
-        */}
-        {/* <LightTestimonials /> */}
+        <LightTestimonials />
         <LightProductProof />
         <LightUseCases />
         <LightWhatItDoes />
