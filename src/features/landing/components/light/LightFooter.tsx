@@ -74,6 +74,7 @@ export function LightFooter() {
             { label: t("landing.privacy"), href: "/privacy" },
             { label: t("landing.terms"), href: "/terms" },
             { label: t("landing.contact"), href: "/contact" },
+            { label: t("light.referral.footerLink"), href: "#refer" },
           ].map((link) => (
             <Link
               key={link.href}
