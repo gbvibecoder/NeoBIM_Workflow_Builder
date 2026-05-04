@@ -60,8 +60,9 @@ export function LightProductProof() {
 
   return (
     <section
+      aria-label="Product demo"
       style={{
-        padding: "96px 24px",
+        padding: "var(--light-section-pad) 24px",
         background: "var(--light-surface)",
       }}
     >
@@ -156,7 +157,7 @@ export function LightProductProof() {
 
         {/* Caption */}
         <div style={{ marginTop: 24 }}>
-          <p
+          <h2
             style={{
               fontSize: 16,
               fontWeight: 500,
@@ -166,7 +167,7 @@ export function LightProductProof() {
             }}
           >
             {t("light.proofTitle")}
-          </p>
+          </h2>
           <p
             style={{
               fontSize: 14,
@@ -182,14 +183,9 @@ export function LightProductProof() {
       </ScrollReveal>
 
       <style>{`
-        @media (max-width: 768px) {
-          section:has(> div > [aria-label]) {
-            padding: 64px 24px !important;
-          }
-        }
         @media (max-width: 480px) {
-          section:has(> div > [aria-label]) {
-            padding: 48px 16px !important;
+          section[aria-label="Product demo"] {
+            padding: var(--light-section-pad) 16px !important;
           }
         }
       `}</style>

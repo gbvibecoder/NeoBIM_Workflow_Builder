@@ -23,7 +23,7 @@ export function LightFAQ() {
     <section
       id="faq"
       style={{
-        padding: "128px 24px",
+        padding: "var(--light-section-pad) 24px",
         background: "var(--light-bg)",
       }}
     >
@@ -130,14 +130,9 @@ export function LightFAQ() {
       </div>
 
       <style>{`
-        @media (max-width: 768px) {
-          #faq {
-            padding: 80px 24px !important;
-          }
-        }
         @media (max-width: 480px) {
           #faq {
-            padding: 64px 16px !important;
+            padding: var(--light-section-pad) 16px !important;
           }
         }
       `}</style>

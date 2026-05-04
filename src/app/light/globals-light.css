@@ -16,6 +16,8 @@
   --light-success: #2D7A4F;
   --light-error: #B5403A;
 
+  --light-section-pad: clamp(64px, 8vh, 96px);
+
   --light-shadow-rest: 0 1px 2px rgba(26, 31, 46, 0.04), 0 4px 12px rgba(26, 31, 46, 0.06);
   --light-shadow-hover: 0 2px 4px rgba(26, 31, 46, 0.06), 0 8px 24px rgba(26, 31, 46, 0.08);
 }
@@ -244,6 +246,15 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
+}
+
+/* ── Anchor Scroll Offset (clear sticky nav) ────────────── */
+.light-theme #what-it-does,
+.light-theme #use-cases,
+.light-theme #pricing,
+.light-theme #faq,
+.light-theme #main-content {
+  scroll-margin-top: 80px;
 }
 
 /* ── Details / Summary (FAQ accordion) ───────────────────── */

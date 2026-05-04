@@ -2979,6 +2979,84 @@ const en = {
   'light.faqLabel': 'COMMON QUESTIONS',
   'light.faqTitle': 'Frequently asked.',
 
+  // ── Phase 3: Conversion rewrite (2026-05-04) ──
+  // Hero v2
+  'light.heroEyebrow': 'AUTOMATE BIM WORKFLOWS',
+  'light.heroHeadline1': 'Automate BIM workflows.',
+  'light.heroHeadline2': 'Brief to building in',
+  'light.heroHeadlineEm': 'minutes.',
+  'light.heroSubhead': 'AI-powered concept design for architects. Generate floor plans, 3D massing, IFC models, and BOQ — without coding, without waiting weeks.',
+  'light.heroPrimaryCTA': 'Get Started Free',
+  'light.heroSecondaryCTA': 'Book a Demo',
+  'light.heroTrust1': 'Free tier \u00B7 no credit card',
+  'light.heroTrust2': '1,000+ workflows generated',
+  'light.heroTrust3': 'Cancel anytime',
+
+  // Social proof strip
+  'light.proof.label': 'TRUSTED BY AEC TEAMS',
+  'light.proof.stat1Number': '3 days \u2192 20 mins',
+  'light.proof.stat1Label': 'typical workflow time saved',
+  'light.proof.stat2Number': '1,000+',
+  'light.proof.stat2Label': 'concept renders generated',
+  'light.proof.stat3Number': 'INDIA \u00B7 BASELINE',
+  'light.proof.stat3Label': 'INR pricing, GST-ready',
+
+  // Use case picker
+  'light.usecases.label': 'CHOOSE YOUR USE CASE',
+  'light.usecases.headline': 'Built for the work you actually do.',
+  'light.usecases.card1Title': 'Generate BOQ from IFC',
+  'light.usecases.card1Body': 'Upload an IFC. Get itemized bill of quantities with INR costs in 2 minutes.',
+  'light.usecases.card2Title': 'Brief \u2192 3D Massing',
+  'light.usecases.card2Body': 'Paste a project brief. Get 3D massing models and concept renders ready for client review.',
+  'light.usecases.card3Title': 'Floor Plan \u2192 CAD',
+  'light.usecases.card3Body': 'Generate vastu-aware floor plans with room labels, dimensions, and CAD-ready output.',
+  'light.usecases.card4Title': 'Concept Renders',
+  'light.usecases.card4Body': 'Photorealistic exterior and interior renders from a single text prompt or floor plan.',
+
+  // Bottom CTA
+  'light.bottomCta.label': 'READY TO START?',
+  'light.bottomCta.headline': 'From brief to building. Today.',
+  'light.bottomCta.subhead': 'Free tier. No credit card. Cancel anytime.',
+  'light.bottomCta.check1': 'Setup in 2 minutes',
+  'light.bottomCta.check2': 'Real workflows, real outputs',
+  'light.bottomCta.check3': 'Cancel anytime',
+
+  // Pricing v2 — Free tier + plan-specific CTAs
+  'light.freeName': 'Free',
+  'light.freeDesc': 'Try BuildFlow',
+  'light.freePrice': '0',
+  'light.freeCta': 'Start Free',
+  'light.freeFeature1': '2 lifetime executions',
+  'light.freeFeature2': '1 concept render',
+  'light.freeFeature3': 'JSON export',
+  'light.freeFeature4': 'Community support',
+  'light.miniCta': 'Get Started',
+  'light.starterCta': 'Get Started',
+  'light.teamCta': 'Get Started',
+  'light.teamPrice': '4,999',
+  'light.cardReassurance': 'No credit card \u00B7 Cancel anytime',
+  'light.teamContact': 'Need 10+ seats? Contact sales \u2192',
+
+  // ── Testimonials (scaffolded — replace placeholders with real quotes) ──
+  'light.testimonials.label': 'WHAT EARLY USERS SAY',
+  'light.testimonials.headline': 'Real workflows. Real ',
+  'light.testimonials.headlineEm': 'results.',
+  'light.testimonials.card1Quote': '[Replace with real customer quote — 1 to 2 sentences max]',
+  'light.testimonials.card1Initials': '[XX]',
+  'light.testimonials.card1Name': '[First Name]',
+  'light.testimonials.card1Role': '[Role]',
+  'light.testimonials.card1Company': '[Company]',
+  'light.testimonials.card2Quote': '[Replace with real customer quote — 1 to 2 sentences max]',
+  'light.testimonials.card2Initials': '[XX]',
+  'light.testimonials.card2Name': '[First Name]',
+  'light.testimonials.card2Role': '[Role]',
+  'light.testimonials.card2Company': '[Company]',
+  'light.testimonials.card3Quote': '[Replace with real customer quote — 1 to 2 sentences max]',
+  'light.testimonials.card3Initials': '[XX]',
+  'light.testimonials.card3Name': '[First Name]',
+  'light.testimonials.card3Role': '[Role]',
+  'light.testimonials.card3Company': '[Company]',
+
   // ===== DASHBOARD V2 (Z.X.1) =====
   // Hero
   'dashboard.v2.heroStripDay': 'Studio dashboard',
@@ -6064,6 +6142,84 @@ const de: Record<keyof typeof en, string | string[]> = {
   // ── Phase 2: FAQ ──
   'light.faqLabel': 'HÄUFIGE FRAGEN',
   'light.faqTitle': 'Häufig gestellt.',
+
+  // ── Phase 3: Conversion rewrite (2026-05-04) ──
+  // Hero v2
+  'light.heroEyebrow': 'BIM-WORKFLOWS AUTOMATISIEREN',
+  'light.heroHeadline1': 'BIM-Workflows automatisieren.',
+  'light.heroHeadline2': 'Vom Briefing zum Gebäude in',
+  'light.heroHeadlineEm': 'Minuten.',
+  'light.heroSubhead': 'KI-gestütztes Konzeptdesign für Architekten. Grundrisse, 3D-Massenmodelle, IFC-Modelle und BOQ generieren — ohne Code, ohne wochenlang zu warten.',
+  'light.heroPrimaryCTA': 'Kostenlos starten',
+  'light.heroSecondaryCTA': 'Demo buchen',
+  'light.heroTrust1': 'Kostenlose Version \u00B7 keine Kreditkarte',
+  'light.heroTrust2': '1.000+ Workflows erstellt',
+  'light.heroTrust3': 'Jederzeit kündbar',
+
+  // Social proof strip
+  'light.proof.label': 'VERTRAUT VON AEC-TEAMS',
+  'light.proof.stat1Number': '3 Tage \u2192 20 Min.',
+  'light.proof.stat1Label': 'typische Zeitersparnis im Workflow',
+  'light.proof.stat2Number': '1.000+',
+  'light.proof.stat2Label': 'Konzeptrenderings erstellt',
+  'light.proof.stat3Number': 'INDIEN \u00B7 BASELINE',
+  'light.proof.stat3Label': 'INR-Preise, GST-fähig',
+
+  // Use case picker
+  'light.usecases.label': 'WÄHLEN SIE IHREN ANWENDUNGSFALL',
+  'light.usecases.headline': 'Entwickelt für Ihre tägliche Arbeit.',
+  'light.usecases.card1Title': 'BOQ aus IFC generieren',
+  'light.usecases.card1Body': 'IFC hochladen. In 2 Minuten eine detaillierte Mengenermittlung mit INR-Kosten erhalten.',
+  'light.usecases.card2Title': 'Briefing \u2192 3D-Masse',
+  'light.usecases.card2Body': 'Projektbriefing einfügen. 3D-Massenmodelle und Konzeptrenderings für die Kundenpräsentation erhalten.',
+  'light.usecases.card3Title': 'Grundriss \u2192 CAD',
+  'light.usecases.card3Body': 'Vastu-konforme Grundrisse mit Raumbeschriftungen, Maßen und CAD-fähigem Export generieren.',
+  'light.usecases.card4Title': 'Konzeptrenderings',
+  'light.usecases.card4Body': 'Fotorealistische Außen- und Innenrenderings aus einem einzelnen Textprompt oder Grundriss.',
+
+  // Bottom CTA
+  'light.bottomCta.label': 'BEREIT ZUM START?',
+  'light.bottomCta.headline': 'Vom Briefing zum Gebäude. Heute.',
+  'light.bottomCta.subhead': 'Kostenlose Version. Keine Kreditkarte. Jederzeit kündbar.',
+  'light.bottomCta.check1': 'Einrichtung in 2 Minuten',
+  'light.bottomCta.check2': 'Echte Workflows, echte Ergebnisse',
+  'light.bottomCta.check3': 'Jederzeit kündbar',
+
+  // Pricing v2 — Free tier + plan-specific CTAs
+  'light.freeName': 'Kostenlos',
+  'light.freeDesc': 'BuildFlow testen',
+  'light.freePrice': '0',
+  'light.freeCta': 'Kostenlos starten',
+  'light.freeFeature1': '2 Ausführungen (lebenslang)',
+  'light.freeFeature2': '1 Konzeptrendering',
+  'light.freeFeature3': 'JSON-Export',
+  'light.freeFeature4': 'Community-Support',
+  'light.miniCta': 'Loslegen',
+  'light.starterCta': 'Loslegen',
+  'light.teamCta': 'Loslegen',
+  'light.teamPrice': '4.999',
+  'light.cardReassurance': 'Keine Kreditkarte \u00B7 Jederzeit kündbar',
+  'light.teamContact': '10+ Plätze benötigt? Vertrieb kontaktieren \u2192',
+
+  // ── Testimonials (Platzhalter — mit echten Zitaten ersetzen) ──
+  'light.testimonials.label': 'WAS NUTZER SAGEN',
+  'light.testimonials.headline': 'Echte Workflows. Echte ',
+  'light.testimonials.headlineEm': 'Ergebnisse.',
+  'light.testimonials.card1Quote': '[Ersetzen mit echtem Kundenzitat — 1 bis 2 Sätze max]',
+  'light.testimonials.card1Initials': '[XX]',
+  'light.testimonials.card1Name': '[Vorname]',
+  'light.testimonials.card1Role': '[Rolle]',
+  'light.testimonials.card1Company': '[Firma]',
+  'light.testimonials.card2Quote': '[Ersetzen mit echtem Kundenzitat — 1 bis 2 Sätze max]',
+  'light.testimonials.card2Initials': '[XX]',
+  'light.testimonials.card2Name': '[Vorname]',
+  'light.testimonials.card2Role': '[Rolle]',
+  'light.testimonials.card2Company': '[Firma]',
+  'light.testimonials.card3Quote': '[Ersetzen mit echtem Kundenzitat — 1 bis 2 Sätze max]',
+  'light.testimonials.card3Initials': '[XX]',
+  'light.testimonials.card3Name': '[Vorname]',
+  'light.testimonials.card3Role': '[Rolle]',
+  'light.testimonials.card3Company': '[Firma]',
 
   // ===== DASHBOARD V2 (Z.X.1) =====
   'dashboard.v2.heroStripDay': 'Studio-Dashboard',
