@@ -223,6 +223,18 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   const bgSceneRef = useRef<Scene | null>(null);
   const bgCameraRef = useRef<Camera | null>(null);
 
+  /* Panorama coordination flag — read by Tier 1 (and any future engine) so
+     they don't fight the panorama for ownership of `scene.background`. The
+     panorama controller toggles this via the imperative handle. */
+  const panoramaActiveRef = useRef(false);
+
+  /* V6: original modelGroup position captured on load. Panorama V6 uses
+     this to translate the BIM in front of the panorama camera and to
+     restore the model on panorama reset. Default (0,0,0) — IFC files
+     historically place geometry near origin; off-origin model handling
+     is out of V6 scope. */
+  const originalModelPositionRef = useRef<Vector3>(new Vector3(0, 0, 0));
+
   /* ────────────────────────────────────────────────────────── */
   /* Scene setup                                                */
   /* ────────────────────────────────────────────────────────── */
@@ -1266,6 +1278,10 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
                     kl.target.updateMatrixWorld();
                   }
                 }
+                /* V6: capture the model group's original position so a
+                   later panorama-reset can restore it after the
+                   controller translated it in front of the dome+disc. */
+                originalModelPositionRef.current.copy(modelGroupRef.current.position);
                 onLoadComplete();
                 resolve();
               };
@@ -1758,6 +1774,59 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
            flow. Without it, hover-out and select-release snap back to the
            pre-Enhance gray captured at mesh creation. */
         originalMaterialsRef.current.set(mesh.uuid, material);
+      },
+
+      /* ── Panorama coordination ───────────────────────────────────────── */
+
+      setBlueprintGridVisible: (visible: boolean) => {
+        if (gridRef.current) gridRef.current.visible = visible;
+        showGridRef.current = visible;
+      },
+
+      isBlueprintGridVisible: (): boolean => {
+        return gridRef.current?.visible ?? showGridRef.current;
+      },
+
+      setPanoramaActive: (active: boolean) => {
+        panoramaActiveRef.current = active;
+      },
+
+      isPanoramaActive: (): boolean => panoramaActiveRef.current,
+
+      getModelBoundingBox: (): Box3 | null => {
+        const group = modelGroupRef.current;
+        if (!group || group.children.length === 0) return null;
+        const bbox = new Box3().setFromObject(group);
+        return bbox.isEmpty() ? null : bbox;
+      },
+
+      getSlabMeshes: (): Array<{ mesh: Object3D; predefinedType: string | null }> => {
+        const typeMap = expressIDToTypeRef.current;
+        const meshMap = meshMapRef.current;
+        if (typeMap.size === 0 || meshMap.size === 0) return [];
+        const out: Array<{ mesh: Object3D; predefinedType: string | null }> = [];
+        for (const [expressID, typeId] of typeMap.entries()) {
+          if (typeId !== IFCSLAB) continue;
+          const meshes = meshMap.get(expressID);
+          if (!meshes) continue;
+          for (const m of meshes) {
+            /* predefinedType is not surfaced to mesh userData by the
+               IFC worker today (only `expressID` and `ifcType` are set
+               at line 1031-1032). Returning null lets `findGroundY`
+               fall through to the "any-slab" branch — still produces
+               correct ground detection because lowest top-face wins. */
+            out.push({ mesh: m, predefinedType: null });
+          }
+        }
+        return out;
+      },
+
+      translateModelTo: (position: Vector3) => {
+        modelGroupRef.current.position.copy(position);
+      },
+
+      restoreModelPosition: () => {
+        modelGroupRef.current.position.copy(originalModelPositionRef.current);
       },
     }),
     [loadFile, applyViewMode, applyColorBy, toggleSectionPlane, selectElement, clearSelection, clearModel, onSelect]

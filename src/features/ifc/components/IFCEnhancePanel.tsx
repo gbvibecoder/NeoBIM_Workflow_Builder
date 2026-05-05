@@ -68,6 +68,16 @@ import {
   createTier4Engine,
   type Tier4Engine,
 } from "@/features/ifc/enhance/tier4/tier4-engine";
+import {
+  createPanoramaController,
+  pickPreselectedAsset,
+  getLastAppliedSlug,
+  type PanoramaController,
+  type PanoramaTier2Adapter,
+} from "@/features/panorama/lib/panorama-controller";
+import type { PanoramaAsset } from "@/features/panorama/constants";
+import { resolveBuildingType } from "@/features/panorama/lib/type-resolver";
+import { PanoramaSection } from "@/features/panorama/components/PanoramaSection";
 
 /* ─── Props + imperative handle ──────────────────────────────────────── */
 
@@ -185,6 +195,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     const [tier4Toggles, setTier4Toggles] = useState<Tier4Toggles>(DEFAULT_TIER4_TOGGLES);
     const [status, setStatus] = useState<EnhanceStatus>({ kind: "idle" });
     const [expanded, setExpanded] = useState({
+      panorama: true,
       materials: true,
       environment: true,
       lighting: true,
@@ -198,11 +209,74 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     const [tier3Result, setTier3Result] = useState<Tier3ApplyResult | null>(null);
     const [tier4Result, setTier4Result] = useState<Tier4ApplyResult | null>(null);
 
+    /* ── Panorama V2 state — staged selection (apply on global Apply Enh.) ─ */
+    const [stagedPanoramaAsset, setStagedPanoramaAsset] =
+      useState<PanoramaAsset | null>(null);
+    const [keepTier2Override, setKeepTier2Override] = useState(false);
+    const [lastAppliedSlug, setLastAppliedSlug] = useState<string | null>(null);
+
     /* Engines live in refs so tab switches don't recreate them and lose state. */
     const engineRef = useRef<Tier1Engine | null>(null);
     const tier2EngineRef = useRef<Tier2Engine | null>(null);
     const tier3EngineRef = useRef<Tier3Engine | null>(null);
     const tier4EngineRef = useRef<Tier4Engine | null>(null);
+    const panoramaControllerRef = useRef<PanoramaController | null>(null);
+
+    /* Mirror refs — the Tier 2 adapter the panorama controller closes over
+       must read CURRENT toggles when remount fires. Without these, the
+       adapter would freeze the toggles seen at controller-construction
+       time and remount with stale values. */
+    const togglesRef = useRef<EnhanceToggles>(toggles);
+    const tier2TogglesRef = useRef<Tier2Toggles>(tier2Toggles);
+    useEffect(() => { togglesRef.current = toggles; }, [toggles]);
+    useEffect(() => { tier2TogglesRef.current = tier2Toggles; }, [tier2Toggles]);
+
+    /* Real Tier 2 adapter — wraps the same Tier 2 engine instance used by
+       the panel itself. `noopTier2Adapter` is left as the controller's
+       default for tests that don't need cross-tier coordination. */
+    const tier2AdapterRef = useRef<PanoramaTier2Adapter | null>(null);
+    const getTier2Adapter = useCallback((): PanoramaTier2Adapter => {
+      if (tier2AdapterRef.current) return tier2AdapterRef.current;
+      tier2AdapterRef.current = {
+        isMounted: () => tier2EngineRef.current?.isApplied() ?? false,
+        unmount: async () => {
+          await tier2EngineRef.current?.reset();
+        },
+        remount: async () => {
+          const eng = tier2EngineRef.current;
+          if (!eng) return;
+          await eng.apply(
+            tier2TogglesRef.current,
+            togglesRef.current.hdriPreset,
+            togglesRef.current.quality,
+            () => {},
+          );
+        },
+      };
+      return tier2AdapterRef.current;
+    }, []);
+
+    const ensurePanoramaController = useCallback((): PanoramaController | null => {
+      if (panoramaControllerRef.current) return panoramaControllerRef.current;
+      if (!viewportRef.current) return null;
+      panoramaControllerRef.current = createPanoramaController(
+        viewportRef.current,
+        getTier2Adapter(),
+      );
+      return panoramaControllerRef.current;
+    }, [viewportRef, getTier2Adapter]);
+
+    /* Hydrate the staged panorama exactly once when a model first lands.
+       Subsequent uploads in the same session keep the user's selection. */
+    const panoramaHydratedRef = useRef(false);
+    useEffect(() => {
+      if (panoramaHydratedRef.current) return;
+      if (!hasModel) return;
+      panoramaHydratedRef.current = true;
+      const detection = resolveBuildingType(null);
+      setStagedPanoramaAsset(pickPreselectedAsset(detection.bucket));
+      setLastAppliedSlug(getLastAppliedSlug());
+    }, [hasModel]);
 
     const isLoading = status.kind === "loading";
     const isApplied = status.kind === "applied";
@@ -223,12 +297,14 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           await handleAutoRef.current?.();
         },
         resetIfApplied: async () => {
-          /* Order: tier4 → tier3 → tier2 → tier1. Stack-unwind: building
+          /* V2: panorama resets first — its prior-background snapshot
+             references the pre-panorama scene state, which is invalidated
+             once the worker swaps meshes. Order overall: panorama →
+             tier4 → tier3 → tier2 → tier1. Stack-unwind for tiers: building
              details come off first (they hang off wall / window / slab
-             meshes that tier3 would otherwise unhide), then roof (it
-             depends on the IFC slab being hidden), then site context,
-             finally building materials + env. This keeps the scene
-             coherent at every frame. */
+             meshes that tier3 would otherwise unhide), then roof, then
+             site context, finally materials + env. */
+          panoramaControllerRef.current?.reset();
           const tier4 = tier4EngineRef.current;
           if (tier4 && tier4.isApplied()) {
             await tier4.reset();
@@ -249,6 +325,10 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           setTier3Result(null);
           setTier4Result(null);
           setStatus({ kind: "idle" });
+          /* Note: do NOT clear stagedPanoramaAsset / lastAppliedSlug here.
+             A file reload should preserve the user's selection — the panel
+             is logically the same session. The global Reset button (below)
+             is the one that wipes staged state. */
         },
       }),
       [],
@@ -261,6 +341,11 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         overrideTier2?: Tier2Toggles,
         overrideTier3?: Tier3Toggles,
         overrideTier4?: Tier4Toggles,
+        /* V2: panorama can be force-overridden (used by `handleAuto` to
+           ensure a panorama is staged before orchestration runs). When
+           omitted, the staged panorama state is used. Pass `null` to
+           force-skip panorama. */
+        overridePanorama?: PanoramaAsset | null,
       ) => {
         if (!viewportRef.current) {
           setStatus({ kind: "error", message: "Viewer not ready." });
@@ -270,6 +355,8 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         const nextTier2 = overrideTier2 ?? tier2Toggles;
         const nextTier3 = overrideTier3 ?? tier3Toggles;
         const nextTier4 = overrideTier4 ?? tier4Toggles;
+        const nextPanorama =
+          overridePanorama !== undefined ? overridePanorama : stagedPanoramaAsset;
         if (overrideToggles) setToggles(overrideToggles);
         if (overrideTier2) setTier2Toggles(overrideTier2);
         if (overrideTier3) setTier3Toggles(overrideTier3);
@@ -280,43 +367,91 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         if (!tier3EngineRef.current) tier3EngineRef.current = createTier3Engine(viewportRef.current);
         if (!tier4EngineRef.current) tier4EngineRef.current = createTier4Engine(viewportRef.current);
 
+        /* V2 progress slices — panorama gets the leading 5% when staged,
+           tiers compress proportionally. */
+        const panoSelected = nextPanorama !== null;
+        const PANO_END = panoSelected ? 0.05 : 0;
+        const T1_END = panoSelected ? 0.33 : 0.30;
+        const T2_END = panoSelected ? 0.57 : 0.55;
+        const T3_END = panoSelected ? 0.80 : 0.80;
+
         setStatus({ kind: "loading", step: "Starting", progress: 0 });
         try {
-          /* Tier 1 (materials + HDRI + lighting) — 0.0 → 0.3 of combined. */
+          /* Step 0 (NEW V2): Panorama if staged. Runs FIRST so any
+             auto-disable of Tier 2 happens before the tier orchestration
+             would otherwise re-mount it. */
+          if (nextPanorama) {
+            setStatus({
+              kind: "loading",
+              step: "Loading 360° environment",
+              progress: 0,
+            });
+            const ctl = ensurePanoramaController();
+            if (ctl) {
+              const r = await ctl.apply(nextPanorama);
+              if (!r.success) {
+                setStatus({
+                  kind: "error",
+                  message: r.message ?? "Panorama apply failed.",
+                });
+                return;
+              }
+              if (keepTier2Override) {
+                /* User explicitly opted in to keep Tier 2 — controller
+                   remounts via the adapter. Tier 2 orchestration step
+                   below is then a no-op on already-mounted state. */
+                await ctl.keepTier2Anyway();
+              }
+              setLastAppliedSlug(nextPanorama.slug);
+            }
+            setStatus({
+              kind: "loading",
+              step: "360° environment ready",
+              progress: PANO_END,
+            });
+          }
+
+          /* Tier 1 (materials + HDRI + lighting). */
           const tier1Result = await engineRef.current.apply(nextToggles, (step, progress) => {
-            setStatus({ kind: "loading", step, progress: progress * 0.3 });
+            setStatus({ kind: "loading", step, progress: PANO_END + progress * (T1_END - PANO_END) });
           });
           if (!tier1Result.success) {
             setStatus({ kind: "error", message: tier1Result.message ?? "Tier 1 apply failed." });
             return;
           }
 
-          /* Tier 2 (site context — ground only post-strip) — 0.3 → 0.55.
-             Skip quietly if master toggle off. */
+          /* Tier 2 (site context — ground only post-strip).
+             V2: when a panorama is staged AND user has NOT opted into
+             "Keep ground anyway", suppress the Tier 2 step regardless of
+             toggle. Visually clashing ground-on-panorama is the failure
+             mode this prevents. */
+          const tier2SuppressedByPanorama =
+            panoSelected && nextTier2.ground && !keepTier2Override;
           let tier2Result: Awaited<ReturnType<Tier2Engine["apply"]>> = {
             success: true,
             groundAreaM2: 0,
             durationMs: 0,
           };
-          if (nextTier2.context) {
+          if (nextTier2.context && !tier2SuppressedByPanorama) {
             tier2Result = await tier2EngineRef.current.apply(
               nextTier2,
               nextToggles.hdriPreset,
               nextToggles.quality,
-              (step, progress) => setStatus({ kind: "loading", step, progress: 0.3 + progress * 0.25 }),
+              (step, progress) => setStatus({ kind: "loading", step, progress: T1_END + progress * (T2_END - T1_END) }),
             );
             if (!tier2Result.success) {
               setStatus({ kind: "error", message: tier2Result.message ?? "Tier 2 apply failed." });
               return;
             }
           } else if (tier2EngineRef.current?.isApplied()) {
-            /* Context was toggled off after a prior apply — drop the site. */
+            /* Context toggled off after a prior apply OR suppressed by
+               panorama conflict — drop the site either way. */
             await tier2EngineRef.current.reset();
           }
 
-          /* Tier 3 (roof treatment) — 0.55 → 0.8. Skip quietly if master
-             enabled toggle off, but reset any prior roof so the scene
-             reflects the new state. */
+          /* Tier 3 (roof treatment). Skip quietly if master enabled toggle
+             off, but reset any prior roof so the scene reflects the new
+             state. */
           let tier3Out: Tier3ApplyResult = {
             success: true,
             resolvedStyle: "skipped",
@@ -327,7 +462,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               nextTier3,
               nextToggles.hdriPreset,
               nextToggles.quality,
-              (step, progress) => setStatus({ kind: "loading", step, progress: 0.55 + progress * 0.25 }),
+              (step, progress) => setStatus({ kind: "loading", step, progress: T2_END + progress * (T3_END - T2_END) }),
             );
             if (!tier3Out.success) {
               setStatus({ kind: "error", message: tier3Out.message ?? "Tier 3 apply failed." });
@@ -337,10 +472,9 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             await tier3EngineRef.current.reset();
           }
 
-          /* Tier 4 (building details — railings / frames / sills) —
-             0.8 → 1.0. Skip quietly if master enabled toggle off, but
-             reset any prior details so the scene reflects the new
-             state. */
+          /* Tier 4 (building details — railings / frames / sills). Skip
+             quietly if master enabled toggle off, but reset any prior
+             details so the scene reflects the new state. */
           let tier4Out: Tier4ApplyResult = {
             success: true,
             balconyEdgesDetected: 0,
@@ -353,7 +487,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           if (nextTier4.enabled) {
             tier4Out = await tier4EngineRef.current.apply(
               nextTier4,
-              (step, progress) => setStatus({ kind: "loading", step, progress: 0.8 + progress * 0.2 }),
+              (step, progress) => setStatus({ kind: "loading", step, progress: T3_END + progress * (1 - T3_END) }),
             );
             if (!tier4Out.success) {
               setStatus({ kind: "error", message: tier4Out.message ?? "Tier 4 apply failed." });
@@ -374,17 +508,26 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           });
         }
       },
-      [toggles, tier2Toggles, tier3Toggles, tier4Toggles, viewportRef],
+      [
+        toggles,
+        tier2Toggles,
+        tier3Toggles,
+        tier4Toggles,
+        viewportRef,
+        stagedPanoramaAsset,
+        keepTier2Override,
+        ensurePanoramaController,
+      ],
     );
 
     /* ── Reset button handler ── */
     const handleReset = useCallback(async () => {
       try {
-        /* Stack unwind: tier4 → tier3 → tier2 → tier1. Building details
-           come off first (they hang off wall / window / slab meshes);
-           roof next (it depends on the IFC slab being hidden); site
-           context next so the ground doesn't float under the building
-           mid-reset; Tier 1 last. */
+        /* V2: panorama goes first — its prior-background snapshot was taken
+           BEFORE any tier mounted, so restoring it must happen before tier
+           reset cascade reorganises the scene. Stack unwind for tiers:
+           tier4 → tier3 → tier2 → tier1. */
+        panoramaControllerRef.current?.reset();
         const tier4 = tier4EngineRef.current;
         if (tier4 && tier4.isApplied()) await tier4.reset();
         const tier3 = tier3EngineRef.current;
@@ -396,6 +539,11 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         setTier2Counts(null);
         setTier3Result(null);
         setTier4Result(null);
+        /* V2: full clean slate — clear staged panorama + override + last
+           applied. Controller already wiped LS in reset() above. */
+        setStagedPanoramaAsset(null);
+        setKeepTier2Override(false);
+        setLastAppliedSlug(null);
         setStatus({ kind: "idle" });
         // Re-fit camera after stripping ground/roof geometry
         setTimeout(() => viewportRef.current?.fitToView(), 150);
@@ -420,16 +568,25 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
          Tier 3 "auto" style defers the gable-vs-flat choice to the
          engine's storey-count heuristic at apply time. Phase 4a adds
          tier 4 defaults (railings on, window frames aluminum, sills
-         on). */
+         on). V2: panorama defaults to whatever's already staged (or
+         the preselect helper if nothing is staged yet) — Auto should
+         deliver a complete photoreal result, not skip the backdrop. */
       setTier3Toggles(DEFAULT_TIER3_TOGGLES);
       setTier4Toggles(DEFAULT_TIER4_TOGGLES);
+      const autoPanorama =
+        stagedPanoramaAsset ??
+        pickPreselectedAsset(resolveBuildingType(null).bucket);
+      if (!stagedPanoramaAsset && autoPanorama) {
+        setStagedPanoramaAsset(autoPanorama);
+      }
       await handleApply(
         autoTier1,
         DEFAULT_TIER2_TOGGLES,
         DEFAULT_TIER3_TOGGLES,
         DEFAULT_TIER4_TOGGLES,
+        autoPanorama,
       );
-    }, [handleApply, viewportRef]);
+    }, [handleApply, viewportRef, stagedPanoramaAsset]);
 
     // Keep ref in sync so useImperativeHandle can call it
     handleAutoRef.current = handleAuto;
@@ -437,6 +594,10 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     const classifiedSummary = useMemo(() => {
       if (status.kind !== "applied") return null;
       const rows: string[] = [];
+      /* V2: lead with panorama if applied — most-visible visual change. */
+      if (lastAppliedSlug) {
+        rows.push(`360° ${lastAppliedSlug}`);
+      }
       const c = status.counts;
       if (c["wall-exterior"]) rows.push(`${c["wall-exterior"]} exterior walls`);
       if (c["wall-interior"]) rows.push(`${c["wall-interior"]} interior walls`);
@@ -488,7 +649,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         }
       }
       return rows.join(" · ");
-    }, [status, tier2Counts, tier3Result, tier3Toggles.enabled, tier4Result, tier4Toggles.enabled, tier4Toggles.windowFrames, tier4Toggles.windowSills, tier4Toggles.railings]);
+    }, [status, tier2Counts, tier3Result, tier3Toggles.enabled, tier4Result, tier4Toggles.enabled, tier4Toggles.windowFrames, tier4Toggles.windowSills, tier4Toggles.railings, lastAppliedSlug]);
 
     const anyDisabled = !hasModel || isLoading;
 
@@ -524,6 +685,32 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             </div>
           ) : (
             <>
+              {/* ── ENVIRONMENT (360°) — V2 panorama picker (always-on,
+                  no internal toggle; global Apply Enhancement drives it) ── */}
+              <Section
+                expanded={expanded.panorama}
+                onToggle={() =>
+                  setExpanded((p) => ({ ...p, panorama: !p.panorama }))
+                }
+                title="Environment (360°)"
+              >
+                <PanoramaSection
+                  selectedAsset={stagedPanoramaAsset}
+                  onSelectionChange={(asset) => {
+                    setStagedPanoramaAsset(asset);
+                    /* Clear keep-override when staging is cleared — only
+                       relevant when a panorama is actually selected. */
+                    if (asset === null) setKeepTier2Override(false);
+                  }}
+                  parseResult={null}
+                  tier2GroundEnabled={tier2Toggles.context && tier2Toggles.ground}
+                  keepTier2Override={keepTier2Override}
+                  onToggleKeepTier2={() => setKeepTier2Override((p) => !p)}
+                  lastAppliedSlug={lastAppliedSlug}
+                  disabled={anyDisabled}
+                />
+              </Section>
+
               {/* ── MATERIALS ── */}
               <Section
                 expanded={expanded.materials}

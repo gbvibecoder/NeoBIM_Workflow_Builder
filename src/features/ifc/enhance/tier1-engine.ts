@@ -230,8 +230,12 @@ export class Tier1Engine {
         this.environmentReplaced = true;
       }
       scene.environment = this.hdriTexture;
-      /* Deliberately DO NOT touch scene.background — the blueprint grid
-         stays. Background-swap is a v2.1 toggle. */
+      /* Deliberately DO NOT touch scene.background.
+         · Default state: the procedural blueprint grid owns the background.
+         · Panorama active: the panorama controller owns the background and
+           will collide with us if we swap. Future v2.1 background-swap MUST
+           guard with `if (!this.viewport.isPanoramaActive()) { ... }` to
+           preserve the panorama coexistence contract. */
 
       this.keyLight = findKeyLight(scene);
       if (this.keyLight) {
