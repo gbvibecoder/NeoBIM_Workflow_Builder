@@ -59,6 +59,24 @@ jobs:
       - name: Run Track D baseline quality test
         run: pytest tests/test_baseline_quality.py -v
 
+      # Phase 0 — IDS quality contract gates. Per-PR coverage of the
+      # six-IDS / target_fidelity / Stage-2.5 surface introduced in
+      # PR #301. The buildingSMART baseline test pytest.skips its cases
+      # until the JSON reports are committed (deferred R3 work) — it's
+      # wired in now so the drift gate activates automatically once the
+      # baselines land.
+      - name: Run IDS file validity tests
+        run: pytest tests/test_ids_files_valid.py -v
+
+      - name: Run target_fidelity routing tests
+        run: pytest tests/test_target_fidelity_routing.py -v
+
+      - name: Run Stage 2.5 (VALIDATE-IFC) integration tests
+        run: pytest tests/test_ids_validation_stage.py -v
+
+      - name: Run buildingSMART baseline drift gate
+        run: pytest tests/test_buildingsmart_baseline.py -v
+
       - name: Emit entity counts for baseline run (artifact preview)
         if: always()
         run: |
