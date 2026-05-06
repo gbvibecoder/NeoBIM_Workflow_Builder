@@ -1,0 +1,20 @@
+{
+  "$schema": "neobim/buildingsmart-validation-stub-v1",
+  "filename": "non_rectangular.ifc",
+  "results": {
+    "bsdd_compliance": {
+      "checked": false,
+      "issues": []
+    },
+    "industry_practice_warnings": [],
+    "normative_rule_errors": []
+  },
+  "service_status": "stub",
+  "skipped_reason": "BSDD_VALIDATION_OFFLINE=1",
+  "submitted_at": "2026-05-06",
+  "summary": {
+    "error_count": 0,
+    "rules_evaluated": 0,
+    "warning_count": 0
+  }
+}
