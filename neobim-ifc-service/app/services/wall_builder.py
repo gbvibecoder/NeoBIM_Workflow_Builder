@@ -8,7 +8,7 @@ import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
-from app.utils.guid import new_guid
+from app.utils.guid import new_guid, derive_guid
 
 
 def create_wall(
@@ -44,7 +44,7 @@ def create_wall(
 
     # Create the wall entity
     wall = api.run("root.create_entity", model, ifc_class="IfcWall")
-    wall.GlobalId = new_guid()
+    wall.GlobalId = derive_guid("IfcWall", elem.id)
     wall.Name = props.name
     wall.PredefinedType = "PARTITIONING" if props.is_partition else "STANDARD"
 
@@ -130,7 +130,12 @@ def create_opening_in_wall(
     - Z: sill height above wall base
     """
     opening = api.run("root.create_entity", model, ifc_class="IfcOpeningElement")
-    opening.GlobalId = new_guid()
+    opening.GlobalId = derive_guid(
+        "IfcOpeningElement",
+        wall.GlobalId,
+        f"{offset_along_wall:.4f}",
+        f"{sill_height:.4f}",
+    )
     opening.Name = "Opening"
     opening.PredefinedType = "OPENING"
 
@@ -183,7 +188,7 @@ def create_opening_in_wall(
     # Void the wall with this opening
     model.create_entity(
         "IfcRelVoidsElement",
-        GlobalId=new_guid(),
+        GlobalId=derive_guid("IfcRelVoidsElement", wall.GlobalId, opening.GlobalId),
         RelatingBuildingElement=wall,
         RelatedOpeningElement=opening,
     )
@@ -199,7 +204,9 @@ def fill_opening(
     """Create IfcRelFillsElement linking an opening to a window or door."""
     model.create_entity(
         "IfcRelFillsElement",
-        GlobalId=new_guid(),
+        GlobalId=derive_guid(
+            "IfcRelFillsElement", opening.GlobalId, filling_element.GlobalId
+        ),
         RelatingOpeningElement=opening,
         RelatedBuildingElement=filling_element,
     )

@@ -335,17 +335,42 @@ def test_windows_and_doors_have_openings(build_results: dict):
 
 
 def test_walls_have_material_association(build_results: dict):
-    """Every IfcWall in the 'combined' output must have an IfcRelAssociatesMaterial."""
+    """Every IfcWall must reach a material — either DIRECTLY (instance-level
+    rel, the Phase 1 contract) or INDIRECTLY via its IfcWallType (the
+    Phase 2 contract introduced by Fix 3 type instancing).
+
+    The walk-up lets the same test pin both contracts: parapet/enrichment
+    walls keep the per-instance pattern, user-emitted walls inherit
+    through their type.
+    """
     model = build_results["combined"]["model"]
+    # Direct: instance is the RelatedObject of an IfcRelAssociatesMaterial
     materialised_walls: set[str] = set()
     for rel in model.by_type("IfcRelAssociatesMaterial"):
         for obj in rel.RelatedObjects or []:
             if obj.is_a("IfcWall"):
                 materialised_walls.add(obj.GlobalId)
+    # Indirect: wall → IfcRelDefinesByType → IfcWallType (the type carries
+    # the material). The same IfcRelAssociatesMaterial scan above also
+    # captures type-level associations; we just need to translate from
+    # type → instances.
+    typed_to_instances: dict[int, list[str]] = {}
+    for rel in model.by_type("IfcRelDefinesByType"):
+        relating = rel.RelatingType
+        if relating is None or not relating.is_a("IfcWallType"):
+            continue
+        ids = [o.GlobalId for o in (rel.RelatedObjects or []) if o.is_a("IfcWall")]
+        typed_to_instances.setdefault(relating.id(), []).extend(ids)
+    for rel in model.by_type("IfcRelAssociatesMaterial"):
+        for obj in rel.RelatedObjects or []:
+            if obj.is_a("IfcWallType"):
+                materialised_walls.update(typed_to_instances.get(obj.id(), []))
+
     all_walls = {w.GlobalId for w in model.by_type("IfcWall")}
     unmaterialised = all_walls - materialised_walls
     assert not unmaterialised, (
-        f"{len(unmaterialised)} IfcWall(s) with no material association"
+        f"{len(unmaterialised)} IfcWall(s) with no material association "
+        f"(direct OR via IfcWallType inheritance)"
     )
 
 

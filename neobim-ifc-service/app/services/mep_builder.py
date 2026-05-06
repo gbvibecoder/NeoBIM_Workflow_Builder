@@ -16,7 +16,7 @@ import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
-from app.utils.guid import new_guid
+from app.utils.guid import derive_guid
 
 
 def _mep_placement(
@@ -94,7 +94,7 @@ def create_duct(
     height = props.height or 0.3
 
     duct = api.run("root.create_entity", model, ifc_class="IfcDuctSegment")
-    duct.GlobalId = new_guid()
+    duct.GlobalId = derive_guid("IfcDuctSegment", elem.id)
     duct.Name = props.name
 
     from app.utils.ifc_helpers import assign_to_storey
@@ -133,7 +133,7 @@ def create_pipe(
     radius = diameter / 2.0
 
     pipe = api.run("root.create_entity", model, ifc_class="IfcPipeSegment")
-    pipe.GlobalId = new_guid()
+    pipe.GlobalId = derive_guid("IfcPipeSegment", elem.id)
     pipe.Name = props.name
 
     from app.utils.ifc_helpers import assign_to_storey
@@ -170,7 +170,7 @@ def create_cable_tray(
     height = props.height or 0.1
 
     tray = api.run("root.create_entity", model, ifc_class="IfcCableCarrierSegment")
-    tray.GlobalId = new_guid()
+    tray.GlobalId = derive_guid("IfcCableCarrierSegment", elem.id)
     tray.Name = props.name
 
     from app.utils.ifc_helpers import assign_to_storey
@@ -208,7 +208,7 @@ def create_equipment(
     length = props.length or 0.6
 
     equip = api.run("root.create_entity", model, ifc_class="IfcFlowTerminal")
-    equip.GlobalId = new_guid()
+    equip.GlobalId = derive_guid("IfcFlowTerminal", elem.id)
     equip.Name = props.name
 
     from app.utils.ifc_helpers import assign_to_storey
@@ -228,24 +228,55 @@ def create_equipment(
     return equip
 
 
+# ── System name → IfcDistributionSystem PredefinedType (Phase 2 / Fix 8) ──
+#
+# IfcDistributionSystem subclasses IfcSystem and adds a PredefinedType
+# enum so downstream tools can disambiguate "this group is HVAC" from
+# "this group is plumbing" without parsing the system Name. Mirrors the
+# Fix 8 contract from §2.1 of the TS-exporter R&D report.
+_SYSTEM_PREDEFINED_TYPE: dict[str, str] = {
+    "HVAC": "VENTILATION",
+    "Plumbing": "DOMESTICCOLDWATER",
+    "Electrical": "ELECTRICAL",
+    "Data": "DATA",
+}
+
+
+def _system_predefined_type(system_name: str) -> str:
+    """Map an internal system bucket name to an IFC4 PredefinedType.
+
+    Unknown buckets fall through to USERDEFINED — the IFC4 spec value
+    for "system kind not in the standard enum but the modeller still
+    wants to mark it as distribution".
+    """
+    return _SYSTEM_PREDEFINED_TYPE.get(system_name, "USERDEFINED")
+
+
 def create_mep_system(
     model: ifcopenshell.file,
     building: ifcopenshell.entity_instance,
     system_name: str,
     elements: list[ifcopenshell.entity_instance],
 ) -> ifcopenshell.entity_instance | None:
-    """Group MEP elements into an IfcSystem and link to the building."""
+    """Group MEP elements into an IfcDistributionSystem and link to the building.
+
+    Phase 2 (Fix 8): emits IfcDistributionSystem (subclass of IfcSystem)
+    with a discipline-appropriate PredefinedType so downstream tools can
+    distinguish HVAC vs plumbing vs electrical without parsing the Name.
+    """
     if not elements:
         return None
 
-    system = api.run("root.create_entity", model, ifc_class="IfcSystem")
-    system.GlobalId = new_guid()
+    system = api.run("root.create_entity", model, ifc_class="IfcDistributionSystem")
+    system.GlobalId = derive_guid("IfcDistributionSystem", system_name)
     system.Name = system_name
+    system.PredefinedType = _system_predefined_type(system_name)
 
-    # Group elements into system
+    # Group elements into system. IfcRelAssignsToGroup pattern unchanged
+    # — only the relating group's class differs from Phase 1.
     model.create_entity(
         "IfcRelAssignsToGroup",
-        GlobalId=new_guid(),
+        GlobalId=derive_guid("IfcRelAssignsToGroup", system.GlobalId),
         RelatedObjects=elements,
         RelatingGroup=system,
     )
@@ -253,7 +284,7 @@ def create_mep_system(
     # Link system to building
     model.create_entity(
         "IfcRelServicesBuildings",
-        GlobalId=new_guid(),
+        GlobalId=derive_guid("IfcRelServicesBuildings", system.GlobalId, building.GlobalId),
         RelatingSystem=system,
         RelatedBuildings=[building],
     )

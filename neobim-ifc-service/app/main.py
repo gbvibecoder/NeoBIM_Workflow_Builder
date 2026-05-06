@@ -223,10 +223,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # ── Routers ───────────────────────────────────────────────────────────
-from app.routers import health, export  # noqa: E402
+from app.routers import health, export, audit  # noqa: E402
 
 app.include_router(health.router)
 app.include_router(export.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
 
 
 @app.get("/")

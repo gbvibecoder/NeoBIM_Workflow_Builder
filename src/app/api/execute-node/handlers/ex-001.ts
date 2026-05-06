@@ -7,7 +7,9 @@ import {
   type ExecutionArtifact,
 } from "./deps";
 import type { NodeHandler } from "./types";
-import { resolveRichMode } from "@/features/ifc/lib/rich-mode";
+import { resolveRichMode, richModeToFlags } from "@/features/ifc/lib/rich-mode";
+import { floorPlanToMassingGeometry } from "@/features/ifc/services/floor-plan-to-massing";
+import type { FloorPlanSchema } from "@/features/ifc/types/floor-plan-schema";
 
 /**
  * EX-001 — IFC Exporter (multi-discipline IFC generation + R2 upload)
@@ -33,7 +35,7 @@ export const handleEX001: NodeHandler = async (ctx) => {
   // Phase 1 Track B — resolve rich mode once per invocation.
   // Source tracking (override/env/default) feeds logs + artifact metadata
   // so operators can verify which code path selected the current flags.
-  const richMode = resolveRichMode(inputData);
+  let richMode = resolveRichMode(inputData);
   // ── IFC Exporter ──────────────────────────────────────────────────
   // Generates a downloadable .ifc file from upstream data.
   // Path 0: If upstream GN-001 already uploaded IFC to R2, pass through the URL
@@ -64,17 +66,104 @@ export const handleEX001: NodeHandler = async (ctx) => {
     };
   }
 
-  const upstreamGeometry = inputData?._geometry as Record<string, unknown> | undefined;
+  // ── Path A.5: Floor-plan brief from TR-001 (added 2026-05-06) ──────
+  // When TR-001 detects a room-level floor-plan PDF (plot dims + rooms
+  // with explicit width/length/quadrant), it populates
+  // ParsedBrief.floorPlan in `_raw.floorPlan`. Convert that into a
+  // MassingGeometry HERE so the existing Path A code below picks it up
+  // unchanged. Existing massing-brief flows (where floorPlan is
+  // undefined) skip this block entirely — zero impact.
+  const upstreamRawForFloorPlan = (inputData?._raw ?? {}) as Record<string, unknown>;
+  const floorPlan = upstreamRawForFloorPlan?.floorPlan as FloorPlanSchema | undefined;
+  let upstreamGeometry = inputData?._geometry as Record<string, unknown> | undefined;
+  let derivedFromFloorPlan = false;
+  if (!upstreamGeometry && floorPlan && Array.isArray(floorPlan.floors) && floorPlan.floors.length > 0) {
+    try {
+      /* Defensive: drop floors that have NO rooms and aren't a roof
+         stub. GPT-4o-mini sometimes extrapolates extra storeys from the
+         brief's "upper floors" hint without populating the rooms array.
+         Those phantom storeys produce stacked empty slab decks (the
+         "parking deck" failure mode). The brief's literal floor count
+         is the source of truth — anything else gets dropped. */
+      const filteredFloors = floorPlan.floors.filter((f) => {
+        if (f.isRoofStub) return true;
+        const hasRooms = Array.isArray(f.rooms) && f.rooms.length > 0;
+        if (!hasRooms) {
+          logger.debug("[EX-001] dropping phantom floor:", f.name, "index", f.index);
+        }
+        return hasRooms;
+      });
+      /* Re-index so storeys are 0..N-1 + roof stub at N. */
+      filteredFloors.forEach((f, i) => { f.index = i; });
+      /* Ensure a roof stub exists for visual completion. */
+      if (!filteredFloors.some((f) => f.isRoofStub)) {
+        filteredFloors.push({
+          name: "Roof",
+          index: filteredFloors.length,
+          rooms: [],
+          isRoofStub: true,
+        });
+      }
+      const sanitisedPlan = { ...floorPlan, floors: filteredFloors };
+      const fromPlan = floorPlanToMassingGeometry(sanitisedPlan);
+      upstreamGeometry = fromPlan as unknown as Record<string, unknown>;
+      derivedFromFloorPlan = true;
+      /* Floor-plan briefs emit furniture, finishes (IfcCovering), MEP
+         (IfcSanitaryTerminal / IfcPipeSegment / IfcLightFixture), and
+         pad footings — element types the Python `arch-only` filter
+         drops (per `_ARCH_AND_STRUCT_TYPES`). Force "full" mode so
+         every element survives the filter. The user's last-applied
+         richMode env / per-run override is unaffected when
+         `floorPlan` isn't present, so existing massing-brief
+         workflows keep their resolved mode. */
+      const previousMode = richMode.mode;
+      /* RichModeSource is "override" | "env" | "default" — use "override"
+         since this is effectively a per-run override driven by the brief
+         shape (floorPlan presence). */
+      richMode = {
+        mode: "full",
+        flags: richModeToFlags("full"),
+        source: "override",
+      };
+      const elementCount = fromPlan.storeys.reduce((n, s) => n + s.elements.length, 0);
+      // eslint-disable-next-line no-console
+      console.log(
+        `\n╔════════════════════════════════════════════════════════════════╗\n` +
+        `║  [EX-001] FLOOR-PLAN PATH FIRED — converter ran successfully    ║\n` +
+        `║  plot: ${String(floorPlan.plotWidthFt).padEnd(3)} × ${String(floorPlan.plotDepthFt).padEnd(3)} ft  ` +
+        `floors: ${String(sanitisedPlan.floors.length).padEnd(2)}  ` +
+        `rooms: ${String(sanitisedPlan.floors.reduce((n, f) => n + (f.rooms?.length ?? 0), 0)).padEnd(3)}  ` +
+        `elements: ${String(elementCount).padEnd(4)}                  ║\n` +
+        `║  richMode: ${(previousMode + " → full").padEnd(20)}                                ║\n` +
+        `╚════════════════════════════════════════════════════════════════╝\n`,
+      );
+      logger.debug("[EX-001] Derived MassingGeometry from floor-plan brief:", {
+        plotWidthFt: floorPlan.plotWidthFt,
+        plotDepthFt: floorPlan.plotDepthFt,
+        floorCount: floorPlan.floors.length,
+        roomCount: floorPlan.floors.reduce((n, f) => n + (f.rooms?.length ?? 0), 0),
+        sanitisedFloorCount: sanitisedPlan.floors.length,
+        sanitisedRoomCount: sanitisedPlan.floors.reduce((n, f) => n + (f.rooms?.length ?? 0), 0),
+        storeys: fromPlan.storeys.length,
+        elements: elementCount,
+        richModeOverride: `${previousMode} → full`,
+      });
+    } catch (err) {
+      logger.debug("[EX-001] floorPlanToMassingGeometry failed; falling back to massing path:", err);
+    }
+  }
 
   let resolvedBuildingType = "Mixed-Use Building";
   let resolvedProjectName = "BuildFlow Export";
   let resolvedGeometry: import("@/types/geometry").MassingGeometry;
 
   if (upstreamGeometry?.storeys && upstreamGeometry?.footprint) {
-    // ── Path A: Real geometry from GN-001 ──
+    // ── Path A: Real geometry from GN-001 OR converted floor-plan brief ──
     const upstreamRaw = (inputData?._raw ?? {}) as Record<string, unknown>;
-    resolvedProjectName = String(upstreamRaw?.projectName ?? inputData?.buildingType ?? inputData?.content ?? "BuildFlow Export");
-    resolvedBuildingType = String(upstreamRaw?.projectName ?? inputData?.buildingType ?? "Generated Building");
+    resolvedProjectName = String(upstreamRaw?.projectName ?? upstreamRaw?.projectTitle ?? inputData?.buildingType ?? inputData?.content ?? "BuildFlow Export");
+    resolvedBuildingType = derivedFromFloorPlan
+      ? "Residential"
+      : String(upstreamRaw?.projectName ?? inputData?.buildingType ?? "Generated Building");
     resolvedGeometry = upstreamGeometry as unknown as import("@/types/geometry").MassingGeometry;
   } else {
     // ── Path B/C: Extract building parameters from upstream data ──

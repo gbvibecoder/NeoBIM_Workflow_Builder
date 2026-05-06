@@ -9,6 +9,7 @@ import type {
   Box3,
   Object3D,
   Material,
+  Vector3,
 } from "three";
 
 export interface IFCModelInfo {
@@ -197,6 +198,80 @@ export interface ViewportHandle {
    * pre-swap gray. Phase-2 fix for hover-reverts-to-gray regression.
    */
   syncMeshBaseline: (mesh: Mesh, material: Material | Material[]) => void;
+
+  /* ── Panorama coordination surface ──────────────────────────────────────
+     The 360° panorama feature owns `scene.background` whenever it is
+     active. These three methods are the contract between the panorama
+     controller and the rest of the viewer. They are safe to call before a
+     model is loaded (no-op). */
+
+  /** Show or hide the procedural blueprint-grid ground plane. The panorama
+   *  controller hides it on apply (otherwise the grid floats in front of a
+   *  real-world environment) and restores prior state on reset. */
+  setBlueprintGridVisible: (visible: boolean) => void;
+
+  /** Read current visibility of the procedural blueprint-grid ground plane.
+   *  Used by the panorama controller to capture prior state on apply. */
+  isBlueprintGridVisible: () => boolean;
+
+  /** Flag this viewport as having panorama active. Read by other engines
+   *  (notably Tier 1) to skip touching `scene.background`. The flag does
+   *  NOT itself swap the background — that is the panorama controller's
+   *  responsibility. */
+  setPanoramaActive: (active: boolean) => void;
+
+  /** Read the panorama-active flag. */
+  isPanoramaActive: () => boolean;
+
+  /**
+   * World-space axis-aligned bounding box of the loaded model. Returns
+   * null if no model is loaded or the model group has no geometry.
+   *
+   * Phase Panorama-V3 added this accessor so the panorama controller can
+   * anchor its inverted-sphere environment to the model's footprint
+   * centre + base elevation. Without it, a typical-size building floats
+   * above the panorama horizon (which Three.js otherwise pins to camera
+   * eye level via the implicit equirectangular-background path).
+   */
+  getModelBoundingBox: () => Box3 | null;
+
+  /**
+   * IfcSlab meshes from the loaded model with their predefinedType (when
+   * surfaced from the parser; null otherwise).
+   *
+   * Phase Panorama-V4 added this accessor so the panorama controller can
+   * anchor its sphere to the user-perceived ground plane (top face of the
+   * lowest IfcSlab) rather than to `bbox.min.y`, which includes
+   * foundations / footings / basement walls and would push the horizon
+   * below the visible slab base.
+   *
+   * Returns an empty array when no model is loaded or no IfcSlab meshes
+   * exist. `predefinedType` is null in V4 because Viewport's worker does
+   * not yet surface IfcSlab.PredefinedType to mesh userData — the slab
+   * filter in `findGroundY` falls through to "any slab" in that case
+   * (still produces correct ground detection because lowest top-face wins).
+   */
+  getSlabMeshes: () => Array<{ mesh: Object3D; predefinedType: string | null }>;
+
+  /**
+   * Translate the loaded BIM model group to a world-space position.
+   * Phase Panorama-V6 added this so the panorama controller can offset
+   * the model so it appears `groundAnchorDistance` metres in front of
+   * the panorama camera. Idempotent: calling twice with the same
+   * position is a no-op.
+   *
+   * Safe no-op before a model has loaded.
+   */
+  translateModelTo: (position: Vector3) => void;
+
+  /**
+   * Restore the BIM model group to the position captured at first
+   * model load (typically the world origin). Used by the panorama
+   * controller's reset path.
+   *
+   * Safe no-op before a model has loaded.
+   */
+  restoreModelPosition: () => void;
 }
 
 /* IFC element type IDs (web-ifc constants) */

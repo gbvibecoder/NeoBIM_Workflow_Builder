@@ -7,7 +7,7 @@ import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
 from app.services.wall_builder import create_opening_in_wall, fill_opening
-from app.utils.guid import new_guid
+from app.utils.guid import derive_guid
 
 
 def create_window(
@@ -31,7 +31,7 @@ def create_window(
     wall_offset = props.wall_offset or 0.0
 
     window = api.run("root.create_entity", model, ifc_class="IfcWindow")
-    window.GlobalId = new_guid()
+    window.GlobalId = derive_guid("IfcWindow", elem.id)
     window.Name = props.name
     window.OverallHeight = height
     window.OverallWidth = width
@@ -134,7 +134,7 @@ def create_door(
     wall_offset = props.wall_offset or 0.0
 
     door = api.run("root.create_entity", model, ifc_class="IfcDoor")
-    door.GlobalId = new_guid()
+    door.GlobalId = derive_guid("IfcDoor", elem.id)
     door.Name = props.name
     door.OverallHeight = height
     door.OverallWidth = width

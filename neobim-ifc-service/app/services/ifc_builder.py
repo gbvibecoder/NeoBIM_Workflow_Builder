@@ -57,8 +57,15 @@ from app.services.property_sets import (
 )
 from app.services.presentation import StyleCache, apply_color
 from app.services.enrichment import enrich_building
-from app.services.classification import attach_omniclass
-from app.utils.guid import new_guid
+from app.services.classification import attach_omniclass, attach_nbc_india
+from app.services.rera_pset import ReraInputs, attach_rera_psets
+from app.services.type_registry import TypeRegistry
+from app.utils.guid import (
+    new_guid,
+    derive_guid,
+    set_project_namespace,
+    reset_new_guid_counter,
+)
 
 log = structlog.get_logger()
 
@@ -80,23 +87,72 @@ def _element_in_discipline(elem: GeometryElement, discipline: str) -> bool:
     return elem.type in DISCIPLINE_TYPES.get(discipline, set())
 
 
-# ── Rich-mode → MEP geometry gate ────────────────────────────────────
+# ── Rich-mode dispatch tables ────────────────────────────────────────
 #
 # Mirrors the TypeScript-side resolver in src/features/ifc/lib/rich-mode.ts.
-# Python currently only honours the MEP flag — Phase 2+ will grow this table
-# as Python gains curtain-wall and rebar builders. Unknown modes fall
-# through to the default "off" (bodyless MEP).
+# Two orthogonal gates apply on every build:
+#
+#   1. Element-type allowlist — `_RICH_MODE_ELEMENT_TYPES` decides which
+#      `GeometryElement.type` literals pass through. `None` means "no
+#      filtering, all types allowed"; an empty frozenset means "no
+#      elements at all" (spatial structure only). Applied alongside (and
+#      independent of) the per-discipline filter below.
+#
+#   2. MEP body geometry — `_MEP_GEOMETRY_BY_MODE` decides whether MEP
+#      elements get an IfcExtrudedAreaSolid body or stay bodyless (Pset +
+#      IfcSystem grouping only). Bodyless is the safe default because the
+#      pre-Phase-3 placement primitives produce "flying debris" on
+#      non-rectangular footprints (see frozen TS exporter §2.1).
+#
+# Backward compat: rich_mode=None (no field on the wire) bypasses BOTH
+# gates and emits the full element set with bodyful MEP. This preserves
+# pre-Phase-1-audit behaviour for payloads that pre-date the typed field
+# (notably tests/fixtures/baseline_building.json). An explicit "off"
+# value is the new "minimal" mode and honoured strictly.
+
+# Architectural + structural element types (no MEP, no rebar).
+# `arch-only` and `structural` are equal here because the rebar emitter
+# does not yet exist in Python — Phase 3 lifts structural above arch-only.
+_ARCH_AND_STRUCT_TYPES: frozenset[str] = frozenset({
+    "wall", "slab", "column", "roof", "space", "window", "door",
+    "beam", "stair", "balcony", "canopy", "parapet",
+})
+
+_RICH_MODE_ELEMENT_TYPES: dict[str, frozenset[str] | None] = {
+    "off": frozenset(),         # spatial structure only — no elements
+    "arch-only": _ARCH_AND_STRUCT_TYPES,
+    "structural": _ARCH_AND_STRUCT_TYPES,  # rebar emitter not yet implemented (Phase 3)
+    "mep": None,                # all element types allowed
+    "full": None,               # all element types allowed
+}
+
 _MEP_GEOMETRY_BY_MODE: dict[str, bool] = {
     "off": False,
     "arch-only": False,
-    "mep": True,
+    "mep": False,               # bodyless MEP — Pset + system grouping only
     "structural": False,
-    "full": True,
+    "full": True,               # full = mep + bodyful MEP geometry
 }
 
 
 def _emit_mep_geometry(rich_mode: str | None) -> bool:
-    return _MEP_GEOMETRY_BY_MODE.get(rich_mode or "off", False)
+    if rich_mode is None:
+        return True  # backward compat — pre-rich-mode callers got bodies
+    return _MEP_GEOMETRY_BY_MODE.get(rich_mode, False)
+
+
+def _element_passes_rich_mode(elem: GeometryElement, rich_mode: str | None) -> bool:
+    """Rich-mode element-type gate.
+
+    Returns True if `elem.type` is allowed under the current rich mode.
+    None (no field on the wire) is backward-compat — no gating.
+    """
+    if rich_mode is None:
+        return True
+    allowed = _RICH_MODE_ELEMENT_TYPES.get(rich_mode)
+    if allowed is None:
+        return True  # mep, full
+    return elem.type in allowed
 
 
 # ── Main build function ──────────────────────────────────────────────
@@ -110,6 +166,8 @@ def build_ifc(
     author: str = "NeoBIM",
     discipline: Discipline = "combined",
     emit_mep_geometry: bool = False,
+    rich_mode: str | None = None,
+    rera_inputs: ReraInputs | None = None,
 ) -> tuple[ifcopenshell.file, EntityCounts, list[BuildFailure]]:
     """Build a complete IFC4 model from MassingGeometry.
 
@@ -118,11 +176,19 @@ def build_ifc(
     """
     start = time.monotonic()
 
+    # Phase 2 (Fix 5) — seed deterministic GUIDs for this build. Discipline
+    # is intentionally NOT in the namespace: a single wall must keep the
+    # same GlobalId across architectural.ifc and combined.ifc so external
+    # change-tracking can correlate them. Same fixture + same richMode +
+    # same options → same GUIDs across re-runs.
+    set_project_namespace(project_name, building_name, site_name)
+    reset_new_guid_counter()
+
     model = ifcopenshell.file(schema="IFC4")
 
     # ── Project + context ────────────────────────────────────────
     project = api.run("root.create_entity", model, ifc_class="IfcProject", name=project_name)
-    project.GlobalId = new_guid()
+    project.GlobalId = derive_guid("IfcProject", project_name)
 
     # Units (SI: metres)
     api.run("unit.assign_unit", model, length={"is_metric": True, "raw": "METRE"})
@@ -140,11 +206,11 @@ def build_ifc(
 
     # ── Spatial hierarchy ────────────────────────────────────────
     site = api.run("root.create_entity", model, ifc_class="IfcSite", name=site_name)
-    site.GlobalId = new_guid()
+    site.GlobalId = derive_guid("IfcSite", site_name)
     api.run("aggregate.assign_object", model, relating_object=project, products=[site])
 
     building = api.run("root.create_entity", model, ifc_class="IfcBuilding", name=building_name)
-    building.GlobalId = new_guid()
+    building.GlobalId = derive_guid("IfcBuilding", building_name)
     api.run("aggregate.assign_object", model, relating_object=site, products=[building])
 
     # Create storeys
@@ -156,7 +222,7 @@ def build_ifc(
             ifc_class="IfcBuildingStorey",
             name=storey_data.name,
         )
-        ifc_storey.GlobalId = new_guid()
+        ifc_storey.GlobalId = derive_guid("IfcBuildingStorey", str(storey_data.index), storey_data.name)
         ifc_storey.Elevation = storey_data.elevation
         ifc_storeys[storey_data.index] = ifc_storey
 
@@ -195,6 +261,14 @@ def build_ifc(
     # discipline-appropriate IfcStyledItem for the viewer to paint.
     style_cache = StyleCache(model)
 
+    # Phase 2 / Fix 3 — type-instance registry. Collects IfcXxxType
+    # entities deduplicated by (material, thickness, predefined_type,
+    # section_profile) signature. Flushed once at end-of-build, emitting
+    # one IfcRelDefinesByType per type with all its instances. Material
+    # association moves from instance level to type level inside the
+    # registry — instances no longer carry their own IfcRelAssociatesMaterial.
+    type_registry = TypeRegistry(model)
+
     for storey_data in geometry.storeys:
         ifc_storey = ifc_storeys.get(storey_data.index)
         if not ifc_storey:
@@ -205,10 +279,19 @@ def build_ifc(
         for elem in storey_data.elements:
             if elem.type != "wall" or not _element_in_discipline(elem, discipline):
                 continue
+            if not _element_passes_rich_mode(elem, rich_mode):
+                continue
             try:
                 ifc_wall = create_wall(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                 wall_lookup[elem.id] = ifc_wall
-                assign_material_to_element(model, ifc_wall, _get_wall_mat(elem.properties.is_partition or False))
+                wall_mat = _get_wall_mat(elem.properties.is_partition or False)
+                wall_sig = type_registry.signature(
+                    type_class="IfcWallType",
+                    material_layer_set=wall_mat,
+                    thickness_m=elem.properties.thickness,
+                    predefined_type="PARTITIONING" if elem.properties.is_partition else "STANDARD",
+                )
+                type_registry.attach(ifc_wall, wall_sig, material_layer_set=wall_mat)
                 add_wall_psets(model, ifc_wall, elem, building_type)
                 apply_color(model, ifc_wall, "wall-partition" if elem.properties.is_partition else "wall-exterior", style_cache)
                 counts.IfcWall += 1
@@ -235,6 +318,8 @@ def build_ifc(
                 continue  # already handled
             if not _element_in_discipline(elem, discipline):
                 continue
+            if not _element_passes_rich_mode(elem, rich_mode):
+                continue
 
             try:
                 if elem.type in ("slab", "roof"):
@@ -244,13 +329,28 @@ def build_ifc(
                         elevation=storey_elevation if elem.type == "slab" else storey_elevation + storey_data.height,
                     )
                     is_roof = elem.type == "roof"
-                    assign_material_to_element(model, ifc_slab, roof_mat if is_roof else slab_mat)
+                    slab_layer_set = roof_mat if is_roof else slab_mat
+                    slab_sig = type_registry.signature(
+                        type_class="IfcSlabType",
+                        material_layer_set=slab_layer_set,
+                        thickness_m=elem.properties.thickness,
+                        predefined_type="ROOF" if is_roof else "FLOOR",
+                    )
+                    type_registry.attach(ifc_slab, slab_sig, material_layer_set=slab_layer_set)
                     add_slab_psets(model, ifc_slab, elem, is_roof=is_roof)
                     apply_color(model, ifc_slab, "slab-roof" if is_roof else "slab-floor", style_cache)
                     counts.IfcSlab += 1
 
                 elif elem.type == "column":
                     ifc_col = create_column(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    col_sig = type_registry.signature(
+                        type_class="IfcColumnType",
+                        material_layer_set=None,
+                        thickness_m=None,
+                        predefined_type="COLUMN",
+                        section_profile=(elem.properties.section_profile or ""),
+                    )
+                    type_registry.attach(ifc_col, col_sig)
                     add_column_psets(model, ifc_col, elem)
                     apply_color(model, ifc_col, "column", style_cache)
                     counts.IfcColumn += 1
@@ -258,6 +358,13 @@ def build_ifc(
                 elif elem.type == "window":
                     parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
                     ifc_win = create_window(model, elem, ifc_storey, body_context, parent_wall, storey_elevation=storey_elevation)
+                    win_sig = type_registry.signature(
+                        type_class="IfcWindowType",
+                        material_layer_set=None,
+                        thickness_m=None,
+                        predefined_type="WINDOW",
+                    )
+                    type_registry.attach(ifc_win, win_sig)
                     add_window_psets(model, ifc_win, elem)
                     apply_color(model, ifc_win, "window", style_cache)
                     counts.IfcWindow += 1
@@ -267,6 +374,13 @@ def build_ifc(
                 elif elem.type == "door":
                     parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
                     ifc_door = create_door(model, elem, ifc_storey, body_context, parent_wall, storey_elevation=storey_elevation)
+                    door_sig = type_registry.signature(
+                        type_class="IfcDoorType",
+                        material_layer_set=None,
+                        thickness_m=None,
+                        predefined_type="DOOR",
+                    )
+                    type_registry.attach(ifc_door, door_sig)
                     add_door_psets(model, ifc_door, elem)
                     apply_color(model, ifc_door, "door", style_cache)
                     counts.IfcDoor += 1
@@ -275,18 +389,40 @@ def build_ifc(
 
                 elif elem.type == "space":
                     ifc_space = create_space(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    space_sig = type_registry.signature(
+                        type_class="IfcSpaceType",
+                        material_layer_set=None,
+                        thickness_m=None,
+                        predefined_type="SPACE",
+                    )
+                    type_registry.attach(ifc_space, space_sig)
                     add_space_psets(model, ifc_space, elem)
                     apply_color(model, ifc_space, "space", style_cache)
                     counts.IfcSpace += 1
 
                 elif elem.type == "beam":
                     ifc_beam = create_beam(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    beam_sig = type_registry.signature(
+                        type_class="IfcBeamType",
+                        material_layer_set=None,
+                        thickness_m=None,
+                        predefined_type="BEAM",
+                        section_profile=(elem.properties.section_profile or ""),
+                    )
+                    type_registry.attach(ifc_beam, beam_sig)
                     add_beam_psets(model, ifc_beam, elem)
                     apply_color(model, ifc_beam, "beam", style_cache)
                     counts.IfcBeam += 1
 
                 elif elem.type == "stair":
                     ifc_stair = create_stair(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    stair_sig = type_registry.signature(
+                        type_class="IfcStairFlightType",
+                        material_layer_set=None,
+                        thickness_m=None,
+                        predefined_type="STRAIGHT",
+                    )
+                    type_registry.attach(ifc_stair, stair_sig)
                     apply_color(model, ifc_stair, "stair", style_cache)
                     counts.IfcStairFlight += 1
 
@@ -332,7 +468,7 @@ def build_ifc(
                     proxy = api.run(
                         "root.create_entity", model, ifc_class="IfcBuildingElementProxy"
                     )
-                    proxy.GlobalId = new_guid()
+                    proxy.GlobalId = derive_guid("IfcBuildingElementProxy", elem.id)
                     proxy.Name = elem.properties.name
                     from app.utils.ifc_helpers import assign_to_storey
                     assign_to_storey(model, ifc_storey, proxy)
@@ -367,13 +503,38 @@ def build_ifc(
     # building in the viewer. Architectural disciplines get the full set;
     # structural / MEP only get what applies (podium, ceiling soffit).
     # Failures are logged but never abort the build.
-    if discipline in ("architectural", "combined"):
+    #
+    # Skipped when rich_mode == "off": the contract for "off" is "spatial
+    # structure only — no elements". Enrichment would emit parapet walls,
+    # podium slabs, ceiling coverings, etc. — all elements — which would
+    # break the off-mode invariant the audit endpoint exists to verify.
+    if discipline in ("architectural", "combined") and rich_mode != "off":
         enrich_building(model, geometry, ifc_storeys, body_context, style_cache)
 
-    # ── Classification: OmniClass references on every element type ──
-    # Makes the IFC legible to downstream cost/spec tools. Always on —
-    # classification is cheap and every professional IFC carries it.
+    # ── Type-instance flush (Phase 2 / Fix 3) ───────────────────
+    # Emit one IfcRelDefinesByType per type with its full instance list.
+    # Ran AFTER element creation so every typed instance is already in
+    # the registry; runs BEFORE classification so the OmniClass scan
+    # sees both type entities and instances.
+    type_registry.flush()
+
+    # ── Classification: OmniClass + NBC India ────────────────────
+    # OmniClass — element-level, every emitter type has an entry.
+    # NBC India 2016 Part 4 — building-level, occupancy group derived
+    # from buildingType. Both attach via IfcRelAssociatesClassification.
+    # Always on — classification is cheap and every professional IFC
+    # carries it.
     attach_omniclass(model)
+    attach_nbc_india(model, geometry.building_type)
+
+    # ── RERA Pset (Phase 2 / Task 7) ─────────────────────────────
+    # Indian Real Estate Regulation Act metadata, attached only to
+    # residential IfcSpaces (NBC Group A). Falls back to defaults when
+    # `rera_inputs` is None (no extension on the BuildFlow side yet).
+    # Skipped on richMode='off' because there are no spaces to attach
+    # to. No-op for non-residential buildings.
+    inputs = rera_inputs or ReraInputs.from_options(None, None, None)
+    attach_rera_psets(model, geometry.building_type, inputs)
 
     elapsed = round((time.monotonic() - start) * 1000, 1)
     log.info(
@@ -402,7 +563,13 @@ def build_multi_discipline(
     (ifc_bytes, entity_counts, per_element_failures).
     """
     results: dict[str, tuple[bytes, EntityCounts, list[BuildFailure]]] = {}
-    emit_mep_geometry = _emit_mep_geometry(request.options.rich_mode)
+    rich_mode = request.options.rich_mode
+    emit_mep_geometry = _emit_mep_geometry(rich_mode)
+    rera_inputs = ReraInputs.from_options(
+        rera_project_id=request.options.rera_project_id,
+        seismic_zone=request.options.seismic_zone,
+        wind_zone=request.options.wind_zone,
+    )
 
     for discipline in request.options.disciplines:
         model, counts, failures = build_ifc(
@@ -413,6 +580,8 @@ def build_multi_discipline(
             author=request.options.author,
             discipline=discipline,
             emit_mep_geometry=emit_mep_geometry,
+            rich_mode=rich_mode,
+            rera_inputs=rera_inputs,
         )
 
         # Write to bytes

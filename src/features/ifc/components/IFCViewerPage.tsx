@@ -265,6 +265,10 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
     setBottomPanelOpen(true);
     setBottomTab("editor");
 
+    /* Panorama V2: auto-apply on model load is intentionally removed.
+       Panorama is now part of the Enhance-tab orchestration — applies
+       only when the user clicks Apply Enhancement. */
+
     // Auto-enhance: apply all tiers when opening a BuildFlow-generated IFC
     if (shouldAutoEnhance(autoEnhance) && !autoEnhancedRef.current) {
       autoEnhancedRef.current = true;

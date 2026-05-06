@@ -8,7 +8,8 @@ import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
-from app.utils.guid import new_guid
+from app.services.steel_profiles import get_is_section, is_steel_material
+from app.utils.guid import derive_guid
 
 
 def create_column(
@@ -28,7 +29,7 @@ def create_column(
     radius = props.radius or 0.25
 
     column = api.run("root.create_entity", model, ifc_class="IfcColumn")
-    column.GlobalId = new_guid()
+    column.GlobalId = derive_guid("IfcColumn", elem.id)
     column.Name = props.name
 
     from app.utils.ifc_helpers import assign_to_storey
@@ -51,12 +52,38 @@ def create_column(
         ),
     )
 
-    # Circular profile
-    profile = model.create_entity(
-        "IfcCircleProfileDef",
-        ProfileType="AREA",
-        Radius=radius,
+    # Profile selection (Phase 2 / Fix 11):
+    #   1. Steel + IS-808 designation → IfcIShapeProfileDef with spec dims.
+    #   2. Anything else → existing circular fallback (matches pre-Phase-2).
+    # Steel material can come from either `properties.structuralMaterial`
+    # (Track C typed Literal) or `properties.material` (older free-form).
+    structural_material = (
+        props.structural_material if props.structural_material else props.material
     )
+    is_section = (
+        get_is_section(props.section_profile)
+        if is_steel_material(structural_material)
+        else None
+    )
+
+    if is_section is not None:
+        d = is_section.as_metres()
+        profile = model.create_entity(
+            "IfcIShapeProfileDef",
+            ProfileType="AREA",
+            ProfileName=is_section.designation,
+            OverallDepth=d["depth"],
+            OverallWidth=d["flange_width"],
+            FlangeThickness=d["flange_thickness"],
+            WebThickness=d["web_thickness"],
+        )
+    else:
+        # Circular profile (pre-Phase-2 default)
+        profile = model.create_entity(
+            "IfcCircleProfileDef",
+            ProfileType="AREA",
+            Radius=radius,
+        )
 
     solid = model.create_entity(
         "IfcExtrudedAreaSolid",

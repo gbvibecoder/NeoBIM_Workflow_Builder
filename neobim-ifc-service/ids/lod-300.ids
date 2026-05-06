@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NeoBIM Phase 0 — LOD 300 IDS
+
+  Design-development tier additions, validated on top of core.ids. These
+  rules require Pset_*Common populated (LoadBearing, IsExternal, FireRating
+  etc. on walls/slabs/doors/windows/columns/beams) and base quantities
+  (Qto_*BaseQuantities) on slabs and spaces. They are required for IFCs
+  that will feed coordination, clash detection, or cost takeoff.
+
+  Rule count: 13 (>= 12 required).
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <info>
+    <title>NeoBIM LOD 300 IDS</title>
+    <copyright>NeoBIM 2026</copyright>
+    <version>1.0.0</version>
+    <description>Design-development tier — Pset_*Common and Qto_*BaseQuantities population.</description>
+    <author>quality@neobim.app</author>
+    <date>2026-05-06</date>
+    <purpose>Phase 0 quality gate (design-development and tender-ready)</purpose>
+    <milestone>Phase 0</milestone>
+  </info>
+  <specifications>
+
+    <specification ifcVersion="IFC4"
+                   name="Wall — Pset_WallCommon present"
+                   identifier="LOD300_WALL_PSET_COMMON"
+                   description="Every IfcWall must carry Pset_WallCommon. Solibri / BIMcollab clash workflows depend on this set."
+                   instructions="Attach via ifcopenshell.api.run('pset.add_pset', product=wall, name='Pset_WallCommon').">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWALL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required">
+          <propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Wall — IsExternal populated"
+                   identifier="LOD300_WALL_IS_EXTERNAL"
+                   description="Pset_WallCommon.IsExternal must be set (TRUE/FALSE). Energy / shading tools branch on this."
+                   instructions="Derive from MassingElement.properties.is_exterior or wall_type ('exterior' → TRUE).">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWALL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet>
+          <baseName><simpleValue>IsExternal</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Wall — LoadBearing populated"
+                   identifier="LOD300_WALL_LOAD_BEARING"
+                   description="Pset_WallCommon.LoadBearing must be set. Structural-discipline filters and shear-wall recognition depend on this."
+                   instructions="Derive from MassingElement.properties.load_bearing or wall_type ('shear' → TRUE).">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWALL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet>
+          <baseName><simpleValue>LoadBearing</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Slab — Qto_SlabBaseQuantities present"
+                   identifier="LOD300_SLAB_QTO"
+                   description="Quantity takeoff requires Qto_SlabBaseQuantities on every IfcSlab."
+                   instructions="Compute NetVolume / NetArea from the swept-solid extrusion at build time.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSLAB</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCQUANTITYVOLUME">
+          <propertySet><simpleValue>Qto_SlabBaseQuantities</simpleValue></propertySet>
+          <baseName><simpleValue>NetVolume</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Slab — NetArea populated"
+                   identifier="LOD300_SLAB_NET_AREA"
+                   description="Qto_SlabBaseQuantities.NetArea required for cost takeoff."
+                   instructions="Compute from the slab footprint polygon area.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSLAB</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCQUANTITYAREA">
+          <propertySet><simpleValue>Qto_SlabBaseQuantities</simpleValue></propertySet>
+          <baseName><simpleValue>NetArea</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Slab — Pset_SlabCommon present"
+                   identifier="LOD300_SLAB_PSET_COMMON"
+                   description="Pset_SlabCommon required for IsExternal / LoadBearing / ThermalTransmittance routing in arch + struct flows."
+                   instructions="Attach via pset.add_pset on each slab.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSLAB</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required">
+          <propertySet><simpleValue>Pset_SlabCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Space — Pset_SpaceCommon present"
+                   identifier="LOD300_SPACE_PSET_COMMON"
+                   description="IfcSpace must carry Pset_SpaceCommon. Required by COBie space-list takeoff."
+                   instructions="Attach via pset.add_pset.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSPACE</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required">
+          <propertySet><simpleValue>Pset_SpaceCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Space — Qto_SpaceBaseQuantities.NetFloorArea populated"
+                   identifier="LOD300_SPACE_NET_FLOOR_AREA"
+                   description="Floor-area takeoff and FAR / RERA carpet-area calculations depend on this."
+                   instructions="Compute from MassingElement space_footprint polygon area.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSPACE</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCQUANTITYAREA">
+          <propertySet><simpleValue>Qto_SpaceBaseQuantities</simpleValue></propertySet>
+          <baseName><simpleValue>NetFloorArea</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Door — Pset_DoorCommon present"
+                   identifier="LOD300_DOOR_PSET_COMMON"
+                   description="Required for FireRating / IsExternal / OperationType data downstream."
+                   instructions="Attach via pset.add_pset.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDOOR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required">
+          <propertySet><simpleValue>Pset_DoorCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Window — Pset_WindowCommon present"
+                   identifier="LOD300_WINDOW_PSET_COMMON"
+                   description="Required for GlazingAreaFraction / ThermalTransmittance routing."
+                   instructions="Attach via pset.add_pset.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWINDOW</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required">
+          <propertySet><simpleValue>Pset_WindowCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Column — Pset_ColumnCommon present"
+                   identifier="LOD300_COLUMN_PSET_COMMON"
+                   description="Pset_ColumnCommon must be present so structural filters can identify load-bearing columns."
+                   instructions="Attach via pset.add_pset.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCCOLUMN</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required">
+          <propertySet><simpleValue>Pset_ColumnCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Beam — Pset_BeamCommon present"
+                   identifier="LOD300_BEAM_PSET_COMMON"
+                   description="Pset_BeamCommon must be present so structural filters can identify load-bearing beams."
+                   instructions="Attach via pset.add_pset.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBEAM</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required">
+          <propertySet><simpleValue>Pset_BeamCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Storey — CompositionType set"
+                   identifier="LOD300_STOREY_COMPOSITION_TYPE"
+                   description="IfcBuildingStorey.CompositionType must be ELEMENT (or COMPLEX/PARTIAL with intent). Default null breaks Solibri storey-grouping."
+                   instructions="Set CompositionType=ELEMENT on every storey.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>CompositionType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+  </specifications>
+</ids>

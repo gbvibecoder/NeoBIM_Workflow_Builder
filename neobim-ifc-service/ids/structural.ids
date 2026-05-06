@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NeoBIM Phase 0 — Structural discipline IDS
+
+  Structural-specific rules for columns, beams, footings, slabs, grids,
+  reinforcement and the structural-analysis model. Validated on top of
+  core.ids + the active LOD tier.
+
+  Rule count: 13 (>= 12 required).
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <info>
+    <title>NeoBIM Structural IDS</title>
+    <copyright>NeoBIM 2026</copyright>
+    <version>1.0.0</version>
+    <description>Structural-discipline data quality.</description>
+    <author>quality@neobim.app</author>
+    <date>2026-05-06</date>
+    <purpose>Phase 0 quality gate (structural discipline)</purpose>
+    <milestone>Phase 0</milestone>
+  </info>
+  <specifications>
+
+    <specification ifcVersion="IFC4"
+                   name="Column — LoadBearing populated"
+                   identifier="STRUCT_COLUMN_LOAD_BEARING"
+                   description="Pset_ColumnCommon.LoadBearing must be set; structural filters key on this."
+                   instructions="Default TRUE; non-load-bearing decorative columns set FALSE.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCCOLUMN</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_ColumnCommon</simpleValue></propertySet>
+          <baseName><simpleValue>LoadBearing</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Beam — LoadBearing populated"
+                   identifier="STRUCT_BEAM_LOAD_BEARING"
+                   description="Pset_BeamCommon.LoadBearing must be set."
+                   instructions="Default TRUE for primary / secondary beams; FALSE for tertiary cross-bracing only when applicable.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBEAM</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_BeamCommon</simpleValue></propertySet>
+          <baseName><simpleValue>LoadBearing</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Slab — LoadBearing populated"
+                   identifier="STRUCT_SLAB_LOAD_BEARING"
+                   description="Pset_SlabCommon.LoadBearing must be set on every slab."
+                   instructions="See ARCH_SLAB_LOAD_BEARING.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSLAB</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_SlabCommon</simpleValue></propertySet>
+          <baseName><simpleValue>LoadBearing</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Column — material assigned"
+                   identifier="STRUCT_COLUMN_MATERIAL"
+                   description="Every IfcColumn references an IfcMaterial / IfcMaterialProfileSetUsage. Section + grade ambiguity makes the model un-tenderable."
+                   instructions="Use ifcopenshell.api.run('material.assign_material', ...).">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCCOLUMN</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <material cardinality="required">
+          <value>
+            <xs:restriction base="xs:string">
+              <xs:pattern value=".*"/>
+            </xs:restriction>
+          </value>
+        </material>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Beam — material assigned"
+                   identifier="STRUCT_BEAM_MATERIAL"
+                   description="Every IfcBeam references an IfcMaterial."
+                   instructions="See STRUCT_COLUMN_MATERIAL.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBEAM</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <material cardinality="required">
+          <value>
+            <xs:restriction base="xs:string">
+              <xs:pattern value=".*"/>
+            </xs:restriction>
+          </value>
+        </material>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Footing — Pset_FootingCommon present"
+                   identifier="STRUCT_FOOTING_PSET_COMMON"
+                   description="Footings carry Pset_FootingCommon for cost takeoff and earthworks coordination."
+                   instructions="Attach via pset.add_pset.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCFOOTING</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional">
+          <propertySet><simpleValue>Pset_FootingCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Column — Name attribute populated"
+                   identifier="STRUCT_COLUMN_NAME"
+                   description="Naming convention C-101 / C-201 etc. is required for the column schedule."
+                   instructions="Build name from grid intersection + storey level.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCCOLUMN</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Name</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Beam — Name attribute populated"
+                   identifier="STRUCT_BEAM_NAME"
+                   description="Naming convention B-101-A / B-201-A required for beam schedule."
+                   instructions="Build name from storey + sequence id.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBEAM</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Name</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Column — ObjectType populated (profile name)"
+                   identifier="STRUCT_COLUMN_OBJECT_TYPE"
+                   description="ObjectType holds the section name (e.g. 'ISMB-450', 'RCC-450x600'). Used by structural BIM viewers for type-grouping."
+                   instructions="Set from MassingElement.properties.section_profile.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCCOLUMN</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="optional">
+          <name><simpleValue>ObjectType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Reinforcing bar — Material assigned"
+                   identifier="STRUCT_REBAR_MATERIAL"
+                   description="Rebar must reference an IfcMaterial (typically Fe500 / Fe415)."
+                   instructions="Map structural_material + material_grade → IfcMaterial.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCREINFORCINGBAR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <material cardinality="required">
+          <value>
+            <xs:restriction base="xs:string">
+              <xs:pattern value=".*"/>
+            </xs:restriction>
+          </value>
+        </material>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Reinforcing bar — NominalDiameter populated"
+                   identifier="STRUCT_REBAR_DIAMETER"
+                   description="Rebar requires NominalDiameter for steel takeoff."
+                   instructions="Set from MassingElement.properties.diameter (mm).">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCREINFORCINGBAR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>NominalDiameter</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Grid — present at tender-ready"
+                   identifier="STRUCT_GRID_PRESENT"
+                   description="At least one IfcGrid must exist; column / beam positions reference it."
+                   instructions="Emit IfcGrid with U/V axes derived from column footprints.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCGRID</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>GlobalId</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Footing — Material assigned"
+                   identifier="STRUCT_FOOTING_MATERIAL"
+                   description="Every footing references an IfcMaterial (RCC grade)."
+                   instructions="Default M25 RCC unless concrete_strength specified.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCFOOTING</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <material cardinality="required">
+          <value>
+            <xs:restriction base="xs:string">
+              <xs:pattern value=".*"/>
+            </xs:restriction>
+          </value>
+        </material>
+      </requirements>
+    </specification>
+
+  </specifications>
+</ids>

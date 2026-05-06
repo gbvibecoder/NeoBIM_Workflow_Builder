@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NeoBIM Phase 0 — MEP discipline IDS
+
+  MEP-specific rules for distribution systems, segments, terminals, and
+  ports. Validated on top of core.ids + the active LOD tier.
+
+  Note: distribution-port presence is only enforceable at lod-350; at
+  lower fidelities MEP is bodyless / port-less (the existing IFC visual-
+  quality milestone allows bodyless rebar/MEP at concept tier, see
+  feedback_ifc_visual_quality.md).
+
+  Rule count: 11 (>= 10 required).
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <info>
+    <title>NeoBIM MEP IDS</title>
+    <copyright>NeoBIM 2026</copyright>
+    <version>1.0.0</version>
+    <description>MEP-discipline data quality.</description>
+    <author>quality@neobim.app</author>
+    <date>2026-05-06</date>
+    <purpose>Phase 0 quality gate (MEP discipline)</purpose>
+    <milestone>Phase 0</milestone>
+  </info>
+  <specifications>
+
+    <specification ifcVersion="IFC4"
+                   name="DistributionSystem — present"
+                   identifier="MEP_DISTRIBUTION_SYSTEM_PRESENT"
+                   description="At least one IfcDistributionSystem must exist when MEP elements are present. Without it, segments and terminals are unrooted in any system."
+                   instructions="Group by mep_system field; emit one IfcDistributionSystem per group.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDISTRIBUTIONSYSTEM</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>GlobalId</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="DistributionSystem — PredefinedType set"
+                   identifier="MEP_DISTRIBUTION_SYSTEM_PREDEFINED_TYPE"
+                   description="IfcDistributionSystem.PredefinedType must be set (DOMESTICCOLDWATER, SUPPLYAIR, ELECTRICALCIRCUIT, etc.). USERDEFINED is allowed only when ObjectType is set to a meaningful label."
+                   instructions="Map mep_system → PredefinedType per app/services/mep_builder.py system table.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDISTRIBUTIONSYSTEM</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="DuctSegment — Name populated"
+                   identifier="MEP_DUCT_NAME"
+                   description="Every IfcDuctSegment has a Name (e.g. 'D-SUP-101'). Required for schedule + clash reporting."
+                   instructions="Build name from system + sequence index.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDUCTSEGMENT</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Name</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="PipeSegment — Name populated"
+                   identifier="MEP_PIPE_NAME"
+                   description="Every IfcPipeSegment has a Name (e.g. 'P-DCW-101'). Required for schedule + clash reporting."
+                   instructions="Build name from system + sequence index.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCPIPESEGMENT</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Name</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="DuctSegment — PredefinedType set"
+                   identifier="MEP_DUCT_PREDEFINED_TYPE"
+                   description="DuctSegment PredefinedType (RIGIDSEGMENT / FLEXIBLESEGMENT) is required for fabrication takeoff."
+                   instructions="Default RIGIDSEGMENT.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDUCTSEGMENT</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="PipeSegment — PredefinedType set"
+                   identifier="MEP_PIPE_PREDEFINED_TYPE"
+                   description="PipeSegment PredefinedType (CULVERT / FLEXIBLESEGMENT / RIGIDSEGMENT) required for fabrication takeoff."
+                   instructions="Default RIGIDSEGMENT.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCPIPESEGMENT</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="SanitaryTerminal — PredefinedType set"
+                   identifier="MEP_SANITARY_TERMINAL_PREDEFINED_TYPE"
+                   description="WCs / wash basins / sinks must be class-correct as IfcSanitaryTerminal with PredefinedType. Using IfcFlowTerminal for a WC is a category error."
+                   instructions="Map subtype: TOILETPAN, WASHHANDBASIN, SINK, SHOWER, BATH, URINAL. Default TOILETPAN where the source mep_system suggests a WC.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSANITARYTERMINAL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="AirTerminal — PredefinedType set"
+                   identifier="MEP_AIR_TERMINAL_PREDEFINED_TYPE"
+                   description="Diffusers / grilles / registers carry PredefinedType (DIFFUSER, GRILLE, REGISTER, EYEBALL)."
+                   instructions="Default DIFFUSER for ceiling supplies.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCAIRTERMINAL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="LightFixture — PredefinedType set"
+                   identifier="MEP_LIGHT_FIXTURE_PREDEFINED_TYPE"
+                   description="Light fixtures carry PredefinedType (POINTSOURCE, DIRECTIONSOURCE, SECURITYLIGHTING)."
+                   instructions="Default POINTSOURCE for general purpose; DIRECTIONSOURCE for spots.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCLIGHTFIXTURE</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="DuctSegment — Pset_DuctSegmentTypeCommon present"
+                   identifier="MEP_DUCT_PSET_TYPE_COMMON"
+                   description="Pset_DuctSegmentTypeCommon (or Pset_DuctSegmentOccurrence) provides shape / material / insulation data needed for clash detection and energy modelling."
+                   instructions="Attach via pset.add_pset.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDUCTSEGMENT</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional">
+          <propertySet><simpleValue>Pset_DuctSegmentTypeCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="PipeSegment — Pset_PipeSegmentTypeCommon present"
+                   identifier="MEP_PIPE_PSET_TYPE_COMMON"
+                   description="Pset_PipeSegmentTypeCommon provides nominal diameter + flow direction needed for hydraulic analysis."
+                   instructions="Attach via pset.add_pset.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCPIPESEGMENT</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional">
+          <propertySet><simpleValue>Pset_PipeSegmentTypeCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+  </specifications>
+</ids>

@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NeoBIM Phase 0 — Architectural discipline IDS
+
+  Architectural-specific rules for walls, slabs, doors, windows, spaces,
+  coverings, and railings. Validated on top of core.ids + the active LOD
+  tier. Most rules require Pset_*Common population; layered onto LOD 300+
+  these become sharper (e.g. ThermalTransmittance becomes mandatory).
+
+  Rule count: 16 (>= 15 required).
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <info>
+    <title>NeoBIM Architectural IDS</title>
+    <copyright>NeoBIM 2026</copyright>
+    <version>1.0.0</version>
+    <description>Architectural-discipline data quality.</description>
+    <author>quality@neobim.app</author>
+    <date>2026-05-06</date>
+    <purpose>Phase 0 quality gate (architectural discipline)</purpose>
+    <milestone>Phase 0</milestone>
+  </info>
+  <specifications>
+
+    <specification ifcVersion="IFC4"
+                   name="Wall — IsExternal populated"
+                   identifier="ARCH_WALL_IS_EXTERNAL"
+                   description="Architectural walls must declare IsExternal."
+                   instructions="See LOD300_WALL_IS_EXTERNAL.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWALL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet>
+          <baseName><simpleValue>IsExternal</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Wall — LoadBearing populated"
+                   identifier="ARCH_WALL_LOAD_BEARING"
+                   description="Pset_WallCommon.LoadBearing populated."
+                   instructions="See LOD300_WALL_LOAD_BEARING.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWALL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet>
+          <baseName><simpleValue>LoadBearing</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Wall — FireRating populated"
+                   identifier="ARCH_WALL_FIRE_RATING"
+                   description="Walls must carry FireRating per NBC Part 4 / IBC."
+                   instructions="Default '60 min' for stair / shaft enclosures; '120 min' for compartment walls.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWALL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCLABEL">
+          <propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet>
+          <baseName><simpleValue>FireRating</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="External wall — ThermalTransmittance populated"
+                   identifier="ARCH_EXT_WALL_U_VALUE"
+                   description="External walls must declare U-value (Wm⁻²K⁻¹). ECBC compliance + energy modelling."
+                   instructions="Derive from MassingElement.properties.u_value or wall-type lookup.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWALL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional" dataType="IFCTHERMALTRANSMITTANCEMEASURE">
+          <propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet>
+          <baseName><simpleValue>ThermalTransmittance</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Slab — IsExternal populated"
+                   identifier="ARCH_SLAB_IS_EXTERNAL"
+                   description="Slabs declare IsExternal so roof / floor / canopy can be distinguished."
+                   instructions="Roof slabs → IsExternal=TRUE; floor slabs → FALSE.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSLAB</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_SlabCommon</simpleValue></propertySet>
+          <baseName><simpleValue>IsExternal</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Slab — LoadBearing populated"
+                   identifier="ARCH_SLAB_LOAD_BEARING"
+                   description="LoadBearing required for structural-discipline filtering."
+                   instructions="Default TRUE for all RCC slabs.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSLAB</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_SlabCommon</simpleValue></propertySet>
+          <baseName><simpleValue>LoadBearing</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Roof slab — ThermalTransmittance populated"
+                   identifier="ARCH_ROOF_U_VALUE"
+                   description="Roofs must carry U-value for ECBC compliance."
+                   instructions="Derive from u_value or material lookup.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSLAB</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional" dataType="IFCTHERMALTRANSMITTANCEMEASURE">
+          <propertySet><simpleValue>Pset_SlabCommon</simpleValue></propertySet>
+          <baseName><simpleValue>ThermalTransmittance</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Door — OperationType populated"
+                   identifier="ARCH_DOOR_OPERATION_TYPE"
+                   description="IfcDoor.OperationType (or PredefinedType in IFC4.3) must be set: SINGLE_SWING_LEFT, DOUBLE_SWING, SLIDING_TO_LEFT, etc."
+                   instructions="Map MassingElement.properties.operation_type to the IFC4 enumeration; default SINGLE_SWING_RIGHT.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDOOR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>OperationType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Door — FireRating populated"
+                   identifier="ARCH_DOOR_FIRE_RATING"
+                   description="FireRating on doors is required for compartmentation and stair / shaft openings."
+                   instructions="Default '60 min' for stair-shaft and shaft doors; null acceptable for non-compartment.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDOOR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional" dataType="IFCLABEL">
+          <propertySet><simpleValue>Pset_DoorCommon</simpleValue></propertySet>
+          <baseName><simpleValue>FireRating</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Window — GlazingAreaFraction populated"
+                   identifier="ARCH_WINDOW_GLAZING_FRACTION"
+                   description="Required for daylight + ECBC analyses."
+                   instructions="Compute glazing_area / total_opening_area.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWINDOW</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional" dataType="IFCPOSITIVERATIOMEASURE">
+          <propertySet><simpleValue>Pset_WindowCommon</simpleValue></propertySet>
+          <baseName><simpleValue>GlazingAreaFraction</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Window — IsExternal populated"
+                   identifier="ARCH_WINDOW_IS_EXTERNAL"
+                   description="Windows declare IsExternal — internal-glazed-partition vs facade is a basic data-quality assertion."
+                   instructions="Default TRUE for facade openings.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWINDOW</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_WindowCommon</simpleValue></propertySet>
+          <baseName><simpleValue>IsExternal</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Space — IsExternal populated"
+                   identifier="ARCH_SPACE_IS_EXTERNAL"
+                   description="Spaces declare IsExternal so balconies / canopies / atriums are flagged for daylight and HVAC."
+                   instructions="Set TRUE for outdoor / semi-outdoor spaces.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSPACE</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_SpaceCommon</simpleValue></propertySet>
+          <baseName><simpleValue>IsExternal</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Space — PubliclyAccessible populated"
+                   identifier="ARCH_SPACE_PUBLICLY_ACCESSIBLE"
+                   description="Required for accessibility analysis (NBC Part 3, ADA, etc.)."
+                   instructions="Public lobbies / stairs / corridors → TRUE; private apartments → FALSE.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSPACE</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="optional" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_SpaceCommon</simpleValue></propertySet>
+          <baseName><simpleValue>PubliclyAccessible</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Covering — PredefinedType set"
+                   identifier="ARCH_COVERING_PREDEFINED_TYPE"
+                   description="Coverings (FLOORING / CEILING / WRAPPING / CLADDING) need PredefinedType to render in viewers."
+                   instructions="Map MassingElement.type covering-floor → FLOORING, covering-ceiling → CEILING.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCCOVERING</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Railing — PredefinedType set"
+                   identifier="ARCH_RAILING_PREDEFINED_TYPE"
+                   description="Railings need PredefinedType (HANDRAIL / GUARDRAIL / BALUSTRADE) for code analysis."
+                   instructions="Default GUARDRAIL on stair / balcony edges.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCRAILING</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Wall — Pset_WallCommon Reference populated"
+                   identifier="ARCH_WALL_REFERENCE_TAG"
+                   description="Pset_WallCommon.Reference (the type-mark, e.g. W-EXT-1, W-INT-PART) is required for schedule generation."
+                   instructions="Derive from wall_type + IS_PARTITION lookup.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWALL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCIDENTIFIER">
+          <propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet>
+          <baseName><simpleValue>Reference</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+  </specifications>
+</ids>

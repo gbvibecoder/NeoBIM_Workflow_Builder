@@ -28,6 +28,7 @@ from app.models.response import (
     EntityCounts,
 )
 from app.services.ifc_builder import build_multi_discipline
+from app.services.ids_validator import merge_results, validate_ifc
 from app.services.r2_uploader import upload_ifc_to_r2, ifc_to_base64_data_uri
 
 log = structlog.get_logger()
@@ -139,6 +140,71 @@ async def export_ifc(
             "Build completed but produced zero discipline files",
         )
 
+    # ── STAGE 2.5: VALIDATE-IFC (Phase 0) ─────────────────────────────
+    # Run ifctester against each emitted discipline IFC. Picks the IDS
+    # rule set from (target_fidelity, discipline). Crashes here are non-
+    # fatal: we log them and surface a `skipped_reason` rather than
+    # blocking UPLOAD — IFCs that build successfully should still ship
+    # even if Phase 0's validator misbehaves on a corner case. Hard
+    # failures (error-severity violations) flip response status to
+    # "partial" via the same path build failures use.
+    stage = "VALIDATE-IFC"
+    import tempfile
+    from app.models.response import IdsValidationResult
+
+    target_fidelity = request.options.target_fidelity
+    ids_per_discipline = []
+    try:
+        for discipline, (ifc_bytes, _counts, _failures) in results.items():
+            with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False, mode="wb") as tmp:
+                tmp.write(ifc_bytes)
+                tmp.flush()
+                tmp_path = tmp.name
+            try:
+                model = ifcopenshell.open(tmp_path)
+            except Exception as exc:
+                log.error(
+                    "ids_open_failed",
+                    request_id=rid,
+                    discipline=discipline,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                    exc_info=True,
+                )
+                continue
+            ids_per_discipline.append(
+                validate_ifc(model, discipline, target_fidelity)
+            )
+        ids_envelope = (
+            merge_results(ids_per_discipline)
+            if ids_per_discipline
+            else IdsValidationResult(target_fidelity=target_fidelity)
+        )
+    except Exception as exc:
+        log.error(
+            "ids_validation_stage_crashed",
+            request_id=rid,
+            error=str(exc),
+            error_type=type(exc).__name__,
+            exc_info=True,
+        )
+        ids_envelope = IdsValidationResult(
+            passed=True,
+            target_fidelity=target_fidelity,
+            skipped_reason=f"{type(exc).__name__}: {exc}",
+        )
+
+    log.info(
+        "export_ifc_ids_validated",
+        request_id=rid,
+        target_fidelity=target_fidelity,
+        rules_evaluated=ids_envelope.rules_evaluated,
+        violations=len(ids_envelope.violations),
+        warnings=len(ids_envelope.warnings),
+        elapsed_ms=ids_envelope.elapsed_ms,
+        skipped_reason=ids_envelope.skipped_reason,
+    )
+
     # ── STAGE 3: UPLOAD ───────────────────────────────────────────────
     stage = "UPLOAD"
     files: list[ExportedFile] = []
@@ -209,7 +275,9 @@ async def export_ifc(
             seen.add(key)
             unique_failures.append(f)
 
-    status = "partial" if unique_failures else "success"
+    ids_violations = list(ids_envelope.violations)
+    ids_warnings = list(ids_envelope.warnings)
+    status = "partial" if (unique_failures or ids_violations) else "success"
 
     log.info(
         "export_ifc_complete",
@@ -218,6 +286,9 @@ async def export_ifc(
         files=len(files),
         elapsed_ms=elapsed_ms,
         build_failure_count=len(unique_failures),
+        ids_violation_count=len(ids_violations),
+        ids_warning_count=len(ids_warnings),
+        target_fidelity=target_fidelity,
     )
 
     return ExportIFCResponse(
@@ -227,10 +298,13 @@ async def export_ifc(
             engine="ifcopenshell",
             ifcopenshell_version=ifcopenshell.version,
             generation_time_ms=elapsed_ms,
-            validation_passed=True,
+            validation_passed=ids_envelope.passed,
             entity_counts=combined_counts,
             build_failures=unique_failures,
             build_failure_count=len(unique_failures),
+            ids_validation=ids_envelope,
+            ids_violations=ids_violations,
+            ids_warnings=ids_warnings,
         ),
         request_id=rid,
     )

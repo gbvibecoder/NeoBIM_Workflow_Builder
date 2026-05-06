@@ -151,9 +151,16 @@ export function resolveRichMode(
   }
 
   // 3) Default
+  // Phase 2: changed from "off" to "arch-only" because the Python service
+  // post-Phase-1 honours "off" strictly (spatial structure only, no
+  // physical elements). With the old "off" default, fresh dev machines /
+  // CI / cold lambdas would silently generate empty IFCs whenever
+  // IFC_RICH_MODE wasn't set. "arch-only" is the safe, content-bearing
+  // baseline (walls, slabs, doors, windows, columns, beams, stairs,
+  // spaces — no MEP, no rebar). See PHASE_2_REPORT_2026-05-02 § Task 1.
   return {
-    mode: "off",
-    flags: richModeToFlags("off"),
+    mode: "arch-only",
+    flags: richModeToFlags("arch-only"),
     source: "default",
   };
 }

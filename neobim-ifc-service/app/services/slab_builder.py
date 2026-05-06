@@ -6,7 +6,7 @@ import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement, FootprintPoint
-from app.utils.guid import new_guid
+from app.utils.guid import derive_guid
 
 
 def create_slab(
@@ -27,7 +27,7 @@ def create_slab(
     is_roof = elem.type == "roof" or "roof" in props.name.lower()
 
     slab = api.run("root.create_entity", model, ifc_class="IfcSlab")
-    slab.GlobalId = new_guid()
+    slab.GlobalId = derive_guid("IfcSlab", elem.id)
     slab.Name = props.name
     slab.PredefinedType = "ROOF" if is_roof else "FLOOR"
 

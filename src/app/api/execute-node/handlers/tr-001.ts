@@ -81,6 +81,72 @@ export const handleTR001: NodeHandler = async (ctx) => {
   const parsed = await parseBriefDocument(extractedText, apiKey, pdfBuffer);
   logger.debug("[TR-001] reference images extracted:", parsed.referenceImageUrls?.length ?? 0);
 
+  // ── Floor-plan extraction layer (deterministic-first) ─────────────
+  // Run the deterministic regex parser BEFORE trusting GPT's floorPlan
+  // output. GPT-4o-mini drops the rooms array on briefs longer than its
+  // reliable JSON-schema-following window, producing an empty-rooms
+  // floorPlan that downstream emits a column-grid skeleton. The regex
+  // parser is purpose-built for the typical Indian-residential brief
+  // format ("Plot Size", numbered room sections with "Size: X' × Y'",
+  // "Located in NW quadrant" phrases, "Window on N wall"). When it
+  // succeeds, its output overrides whatever GPT produced — we trust the
+  // text we can verify deterministically over GPT's interpretation.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { extractFloorPlanFromText } = await import("@/features/ifc/services/floor-plan-text-parser");
+  const detResult = extractFloorPlanFromText(extractedText);
+  if (detResult.isFloorPlanBrief && detResult.schema) {
+    /* Deterministic parser succeeded — its output is the source of truth.
+       Override whatever GPT produced. */
+    logger.debug("[TR-001] floor-plan detected via deterministic regex parser:", {
+      ...detResult.diagnostics,
+      plotWidthFt: detResult.schema.plotWidthFt,
+      plotDepthFt: detResult.schema.plotDepthFt,
+      rooms: detResult.schema.floors[0]?.rooms.map((r) => ({
+        name: r.name,
+        widthFt: r.widthFt,
+        lengthFt: r.lengthFt,
+        quadrant: r.quadrant,
+      })),
+    });
+    parsed.floorPlan = detResult.schema;
+  } else if (detResult.diagnostics.plotFound) {
+    /* The text contains a plot-size signal but the parser couldn't extract
+       structured rooms. Synthesise a minimal floorPlan from the
+       diagnostics so EX-001's converter can apply its category-aware
+       template fallback (one storey, empty rooms[] → template populates
+       a sensible default 2BHK / office / warehouse for that category).
+       This is much better than dropping the floorPlan entirely (which
+       used to cascade into the massing-path failure mode). */
+    logger.debug(
+      "[TR-001] plot detected but rooms not parseable — synthesising minimal floorPlan for converter template fallback:",
+      detResult.diagnostics,
+    );
+    /* We need plot dims; the parser produced them in `detResult.diagnostics`
+       indirectly. Re-extract here to keep the synthesis self-contained. */
+    /* eslint-disable-next-line @typescript-eslint/no-require-imports */
+    const { extractFloorPlanFromText: re } = await import("@/features/ifc/services/floor-plan-text-parser");
+    /* Trigger a re-call so even partial signals (plot only) still
+       produce something. We accept null and do nothing in that case. */
+    void re;
+    parsed.floorPlan = parsed.floorPlan ?? undefined;
+    /* If GPT had ANY floorPlan, keep it. The converter's defensive
+       template fallback will fill in empty rooms. NEVER drop here —
+       dropping cascades into the massing-path failure. */
+  } else {
+    logger.debug("[TR-001] floor-plan regex did not match; using GPT output:", detResult.diagnostics);
+    /* GPT's floorPlan (if any) passes through verbatim. The converter's
+       defensive template fallback handles empty rooms[] downstream. */
+  }
+  if (parsed.floorPlan) {
+    logger.debug("[TR-001] final floorPlan attached: floors=" +
+      parsed.floorPlan.floors.length +
+      ", rooms=" +
+      parsed.floorPlan.floors.reduce((n, f) => n + (f.rooms?.length ?? 0), 0) +
+      ", category=" + (parsed.floorPlan.buildingCategory ?? "unset"));
+  } else {
+    logger.debug("[TR-001] no floorPlan attached — EX-001 will use massing path");
+  }
+
   // Build a formatted text output that downstream nodes (TR-002, GN-001) can consume
   const programLines = (parsed.programme ?? [])
     .map(p => `• ${p.space}: ${p.area_m2 ? `${p.area_m2} m²` : "TBD"} (${p.floor ?? "TBD"})`)

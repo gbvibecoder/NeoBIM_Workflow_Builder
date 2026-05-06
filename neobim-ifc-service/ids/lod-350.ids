@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NeoBIM Phase 0 — LOD 350 IDS
+
+  Tender-ready additions, validated on top of core.ids + lod-300.ids. These
+  rules require the project to carry constructible-level detail: rebar
+  in concrete elements, structural-analysis model present, full COBie
+  Psets on operable equipment (doors, windows, terminals).
+
+  Rule count: 11 (>= 10 required).
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <info>
+    <title>NeoBIM LOD 350 IDS</title>
+    <copyright>NeoBIM 2026</copyright>
+    <version>1.0.0</version>
+    <description>Tender-ready tier — rebar, structural analysis, full COBie Psets.</description>
+    <author>quality@neobim.app</author>
+    <date>2026-05-06</date>
+    <purpose>Phase 0 quality gate (tender-ready only)</purpose>
+    <milestone>Phase 0</milestone>
+  </info>
+  <specifications>
+
+    <specification ifcVersion="IFC4"
+                   name="Project must contain reinforcing bars"
+                   identifier="LOD350_REBAR_PRESENT"
+                   description="A tender-ready model must carry IfcReinforcingBar instances in concrete elements. Absent rebar means the model is not buildable."
+                   instructions="Emit IfcReinforcingBar from rebar_ratio + concrete_strength on each IfcColumn / IfcBeam / IfcSlab.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCREINFORCINGBAR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>GlobalId</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Project must contain a structural-analysis model"
+                   identifier="LOD350_STRUCTURAL_ANALYSIS_MODEL"
+                   description="At tender-ready fidelity the project carries an IfcStructuralAnalysisModel — the analytical mesh that ties to the physical model."
+                   instructions="Emit one IfcStructuralAnalysisModel per project; each load-bearing IfcMember is referenced from it.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSTRUCTURALANALYSISMODEL</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>GlobalId</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Door — FireRating populated"
+                   identifier="LOD350_DOOR_FIRE_RATING"
+                   description="Tender doors must carry FireRating (e.g. '60 min'). NBC India + IBC compliance + COBie all require this."
+                   instructions="Set Pset_DoorCommon.FireRating from MassingElement.properties.fire_rating; default '60 min' for stair / shaft doors per NBC.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDOOR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCLABEL">
+          <propertySet><simpleValue>Pset_DoorCommon</simpleValue></propertySet>
+          <baseName><simpleValue>FireRating</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Door — AcousticRating populated"
+                   identifier="LOD350_DOOR_ACOUSTIC_RATING"
+                   description="Tender doors carry AcousticRating (e.g. 'STC 32'). COBie + acoustic-design compliance."
+                   instructions="Set Pset_DoorCommon.AcousticRating from MassingElement.properties.acoustic_rating.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDOOR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCLABEL">
+          <propertySet><simpleValue>Pset_DoorCommon</simpleValue></propertySet>
+          <baseName><simpleValue>AcousticRating</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Window — GlazingAreaFraction populated"
+                   identifier="LOD350_WINDOW_GLAZING_AREA"
+                   description="Energy modelling and ECBC compliance need the glazed-fraction of the window opening."
+                   instructions="Compute as glazing_area / total_opening_area at build time.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCWINDOW</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCPOSITIVERATIOMEASURE">
+          <propertySet><simpleValue>Pset_WindowCommon</simpleValue></propertySet>
+          <baseName><simpleValue>GlazingAreaFraction</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Column — material profile-set usage present"
+                   identifier="LOD350_COLUMN_MATERIAL_PROFILE"
+                   description="Steel + concrete columns at tender-ready must reference IfcMaterialProfileSetUsage so the section profile (e.g. ISMB 200, 450x600 RCC) is unambiguous."
+                   instructions="Use ifcopenshell.api.run('material.assign_material', type='IfcMaterialProfileSetUsage', ...).">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCCOLUMN</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <material cardinality="required">
+          <value>
+            <xs:restriction base="xs:string">
+              <xs:pattern value=".*"/>
+            </xs:restriction>
+          </value>
+        </material>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Beam — material profile-set usage present"
+                   identifier="LOD350_BEAM_MATERIAL_PROFILE"
+                   description="Beams at tender-ready must reference an IfcMaterialProfileSetUsage."
+                   instructions="Same pattern as LOD350_COLUMN_MATERIAL_PROFILE.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBEAM</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <material cardinality="required">
+          <value>
+            <xs:restriction base="xs:string">
+              <xs:pattern value=".*"/>
+            </xs:restriction>
+          </value>
+        </material>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Project must contain a distribution system"
+                   identifier="LOD350_DISTRIBUTION_SYSTEM_PRESENT"
+                   description="MEP at tender-ready requires at least one IfcDistributionSystem grouping the segments / terminals."
+                   instructions="Emit IfcDistributionSystem with PredefinedType matching the system kind (DOMESTICCOLDWATER, SUPPLYAIR, etc.).">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDISTRIBUTIONSYSTEM</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>PredefinedType</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Space — Pset_SpaceCommon.OccupancyType populated"
+                   identifier="LOD350_SPACE_OCCUPANCY_TYPE"
+                   description="OccupancyType is required for life-safety analysis (NBC Part 4 + IBC chapter 3) at tender."
+                   instructions="Map MassingElement.properties.occupancy_type into Pset_SpaceCommon.OccupancyType.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSPACE</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCLABEL">
+          <propertySet><simpleValue>Pset_SpaceCommon</simpleValue></propertySet>
+          <baseName><simpleValue>OccupancyType</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Space — GrossVolume populated"
+                   identifier="LOD350_SPACE_GROSS_VOLUME"
+                   description="HVAC sizing at tender depends on Qto_SpaceBaseQuantities.GrossVolume."
+                   instructions="Compute as net_floor_area × storey_height.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSPACE</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCQUANTITYVOLUME">
+          <propertySet><simpleValue>Qto_SpaceBaseQuantities</simpleValue></propertySet>
+          <baseName><simpleValue>GrossVolume</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Door — IsExternal populated"
+                   identifier="LOD350_DOOR_IS_EXTERNAL"
+                   description="External-door identification is required for COBie + life-safety egress counting."
+                   instructions="Set Pset_DoorCommon.IsExternal from MassingElement.properties.is_exterior.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCDOOR</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <property cardinality="required" dataType="IFCBOOLEAN">
+          <propertySet><simpleValue>Pset_DoorCommon</simpleValue></propertySet>
+          <baseName><simpleValue>IsExternal</simpleValue></baseName>
+        </property>
+      </requirements>
+    </specification>
+
+  </specifications>
+</ids>
