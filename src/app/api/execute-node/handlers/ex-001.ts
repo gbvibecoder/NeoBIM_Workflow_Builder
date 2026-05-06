@@ -314,6 +314,64 @@ export const handleEX001: NodeHandler = async (ctx) => {
           timeMs: serviceResult.metadata.generation_time_ms,
           probeMs: readiness.latencyMs,
         });
+
+        // ── Phase 1 Slice 7 — BuildingModel write-through ────────────
+        // When the Python service ran the parametric pipeline the
+        // response carries the full BuildingModel as JSON. DB is
+        // canonical; R2 is a cheap-hot-read replica. R2 failures don't
+        // fail the build (we still ship the IFCs).
+        const buildingModelJson = serviceResult.metadata.building_model_json;
+        if (buildingModelJson && executionId && executionId !== "local") {
+          try {
+            const { prisma } = await import("@/lib/db");
+            const { uploadToR2 } = await import("@/lib/r2");
+            const projectMeta = (
+              buildingModelJson as { project?: { metadata?: { provenance?: { model_version?: string } } } }
+            ).project;
+            const modelVersion = projectMeta?.metadata?.provenance?.model_version ?? "1.0.0";
+            const bm = await prisma.buildingModel.create({
+              data: {
+                executionId,
+                modelVersion,
+                graph: buildingModelJson as unknown as object,
+              },
+            });
+            try {
+              const jsonBuffer = Buffer.from(JSON.stringify(buildingModelJson));
+              const filename = `building-model-${bm.id}.json`;
+              const result = await uploadToR2(jsonBuffer, filename, "application/json");
+              if ("success" in result && result.success) {
+                await prisma.buildingModel.update({
+                  where: { id: bm.id },
+                  data: { r2Key: result.url },
+                });
+                logger.debug("[EX-001] BuildingModel persisted", {
+                  id: bm.id,
+                  executionId,
+                  r2Key: result.url,
+                });
+              } else {
+                logger.warn("[EX-001] R2 write-through skipped (DB row kept)", {
+                  id: bm.id,
+                  reason: "error" in result ? result.error : "unknown",
+                });
+              }
+            } catch (r2Err) {
+              logger.warn("[EX-001] BuildingModel R2 write-through failed (DB row kept)", {
+                id: bm.id,
+                error: String(r2Err),
+              });
+            }
+          } catch (dbErr) {
+            // DB write failure is non-fatal — IFC files are already
+            // emitted and the parametric BuildingModel can be
+            // reconstructed from the same MassingGeometry on a re-run.
+            logger.warn("[EX-001] BuildingModel DB write failed", {
+              error: String(dbErr),
+              error_type: dbErr instanceof Error ? dbErr.constructor.name : "unknown",
+            });
+          }
+        }
       } else {
         logger.debug("[EX-001] service probe ready but export returned null — using TS fallback");
       }

@@ -28,6 +28,14 @@ export interface IFCServiceResponse {
     generation_time_ms: number;
     validation_passed: boolean;
     entity_counts: Record<string, number>;
+    // Phase 1 Slice 6 — populated when useParametricPipeline=true.
+    // The full BuildingModel graph as JSON; the EX-001 TS handler
+    // writes this to the BuildingModel table + R2 (Slice 7).
+    building_model_json?: Record<string, unknown> | null;
+    building_model_r2_key?: string | null;
+    // IDS validation envelope (Phase 0 stage 2.5 + Slice 6 re-stamp)
+    ids_validation?: Record<string, unknown> | null;
+    ids_violations?: Array<Record<string, unknown>>;
   };
   error?: string;
 }
