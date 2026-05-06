@@ -191,10 +191,11 @@ def create_wall_parametric(
     height = float(geometry.extrusion_depth)
     extr_dir = geometry.extrusion_direction or _DEFAULT_UP
 
-    # Wall entity + identity.
+    # Wall entity + identity. Use BuildingModel name when lift preserved
+    # one (Slice 5), fall back to id otherwise.
     wall_entity = api.run("root.create_entity", ifc_file, ifc_class="IfcWall")
     wall_entity.GlobalId = derive_guid("IfcWall", wall.id)
-    wall_entity.Name = wall.id
+    wall_entity.Name = wall.name if wall.name else wall.id
     wall_entity.PredefinedType = (
         "PARTITIONING" if wall.type == "partition" else "STANDARD"
     )

@@ -6,17 +6,34 @@ viewer doesn't render the chaotic horizontal rods the absolute-coordinate
 extrusion pattern used to produce. This matches the frozen TS exporter
 (`emitMEPGeometry=false` by default, gated via Phase 1 Track B). Rich mode
 "mep" / "full" re-enables bodies via `emit_geometry=True`.
+
+Slice 5 adds three parametric variants — `create_mep_equipment_parametric`,
+`create_mep_segment_parametric`, `create_mep_terminal_parametric` —
+consuming BuildingModel MEPEquipment / MEPSegment / MEPTerminal. The
+parametric path emits IfcAirHandlingUnit / IfcDuctSegment etc. with
+ResolvedPlacement-driven local placements. Bodyless-by-default contract
+preserved.
 """
 
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
 from app.utils.guid import derive_guid
+
+if TYPE_CHECKING:
+    from app.domain.building_model import (
+        MEPEquipment,
+        MEPSegment,
+        MEPTerminal,
+    )
+    from app.services.geometry_resolver import ResolvedGeometry
+    from app.services.placement_resolver import ResolvedPlacement
 
 
 def _mep_placement(
@@ -250,6 +267,188 @@ def _system_predefined_type(system_name: str) -> str:
     wants to mark it as distribution".
     """
     return _SYSTEM_PREDEFINED_TYPE.get(system_name, "USERDEFINED")
+
+
+# ─── Slice 5 parametric variants ──────────────────────────────────────
+
+
+_SEGMENT_IFC_CLASS = {
+    "HVAC": "IfcDuctSegment",
+    "Plumbing": "IfcPipeSegment",
+    "Electrical": "IfcCableCarrierSegment",
+    "FireProtection": "IfcPipeSegment",
+}
+
+_TERMINAL_IFC_CLASS = {
+    "HVAC": "IfcAirTerminal",
+    "Plumbing": "IfcSanitaryTerminal",
+    "Electrical": "IfcLightFixture",
+    "FireProtection": "IfcFireSuppressionTerminal",
+}
+
+_EQUIPMENT_IFC_CLASS = {
+    # IFC4 only — IfcAirHandlingUnit was added in IFC4x3 and isn't in the
+    # ifcopenshell IFC4 schema; IfcUnitaryEquipment with PredefinedType
+    # AIRHANDLER is the correct IFC4 mapping.
+    "HVAC": "IfcUnitaryEquipment",
+    "Plumbing": "IfcPump",
+    "Electrical": "IfcElectricDistributionBoard",
+    # FireProtection has no canonical "source" in IFC4; emit as
+    # IfcUnitaryEquipment for now (Phase 5a will revisit).
+    "FireProtection": "IfcUnitaryEquipment",
+}
+
+
+def _placement_from_resolved(
+    ifc_file: ifcopenshell.file, placement: "ResolvedPlacement"
+) -> ifcopenshell.entity_instance:
+    """Build an IfcLocalPlacement from a ResolvedPlacement. No fallback —
+    every coordinate comes from the resolver."""
+    return ifc_file.create_entity(
+        "IfcLocalPlacement",
+        RelativePlacement=ifc_file.create_entity(
+            "IfcAxis2Placement3D",
+            Location=ifc_file.create_entity(
+                "IfcCartesianPoint",
+                Coordinates=(placement.origin.x, placement.origin.y, placement.origin.z),
+            ),
+        ),
+    )
+
+
+def create_mep_equipment_parametric(
+    equip: "MEPEquipment",
+    placement: "ResolvedPlacement",
+    geometry: "ResolvedGeometry",
+    ifc_file: ifcopenshell.file,
+    body_context: ifcopenshell.entity_instance,
+    ifc_storey: ifcopenshell.entity_instance,
+    type_registry,
+    emit_geometry: bool = False,
+) -> ifcopenshell.entity_instance:
+    """Slice 5 parametric MEP source equipment. Bodyless by default
+    (matches the locked IFC visual quality floor — no flying MEP)."""
+    ifc_class = _EQUIPMENT_IFC_CLASS.get(equip.system_kind, "IfcFlowTerminal")
+    entity = api.run("root.create_entity", ifc_file, ifc_class=ifc_class)
+    entity.GlobalId = derive_guid(ifc_class, equip.id)
+    entity.Name = equip.name or equip.id
+    if hasattr(entity, "PredefinedType"):
+        # Some IFC equipment subclasses have a PredefinedType attribute
+        try:
+            entity.PredefinedType = equip.predefined_type
+        except Exception:
+            pass  # Schema constraint — silently leave default if value rejected
+
+    from app.utils.ifc_helpers import assign_to_storey
+
+    assign_to_storey(ifc_file, ifc_storey, entity)
+    entity.ObjectPlacement = _placement_from_resolved(ifc_file, placement)
+
+    if emit_geometry and geometry.representation_type == "BoundingBox":
+        if geometry.bbox_x is None or geometry.bbox_y is None or geometry.bbox_z is None:
+            raise ValueError(
+                f"Equipment '{equip.id}' BoundingBox geometry missing bbox dimensions."
+            )
+        profile = ifc_file.create_entity(
+            "IfcRectangleProfileDef",
+            ProfileType="AREA",
+            XDim=float(geometry.bbox_x),
+            YDim=float(geometry.bbox_y),
+        )
+        _attach_extruded_body(
+            ifc_file, entity, body_context, profile, (0.0, 0.0, 1.0),
+            float(geometry.bbox_z),
+        )
+    return entity
+
+
+def create_mep_segment_parametric(
+    seg: "MEPSegment",
+    placement: "ResolvedPlacement",
+    geometry: "ResolvedGeometry",
+    ifc_file: ifcopenshell.file,
+    body_context: ifcopenshell.entity_instance,
+    ifc_storey: ifcopenshell.entity_instance,
+    type_registry,
+    emit_geometry: bool = False,
+) -> ifcopenshell.entity_instance:
+    """Slice 5 parametric MEP segment (duct / pipe / cable tray)."""
+    ifc_class = _SEGMENT_IFC_CLASS.get(seg.system_kind, "IfcPipeSegment")
+    entity = api.run("root.create_entity", ifc_file, ifc_class=ifc_class)
+    entity.GlobalId = derive_guid(ifc_class, seg.id)
+    entity.Name = seg.id
+
+    from app.utils.ifc_helpers import assign_to_storey
+
+    assign_to_storey(ifc_file, ifc_storey, entity)
+    entity.ObjectPlacement = _placement_from_resolved(ifc_file, placement)
+
+    if emit_geometry and geometry.representation_type == "SweptSolid":
+        if geometry.profile_type == "circle":
+            profile = ifc_file.create_entity(
+                "IfcCircleProfileDef",
+                ProfileType="AREA",
+                Radius=geometry.profile_x_dim,
+            )
+        else:
+            if geometry.profile_x_dim is None or geometry.profile_y_dim is None:
+                raise ValueError(
+                    f"Segment '{seg.id}' rectangle profile missing dimensions."
+                )
+            profile = ifc_file.create_entity(
+                "IfcRectangleProfileDef",
+                ProfileType="AREA",
+                XDim=float(geometry.profile_x_dim),
+                YDim=float(geometry.profile_y_dim),
+            )
+        _attach_extruded_body(
+            ifc_file,
+            entity,
+            body_context,
+            profile,
+            (1.0, 0.0, 0.0),  # local X — placement carries world rotation
+            geometry.extrusion_depth,
+        )
+    return entity
+
+
+def create_mep_terminal_parametric(
+    term: "MEPTerminal",
+    placement: "ResolvedPlacement",
+    geometry: "ResolvedGeometry",
+    ifc_file: ifcopenshell.file,
+    body_context: ifcopenshell.entity_instance,
+    ifc_storey: ifcopenshell.entity_instance,
+    type_registry,
+    emit_geometry: bool = False,
+) -> ifcopenshell.entity_instance:
+    """Slice 5 parametric MEP terminal (air diffuser / sanitary fitting / etc.)."""
+    ifc_class = _TERMINAL_IFC_CLASS.get(term.system_kind, "IfcFlowTerminal")
+    entity = api.run("root.create_entity", ifc_file, ifc_class=ifc_class)
+    entity.GlobalId = derive_guid(ifc_class, term.id)
+    entity.Name = term.name or term.id
+
+    from app.utils.ifc_helpers import assign_to_storey
+
+    assign_to_storey(ifc_file, ifc_storey, entity)
+    entity.ObjectPlacement = _placement_from_resolved(ifc_file, placement)
+
+    if emit_geometry and geometry.representation_type == "BoundingBox":
+        if geometry.bbox_x is None or geometry.bbox_y is None or geometry.bbox_z is None:
+            raise ValueError(
+                f"Terminal '{term.id}' BoundingBox geometry missing bbox dimensions."
+            )
+        profile = ifc_file.create_entity(
+            "IfcRectangleProfileDef",
+            ProfileType="AREA",
+            XDim=float(geometry.bbox_x),
+            YDim=float(geometry.bbox_y),
+        )
+        _attach_extruded_body(
+            ifc_file, entity, body_context, profile, (0.0, 0.0, 1.0),
+            float(geometry.bbox_z),
+        )
+    return entity
 
 
 def create_mep_system(

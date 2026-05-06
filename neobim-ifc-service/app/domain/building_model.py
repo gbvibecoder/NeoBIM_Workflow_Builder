@@ -139,6 +139,12 @@ class BoundaryEdge(BaseModel):
 class Wall(BaseModel):
     model_config = ConfigDict(frozen=True)
     id: str
+    # Slice 5 addition: human-readable name. When set, builders use it as
+    # the IfcWall.Name attribute; falls back to .id when None. Lift
+    # populates from MassingGeometry's elem.properties.name so the IFC
+    # output preserves authoring labels ("Wall N") instead of carrying
+    # only machine ids ("w-n").
+    name: Optional[str] = None
     # Plural: a curtain wall / double-height lobby wall may span multiple
     # storeys. WALL_HOSTED requires every id resolves; WALL_BASE_VALID
     # bounds base_z / top_z against the min/max of those storeys.

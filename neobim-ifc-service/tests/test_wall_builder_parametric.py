@@ -81,7 +81,8 @@ def test_create_wall_parametric_returns_an_ifc_wall():
     ifc_wall = create_wall_parametric(wall, p, g, f, body_ctx, storey, type_registry)
     assert ifc_wall.is_a("IfcWall")
     assert ifc_wall.GlobalId is not None and len(ifc_wall.GlobalId) == 22
-    assert ifc_wall.Name == wall.id
+    # Slice 5: builder uses wall.name when lift preserved one, else wall.id.
+    assert ifc_wall.Name == (wall.name if wall.name else wall.id)
 
 
 def test_wall_predefined_type_partitioning_when_partition():
@@ -206,14 +207,21 @@ def _build(use_param: bool):
 
 
 def test_parametric_pipeline_produces_same_total_entity_count():
+    """Slice 5 update: parametric path now stamps Pset_BuildFlow_Provenance
+    on every IfcProject, which adds ~17 entities (1 IfcPropertySet +
+    1 IfcRelDefinesByProperties + 15 IfcPropertySingleValue). The
+    spec'd ±5 tolerance from Slice 4 is updated to ±25 to absorb this
+    expected delta. Anything beyond ±25 indicates a real builder
+    divergence."""
     m_l, c_l, _f_l = _build(False)
     m_p, c_p, _f_p = _build(True)
     n_legacy = len(list(m_l))
     n_param = len(list(m_p))
     delta = abs(n_param - n_legacy)
-    assert delta <= 5, (
+    assert delta <= 25, (
         f"Parametric pipeline entity count {n_param} differs from legacy "
-        f"{n_legacy} by {delta} (>5 tolerance per slice 4 spec)"
+        f"{n_legacy} by {delta} (>25 tolerance — Slice 5 budget covers "
+        "+17 for provenance Pset)"
     )
 
 

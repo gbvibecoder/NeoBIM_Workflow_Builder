@@ -1,12 +1,22 @@
-"""Space builder — creates IfcSpace for room volumes."""
+"""Space builder — creates IfcSpace for room volumes.
+
+Slice 5 adds `create_space_parametric` (Room → IfcSpace).
+"""
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
 from app.utils.guid import derive_guid
+
+if TYPE_CHECKING:
+    from app.domain.building_model import Room
+    from app.services.geometry_resolver import ResolvedGeometry
+    from app.services.placement_resolver import ResolvedPlacement
 
 
 def create_space(
@@ -101,3 +111,91 @@ def create_space(
     )
 
     return space
+
+
+def create_space_parametric(
+    room: "Room",
+    placement: "ResolvedPlacement",
+    geometry: "ResolvedGeometry",
+    ifc_file: ifcopenshell.file,
+    body_context: ifcopenshell.entity_instance,
+    ifc_storey: ifcopenshell.entity_instance,
+    type_registry,
+) -> ifcopenshell.entity_instance:
+    """Slice 5 parametric IfcSpace. Footprint is taken verbatim from the
+    Room; ceiling height comes from ResolvedGeometry.extrusion_depth."""
+    if geometry.representation_type != "SweptSolid":
+        raise ValueError(
+            f"Room '{room.id}' representation_type "
+            f"'{geometry.representation_type}', expected 'SweptSolid'."
+        )
+    if geometry.profile_type != "polygon" or not geometry.profile_polygon:
+        raise ValueError(
+            f"Room '{room.id}' has no polygon footprint in resolved geometry."
+        )
+    if geometry.extrusion_depth is None or geometry.extrusion_depth <= 0:
+        raise ValueError(
+            f"Room '{room.id}' invalid ceiling height "
+            f"{geometry.extrusion_depth}."
+        )
+
+    space_entity = api.run("root.create_entity", ifc_file, ifc_class="IfcSpace")
+    space_entity.GlobalId = derive_guid("IfcSpace", room.id)
+    space_entity.Name = room.name
+    space_entity.LongName = room.usage
+    space_entity.CompositionType = "ELEMENT"
+
+    from app.utils.ifc_helpers import assign_to_storey
+
+    assign_to_storey(ifc_file, ifc_storey, space_entity)
+
+    space_entity.ObjectPlacement = ifc_file.create_entity(
+        "IfcLocalPlacement",
+        RelativePlacement=ifc_file.create_entity(
+            "IfcAxis2Placement3D",
+            Location=ifc_file.create_entity(
+                "IfcCartesianPoint",
+                Coordinates=(placement.origin.x, placement.origin.y, placement.origin.z),
+            ),
+        ),
+    )
+
+    ifc_pts = [
+        ifc_file.create_entity(
+            "IfcCartesianPoint",
+            Coordinates=(v.x - placement.origin.x, v.y - placement.origin.y),
+        )
+        for v in geometry.profile_polygon
+    ]
+    ifc_pts.append(ifc_pts[0])
+    polyline = ifc_file.create_entity("IfcPolyline", Points=ifc_pts)
+    profile = ifc_file.create_entity(
+        "IfcArbitraryClosedProfileDef",
+        ProfileType="AREA",
+        OuterCurve=polyline,
+    )
+    solid = ifc_file.create_entity(
+        "IfcExtrudedAreaSolid",
+        SweptArea=profile,
+        Position=ifc_file.create_entity(
+            "IfcAxis2Placement3D",
+            Location=ifc_file.create_entity(
+                "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0)
+            ),
+        ),
+        ExtrudedDirection=ifc_file.create_entity(
+            "IfcDirection", DirectionRatios=(0.0, 0.0, 1.0)
+        ),
+        Depth=geometry.extrusion_depth,
+    )
+    shape_rep = ifc_file.create_entity(
+        "IfcShapeRepresentation",
+        ContextOfItems=body_context,
+        RepresentationIdentifier="Body",
+        RepresentationType="SweptSolid",
+        Items=[solid],
+    )
+    space_entity.Representation = ifc_file.create_entity(
+        "IfcProductDefinitionShape", Representations=[shape_rep]
+    )
+    return space_entity

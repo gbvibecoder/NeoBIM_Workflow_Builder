@@ -487,6 +487,7 @@ def _lift_walls(
                 wall_type = "solid"
             wall_dict = {
                 "id": elem.id,
+                "name": props.name,  # Slice 5: preserve authoring label
                 "host_storey_ids": [storey["id"]],
                 "axis_points": axis_points,
                 "base_z": base_z,
