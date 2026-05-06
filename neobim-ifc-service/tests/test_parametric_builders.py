@@ -396,11 +396,17 @@ def test_parametric_pipeline_no_failures(fixture: str):
 
 @pytest.mark.parametrize(
     "fixture,delta_max",
-    [("simple_box", 25), ("multistorey_residential", 25), ("non_rectangular", 25)],
+    # Slice 6 widened the budget: instance-level material association
+    # (IfcRelAssociatesMaterial + IfcMaterial per column), Qto_SpaceBase
+    # quantities on every space, and post-emission MEP PredefinedType
+    # all add entities beyond the +17 provenance Pset baseline. The
+    # multistorey/non_rectangular fixtures have more rooms + columns
+    # so their delta is larger; budget set to absorb worst-case
+    # observed value (~150) with headroom.
+    [("simple_box", 50), ("multistorey_residential", 200), ("non_rectangular", 200)],
 )
 def test_parametric_pipeline_entity_count_within_budget(fixture: str, delta_max: int):
-    """Parametric vs legacy entity-count delta within +25 (covers the
-    +17 provenance Pset entities documented in Slice 5)."""
+    """Parametric vs legacy entity-count delta within budget."""
     with open(_FIXTURE_DIR / f"{fixture}.json") as fp:
         d = json.load(fp)
     d.pop("_comment", None)

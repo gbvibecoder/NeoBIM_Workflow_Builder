@@ -377,6 +377,14 @@ def create_mep_segment_parametric(
     entity = api.run("root.create_entity", ifc_file, ifc_class=ifc_class)
     entity.GlobalId = derive_guid(ifc_class, seg.id)
     entity.Name = seg.id
+    # Slice 6 — IDS reduction: set PredefinedType (RIGIDSEGMENT etc.) per
+    # the IFC4 schema. Different segment classes accept different enums;
+    # IDS rules check the attribute is populated.
+    if hasattr(entity, "PredefinedType"):
+        try:
+            entity.PredefinedType = seg.predefined_type
+        except Exception:
+            pass  # schema enum mismatch — leave default
 
     from app.utils.ifc_helpers import assign_to_storey
 
@@ -427,6 +435,12 @@ def create_mep_terminal_parametric(
     entity = api.run("root.create_entity", ifc_file, ifc_class=ifc_class)
     entity.GlobalId = derive_guid(ifc_class, term.id)
     entity.Name = term.name or term.id
+    # Slice 6 — IDS reduction: PredefinedType per IFC4 enum.
+    if hasattr(entity, "PredefinedType"):
+        try:
+            entity.PredefinedType = term.predefined_type
+        except Exception:
+            pass
 
     from app.utils.ifc_helpers import assign_to_storey
 

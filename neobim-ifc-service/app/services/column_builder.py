@@ -148,10 +148,30 @@ def create_column_parametric(
     column_entity = api.run("root.create_entity", ifc_file, ifc_class="IfcColumn")
     column_entity.GlobalId = derive_guid("IfcColumn", column.id)
     column_entity.Name = column.id
+    # Slice 6 — IDS reduction: set ObjectType to the profile name so the
+    # "Column ObjectType populated (profile name)" rule resolves.
+    column_entity.ObjectType = column.profile.name
+    column_entity.PredefinedType = "COLUMN"
 
     from app.utils.ifc_helpers import assign_to_storey
 
     assign_to_storey(ifc_file, ifc_storey, column_entity)
+
+    # Slice 6 — IDS reduction: instance-level material association.
+    # Type-level material (TypeRegistry) doesn't satisfy the IDS rule
+    # which checks the instance directly.
+    _material_entity = api.run(
+        "material.add_material",
+        ifc_file,
+        name=column.material,
+    )
+    api.run(
+        "material.assign_material",
+        ifc_file,
+        products=[column_entity],
+        material=_material_entity,
+        type="IfcMaterial",
+    )
 
     column_entity.ObjectPlacement = ifc_file.create_entity(
         "IfcLocalPlacement",

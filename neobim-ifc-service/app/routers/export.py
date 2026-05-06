@@ -205,6 +205,76 @@ async def export_ifc(
         skipped_reason=ids_envelope.skipped_reason,
     )
 
+    # ── Slice 6 — provenance Pset re-stamping post-Stage-2.5 ─────────
+    # The initial stamp (Slice 5) writes ids_rules_passed=0 / failed=0
+    # because Stage 2.5 hasn't run yet at build time. After Stage 2.5
+    # we know the real counts; re-open each IFC, find its IfcProject,
+    # update Pset_BuildFlow_Provenance with the real numbers, and write
+    # back to bytes. Idempotent thanks to stamp_provenance unwrap.
+    if request.options.use_parametric_pipeline:
+        from app.services.provenance import stamp_provenance
+        from app.domain.building_model import Provenance
+
+        ids_passed = ids_envelope.rules_evaluated - len(ids_envelope.violations)
+        ids_failed = len(ids_envelope.violations)
+        restamped: dict[str, tuple[bytes, EntityCounts, list]] = {}
+        for discipline, (ifc_bytes_orig, counts_orig, failures_orig) in results.items():
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False, mode="wb") as tmp:
+                    tmp.write(ifc_bytes_orig)
+                    tmp_path = tmp.name
+                m = ifcopenshell.open(tmp_path)
+                project = m.by_type("IfcProject")[0]
+                # Read the existing provenance values so we keep build_id /
+                # target_fidelity / generated_at / etc., overriding only
+                # the IDS counters.
+                existing = {
+                    p.Name: p.NominalValue.wrappedValue
+                    for rel in (project.IsDefinedBy or [])
+                    if rel.is_a("IfcRelDefinesByProperties")
+                    and rel.RelatingPropertyDefinition.is_a("IfcPropertySet")
+                    and rel.RelatingPropertyDefinition.Name == "Pset_BuildFlow_Provenance"
+                    for p in rel.RelatingPropertyDefinition.HasProperties
+                }
+                refreshed = Provenance(
+                    model_version=existing.get("ModelVersion", "1.0.0"),
+                    input_contract_version=existing.get(
+                        "InputContractVersion", "MassingGeometry-1.0.0"
+                    ),
+                    agent_stages_run=existing.get(
+                        "AgentStagesRun", "lift-from-massing"
+                    ),
+                    agent_models_used=existing.get("AgentModelsUsed", ""),
+                    total_llm_cost_usd=float(existing.get("TotalLLMCostUSD", 0.0)),
+                    total_wallclock_ms=int(existing.get("TotalWallclockMs", 0)),
+                    prompt_cache_hit_rate=float(existing.get("PromptCacheHitRate", 0.0)),
+                    ids_rules_passed=int(ids_passed),
+                    ids_rules_failed=int(ids_failed),
+                    target_fidelity=existing.get("TargetFidelity", target_fidelity),
+                    fixture_match=existing.get("FixtureMatch", ""),
+                    generated_at=existing.get("GeneratedAt", ""),
+                    build_id=existing.get("BuildId", "unknown"),
+                    source_contract=existing.get(
+                        "SourceContract", "MassingGeometry-lifted"
+                    ),
+                )
+                stamp_provenance(m, refreshed, project)
+                with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False, mode="wb") as tmp:
+                    m.write(tmp.name)
+                    with open(tmp.name, "rb") as fp:
+                        new_bytes = fp.read()
+                restamped[discipline] = (new_bytes, counts_orig, failures_orig)
+            except Exception as exc:
+                log.warning(
+                    "provenance_restamp_failed",
+                    request_id=rid,
+                    discipline=discipline,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
+                restamped[discipline] = (ifc_bytes_orig, counts_orig, failures_orig)
+        results = restamped
+
     # ── STAGE 3: UPLOAD ───────────────────────────────────────────────
     stage = "UPLOAD"
     files: list[ExportedFile] = []
@@ -279,6 +349,29 @@ async def export_ifc(
     ids_warnings = list(ids_envelope.warnings)
     status = "partial" if (unique_failures or ids_violations) else "success"
 
+    # Slice 6 — building_model_json: when the parametric pipeline ran,
+    # surface the lifted BuildingModel as JSON in the response so the
+    # TS-side EX-001 handler can write through to Postgres + R2 (Slice 7).
+    bm_json: dict | None = None
+    if request.options.use_parametric_pipeline:
+        try:
+            from app.services.massing_to_building_model import lift as _lift
+
+            _bm, _ = _lift(
+                request.geometry,
+                request.options,
+                build_id=rid,
+                fixture_match="",
+            )
+            bm_json = _bm.model_dump(mode="json")
+        except Exception as exc:
+            log.warning(
+                "building_model_dump_failed",
+                request_id=rid,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+
     log.info(
         "export_ifc_complete",
         request_id=rid,
@@ -305,6 +398,7 @@ async def export_ifc(
             ids_validation=ids_envelope,
             ids_violations=ids_violations,
             ids_warnings=ids_warnings,
+            building_model_json=bm_json,
         ),
         request_id=rid,
     )

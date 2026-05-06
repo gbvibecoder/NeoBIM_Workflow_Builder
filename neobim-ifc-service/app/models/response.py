@@ -97,6 +97,13 @@ class ExportMetadata(BaseModel):
     ids_validation: Optional[IdsValidationResult] = None
     ids_violations: list[IdsViolation] = Field(default_factory=list)
     ids_warnings: list[IdsViolation] = Field(default_factory=list)
+    # Phase 1 Slice 6 — BuildingModel JSON in the response. Populated when
+    # `useParametricPipeline=true`; serialized via `.model_dump(mode="json")`
+    # so the Phase 2 design agent can produce identically-shaped output.
+    # The TS `EX-001` handler reads this and writes through to Postgres +
+    # R2 (Slice 7).
+    building_model_json: Optional[dict] = None
+    building_model_r2_key: Optional[str] = None
 
 
 class ExportIFCResponse(BaseModel):

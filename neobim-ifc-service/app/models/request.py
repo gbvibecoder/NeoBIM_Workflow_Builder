@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ── Geometry primitives ──────────────────────────────────────────────
@@ -272,7 +272,30 @@ class ExportIFCRequest(BaseModel):
     options: ExportOptions = ExportOptions()
     file_prefix: str = Field(alias="filePrefix", default="building")
 
+    # Phase 1 Slice 6 — optional pre-built BuildingModel. When present,
+    # the route handler skips the MassingGeometry → BuildingModel lift
+    # step and uses this graph directly. The Phase 2 design agent will
+    # produce these natively. Loose-typed dict at the wire so the
+    # router can construct via BuildingModel.build() (which gives us
+    # the canonical BuildingModelValidationError on invariant failure).
+    building_model: Optional[dict] = Field(alias="buildingModel", default=None)
+
     # Top-level extra="forbid" — same reasoning as ExportOptions: the
     # request envelope is small, stable, and any unknown field here is
     # almost certainly a typo. Inner models stay loose for forward compat.
     model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _whitelist_comment_field(cls, data: object) -> object:
+        """Phase 1 Slice 6 — whitelist `_comment` at the request top level.
+
+        Phase 0 fixtures author a `_comment` field at the top of every
+        fixture JSON to document the test purpose. `extra="forbid"` would
+        otherwise reject these fixtures with a 422. We strip exactly
+        `_comment` (no other keys) BEFORE Pydantic checks for extras, so
+        the strict-validation surface for everything else stays intact.
+        """
+        if isinstance(data, dict):
+            data.pop("_comment", None)
+        return data

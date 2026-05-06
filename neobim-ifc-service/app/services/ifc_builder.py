@@ -234,6 +234,12 @@ def build_ifc(
         )
         ifc_storey.GlobalId = derive_guid("IfcBuildingStorey", str(storey_data.index), storey_data.name)
         ifc_storey.Elevation = storey_data.elevation
+        # Slice 6 — IDS reduction: CompositionType is a required attribute
+        # the LOD300_STOREY_COMPOSITION_TYPE rule checks. Set on the
+        # parametric path only so legacy stays byte-equivalent for
+        # production users who haven't opted in.
+        if use_parametric_pipeline:
+            ifc_storey.CompositionType = "ELEMENT"
         ifc_storeys[storey_data.index] = ifc_storey
 
     if ifc_storeys:
@@ -569,6 +575,28 @@ def build_ifc(
                             r_node, r_placement, r_geometry, model,
                             body_context, ifc_storey, type_registry,
                         )
+                        # Slice 6 — IDS reduction: Qto_SpaceBaseQuantities
+                        # carries NetFloorArea (the rule checks this is
+                        # populated). Compute via shapely on the room
+                        # footprint (already validated by ROOM_BOUNDED).
+                        from shapely.geometry import Polygon as _Poly
+                        _poly = _Poly([(v.x, v.y) for v in r_node.footprint_polygon])
+                        _net_area = float(_poly.area)
+                        _height = float(r_geometry.extrusion_depth or 3.0)
+                        _qto = api.run(
+                            "pset.add_qto", model, product=ifc_space,
+                            name="Qto_SpaceBaseQuantities",
+                        )
+                        api.run(
+                            "pset.edit_qto", model, qto=_qto,
+                            properties={
+                                "Height": _height,
+                                "NetFloorArea": _net_area,
+                                "GrossFloorArea": _net_area,
+                                "GrossVolume": _net_area * _height,
+                                "NetVolume": _net_area * _height,
+                            },
+                        )
                     else:
                         ifc_space = create_space(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                     space_sig = type_registry.signature(
@@ -763,6 +791,25 @@ def build_ifc(
     # to. No-op for non-residential buildings.
     inputs = rera_inputs or ReraInputs.from_options(None, None, None)
     attach_rera_psets(model, geometry.building_type, inputs)
+
+    # ── Slice 6 — IDS reduction: MEP PredefinedType on every segment ─
+    # Lift skips MEP segments that fail MEP_TERMINATES (no source / no
+    # terminal / cyclic), so those fall back to legacy create_duct /
+    # create_pipe / create_cable_tray, which don't set PredefinedType
+    # — and the IDS rule fires once per discipline that finds a
+    # segment without it. Parametric path post-process: ensure every
+    # segment carries the IFC4 RIGIDSEGMENT default. Gated by
+    # use_parametric_pipeline so legacy stays byte-equivalent.
+    if use_parametric_pipeline:
+        for _seg in model.by_type("IfcDuctSegment"):
+            if not _seg.PredefinedType:
+                _seg.PredefinedType = "RIGIDSEGMENT"
+        for _seg in model.by_type("IfcPipeSegment"):
+            if not _seg.PredefinedType:
+                _seg.PredefinedType = "RIGIDSEGMENT"
+        for _seg in model.by_type("IfcCableCarrierSegment"):
+            if not _seg.PredefinedType:
+                _seg.PredefinedType = "CABLETRAYSEGMENT"
 
     # ── Slice 5 — Provenance Pset (parametric pipeline only) ─────
     # Slice 3's stamp_provenance attaches Pset_BuildFlow_Provenance with
