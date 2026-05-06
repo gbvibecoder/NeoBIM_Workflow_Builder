@@ -98,26 +98,28 @@ describe("rich-mode: richModeToFlags produces expected bundle", () => {
 describe("rich-mode: resolveRichMode source = default", () => {
   test("no input and no env → default + off", () => {
     const result = resolveRichMode(undefined, undefined);
-    expect(result.mode).toBe("off");
+    // Phase 2: default flipped from "off" → "arch-only" so cold-start
+    // BuildFlow → Python doesn't silently produce empty IFCs.
+    expect(result.mode).toBe("arch-only");
     expect(result.source).toBe("default");
-    expect(result.flags).toEqual(richModeToFlags("off"));
+    expect(result.flags).toEqual(richModeToFlags("arch-only"));
   });
 
-  test("empty-object input and no env → default + off", () => {
+  test("empty-object input and no env → default + arch-only", () => {
     const result = resolveRichMode({}, undefined);
-    expect(result.mode).toBe("off");
+    expect(result.mode).toBe("arch-only");
     expect(result.source).toBe("default");
   });
 
-  test("null input and no env → default + off", () => {
+  test("null input and no env → default + arch-only", () => {
     const result = resolveRichMode(null, undefined);
-    expect(result.mode).toBe("off");
+    expect(result.mode).toBe("arch-only");
     expect(result.source).toBe("default");
   });
 
-  test("invalid env value → default + off (silent fall-through)", () => {
+  test("invalid env value → default + arch-only (silent fall-through)", () => {
     const result = resolveRichMode(undefined, "turbo");
-    expect(result.mode).toBe("off");
+    expect(result.mode).toBe("arch-only");
     expect(result.source).toBe("default");
   });
 });
@@ -170,7 +172,8 @@ describe("rich-mode: resolveRichMode source = override", () => {
 
   test("invalid override + no env → falls through to default", () => {
     const result = resolveRichMode({ richMode: 42 }, undefined);
-    expect(result.mode).toBe("off");
+    // Phase 2 default
+    expect(result.mode).toBe("arch-only");
     expect(result.source).toBe("default");
   });
 

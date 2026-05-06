@@ -2722,6 +2722,8 @@ IMPORTANT: Each floor's rooms MUST sum to approximately ${floorPlate} m². Follo
 
 // ─── parseBriefDocument (TR-001) ────────────────────────────────────────────
 
+import type { FloorPlanSchema } from "@/features/ifc/types/floor-plan-schema";
+
 export interface ParsedBrief {
   projectTitle: string;
   projectType: string;
@@ -2738,6 +2740,16 @@ export interface ParsedBrief {
    *  to gpt-image-1.5 images.edit() so the rendered output is anchored to
    *  the user's actual visual references instead of generic interpretation. */
   referenceImageUrls?: string[];
+  /**
+   * Floor-plan-style brief extraction (added 2026-05-06). Populated ONLY
+   * when the PDF describes a specific room-level layout (plot dimensions,
+   * named rooms with width × length, quadrant positions, doors/windows on
+   * stated walls). Left undefined for high-level massing briefs so the
+   * existing massing path in EX-001 keeps running unchanged. When set,
+   * EX-001 routes to the room-level builder via
+   * `floorPlanToMassingGeometry()`.
+   */
+  floorPlan?: FloorPlanSchema;
 }
 
 export async function parseBriefDocument(
@@ -2788,9 +2800,112 @@ export async function parseBriefDocument(
   "budget": { "amount": "...", "currency": "..." },
   "sustainability": "...",
   "designIntent": "...",
-  "keyRequirements": ["...", "..."]
+  "keyRequirements": ["...", "..."],
+  "floorPlan": { ...see floor-plan section below... }
 }
-If information is not found in the text, omit the field. Be precise with numbers. Extract ALL programme spaces with their areas.`,
+
+If information is not found in the text, omit the field. Be precise with numbers. Extract ALL programme spaces with their areas.
+
+═══════════════════════════════════════════════════════════════════════
+FLOOR-PLAN EXTRACTION — read this carefully.
+═══════════════════════════════════════════════════════════════════════
+
+Decide whether the brief is a "floor-plan brief" (specific rooms with
+explicit width × length and a stated position in the plot) versus a
+"massing brief" (high-level totals like "5-storey 2000 m² residential
+block"). Signals of a floor-plan brief:
+  · Plot dimensions stated (e.g., "24 ft × 50 ft", "Plot Size: …")
+  · Per-room dimensions (e.g., "Hall: 15' × 12'", "Bedroom 12 × 12")
+  · Per-room quadrant or cardinal position (e.g., "located in NW quadrant",
+    "on the South-East side")
+  · Door/window walls stated (e.g., "Window on North wall")
+
+If — and ONLY if — the brief is a floor-plan brief, populate the
+"floorPlan" field with this exact shape:
+
+{
+  "plotWidthFt": 50,            // East-West plot extent in FEET
+  "plotDepthFt": 24,            // North-South plot extent in FEET
+  "northAxis": "Z+",            // which world axis is north: "Z+", "Z-", "X+", or "X-".
+                                // Default "Z+". If the brief says "North is towards the top"
+                                // (i.e., +Y in plan view) → keep "Z+".
+  "buildingCategory": "residential",  // one of: "residential" | "commercial" |
+                                      // "industrial" | "institutional" | "hospitality".
+                                      // Drives furniture + sanitary preset selection in the
+                                      // converter. Default "residential".
+                                      // Use "commercial" for offices, retail, restaurants,
+                                      // hotels lobbies. Use "institutional" for schools,
+                                      // hospitals, government buildings.
+  "exteriorWallThicknessMm": 230,   // optional — convert if brief states inches/feet
+  "interiorWallThicknessMm": 150,   // optional
+  "slabThicknessMm": 150,           // optional
+  "floors": [
+    {
+      "name": "Ground Floor",
+      "index": 0,
+      "storeyHeightFt": 10,         // optional
+      "rooms": [
+        {
+          "name": "Hall",
+          "widthFt": 15,            // E-W extent of the room, in FEET
+          "lengthFt": 12,           // N-S extent of the room, in FEET
+          "quadrant": "NW",         // one of: NW, N, NE, W, E, SW, S, SE, center
+          "doors": [
+            { "wall": "S", "widthFt": 3, "heightFt": 7 }
+          ],
+          "windows": [
+            { "wall": "N", "widthFt": 4, "heightFt": 4, "sillHeightFt": 3 }
+          ],
+          "usage": "living",            // controls auto-furniture + auto-MEP selection.
+                                          // residential: living | bedroom | kitchen | toilet | wash | balcony
+                                          // commercial:  office | conference | reception | lobby | shop | restaurant
+                                          // industrial:  warehouse | factory
+                                          // also: stair | corridor | default
+          "finishMaterial": "vitrified tiles"   // floor finish per room — surfaces in
+                                                 // the IfcCovering element + Pset metadata.
+                                                 // Examples from briefs: "vitrified tiles",
+                                                 // "anti-skid tiles", "marble", "wood",
+                                                 // "epoxy", "carpet", "polished concrete"
+        }
+      ],
+      "staircase": {
+        "quadrant": "SW",
+        "type": "dog-legged",       // "dog-legged" or "straight"
+        "widthFt": 4,
+        "hasGeometry": true
+      }
+    },
+    {
+      "name": "Roof",
+      "index": 1,
+      "rooms": [],
+      "isRoofStub": true            // emit a flat slab + parapet, no rooms
+    }
+  ]
+}
+
+Conversion rules — get these exactly right:
+  · Convert all room/plot dimensions to FEET. "10' 6\"" → 10.5. "3 m" →
+    9.84. Inches alone ("4'6\"") → 4.5 feet.
+  · Quadrants: split the plot into 9 zones (NW / N / NE / W / center / E /
+    SW / S / SE). Use the quadrant the brief literally names. "Located on
+    the North side" → "N". "South-East side" → "SE".
+  · Wall identifiers ("N", "S", "E", "W") are with respect to NORTH-UP
+    (after orientation rotation). "Window on North wall" → wall: "N".
+  · Storey count is EXACTLY what the brief enumerates. If the brief
+    describes ONE floor + says "stairs go up", emit ONE floor + a
+    single roof-stub floor (isRoofStub: true) on top of it. Do NOT
+    invent extra floors.
+  · The brief's "main entry direction" tells you where the entry door
+    sits. South-facing entry → entry door on the S wall of whichever
+    room contains the entry circulation (typically the hall).
+  · If the brief is a MASSING brief (no per-room dimensions, no plot
+    dimensions, no per-room positions), DO NOT populate floorPlan —
+    leave it OUT entirely. The downstream pipeline has a separate
+    massing path that handles those briefs.
+
+Be conservative: it is far better to OMIT floorPlan than to fabricate
+dimensions or positions that the brief does not state.`,
         },
         {
           role: "user",

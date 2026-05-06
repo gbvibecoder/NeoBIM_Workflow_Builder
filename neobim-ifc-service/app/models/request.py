@@ -211,15 +211,46 @@ class ExportOptions(BaseModel):
     disciplines: list[Discipline] = [
         "architectural", "structural", "mep", "combined"
     ]
-    # Phase 1 Track D — reserve the `richMode` field so future tightening of
-    # extra='forbid' doesn't silently break EX-001. The TS client forwards
-    # this today under options.richMode (camelCase → snake_case via alias).
-    # Accepted values are validated at the caller (TS side, richModeToFlags);
-    # kept as Optional[str] here to keep the service loose at the boundary.
-    # No builder consumes this yet — Phase 2+ grows dispatch.
-    rich_mode: Optional[str] = Field(alias="richMode", default=None)
+    # Phase 1 (audit) — richMode is now a typed Literal, not a free-form
+    # string. Honors the same five values the TS resolver in
+    # src/features/ifc/lib/rich-mode.ts produces. Default None is treated
+    # as "no gating" (backward-compatible with payloads that pre-date the
+    # field — tests/fixtures/baseline_building.json relies on this).
+    # Garbage values now hit the 422 path via Pydantic Literal validation
+    # instead of being silently accepted.
+    rich_mode: Optional[
+        Literal["off", "arch-only", "mep", "structural", "full"]
+    ] = Field(alias="richMode", default=None)
 
-    model_config = {"populate_by_name": True}
+    # ── Phase 0 — IDS / LOD-tier target ─────────────────────────────
+    # Drives Stage 2.5 (VALIDATE-IFC) in routers/export.py. Orthogonal
+    # to rich_mode: rich_mode controls *what is emitted*; target_fidelity
+    # controls *which IDS rule set the emitted IFC is validated against*.
+    # See neobim-ifc-service/docs/lod-target.md for the per-tier contract.
+    target_fidelity: Literal["concept", "design-development", "tender-ready"] = Field(
+        alias="targetFidelity",
+        default="design-development",
+    )
+
+    # ── Phase 2 / Task 7 — RERA inputs ────────────────────────────
+    # Indian Real Estate Regulation Act 2016 metadata, attached to
+    # residential IfcSpaces via Pset_ReraData. All Optional so existing
+    # callers (BuildFlow's ifc-service-client) don't need to send these
+    # — defaults are documented in `app/services/rera_pset.py`. Adding
+    # new Optional fields under extra="forbid" is safe; existing
+    # payloads still validate.
+    rera_project_id: Optional[str] = Field(alias="reraProjectId", default=None)
+    seismic_zone: Optional[Literal["II", "III", "IV", "V"]] = Field(
+        alias="seismicZone", default=None
+    )
+    wind_zone: Optional[int] = Field(alias="windZone", default=None, ge=1, le=6)
+
+    # extra="forbid" is intentionally on ExportOptions only — the inner
+    # geometry models stay loose because the TS massing-generator may emit
+    # experimental fields that should round-trip through Pydantic without
+    # 422'ing the whole request. Locking ExportOptions surfaces contract
+    # drift on the *control plane* (rich mode, disciplines, etc.) loudly.
+    model_config = {"populate_by_name": True, "extra": "forbid"}
 
 
 # ── Top-level request ───────────────────────────────────────────────
@@ -230,4 +261,7 @@ class ExportIFCRequest(BaseModel):
     options: ExportOptions = ExportOptions()
     file_prefix: str = Field(alias="filePrefix", default="building")
 
-    model_config = {"populate_by_name": True}
+    # Top-level extra="forbid" — same reasoning as ExportOptions: the
+    # request envelope is small, stable, and any unknown field here is
+    # almost certainly a typo. Inner models stay loose for forward compat.
+    model_config = {"populate_by_name": True, "extra": "forbid"}

@@ -6,7 +6,7 @@ import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
-from app.utils.guid import new_guid
+from app.utils.guid import derive_guid
 
 
 def create_space(
@@ -21,7 +21,7 @@ def create_space(
     height = props.height or 3.0
 
     space = api.run("root.create_entity", model, ifc_class="IfcSpace")
-    space.GlobalId = new_guid()
+    space.GlobalId = derive_guid("IfcSpace", elem.id)
     space.Name = props.space_name or props.name
     space.LongName = props.space_usage or ""
     space.CompositionType = "ELEMENT"

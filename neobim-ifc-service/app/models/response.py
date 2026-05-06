@@ -44,6 +44,42 @@ class BuildFailure(BaseModel):
     error: str
 
 
+class IdsViolation(BaseModel):
+    """One failed IDS specification, scoped to a single matched IFC entity.
+
+    Phase 0 stage 2.5 (VALIDATE-IFC) emits one of these per (spec, failed
+    element) pair. `severity="error"` flips the response status to
+    `"partial"`; `severity="warning"` is informational only.
+    """
+
+    rule_id: str
+    rule_name: str
+    severity: Literal["error", "warning"]
+    discipline: str
+    applicable_element_guid: Optional[str] = None
+    expected: str = ""
+    actual: str = ""
+    hint: Optional[str] = None
+
+
+class IdsValidationResult(BaseModel):
+    """Outcome of running ifctester against the emitted discipline IFCs.
+
+    `passed` is True iff the violations list is empty (warnings don't
+    fail the gate). `skipped_reason` is set when validation could not run
+    (e.g. ifctester not installed in the runtime image).
+    """
+
+    passed: bool = True
+    target_fidelity: str = "design-development"
+    violations: list[IdsViolation] = Field(default_factory=list)
+    warnings: list[IdsViolation] = Field(default_factory=list)
+    files_validated: int = 0
+    rules_evaluated: int = 0
+    elapsed_ms: float = 0
+    skipped_reason: Optional[str] = None
+
+
 class ExportMetadata(BaseModel):
     engine: str = "ifcopenshell"
     ifcopenshell_version: str = ""
@@ -54,6 +90,13 @@ class ExportMetadata(BaseModel):
     # some elements skipped — caller should decide whether that's acceptable.
     build_failures: list[BuildFailure] = Field(default_factory=list)
     build_failure_count: int = 0
+    # Phase 0 stage 2.5 (VALIDATE-IFC) — null when validation was skipped
+    # (e.g. ifctester not installed in the worker image). Populated for
+    # every successful BUILD; an error-severity violation flips response
+    # status to "partial" via the same mechanism build failures use.
+    ids_validation: Optional[IdsValidationResult] = None
+    ids_violations: list[IdsViolation] = Field(default_factory=list)
+    ids_warnings: list[IdsViolation] = Field(default_factory=list)
 
 
 class ExportIFCResponse(BaseModel):

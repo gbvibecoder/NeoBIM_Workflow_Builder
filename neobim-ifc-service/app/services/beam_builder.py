@@ -8,7 +8,8 @@ import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
-from app.utils.guid import new_guid
+from app.services.steel_profiles import get_is_section, is_steel_material
+from app.utils.guid import derive_guid
 
 
 def create_beam(
@@ -29,7 +30,7 @@ def create_beam(
     width = props.width or 0.2  # flange width
 
     beam = api.run("root.create_entity", model, ifc_class="IfcBeam")
-    beam.GlobalId = new_guid()
+    beam.GlobalId = derive_guid("IfcBeam", elem.id)
     beam.Name = props.name
 
     from app.utils.ifc_helpers import assign_to_storey
@@ -62,17 +63,40 @@ def create_beam(
         ),
     )
 
-    # I-shape profile
-    flange_thickness = 0.015
-    web_thickness = 0.010
-    profile = model.create_entity(
-        "IfcIShapeProfileDef",
-        ProfileType="AREA",
-        OverallWidth=width,
-        OverallDepth=height,
-        WebThickness=web_thickness,
-        FlangeThickness=flange_thickness,
+    # I-shape profile (Phase 2 / Fix 11):
+    #   * Steel + IS-808 designation → spec dimensions (ProfileName set).
+    #   * Otherwise → generic 15mm/10mm flange/web fallback (pre-Phase-2).
+    structural_material = (
+        props.structural_material if props.structural_material else props.material
     )
+    is_section = (
+        get_is_section(props.section_profile)
+        if is_steel_material(structural_material)
+        else None
+    )
+
+    if is_section is not None:
+        d = is_section.as_metres()
+        profile = model.create_entity(
+            "IfcIShapeProfileDef",
+            ProfileType="AREA",
+            ProfileName=is_section.designation,
+            OverallDepth=d["depth"],
+            OverallWidth=d["flange_width"],
+            FlangeThickness=d["flange_thickness"],
+            WebThickness=d["web_thickness"],
+        )
+    else:
+        flange_thickness = 0.015
+        web_thickness = 0.010
+        profile = model.create_entity(
+            "IfcIShapeProfileDef",
+            ProfileType="AREA",
+            OverallWidth=width,
+            OverallDepth=height,
+            WebThickness=web_thickness,
+            FlangeThickness=flange_thickness,
+        )
 
     solid = model.create_entity(
         "IfcExtrudedAreaSolid",

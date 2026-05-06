@@ -29,7 +29,7 @@ from collections import defaultdict
 import ifcopenshell
 import structlog
 
-from app.utils.guid import new_guid
+from app.utils.guid import new_guid, derive_guid
 
 log = structlog.get_logger()
 
@@ -139,7 +139,17 @@ def attach_omniclass(model: ifcopenshell.file) -> int:
 
         model.create_entity(
             "IfcRelAssociatesClassification",
-            GlobalId=new_guid(),
+            # Include (ifc_class, predefined_type) in the GUID seed:
+            # multiple groups can map to the same OmniClass code (e.g.
+            # IfcSlab+FLOOR and IfcSlab+None both → "21-01 20 10 00").
+            # Without the group key, two rels would collide.
+            GlobalId=derive_guid(
+                "IfcRelAssociatesClassification",
+                "OmniClass",
+                ifc_class,
+                str(pt or ""),
+                code,
+            ),
             Name=f"OmniClass {code}",
             RelatedObjects=elements,
             RelatingClassification=ref,
@@ -152,3 +162,144 @@ def attach_omniclass(model: ifcopenshell.file) -> int:
         groups=len(groups),
     )
     return ref_count
+
+
+# ── NBC India 2016 Part 4 (Phase 2 / new classification system) ───────
+#
+# A second classification chain alongside OmniClass. NBC = National
+# Building Code of India, Part 4 = Fire and Life Safety. The Part 4
+# occupancy groups are the canonical Indian-market classification for
+# any building submitted to a municipal authority.
+#
+# Reference: Bureau of Indian Standards, NBC 2016 Vol. 1 Part 4 § 4.2.
+# The Group A→I letter codes are spec-published — do not invent.
+
+NBC_NAME = "NBC 2016 Part 4"
+NBC_SOURCE = "Bureau of Indian Standards"
+NBC_EDITION = "2016"
+NBC_LOCATION = "https://www.bis.gov.in/standards/nbc-2016/"
+
+NBC_OCCUPANCY_GROUPS: dict[str, str] = {
+    "A":   "Residential",
+    "A-1": "Lodging",
+    "A-2": "One/two family private dwelling",
+    "A-3": "Dormitory",
+    "A-4": "Apartment",
+    "A-5": "Hotel",
+    "B":   "Educational",
+    "C":   "Institutional",
+    "D":   "Assembly",
+    "E":   "Business",
+    "F":   "Mercantile",
+    "G":   "Industrial",
+    "H":   "Storage",
+    "I":   "Hazardous",
+}
+
+
+# Map fragments of a `buildingType` string to an NBC group code.
+# Order matters — first hit wins. Specific tokens checked before
+# generic ones, AND substring-trap tokens (e.g. "warehouse" contains
+# "house") are placed before the shorter pattern they could collide
+# with. The check is plain `token in bt`, so reordering is the
+# correctness lever.
+_NBC_BUILDING_TYPE_PATTERNS: list[tuple[str, str]] = [
+    # Industrial / storage first — `warehouse` contains `house`,
+    # `factory` doesn't collide but stays grouped here.
+    ("warehouse", "H"),
+    ("storage", "H"),
+    ("hazardous", "I"),
+    ("factory", "G"),
+    ("industrial", "G"),
+    # Specific residential tokens before the generic catch-all.
+    ("single-family", "A-2"),
+    ("two-family", "A-2"),
+    ("apartment", "A-4"),
+    ("hotel", "A-5"),
+    ("dormitory", "A-3"),
+    ("hostel", "A-3"),
+    ("villa", "A-2"),
+    ("house", "A-2"),
+    ("residence", "A"),
+    ("residential", "A"),
+    # Other categories.
+    ("school", "B"),
+    ("college", "B"),
+    ("educational", "B"),
+    ("hospital", "C"),
+    ("clinic", "C"),
+    ("institutional", "C"),
+    ("auditorium", "D"),
+    ("assembly", "D"),
+    ("office", "E"),
+    ("business", "E"),
+    ("mall", "F"),
+    ("shop", "F"),
+    ("retail", "F"),
+    ("mercantile", "F"),
+]
+
+
+def nbc_group_for_building_type(building_type: str) -> str:
+    """Map a free-form `buildingType` string to an NBC Part 4 group code.
+
+    Falls back to "E" (Business) — the safe default for an
+    unclassifiable commercial building. Surfaced in the Phase 2 report
+    so callers know to populate `buildingType` precisely if they care
+    about classification accuracy.
+    """
+    bt = (building_type or "").lower()
+    for token, code in _NBC_BUILDING_TYPE_PATTERNS:
+        if token in bt:
+            return code
+    return "E"
+
+
+def attach_nbc_india(
+    model: ifcopenshell.file,
+    building_type: str,
+) -> str | None:
+    """Attach an NBC 2016 Part 4 classification reference to IfcBuilding.
+
+    A SECOND classification chain alongside OmniClass — they coexist
+    cleanly because each `IfcRelAssociatesClassification` is independent.
+    Returns the assigned NBC group code, or None if there is no
+    IfcBuilding in the model (off-mode skips this).
+    """
+    buildings = list(model.by_type("IfcBuilding"))
+    if not buildings:
+        return None
+
+    code = nbc_group_for_building_type(building_type)
+    title = NBC_OCCUPANCY_GROUPS.get(code, code)
+
+    system = model.create_entity(
+        "IfcClassification",
+        Source=NBC_SOURCE,
+        Edition=NBC_EDITION,
+        Name=NBC_NAME,
+        Location=NBC_LOCATION,
+    )
+    ref = model.create_entity(
+        "IfcClassificationReference",
+        Location=NBC_LOCATION,
+        Identification=f"Group {code}",
+        Name=title,
+        ReferencedSource=system,
+    )
+    model.create_entity(
+        "IfcRelAssociatesClassification",
+        GlobalId=derive_guid("IfcRelAssociatesClassification", "NBC", code),
+        Name=f"NBC 2016 Part 4 - Group {code}",
+        RelatedObjects=buildings,
+        RelatingClassification=ref,
+    )
+
+    log.info(
+        "classification_attached",
+        system="NBC 2016 Part 4",
+        group=code,
+        title=title,
+        building_type=building_type,
+    )
+    return code

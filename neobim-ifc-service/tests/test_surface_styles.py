@@ -25,7 +25,8 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "baseline_building.json"
 def combined_model() -> ifcopenshell.file:
     """Build the combined-discipline model from the baseline fixture."""
     raw = json.loads(FIXTURE_PATH.read_text())
-    request = ExportIFCRequest(**raw)
+    raw.pop("_comment", None)  # Phase 1 added extra="forbid" on ExportIFCRequest
+    request = ExportIFCRequest.model_validate(raw)
     results = build_multi_discipline(request)
     ifc_bytes, _counts, _failures = results["combined"]
     with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as tmp:

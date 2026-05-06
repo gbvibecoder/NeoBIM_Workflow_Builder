@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NeoBIM Phase 0 — Core IDS
+
+  Spec-mandatory rules. These apply to EVERY emitted IFC regardless of
+  target_fidelity (concept / design-development / tender-ready). A failure
+  here means the IFC violates the IFC4 schema's mandatory expectations or
+  buildingSMART normative-rule baseline. No phase later than Phase 0 may
+  weaken any of these.
+
+  Rule count: 10 (>= 8 required).
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <info>
+    <title>NeoBIM Core IDS</title>
+    <copyright>NeoBIM 2026</copyright>
+    <version>1.0.0</version>
+    <description>Spec-mandatory IFC4 invariants enforced at every fidelity tier.</description>
+    <author>quality@neobim.app</author>
+    <date>2026-05-06</date>
+    <purpose>Phase 0 quality gate</purpose>
+    <milestone>Phase 0</milestone>
+  </info>
+  <specifications>
+
+    <specification ifcVersion="IFC4"
+                   name="Project must declare units"
+                   identifier="CORE_PROJECT_UNITS"
+                   description="Every IfcProject must have UnitsInContext populated. Unit-less projects break length-quantity downstream tools."
+                   instructions="Set IfcProject.UnitsInContext via ifcopenshell.api.run('unit.assign_unit', file=ifc).">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCPROJECT</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>UnitsInContext</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Project must declare representation contexts"
+                   identifier="CORE_PROJECT_CONTEXTS"
+                   description="Every IfcProject must have RepresentationContexts populated; Body geometry is parented under one."
+                   instructions="Create an IfcGeometricRepresentationContext for 'Model' / 'Body'.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCPROJECT</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>RepresentationContexts</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Site must have a Name"
+                   identifier="CORE_SITE_NAME"
+                   description="IfcSite without a Name fails buildingSMART normative-rule SPS-001."
+                   instructions="Set IfcSite.Name to a non-empty string at build time.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCSITE</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Name</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Building must have a Name"
+                   identifier="CORE_BUILDING_NAME"
+                   description="IfcBuilding without a Name fails normative-rule SPS-002."
+                   instructions="Set IfcBuilding.Name from ExportOptions.building_name.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBUILDING</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Name</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Storey must have a Name"
+                   identifier="CORE_STOREY_NAME"
+                   description="Every IfcBuildingStorey carries a human-readable Name."
+                   instructions="Use the storey's index-derived label, e.g. 'Ground Floor', 'Level 01'.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Name</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Storey must have an Elevation"
+                   identifier="CORE_STOREY_ELEVATION"
+                   description="Every IfcBuildingStorey must have a finite Elevation (metres above project origin)."
+                   instructions="Set Elevation from MassingStorey.elevation. Zero is valid; null/missing is not.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Elevation</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Physical products must have an ObjectPlacement"
+                   identifier="CORE_PRODUCT_PLACEMENT"
+                   description="Walls, slabs, columns, beams, doors, windows, spaces, and stairs without an ObjectPlacement are unrooted in 3D and break every downstream viewer."
+                   instructions="Use IfcLocalPlacement chained to the parent storey's placement.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="IFCWALL"/>
+              <xs:enumeration value="IFCSLAB"/>
+              <xs:enumeration value="IFCCOLUMN"/>
+              <xs:enumeration value="IFCBEAM"/>
+              <xs:enumeration value="IFCDOOR"/>
+              <xs:enumeration value="IFCWINDOW"/>
+              <xs:enumeration value="IFCSPACE"/>
+              <xs:enumeration value="IFCSTAIRFLIGHT"/>
+            </xs:restriction>
+          </name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>ObjectPlacement</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Physical products must have a 22-character GlobalId"
+                   identifier="CORE_PRODUCT_GUID"
+                   description="Every IfcRoot subclass must carry a base64-IFC-encoded GlobalId of exactly 22 characters. Determinism of GUIDs across re-builds is verified separately by tests/test_deterministic_guids.py."
+                   instructions="Use ifcopenshell.guid.compress() over a deterministic seed; never let IfcOpenShell mint a random GUID for an element with a stable identity.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="IFCWALL"/>
+              <xs:enumeration value="IFCSLAB"/>
+              <xs:enumeration value="IFCCOLUMN"/>
+              <xs:enumeration value="IFCBEAM"/>
+              <xs:enumeration value="IFCDOOR"/>
+              <xs:enumeration value="IFCWINDOW"/>
+              <xs:enumeration value="IFCSPACE"/>
+              <xs:enumeration value="IFCSTAIRFLIGHT"/>
+              <xs:enumeration value="IFCBUILDINGSTOREY"/>
+              <xs:enumeration value="IFCBUILDING"/>
+              <xs:enumeration value="IFCSITE"/>
+              <xs:enumeration value="IFCPROJECT"/>
+            </xs:restriction>
+          </name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>GlobalId</simpleValue></name>
+          <value>
+            <xs:restriction base="xs:string">
+              <xs:length fixed="true" value="22"/>
+            </xs:restriction>
+          </value>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Building elements must have a Body Representation"
+                   identifier="CORE_PRODUCT_REPRESENTATION"
+                   description="Walls, slabs, columns, and beams without a Representation render as invisible in every viewer. (Some MEP categories are exempt at lower fidelities — those rules live in mep.ids.)"
+                   instructions="Attach an IfcProductDefinitionShape with a Body IfcShapeRepresentation. Bodyless elements are only allowed at concept fidelity for placeholder rebar/mullions/MEP — see lod-target.md.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="IFCWALL"/>
+              <xs:enumeration value="IFCSLAB"/>
+              <xs:enumeration value="IFCCOLUMN"/>
+              <xs:enumeration value="IFCBEAM"/>
+            </xs:restriction>
+          </name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Representation</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+    <specification ifcVersion="IFC4"
+                   name="Physical products must have a Name"
+                   identifier="CORE_PRODUCT_NAME"
+                   description="Every emitted physical product carries a Name. A nameless wall in BIMcollab/Solibri is unsearchable; navisworks will display the GlobalId, which is unreadable."
+                   instructions="Use the originating MassingElement.properties.name. Synthesise a stable label if missing rather than emitting null.">
+      <applicability minOccurs="1" maxOccurs="unbounded">
+        <entity>
+          <name>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="IFCWALL"/>
+              <xs:enumeration value="IFCSLAB"/>
+              <xs:enumeration value="IFCCOLUMN"/>
+              <xs:enumeration value="IFCBEAM"/>
+              <xs:enumeration value="IFCDOOR"/>
+              <xs:enumeration value="IFCWINDOW"/>
+              <xs:enumeration value="IFCSPACE"/>
+              <xs:enumeration value="IFCSTAIRFLIGHT"/>
+            </xs:restriction>
+          </name>
+        </entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="required">
+          <name><simpleValue>Name</simpleValue></name>
+        </attribute>
+      </requirements>
+    </specification>
+
+  </specifications>
+</ids>

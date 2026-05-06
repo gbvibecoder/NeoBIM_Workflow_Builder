@@ -1,0 +1,67 @@
+{
+  "_comment": "Phase 1 audit fixture #1 — sanity floor. 10m × 10m, 1 storey, 1 space, no MEP. Used by scripts/audit_emission.py and tests/test_richmode_gating.py to verify the off → arch-only → full chain holds on the simplest possible building.",
+  "geometry": {
+    "buildingType": "Single-Family Residence",
+    "floors": 1,
+    "totalHeight": 3.0,
+    "footprintArea": 100.0,
+    "gfa": 100.0,
+    "footprint": [
+      {"x": 0, "y": 0},
+      {"x": 10, "y": 0},
+      {"x": 10, "y": 10},
+      {"x": 0, "y": 10}
+    ],
+    "storeys": [
+      {
+        "index": 0,
+        "name": "Ground Floor",
+        "elevation": 0.0,
+        "height": 3.0,
+        "elements": [
+          {"id": "w-n", "type": "wall", "ifcType": "IfcWall",
+           "vertices": [{"x": 0, "y": 0, "z": 0}, {"x": 10, "y": 0, "z": 0}], "faces": [],
+           "properties": {"name": "Wall N", "storeyIndex": 0, "length": 10.0, "thickness": 0.25, "height": 3.0, "isPartition": false}},
+          {"id": "w-e", "type": "wall", "ifcType": "IfcWall",
+           "vertices": [{"x": 10, "y": 0, "z": 0}, {"x": 10, "y": 10, "z": 0}], "faces": [],
+           "properties": {"name": "Wall E", "storeyIndex": 0, "length": 10.0, "thickness": 0.25, "height": 3.0, "isPartition": false}},
+          {"id": "w-s", "type": "wall", "ifcType": "IfcWall",
+           "vertices": [{"x": 10, "y": 10, "z": 0}, {"x": 0, "y": 10, "z": 0}], "faces": [],
+           "properties": {"name": "Wall S", "storeyIndex": 0, "length": 10.0, "thickness": 0.25, "height": 3.0, "isPartition": false}},
+          {"id": "w-w", "type": "wall", "ifcType": "IfcWall",
+           "vertices": [{"x": 0, "y": 10, "z": 0}, {"x": 0, "y": 0, "z": 0}], "faces": [],
+           "properties": {"name": "Wall W", "storeyIndex": 0, "length": 10.0, "thickness": 0.25, "height": 3.0, "isPartition": false}},
+          {"id": "win-n", "type": "window", "ifcType": "IfcWindow",
+           "vertices": [{"x": 4, "y": 0, "z": 0.9}], "faces": [],
+           "properties": {"name": "Window N", "storeyIndex": 0, "width": 1.5, "height": 1.5, "sillHeight": 0.9, "wallOffset": 4.0, "parentWallId": "w-n"}},
+          {"id": "door-s", "type": "door", "ifcType": "IfcDoor",
+           "vertices": [{"x": 4, "y": 10, "z": 0}], "faces": [],
+           "properties": {"name": "Entrance", "storeyIndex": 0, "width": 1.0, "height": 2.1, "wallOffset": 4.0, "parentWallId": "w-s", "isExterior": true}},
+          {"id": "slab-gf", "type": "slab", "ifcType": "IfcSlab",
+           "vertices": [], "faces": [],
+           "properties": {"name": "Ground Slab", "storeyIndex": 0, "thickness": 0.25, "area": 100.0}},
+          {"id": "roof", "type": "roof", "ifcType": "IfcSlab",
+           "vertices": [], "faces": [],
+           "properties": {"name": "Roof", "storeyIndex": 0, "thickness": 0.3, "area": 100.0}},
+          {"id": "space-room", "type": "space", "ifcType": "IfcSpace",
+           "vertices": [
+             {"x": 0.25, "y": 0.25, "z": 0},
+             {"x": 9.75, "y": 0.25, "z": 0},
+             {"x": 9.75, "y": 9.75, "z": 0},
+             {"x": 0.25, "y": 9.75, "z": 0}
+           ], "faces": [],
+           "properties": {"name": "Room", "storeyIndex": 0, "spaceName": "Workshop", "spaceUsage": "INTERNAL", "area": 90.25, "height": 3.0}}
+        ]
+      }
+    ],
+    "boundingBox": {"min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 10, "y": 10, "z": 3.0}},
+    "metrics": []
+  },
+  "options": {
+    "projectName": "Audit Fixture - Simple Box",
+    "buildingName": "Simple Box",
+    "siteName": "Audit Site",
+    "disciplines": ["architectural", "structural", "mep", "combined"]
+  },
+  "filePrefix": "simple_box_audit"
+}

@@ -1,0 +1,149 @@
+name: Release Validation
+
+# Phase 0 R5 — full validation suite that runs on `release/*` branch tags.
+# This is the heaviest gate in the pipeline: it runs ifctester at every
+# fidelity tier × every fixture, captures the full visual matrix, and
+# submits each fixture to the buildingSMART Validation Service for the
+# normative-rule baseline. A failure in any leg blocks the release.
+#
+# Per-PR CI runs ifctester only (see ifc-baseline.yml). The nightly job
+# runs the visual matrix only (see nightly-visual-matrix.yml). This
+# release job is what gates the actual production cut.
+
+on:
+  push:
+    tags:
+      - "release/*"
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+jobs:
+  ids-validation:
+    name: IDS validation × all fidelity tiers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: neobim-ifc-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: neobim-ifc-service/pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: IDS file validity
+        run: pytest tests/test_ids_files_valid.py -v
+
+      - name: target_fidelity routing
+        run: pytest tests/test_target_fidelity_routing.py -v
+
+      - name: Stage 2.5 (VALIDATE-IFC) integration
+        run: pytest tests/test_ids_validation_stage.py -v
+
+      - name: All Phase 0 + existing baselines
+        # Belt-and-suspenders: re-run the full suite to ensure nothing
+        # else regressed under the release SHA.
+        run: pytest tests/ -v
+
+  buildingsmart-validation:
+    name: buildingSMART Validation Service baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [ids-validation]
+    defaults:
+      run:
+        working-directory: neobim-ifc-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: neobim-ifc-service/pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install requests
+
+      - name: Submit fixtures to validate.buildingsmart.org
+        env:
+          BSDD_VALIDATION_SERVICE_TOKEN: ${{ secrets.BSDD_VALIDATION_SERVICE_TOKEN }}
+        run: |
+          python scripts/submit_buildingsmart_baseline.py \
+            --fixtures simple_box,multistorey_residential,non_rectangular \
+            --rich-mode full \
+            --output tests/baselines/buildingsmart-validation \
+            --fail-on-baseline-drift
+
+      - name: Upload baseline reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildingsmart-baseline-${{ github.run_id }}
+          path: neobim-ifc-service/tests/baselines/buildingsmart-validation/
+          retention-days: 90
+
+  visual-matrix:
+    name: Full visual matrix (all viewers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [ids-validation]
+    defaults:
+      run:
+        working-directory: neobim-ifc-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install Pillow scikit-image numpy
+
+      - name: Install Blender (BlenderBIM headless)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y blender || true
+
+      - name: Capture full visual matrix
+        run: |
+          python scripts/capture_visual_matrix.py \
+            --fixtures simple_box,multistorey_residential,non_rectangular \
+            --viewers blenderbim,fzk,web-ifc \
+            --rich-mode full \
+            --output tests/baselines/visual-matrix/_release
+
+      - name: Diff against committed baseline (strict)
+        run: |
+          python scripts/diff_visual_matrix.py \
+            --baseline tests/baselines/visual-matrix \
+            --candidate tests/baselines/visual-matrix/_release \
+            --threshold 0.95 \
+            --strict
+
+      - name: Upload visual matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-visual-matrix-${{ github.run_id }}
+          path: neobim-ifc-service/tests/baselines/visual-matrix/_release/
+          retention-days: 90

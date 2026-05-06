@@ -6,7 +6,7 @@ import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
-from app.utils.guid import new_guid
+from app.utils.guid import derive_guid
 
 
 def create_stair(
@@ -26,7 +26,7 @@ def create_stair(
     total_run = riser_count * tread_depth
 
     stair = api.run("root.create_entity", model, ifc_class="IfcStairFlight")
-    stair.GlobalId = new_guid()
+    stair.GlobalId = derive_guid("IfcStairFlight", elem.id)
     stair.Name = props.name
     stair.NumberOfRisers = riser_count
     stair.RiserHeight = riser_height
