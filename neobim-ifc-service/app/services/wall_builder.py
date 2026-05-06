@@ -1,14 +1,40 @@
-"""Wall builder — creates IfcWall with proper geometry and opening support."""
+"""Wall builder — creates IfcWall with proper geometry and opening support.
+
+Two builder entry points coexist during the Phase 1 migration:
+
+  * `create_wall(model, elem, storey, context, storey_elevation=...)`:
+    legacy signature. Consumes a legacy `GeometryElement` + raw storey
+    elevation. Carries the historical fallback-chain logic
+    (`thickness or 0.25`, `length or 1.0`, `if v0.z else
+    storey_elevation`). Used by the default ifc_builder path when
+    `ExportOptions.use_parametric_pipeline=False`.
+
+  * `create_wall_parametric(wall, placement, geometry, ifc_file,
+    body_context, ifc_storey, type_registry)`: new Slice-4 signature.
+    Consumes a `BuildingModel.Wall` plus pre-resolved `ResolvedPlacement`
+    and `ResolvedGeometry`. Zero fallback chains — every value is
+    authoritative because the parametric layer carried the answer.
+
+Slice 5+ will migrate the remaining 7 builder modules to mirror the
+parametric pattern, then Slice 6 will deprecate `create_wall` to a
+thin wrapper that lifts → resolves → calls `create_wall_parametric`.
+"""
 
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import ifcopenshell
 import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
 from app.utils.guid import new_guid, derive_guid
+
+if TYPE_CHECKING:
+    from app.domain.building_model import Wall
+    from app.services.placement_resolver import ResolvedPlacement
+    from app.services.geometry_resolver import ResolvedGeometry
 
 
 def create_wall(
@@ -111,6 +137,152 @@ def create_wall(
     )
 
     return wall
+
+
+def create_wall_parametric(
+    wall: "Wall",
+    placement: "ResolvedPlacement",
+    geometry: "ResolvedGeometry",
+    ifc_file: ifcopenshell.file,
+    body_context: ifcopenshell.entity_instance,
+    ifc_storey: ifcopenshell.entity_instance,
+    type_registry,
+) -> ifcopenshell.entity_instance:
+    """Create an IfcWall consuming pre-resolved placement + geometry.
+
+    No fallback chains. The `Wall` carries `axis_points` + `thickness` +
+    `top_z`/`base_z`; `ResolvedPlacement` carries `origin` (in world
+    space, already accounting for slab below) + the local x/z axes;
+    `ResolvedGeometry` carries the rectangle profile dims (length ×
+    thickness) + extrusion depth (top_z − base_z).
+
+    The `ifc_storey` parameter is the IfcBuildingStorey entity to
+    aggregate the wall into. For multi-storey walls (curtain wall,
+    double-height lobby), pass the LOWEST host storey — the wall's
+    geometry extrudes upward through the higher storeys.
+
+    Caller is responsible for type-registry attachment, Pset assignment,
+    and presentation styling (consistent with the legacy create_wall
+    contract — keeps the orchestrator change minimal during Slice 4).
+    """
+    if geometry.representation_type != "SweptSolid":
+        raise ValueError(
+            f"Wall '{wall.id}' geometry has representation_type "
+            f"'{geometry.representation_type}', expected 'SweptSolid'."
+        )
+    if geometry.profile_type != "rectangle":
+        raise ValueError(
+            f"Wall '{wall.id}' geometry has profile_type "
+            f"'{geometry.profile_type}', expected 'rectangle'."
+        )
+    if geometry.profile_x_dim is None or geometry.profile_y_dim is None:
+        raise ValueError(
+            f"Wall '{wall.id}' geometry missing rectangle dimensions "
+            f"(x_dim={geometry.profile_x_dim}, y_dim={geometry.profile_y_dim})."
+        )
+    if geometry.extrusion_depth is None or geometry.extrusion_depth <= 0:
+        raise ValueError(
+            f"Wall '{wall.id}' geometry has invalid extrusion_depth "
+            f"{geometry.extrusion_depth}; expected > 0."
+        )
+
+    length = float(geometry.profile_x_dim)
+    thickness = float(geometry.profile_y_dim)
+    height = float(geometry.extrusion_depth)
+    extr_dir = geometry.extrusion_direction or _DEFAULT_UP
+
+    # Wall entity + identity.
+    wall_entity = api.run("root.create_entity", ifc_file, ifc_class="IfcWall")
+    wall_entity.GlobalId = derive_guid("IfcWall", wall.id)
+    wall_entity.Name = wall.id
+    wall_entity.PredefinedType = (
+        "PARTITIONING" if wall.type == "partition" else "STANDARD"
+    )
+
+    # Storey containment — same helper the legacy path uses.
+    from app.utils.ifc_helpers import assign_to_storey
+
+    assign_to_storey(ifc_file, ifc_storey, wall_entity)
+
+    # IfcLocalPlacement built from ResolvedPlacement.
+    origin_pt = ifc_file.create_entity(
+        "IfcCartesianPoint",
+        Coordinates=(placement.origin.x, placement.origin.y, placement.origin.z),
+    )
+    z_dir = ifc_file.create_entity(
+        "IfcDirection",
+        DirectionRatios=(
+            placement.local_z_axis.x,
+            placement.local_z_axis.y,
+            placement.local_z_axis.z,
+        ),
+    )
+    x_dir = ifc_file.create_entity(
+        "IfcDirection",
+        DirectionRatios=(
+            placement.local_x_axis.x,
+            placement.local_x_axis.y,
+            placement.local_x_axis.z,
+        ),
+    )
+    placement_3d = ifc_file.create_entity(
+        "IfcAxis2Placement3D", Location=origin_pt, Axis=z_dir, RefDirection=x_dir
+    )
+    wall_entity.ObjectPlacement = ifc_file.create_entity(
+        "IfcLocalPlacement", RelativePlacement=placement_3d
+    )
+
+    # IfcExtrudedAreaSolid built from ResolvedGeometry.
+    rect_profile = ifc_file.create_entity(
+        "IfcRectangleProfileDef",
+        ProfileType="AREA",
+        XDim=length,
+        YDim=thickness,
+        Position=ifc_file.create_entity(
+            "IfcAxis2Placement2D",
+            Location=ifc_file.create_entity(
+                "IfcCartesianPoint", Coordinates=(length / 2.0, 0.0)
+            ),
+        ),
+    )
+    extrusion_dir = ifc_file.create_entity(
+        "IfcDirection", DirectionRatios=(extr_dir.x, extr_dir.y, extr_dir.z)
+    )
+    solid = ifc_file.create_entity(
+        "IfcExtrudedAreaSolid",
+        SweptArea=rect_profile,
+        Position=ifc_file.create_entity(
+            "IfcAxis2Placement3D",
+            Location=ifc_file.create_entity(
+                "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0)
+            ),
+        ),
+        ExtrudedDirection=extrusion_dir,
+        Depth=height,
+    )
+    shape_rep = ifc_file.create_entity(
+        "IfcShapeRepresentation",
+        ContextOfItems=body_context,
+        RepresentationIdentifier="Body",
+        RepresentationType="SweptSolid",
+        Items=[solid],
+    )
+    wall_entity.Representation = ifc_file.create_entity(
+        "IfcProductDefinitionShape", Representations=[shape_rep]
+    )
+
+    return wall_entity
+
+
+# Module-level constant — referenced by create_wall_parametric. Kept here
+# rather than importing to avoid a Vec3 dependency on the legacy path.
+class _DefaultUp:
+    x = 0.0
+    y = 0.0
+    z = 1.0
+
+
+_DEFAULT_UP = _DefaultUp()
 
 
 def create_opening_in_wall(

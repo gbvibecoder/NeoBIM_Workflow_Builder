@@ -232,6 +232,17 @@ class ExportOptions(BaseModel):
         default="design-development",
     )
 
+    # ── Phase 1 Slice 4 — parametric pipeline feature flag ────────────
+    # When True, ifc_builder takes the lift → resolve → emit path for
+    # nodes whose builders have been refactored (Slice 4: walls only).
+    # Other element types still use the legacy GeometryElement-driven
+    # builders. Slice 5+ migrates the remaining 7 builder modules; Slice
+    # 6+ flips the default to True; Slice 7 deletes the legacy path.
+    # Default False keeps the production pipeline unchanged for now.
+    use_parametric_pipeline: bool = Field(
+        alias="useParametricPipeline", default=False
+    )
+
     # ── Phase 2 / Task 7 — RERA inputs ────────────────────────────
     # Indian Real Estate Regulation Act 2016 metadata, attached to
     # residential IfcSpaces via Pset_ReraData. All Optional so existing

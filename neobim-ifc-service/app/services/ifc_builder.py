@@ -25,7 +25,7 @@ from app.models.request import (
     MassingStorey,
 )
 from app.models.response import BuildFailure, EntityCounts
-from app.services.wall_builder import create_wall
+from app.services.wall_builder import create_wall, create_wall_parametric
 from app.services.slab_builder import create_slab
 from app.services.column_builder import create_column
 from app.services.opening_builder import create_window, create_door
@@ -168,6 +168,7 @@ def build_ifc(
     emit_mep_geometry: bool = False,
     rich_mode: str | None = None,
     rera_inputs: ReraInputs | None = None,
+    use_parametric_pipeline: bool = False,
 ) -> tuple[ifcopenshell.file, EntityCounts, list[BuildFailure]]:
     """Build a complete IFC4 model from MassingGeometry.
 
@@ -247,6 +248,39 @@ def build_ifc(
             )
         return wall_mat_cache[is_partition]
 
+    # ── Phase 1 Slice 4 — parametric pre-resolution ──────────────
+    # When the feature flag is on, lift the legacy MassingGeometry into
+    # a BuildingModel once, then resolve placements + geometries for the
+    # whole graph. The wall-emission branch below picks the parametric
+    # builder when a matching Wall node exists in the lifted graph; all
+    # other element types still flow through the legacy builders. Slices
+    # 5–7 will migrate the rest.
+    parametric_walls: dict[
+        str, tuple[object, object, object]
+    ] = {}  # legacy_elem_id → (Wall, ResolvedPlacement, ResolvedGeometry)
+    if use_parametric_pipeline:
+        from app.models.request import ExportOptions as _Opts
+        from app.services.geometry_resolver import resolve_geometries
+        from app.services.massing_to_building_model import lift
+        from app.services.placement_resolver import resolve_placements
+
+        _opts = _Opts(
+            projectName=project_name,
+            buildingName=building_name,
+            siteName=site_name,
+        )
+        bm, _w = lift(geometry, _opts, build_id="parametric-bridge")
+        placements = resolve_placements(bm)
+        geometries = resolve_geometries(bm, placements)
+        for storey_node in bm.project.site.building.storeys:
+            for w_node in storey_node.walls:
+                if w_node.id in placements and w_node.id in geometries:
+                    parametric_walls[w_node.id] = (
+                        w_node,
+                        placements[w_node.id],
+                        geometries[w_node.id],
+                    )
+
     # ── Element creation ─────────────────────────────────────────
     counts = EntityCounts()
     failures: list[BuildFailure] = []
@@ -282,7 +316,25 @@ def build_ifc(
             if not _element_passes_rich_mode(elem, rich_mode):
                 continue
             try:
-                ifc_wall = create_wall(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                if use_parametric_pipeline and elem.id in parametric_walls:
+                    wall_node, w_placement, w_geometry = parametric_walls[elem.id]
+                    ifc_wall = create_wall_parametric(
+                        wall_node,
+                        w_placement,
+                        w_geometry,
+                        model,
+                        body_context,
+                        ifc_storey,
+                        type_registry,
+                    )
+                else:
+                    ifc_wall = create_wall(
+                        model,
+                        elem,
+                        ifc_storey,
+                        body_context,
+                        storey_elevation=storey_elevation,
+                    )
                 wall_lookup[elem.id] = ifc_wall
                 wall_mat = _get_wall_mat(elem.properties.is_partition or False)
                 wall_sig = type_registry.signature(
@@ -582,6 +634,7 @@ def build_multi_discipline(
             emit_mep_geometry=emit_mep_geometry,
             rich_mode=rich_mode,
             rera_inputs=rera_inputs,
+            use_parametric_pipeline=request.options.use_parametric_pipeline,
         )
 
         # Write to bytes
