@@ -55,15 +55,94 @@ async function parseBuffer(buffer: Uint8Array, fileName: string) {
     const result = await parseIFCBuffer(buffer, fileName, undefined, counters);
     const r = result as unknown as Record<string, unknown>;
     const pd = r.parserDiagnostics as Record<string, unknown> | undefined;
-    // Breadcrumb: confirms parserDiagnostics made it out of the parser.
     console.info(`[parse-ifc] parserDiagnostics present: ${!!pd}; samples=${Array.isArray(pd?.elementSamples) ? (pd!.elementSamples as unknown[]).length : 0}; smartWarnings=${Array.isArray(pd?.smartWarnings) ? (pd!.smartWarnings as unknown[]).length : 0}`);
+
+    // E.3: Check if WASM result has sparse geometry (FacetedBrep-heavy IFC).
+    // If >70% of elements lack geometry, try Python ifcopenshell offload.
+    const summary = (r.summary ?? {}) as Record<string, unknown>;
+    const totalElems = Number(summary.processedElements ?? 0);
+    const geomBreakdown = (pd?.geometryTypes ?? {}) as Record<string, number>;
+    const facetedBrepCount = Number(geomBreakdown.facetedBrep ?? 0);
+    const elementsWithArea = countElementsWithArea(r);
+
+    if (totalElems > 50 && elementsWithArea < totalElems * 0.3 && facetedBrepCount > 50) {
+      console.warn(`[parse-ifc] WASM result sparse: ${elementsWithArea}/${totalElems} with area, ${facetedBrepCount} FacetedBrep. Trying Python ifcopenshell offload.`);
+      const pythonResult = await tryPythonOffload(buffer, fileName);
+      if (pythonResult) {
+        return { result: pythonResult, parserUsed: "python-ifcopenshell" as const };
+      }
+      // Python failed — use WASM result with sparse-geometry fallback (Fix #2.2 handles downstream)
+      console.warn("[parse-ifc] Python offload failed — falling back to WASM sparse result + geometry fallback.");
+    }
+
     return { result, parserUsed: "web-ifc" as const };
   } catch (wasmErr) {
     console.warn(`[parse-ifc] web-ifc WASM failed: ${wasmErr instanceof Error ? wasmErr.message : wasmErr}`);
+
+    // Try Python offload before text fallback
+    const pythonResult = await tryPythonOffload(buffer, fileName);
+    if (pythonResult) {
+      return { result: pythonResult, parserUsed: "python-ifcopenshell" as const, wasmError: wasmErr instanceof Error ? wasmErr.message : String(wasmErr) };
+    }
+
+    // Final fallback: text-regex parser
     const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
     const textContent = new TextDecoder().decode(buffer);
     const result = parseIFCText(textContent);
     return { result, parserUsed: "text-regex" as const, wasmError: wasmErr instanceof Error ? wasmErr.message : String(wasmErr) };
+  }
+}
+
+/** Count elements with non-zero gross area from a parse result. */
+function countElementsWithArea(result: Record<string, unknown>): number {
+  const divisions = result.divisions as Array<{ categories: Array<{ elements: Array<{ quantities: { area?: { gross?: number } } }> }> }> | undefined;
+  if (!divisions) return 0;
+  let count = 0;
+  for (const div of divisions) {
+    for (const cat of div.categories) {
+      for (const elem of cat.elements) {
+        if ((elem.quantities.area?.gross ?? 0) > 0) count++;
+      }
+    }
+  }
+  return count;
+}
+
+/** Try parsing via the Python ifcopenshell Railway service. */
+async function tryPythonOffload(buffer: Uint8Array, fileName: string): Promise<Record<string, unknown> | null> {
+  const serviceUrl = process.env.IFC_SERVICE_URL;
+  if (!serviceUrl) {
+    console.warn("[parse-ifc] IFC_SERVICE_URL not set — Python offload unavailable");
+    return null;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("file", new Blob([new Uint8Array(buffer)]), fileName);
+
+    const resp = await fetch(`${serviceUrl}/parse-ifc/quantities`, {
+      method: "POST",
+      body: formData,
+      signal: AbortSignal.timeout(90000), // 90s timeout for large files
+      headers: {
+        ...(process.env.IFC_SERVICE_API_KEY ? { "Authorization": `Bearer ${process.env.IFC_SERVICE_API_KEY}` } : {}),
+      },
+    });
+
+    if (!resp.ok) {
+      console.warn(`[parse-ifc] Python service returned ${resp.status}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    if (data.divisions && Array.isArray(data.divisions)) {
+      console.info(`[parse-ifc] Python ifcopenshell parsed successfully: ${data.summary?.processedElements ?? "?"} elements`);
+      return data;
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[parse-ifc] Python offload failed: ${err instanceof Error ? err.message : err}`);
+    return null;
   }
 }
 

@@ -6,147 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  CheckCircle2, Sparkles, Zap,
+  Sparkles, Zap,
   Share2, Copy, Check, ArrowRight, Crown, Rocket,
 } from "lucide-react";
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { trackAdsConversion, trackPurchase } from "@/lib/meta-pixel";
 import { getPurchaseEventId, getPlanValueINR } from "@/lib/plan-pricing";
-
-/* ── Confetti burst canvas ───────────────────────────────────── */
-function ConfettiBurst() {
-  const ref = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    canvas.style.width = window.innerWidth + "px";
-    canvas.style.height = window.innerHeight + "px";
-    ctx.scale(dpr, dpr);
-
-    const colors = ["#4F8AFF", "#6366F1", "#8B5CF6", "#10B981", "#00F5FF", "#F59E0B", "#EC4899", "#FFBF00"];
-    const pieces: {
-      x: number; y: number; vx: number; vy: number;
-      w: number; h: number; color: string; rot: number; vr: number;
-      gravity: number; alpha: number; decay: number;
-    }[] = [];
-
-    // Spawn from center-top
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight * 0.3;
-    for (let i = 0; i < 120; i++) {
-      const angle = (Math.random() * Math.PI * 2);
-      const speed = Math.random() * 8 + 3;
-      pieces.push({
-        x: cx + (Math.random() - 0.5) * 80,
-        y: cy + (Math.random() - 0.5) * 40,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 4,
-        w: Math.random() * 8 + 4,
-        h: Math.random() * 4 + 2,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        rot: Math.random() * Math.PI * 2,
-        vr: (Math.random() - 0.5) * 0.3,
-        gravity: 0.12 + Math.random() * 0.05,
-        alpha: 1,
-        decay: 0.003 + Math.random() * 0.004,
-      });
-    }
-
-    let raf: number;
-    function draw() {
-      ctx!.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      let alive = false;
-      for (const p of pieces) {
-        if (p.alpha <= 0) continue;
-        alive = true;
-        p.x += p.vx;
-        p.vy += p.gravity;
-        p.y += p.vy;
-        p.vx *= 0.99;
-        p.rot += p.vr;
-        p.alpha -= p.decay;
-        ctx!.save();
-        ctx!.translate(p.x, p.y);
-        ctx!.rotate(p.rot);
-        ctx!.globalAlpha = Math.max(0, p.alpha);
-        ctx!.fillStyle = p.color;
-        ctx!.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-        ctx!.restore();
-      }
-      if (alive) raf = requestAnimationFrame(draw);
-    }
-    draw();
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
-  return (
-    <canvas ref={ref} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 10 }} />
-  );
-}
-
-/* ── Ambient particle canvas ─────────────────────────────────── */
-function AmbientParticles({ accentRgb }: { accentRgb: string }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let raf: number;
-    const dpr = window.devicePixelRatio || 1;
-    const particles: { x: number; y: number; vx: number; vy: number; r: number; alpha: number }[] = [];
-
-    function resize() {
-      canvas!.width = window.innerWidth * dpr;
-      canvas!.height = window.innerHeight * dpr;
-      canvas!.style.width = window.innerWidth + "px";
-      canvas!.style.height = window.innerHeight + "px";
-      ctx!.scale(dpr, dpr);
-    }
-    resize();
-    window.addEventListener("resize", resize);
-
-    for (let i = 0; i < 35; i++) {
-      particles.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: (Math.random() - 0.5) * 0.25,
-        r: Math.random() * 1.5 + 0.5,
-        alpha: Math.random() * 0.3 + 0.08,
-      });
-    }
-
-    function draw() {
-      ctx!.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      for (const p of particles) {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0) p.x = window.innerWidth;
-        if (p.x > window.innerWidth) p.x = 0;
-        if (p.y < 0) p.y = window.innerHeight;
-        if (p.y > window.innerHeight) p.y = 0;
-        ctx!.beginPath();
-        ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx!.fillStyle = `rgba(${accentRgb},${p.alpha})`;
-        ctx!.fill();
-      }
-      raf = requestAnimationFrame(draw);
-    }
-    draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
-  }, [accentRgb]);
-
-  return <canvas ref={ref} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }} />;
-}
 
 /* ── Plan data ───────────────────────────────────────────────── */
 const PLANS: Record<string, {
@@ -187,6 +52,7 @@ function Content() {
   const [copied, setCopied] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const firedRef = useRef(false);
+  const syncedRef = useRef(false);
 
   const planFromUrl = searchParams.get("plan")?.toUpperCase() || "";
   const userRole = (session?.user as { role?: string })?.role || "FREE";
@@ -212,6 +78,13 @@ function Content() {
     const value = getPlanValueINR(planKey);
     const eventID = userId ? getPurchaseEventId(userId, planKey) : undefined;
 
+    // Idempotency guard: skip conversion fires if this purchase was already
+    // tracked in this session (prevents double-fire on page refresh).
+    const fireKey = eventID ? `bf_purchase_fired_${eventID}` : null;
+    if (fireKey && typeof window !== "undefined" && sessionStorage.getItem(fireKey)) {
+      return;
+    }
+
     trackPurchase(
       {
         content_name: `BuildFlow ${plan?.name || "Subscription"}`,
@@ -235,10 +108,16 @@ function Content() {
         ...(eventID && { transaction_id: eventID }),
       });
     }
+
+    // Mark this purchase as fired so page refresh won't re-trigger
+    if (fireKey && typeof window !== "undefined") {
+      sessionStorage.setItem(fireKey, "1");
+    }
   }, [session, plan, userRole, planFromUrl]);
 
   useEffect(() => {
-    if (!session?.user) return;
+    if (!session?.user || syncedRef.current) return;
+    syncedRef.current = true;
     // Safety-net sync: re-query both payment providers in parallel. Whichever
     // reports synced=true wins — e.g. a Razorpay user whose /verify call
     // failed mid-redirect is recovered here without waiting for the webhook.
@@ -265,7 +144,8 @@ function Content() {
   useEffect(() => {
     if (!session?.user) return;
     fetch("/api/referral", { method: "POST" }).then(r => r.json()).then(d => { if (d.code) setReferralCode(d.code); }).catch(() => {});
-  }, [session]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!session?.user]);
 
   const handleCopy = useCallback(() => {
     if (!referralCode) return;
@@ -287,155 +167,172 @@ function Content() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#070809", position: "relative", overflow: "hidden" }}>
-      {/* Dotted canvas grid */}
+      {/* Subtle ambient glow — static, no animation */}
       <div style={{
-        position: "fixed", inset: 0, zIndex: 0,
-        backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px)",
-        backgroundSize: "24px 24px",
+        position: "fixed", top: "-20%", left: "50%", transform: "translateX(-50%)",
+        width: 800, height: 500, borderRadius: "50%", zIndex: 0, pointerEvents: "none",
+        background: `radial-gradient(ellipse, rgba(${accentRgb},0.06) 0%, transparent 65%)`,
       }} />
-      {/* Blueprint grid overlay */}
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none",
-        backgroundImage: `linear-gradient(rgba(${accentRgb},0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(${accentRgb},0.04) 1px, transparent 1px)`,
-        backgroundSize: "120px 120px",
-        maskImage: "radial-gradient(ellipse 70% 60% at 50% 35%, black 10%, transparent 70%)",
-        WebkitMaskImage: "radial-gradient(ellipse 70% 60% at 50% 35%, black 10%, transparent 70%)",
-      }} />
-      {/* Accent glow */}
-      <div style={{
-        position: "fixed", top: "-15%", left: "50%", transform: "translateX(-50%)",
-        width: 700, height: 450, borderRadius: "50%", zIndex: 0, pointerEvents: "none",
-        background: `radial-gradient(ellipse, rgba(${accentRgb},0.08) 0%, transparent 70%)`,
-      }} />
-      <AmbientParticles accentRgb={accentRgb} />
-      <ConfettiBurst />
-      <div className="scan-beam" style={{ position: "fixed", left: 0, right: 0, zIndex: 1, pointerEvents: "none" }} />
 
-      {/* Card */}
-      <div style={{ position: "relative", zIndex: 5, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: "48px 20px" }}>
+      {/* Main content */}
+      <div style={{
+        position: "relative", zIndex: 1,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        minHeight: "100vh", padding: "48px 20px",
+      }}>
         <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="node-card"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           style={{
-            "--node-port-color": accent,
-            maxWidth: 540, width: "100%",
-            background: "rgba(12,12,22,0.92)",
-            backdropFilter: "blur(16px) saturate(1.3)",
-            border: `1px solid rgba(${accentRgb},0.12)`,
-            borderRadius: 16,
-            boxShadow: `0 32px 80px rgba(0,0,0,0.6), 0 0 80px rgba(${accentRgb},0.05), inset 0 1px 0 rgba(255,255,255,0.04)`,
-            overflow: "visible", position: "relative",
-          } as React.CSSProperties}
+            maxWidth: 480, width: "100%",
+            background: "rgba(14,14,24,0.85)",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: 20,
+            boxShadow: `0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02)`,
+            overflow: "hidden",
+          }}
         >
-          {/* Node header */}
-          <div className="node-header" style={{
-            background: `linear-gradient(135deg, rgba(${accentRgb},0.12), rgba(${accentRgb},0.04))`,
-            borderBottom: `1px solid rgba(${accentRgb},0.1)`,
-            borderRadius: "16px 16px 0 0", padding: "10px 20px",
+          {/* Status pill bar */}
+          <div style={{
+            padding: "12px 24px",
+            borderBottom: "1px solid rgba(255,255,255,0.04)",
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <motion.div
-                animate={{ scale: [1, 1.4, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                style={{ width: 7, height: 7, borderRadius: "50%", background: accent, boxShadow: `0 0 10px ${accent}` }}
-              />
-              <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.5, color: accent }}>
-                SUBSCRIPTION ACTIVE
+              <div style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: "#10B981",
+                boxShadow: "0 0 8px rgba(16,185,129,0.4)",
+              }} />
+              <span style={{
+                fontSize: 10, fontWeight: 600, textTransform: "uppercase",
+                letterSpacing: 1.5, color: "rgba(255,255,255,0.4)",
+              }}>
+                Subscription active
               </span>
             </div>
-            {plan && <span style={{
-              fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-              background: `rgba(${accentRgb},0.12)`, color: accent, letterSpacing: 1,
-            }}>{plan.executions}</span>}
+            {plan && (
+              <span style={{
+                fontSize: 10, fontWeight: 600, padding: "3px 10px", borderRadius: 20,
+                background: `rgba(${accentRgb},0.08)`, color: accent, letterSpacing: 0.5,
+              }}>
+                {plan.executions}
+              </span>
+            )}
           </div>
 
-          <div style={{ padding: "28px 28px 32px" }}>
-            {/* Celebration icon */}
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
+          {/* Card body */}
+          <div style={{ padding: "40px 32px 36px" }}>
+            {/* Success icon — single scale-in, no repeat */}
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
               <motion.div
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 180, damping: 12 }}
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.15, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                style={{ display: "inline-block", position: "relative" }}
+              >
+                {/* Glow ring — fades in once */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
+                  style={{
+                    position: "absolute", inset: -8,
+                    borderRadius: "50%",
+                    background: `radial-gradient(circle, rgba(${accentRgb},0.15) 0%, transparent 70%)`,
+                  }}
+                />
+                <svg width="56" height="56" viewBox="0 0 56 56" fill="none" style={{ position: "relative", zIndex: 1 }}>
+                  <circle cx="28" cy="28" r="26" stroke={`url(#grad-${accent.replace("#", "")})`} strokeWidth="2.5" fill="none" opacity="0.8" />
+                  <path d="M20 28.5L25.5 34L36 22" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  <defs>
+                    <linearGradient id={`grad-${accent.replace("#", "")}`} x1="0" y1="0" x2="56" y2="56">
+                      <stop offset="0%" stopColor={accent} stopOpacity="0.6" />
+                      <stop offset="100%" stopColor={accent} stopOpacity="0.15" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </motion.div>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
                 style={{
-                  width: 56, height: 56, borderRadius: 16, display: "inline-flex",
-                  alignItems: "center", justifyContent: "center",
-                  background: `linear-gradient(135deg, ${accent}, ${accent}CC)`,
-                  boxShadow: `0 12px 32px rgba(${accentRgb},0.35)`,
+                  fontSize: 26, fontWeight: 700, marginTop: 20, letterSpacing: "-0.03em",
+                  color: "#F0F0F8", lineHeight: 1.3,
                 }}
               >
-                <CheckCircle2 size={28} color="#fff" />
-              </motion.div>
-              <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-                style={{
-                  fontSize: 24, fontWeight: 800, marginTop: 16, letterSpacing: "-0.03em",
-                  background: `linear-gradient(135deg, #FFFFFF 0%, #E0E7FF 50%, ${accent} 100%)`,
-                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-                }}>
-                You&apos;re on {plan?.name || "a paid plan"}!
+                Welcome to BuildFlow{plan ? ` ${plan.name}` : ""}
               </motion.h1>
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}
-                style={{ fontSize: 13, color: "#6B6B80", marginTop: 6 }}>
-                Your subscription is active. Here&apos;s what&apos;s unlocked.
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                style={{ fontSize: 14, color: "#6B6B80", marginTop: 8, lineHeight: 1.5 }}
+              >
+                Your subscription is active. Start building.
               </motion.p>
             </div>
 
             {/* Plan features */}
             {plan && (
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.5 }}
                 style={{
-                  padding: "14px 16px", borderRadius: 12, marginBottom: 20,
-                  background: `rgba(${accentRgb},0.04)`,
-                  border: `1px solid rgba(${accentRgb},0.1)`,
+                  padding: "16px 18px", borderRadius: 14, marginBottom: 24,
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.05)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <div style={{ color: accent, display: "flex" }}>{plan.icon}</div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#E8E8F0" }}>{plan.name} Plan</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <div style={{ color: accent, display: "flex", opacity: 0.8 }}>{plan.icon}</div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#C8C8D8" }}>{plan.name} Plan</span>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  {plan.features.map((f, i) => (
-                    <motion.div key={f}
-                      initial={{ opacity: 0, x: -12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.55 + i * 0.06 }}
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
-                    >
-                      <Check size={13} style={{ color: accent, flexShrink: 0 }} />
-                      <span style={{ fontSize: 12.5, color: "#A8A8C4" }}>{f}</span>
-                    </motion.div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {plan.features.map((f) => (
+                    <div key={f} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <Check size={13} style={{ color: accent, flexShrink: 0, opacity: 0.7 }} />
+                      <span style={{ fontSize: 13, color: "#8888A0" }}>{f}</span>
+                    </div>
                   ))}
                 </div>
               </motion.div>
             )}
 
             {/* CTA buttons */}
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
-              style={{ display: "flex", gap: 10, marginBottom: 18 }}>
-              <Link href="/dashboard" className="glow-pulse" style={{
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55, duration: 0.5 }}
+              style={{ display: "flex", gap: 10, marginBottom: 20 }}
+            >
+              <Link href="/dashboard" style={{
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                padding: "12px 16px", borderRadius: 10, textDecoration: "none",
+                padding: "13px 18px", borderRadius: 12, textDecoration: "none",
                 background: `linear-gradient(135deg, ${accent}, ${accent}CC)`,
-                color: "#fff", fontSize: 13, fontWeight: 700,
-                boxShadow: `0 4px 20px rgba(${accentRgb},0.35)`,
-                transition: "transform 0.15s",
+                color: "#fff", fontSize: 14, fontWeight: 600,
+                boxShadow: `0 4px 16px rgba(${accentRgb},0.25)`,
+                transition: "all 0.2s ease",
               }}
-                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = `0 6px 24px rgba(${accentRgb},0.35)`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 16px rgba(${accentRgb},0.25)`; }}
               >
                 Go to Dashboard <ArrowRight size={15} />
               </Link>
               <Link href="/dashboard/templates" style={{
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                padding: "12px 16px", borderRadius: 10, textDecoration: "none",
-                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
-                color: "#A8A8C4", fontSize: 13, fontWeight: 600,
-                transition: "all 0.15s",
+                padding: "13px 18px", borderRadius: 12, textDecoration: "none",
+                background: "transparent", border: "1px solid rgba(255,255,255,0.08)",
+                color: "#8888A0", fontSize: 14, fontWeight: 500,
+                transition: "all 0.2s ease",
               }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.color = "#B8B8CC"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#8888A0"; }}
               >
                 Explore Templates
               </Link>
@@ -443,45 +340,58 @@ function Content() {
 
             {/* Referral */}
             {referralCode && (
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.65, duration: 0.5 }}
                 style={{
-                  padding: "14px 16px", borderRadius: 12, marginBottom: 14,
-                  background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.1)",
+                  padding: "16px 18px", borderRadius: 14, marginBottom: 16,
+                  background: "rgba(16,185,129,0.03)",
+                  border: "1px solid rgba(16,185,129,0.08)",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <Share2 size={14} style={{ color: "#10B981" }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#6EE7B7", textTransform: "uppercase", letterSpacing: 1 }}>Referral</span>
+                  <Share2 size={14} style={{ color: "#10B981", opacity: 0.7 }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#6EE7B7", textTransform: "uppercase", letterSpacing: 1 }}>
+                    Referral
+                  </span>
                 </div>
-                <p style={{ fontSize: 12, color: "#9898B0", marginBottom: 10 }}>Invite colleagues — you both get a bonus execution.</p>
+                <p style={{ fontSize: 13, color: "#7A7A90", marginBottom: 12, lineHeight: 1.5 }}>
+                  Invite colleagues — you both get a bonus execution.
+                </p>
                 <button onClick={handleCopy} style={{
                   display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "center",
-                  padding: "9px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  background: copied ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.08)",
-                  border: `1px solid ${copied ? "rgba(16,185,129,0.3)" : "rgba(16,185,129,0.15)"}`,
-                  color: copied ? "#6EE7B7" : "#A8C4B8", transition: "all 0.2s ease",
+                  padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  background: copied ? "rgba(16,185,129,0.12)" : "rgba(16,185,129,0.06)",
+                  border: `1px solid ${copied ? "rgba(16,185,129,0.25)" : "rgba(16,185,129,0.12)"}`,
+                  color: copied ? "#6EE7B7" : "#9ABCB0", transition: "all 0.2s ease",
                 }}>
-                  {copied ? <Check size={13} /> : <Copy size={13} />}
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
                   {copied ? "Copied!" : "Copy referral link"}
                 </button>
               </motion.div>
             )}
 
-            {/* Social */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}
-              style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            {/* Social sharing */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.75, duration: 0.5 }}
+              style={{ display: "flex", gap: 10, justifyContent: "center" }}
+            >
               {[
                 { label: "Share on X", href: `https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent("https://trybuildflow.in")}`, hoverColor: "#1D9BF0" },
                 { label: "Share on LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://trybuildflow.in")}`, hoverColor: "#0077B5" },
               ].map(s => (
                 <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
                   style={{
-                    padding: "7px 14px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-                    color: "#6B6B80", textDecoration: "none", transition: "all 0.15s", letterSpacing: 0.3,
+                    padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 500,
+                    background: "transparent", border: "1px solid rgba(255,255,255,0.05)",
+                    color: "#5A5A70", textDecoration: "none", transition: "all 0.2s ease",
+                    letterSpacing: 0.2,
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = `${s.hoverColor}50`; e.currentTarget.style.color = s.hoverColor; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#6B6B80"; }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = `${s.hoverColor}40`; e.currentTarget.style.color = s.hoverColor; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "#5A5A70"; }}
                 >
                   {s.label}
                 </a>

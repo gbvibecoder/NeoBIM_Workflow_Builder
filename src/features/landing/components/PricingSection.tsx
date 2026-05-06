@@ -14,9 +14,12 @@ import {
   Box,
   Image as ImageIcon,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useLocale } from "@/hooks/useLocale";
 import { trackViewContent } from "@/lib/meta-pixel";
 import { fadeUp, smoothEase } from "@/features/landing/lib/landing-helpers";
+import { STRIPE_PLANS } from "@/features/billing/lib/plan-data";
+import { formatPlanLimit, interpolatePlanString } from "@/features/billing/lib/plan-helpers";
 
 // Shared CTA button style — mirrors dashboard/billing buttons:
 // solid plan color + inset highlight/shadow + outer color glow.
@@ -85,6 +88,8 @@ interface Plan {
 
 export function PricingSection() {
   const { t, tArray } = useLocale();
+  const { data: session } = useSession();
+  const ctaHref = (tier: string) => session ? "/dashboard" : `/register?plan=${tier.toLowerCase()}`;
 
   const plans: Plan[] = [
     {
@@ -93,19 +98,19 @@ export function PricingSection() {
       desc: t("landing.miniDesc"),
       price: t("landing.miniPrice"),
       isCustom: false,
-      savings: t("landing.miniHighlight"),
+      savings: interpolatePlanString(t("landing.miniHighlight"), "MINI"),
       color: "#F59E0B",
       rgb: "245,158,11",
       gradient: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
       icon: <Zap size={18} />,
       credits: [
-        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: "0" },
-        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: "0" },
-        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: "2" },
+        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: formatPlanLimit(STRIPE_PLANS.MINI.limits.videoPerMonth) },
+        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: formatPlanLimit(STRIPE_PLANS.MINI.limits.modelsPerMonth) },
+        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: formatPlanLimit(STRIPE_PLANS.MINI.limits.rendersPerMonth) },
       ],
-      features: tArray("landing.miniFeatures"),
+      features: tArray("landing.miniFeatures").map(s => interpolatePlanString(s, "MINI")),
       cta: t("landing.startNow"),
-      ctaHref: "/dashboard",
+      ctaHref: ctaHref("Mini"),
       ctaTrack: "pricing_cta_mini",
       ctaIsLink: true,
       ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
@@ -125,13 +130,13 @@ export function PricingSection() {
       gradient: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
       icon: <Building2 size={18} />,
       credits: [
-        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: "2" },
-        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: "3" },
-        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: "10" },
+        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: formatPlanLimit(STRIPE_PLANS.STARTER.limits.videoPerMonth) },
+        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: formatPlanLimit(STRIPE_PLANS.STARTER.limits.modelsPerMonth) },
+        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: formatPlanLimit(STRIPE_PLANS.STARTER.limits.rendersPerMonth) },
       ],
-      features: tArray("landing.starterFeatures"),
+      features: tArray("landing.starterFeatures").map(s => interpolatePlanString(s, "STARTER")),
       cta: t("landing.startNow"),
-      ctaHref: "/dashboard",
+      ctaHref: ctaHref("Starter"),
       ctaTrack: "pricing_cta_starter",
       ctaIsLink: true,
       ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
@@ -151,13 +156,13 @@ export function PricingSection() {
       gradient: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
       icon: <Crown size={18} />,
       credits: [
-        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: "5" },
-        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: "10" },
-        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: "30" },
+        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: formatPlanLimit(STRIPE_PLANS.PRO.limits.videoPerMonth) },
+        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: formatPlanLimit(STRIPE_PLANS.PRO.limits.modelsPerMonth) },
+        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: formatPlanLimit(STRIPE_PLANS.PRO.limits.rendersPerMonth) },
       ],
-      features: tArray("landing.proFeatures"),
+      features: tArray("landing.proFeatures").map(s => interpolatePlanString(s, "PRO")),
       cta: t("landing.startNow"),
-      ctaHref: "/dashboard",
+      ctaHref: ctaHref("Pro"),
       ctaTrack: "pricing_cta_pro",
       ctaIsLink: true,
       ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
@@ -177,20 +182,20 @@ export function PricingSection() {
       gradient: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)",
       icon: <Users size={18} />,
       credits: [
-        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: "15" },
-        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: "30" },
-        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: "\u221E" },
+        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: formatPlanLimit(STRIPE_PLANS.TEAM.limits.videoPerMonth) },
+        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: formatPlanLimit(STRIPE_PLANS.TEAM.limits.modelsPerMonth) },
+        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: formatPlanLimit(STRIPE_PLANS.TEAM.limits.rendersPerMonth) },
       ],
       features: [
         t("billing.teamFeature1"),
         t("billing.teamFeature2"),
         t("billing.teamFeature3"),
         t("billing.teamFeature4"),
-        t("billing.teamFeature5"),
+        interpolatePlanString(t("billing.teamFeature5"), "TEAM"),
         t("billing.teamFeature6"),
       ],
       cta: t("landing.startNow"),
-      ctaHref: "/dashboard",
+      ctaHref: ctaHref("Team"),
       ctaTrack: "pricing_cta_team",
       ctaIsLink: true,
       ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,

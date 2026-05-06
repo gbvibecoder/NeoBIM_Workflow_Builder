@@ -43,6 +43,11 @@ export default function RegisterPage() {
   );
 }
 
+const VALID_PLANS = ["free", "mini", "starter", "pro", "team"] as const;
+const VALID_USECASES = ["ifc-boq", "brief-massing", "floor-plan", "renders"] as const;
+const PLAN_LABELS: Record<string, string> = { free: "Free", mini: "Mini", starter: "Starter", pro: "Pro", team: "Team" };
+const USECASE_LABELS: Record<string, string> = { "ifc-boq": "IFC → BOQ", "brief-massing": "Brief → 3D Massing", "floor-plan": "Floor Plan → CAD", renders: "Concept Renders" };
+
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -59,10 +64,35 @@ function RegisterForm() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // Autofocus name field and track page view on mount
+  // Validate plan/usecase query params from /light landing page
+  const planParam = searchParams.get("plan");
+  const usecaseParam = searchParams.get("usecase");
+  const validPlan = planParam && (VALID_PLANS as readonly string[]).includes(planParam) ? planParam : null;
+  const validUsecase = usecaseParam && (VALID_USECASES as readonly string[]).includes(usecaseParam) ? usecaseParam : null;
+
+  // Autofocus name field, track page view, capture signup intent on mount
   useEffect(() => {
     nameInputRef.current?.focus();
     trackRegisterPageView();
+
+    // Capture signup intent from /light landing page
+    if (validPlan) sessionStorage.setItem("bf_signup_plan", validPlan);
+    if (validUsecase) sessionStorage.setItem("bf_signup_usecase", validUsecase);
+    if (validPlan || validUsecase) {
+      const intentData = {
+        plan: validPlan || undefined,
+        usecase: validUsecase || undefined,
+        source: "light",
+      };
+      // Meta Pixel custom event
+      const w = window as Window & { fbq?: (...args: unknown[]) => void };
+      if (w.fbq) {
+        w.fbq("trackCustom", "SignupIntent", intentData);
+      }
+      // GTM dataLayer
+      pushToDataLayer("signup_intent", intentData);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function validateForm(): string | null {
@@ -134,6 +164,11 @@ function RegisterForm() {
       if (!res.ok) {
         setError(extractErrorMessage(data.error ?? data, t('auth.somethingWentWrong')));
         return;
+      }
+
+      // Flag referral claim so PendingReferralClaimer can show a welcome toast
+      if (referralCode) {
+        sessionStorage.setItem("bf_referral_claimed", "1");
       }
 
       trackCompleteRegistration(
@@ -269,6 +304,20 @@ function RegisterForm() {
           <span style={{ fontSize: 12.5, color: "#6EE7B7", lineHeight: 1.4 }}>
             You were invited! Sign up and you both get a bonus execution.
           </span>
+        </div>
+      )}
+
+      {/* Signup intent context pill from /light landing page */}
+      {(validPlan || validUsecase) && (
+        <div style={{
+          padding: "8px 14px", borderRadius: 10, marginBottom: 16,
+          background: "rgba(99,102,241,0.06)",
+          border: "1px solid rgba(99,102,241,0.12)",
+          fontSize: 12.5, color: "#A5B4FC", lineHeight: 1.4,
+        }}>
+          {validPlan && <span>Signing up for the <strong>{PLAN_LABELS[validPlan]}</strong> plan</span>}
+          {validPlan && validUsecase && <span> · </span>}
+          {validUsecase && <span>Starting with <strong>{USECASE_LABELS[validUsecase]}</strong></span>}
         </div>
       )}
 

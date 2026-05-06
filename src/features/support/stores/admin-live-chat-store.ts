@@ -37,6 +37,7 @@ interface AdminLiveChatState {
 
   setMyUserId: (id: string) => void;
   getUnreadCount: (convId: string) => number;
+  markAllAsRead: () => void;
   fetchConversations: () => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   sendReply: (conversationId: string, content: string) => Promise<void>;
@@ -94,6 +95,16 @@ export const useAdminLiveChatStore = create<AdminLiveChatState>()((set, get) => 
     if (!conv) return 0;
     const lastRead = readCounts[convId] ?? 0;
     return Math.max(0, conv.messageCount - lastRead);
+  },
+
+  markAllAsRead: () => {
+    const { conversations, readCounts } = get();
+    const updated: Record<string, number> = { ...readCounts };
+    for (const c of conversations) {
+      updated[c.id] = c.messageCount;
+    }
+    saveReadCounts(updated);
+    set({ readCounts: updated });
   },
 
   fetchConversations: async () => {

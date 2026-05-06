@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isAdminUser, redis, redisConfigured } from "@/lib/rate-limit";
 import { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, STRIPE_PLANS, getNodeTypeLimits } from "@/features/billing/lib/stripe";
+import { getEffectiveLimits, type LegacyLimits } from "@/features/billing/lib/plan-helpers";
 
 interface ExecutionBlock {
   type: "email_verification" | "plan_limit" | "node_limit";
@@ -48,34 +49,39 @@ export async function POST(req: NextRequest) {
   const { catalogueIds } = await req.json().catch(() => ({ catalogueIds: [] }));
   const blocks: ExecutionBlock[] = [];
 
-  const planConfig = STRIPE_PLANS[userRole] || STRIPE_PLANS.FREE;
-  const planLimit = planConfig.limits.runsPerMonth;
+  // Fetch legacyLimits for grandfathering
+  const dbUserLimits = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { legacyLimits: true },
+  });
+  const effectiveLimits = getEffectiveLimits(userRole, dbUserLimits?.legacyLimits as LegacyLimits | null);
+  const planLimit = effectiveLimits.runsPerMonth;
 
   if (userRole === "FREE") {
-    // ── FREE tier: 3 LIFETIME executions ──
-    // 2 without verification → verify email gate → 1 more after → total 3
+    // ── FREE tier: LIFETIME executions ──
+    const freeLimit = effectiveLimits.runsPerMonth;
     const lifetimeCount = await prisma.execution.count({
       where: { userId, status: { notIn: ["FAILED", "PENDING"] } },
     });
 
-    const remaining = Math.max(0, 3 - lifetimeCount);
+    const remaining = Math.max(0, freeLimit - lifetimeCount);
 
-    // Hard cap: 3 lifetime executions
-    if (lifetimeCount >= 3) {
+    // Hard cap: lifetime executions
+    if (lifetimeCount >= freeLimit) {
       blocks.push({
         type: "plan_limit",
         title: "Free executions used",
-        message: "You've used all 3 free workflow executions. Upgrade to Mini to keep building!",
+        message: `You've used all ${freeLimit} free workflow executions. Upgrade to Mini to keep building!`,
         action: "Upgrade to Mini",
         actionUrl: "/dashboard/billing",
       });
     }
-    // Verification gate: after 2 unverified executions, must verify for the 3rd
-    else if (!emailVerified && lifetimeCount >= 2) {
+    // Verification gate: after (limit - 1) unverified executions, must verify for the last
+    else if (!emailVerified && lifetimeCount >= freeLimit - 1) {
       blocks.push({
         type: "email_verification",
         title: "Verify your email",
-        message: "You've used 2 of your 3 free executions. Verify your email to unlock your final free workflow!",
+        message: `You've used ${lifetimeCount} of your ${freeLimit} free executions. Verify your email to unlock your final free workflow!`,
         action: "Verify Email",
         actionUrl: "/dashboard/settings",
       });
@@ -85,7 +91,7 @@ export async function POST(req: NextRequest) {
       canExecute: blocks.length === 0,
       blocks,
       remaining,
-      limit: 3,
+      limit: freeLimit,
       used: lifetimeCount,
       emailVerified,
       role: userRole,
@@ -122,7 +128,7 @@ export async function POST(req: NextRequest) {
     blocks.push({
       type: "plan_limit",
       title: "Monthly limit reached",
-      message: `You've used all ${planLimit} workflow executions this month on the ${planConfig.name} plan.${nextPlan ? ` Upgrade to ${nextPlan} for more.` : " Resets next month."}`,
+      message: `You've used all ${planLimit} workflow executions this month on the ${STRIPE_PLANS[userRole]?.name ?? "current"} plan.${nextPlan ? ` Upgrade to ${nextPlan} for more.` : " Resets next month."}`,
       action: nextPlan ? `Upgrade to ${nextPlan}` : undefined,
       actionUrl: nextPlan ? "/dashboard/billing" : undefined,
     });

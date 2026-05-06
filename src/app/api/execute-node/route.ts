@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { checkRateLimit, logRateLimitHit, isExecutionAlreadyCounted, isAdminUser, checkNodeTypeLimit, consumeReferralBonus } from "@/lib/rate-limit";
 import { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, getNodeTypeLimits } from "@/features/billing/lib/stripe";
+import { FREE_TIER_EXECUTIONS } from "@/features/billing/lib/plan-data";
 import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import {
@@ -56,10 +57,10 @@ export async function POST(req: NextRequest) {
 
   // ── Email verification + FREE tier lifetime gate ──────────────────────────
   //
-  // FREE users get 3 LIFETIME executions (not monthly):
-  //   • 2 without email verification  → experience the product
-  //   • verify email gate             → captures their email
-  //   • 1 more after verification     → total 3, then must upgrade
+  // FREE users get LIMITED LIFETIME executions (not monthly):
+  //   • (limit - 1) without email verification  → experience the product
+  //   • verify email gate                        → captures their email
+  //   • 1 more after verification                → total = FREE_TIER_EXECUTIONS, then must upgrade
   //
   // Paid users (MINI/STARTER/PRO): must verify email/phone, no trial.
   // Their monthly limits are enforced by the Redis rate limiter below.
@@ -89,26 +90,32 @@ export async function POST(req: NextRequest) {
         where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
       });
 
-      // Hard cap: 3 lifetime executions for FREE tier
-      if (lifetimeCompleted >= 3) {
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "Free executions used",
-            message: "You've used all 3 free workflow executions. Upgrade to a paid plan to keep building amazing things!",
-            code: "RATE_001",
-            action: "View Plans",
-            actionUrl: "/dashboard/billing",
-          }),
-          { status: 429 }
-        );
+      // Hard cap: FREE_TIER_EXECUTIONS lifetime executions for FREE tier
+      if (lifetimeCompleted >= FREE_TIER_EXECUTIONS) {
+        // Try consuming a referral bonus before rejecting
+        const usedBonus = await consumeReferralBonus(userId);
+        if (!usedBonus) {
+          return NextResponse.json(
+            formatErrorResponse({
+              title: "Free executions used",
+              message: `You've used all ${FREE_TIER_EXECUTIONS} free workflow executions. Upgrade to a paid plan to keep building amazing things!`,
+              code: "RATE_001",
+              action: "View Plans",
+              actionUrl: "/dashboard/billing",
+            }),
+            { status: 429 }
+          );
+        }
+        // Bonus consumed — allow execution to proceed
+        console.log(`[referral] FREE user ${userId} consumed referral bonus to execute`);
       }
 
-      // Verification gate: 2 free without verification, then must verify for the last one
-      if (!isEmailVerified && !isPhoneVerified && lifetimeCompleted >= 2) {
+      // Verification gate: (limit - 1) free without verification, then must verify for the last one
+      if (!isEmailVerified && !isPhoneVerified && lifetimeCompleted >= FREE_TIER_EXECUTIONS - 1) {
         return NextResponse.json(
           formatErrorResponse({
             title: "Email verification required",
-            message: "You've used 2 of your 3 free executions. Verify your email to unlock your final free workflow!",
+            message: `You've used ${FREE_TIER_EXECUTIONS - 1} of your ${FREE_TIER_EXECUTIONS} free executions. Verify your email to unlock your final free workflow!`,
             code: "AUTH_001",
             action: "Verify Email",
             actionUrl: "/dashboard/settings",

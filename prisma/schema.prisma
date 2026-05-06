@@ -29,6 +29,11 @@ model User {
   razorpaySubscriptionId String?   @unique
   razorpayPlanId         String?
   paymentGateway         String? // "stripe" | "razorpay"
+  // Grandfathering: snapshot of old plan limits for existing users at time of
+  // pricing migration. null = use current STRIPE_PLANS values (new signups).
+  // Cleared on plan change (upgrade/downgrade) so user gets new plan's limits.
+  legacyLimits           Json?     @map("legacy_limits")
+  legacyLimitsSetAt      DateTime? @map("legacy_limits_set_at")
   // Gamification
   xp                     Int       @default(0)
   level                  Int       @default(1)

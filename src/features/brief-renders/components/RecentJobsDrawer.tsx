@@ -11,6 +11,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import s from "@/app/dashboard/brief-renders/page.module.css";
+
 interface RecentJob {
   id: string;
   status: string;
@@ -30,21 +32,35 @@ export interface RecentJobsDrawerProps {
   onSelect: (jobId: string) => void;
 }
 
-const STATUS_TONE: Record<string, string> = {
-  COMPLETED: "text-emerald-400",
-  FAILED: "text-red-400",
-  CANCELLED: "text-zinc-500",
-  RUNNING: "text-cyan-400",
-  AWAITING_APPROVAL: "text-amber-400",
-  QUEUED: "text-zinc-300",
-};
-
-function formatDate(iso: string): string {
+function formatRelativeDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    const d = new Date(iso);
+    const now = Date.now();
+    const diff = now - d.getTime();
+    if (diff < 60_000) return "Just now";
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+    if (diff < 604_800_000) return `${Math.floor(diff / 86_400_000)}d ago`;
+    return d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "2-digit",
+    });
   } catch {
     return iso;
   }
+}
+
+function formatStatus(status: string): string {
+  const map: Record<string, string> = {
+    COMPLETED: "Complete",
+    FAILED: "Failed",
+    CANCELLED: "Cancelled",
+    RUNNING: "Running",
+    AWAITING_APPROVAL: "Awaiting you",
+    QUEUED: "Queued",
+  };
+  return map[status] ?? status;
 }
 
 export function RecentJobsDrawer({
@@ -75,82 +91,132 @@ export function RecentJobsDrawer({
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot fetch trigger; setState happens inside fetchJobs after the await resolves, not synchronously here
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot fetch trigger
     void fetchJobs();
   }, [fetchJobs]);
 
   return (
-    <aside
-      className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden"
-      data-testid="recent-jobs-drawer"
-    >
+    <aside className={s.jobsBlock} data-testid="recent-jobs-drawer">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-2 text-sm text-zinc-100 hover:bg-zinc-800/50"
+        className={s.jobsHead}
         aria-expanded={open}
         aria-controls="recent-jobs-list"
       >
         <span>Recent jobs {jobs ? `(${jobs.length})` : ""}</span>
-        <span className="text-zinc-500 text-xs">{open ? "▾" : "▸"}</span>
+        <span className={s.jobsHeadCount}>{open ? "▾" : "▸"}</span>
       </button>
 
       {open && (
-        <div id="recent-jobs-list" className="border-t border-zinc-800">
+        <div
+          id="recent-jobs-list"
+          style={{ borderTop: "1px solid var(--rs-rule)" }}
+        >
           {error && (
-            <div role="alert" className="px-4 py-2 text-xs text-red-300">
+            <div
+              role="alert"
+              style={{ padding: "12px 20px", fontSize: 12, color: "#b44" }}
+            >
               Failed to load: {error}
               <button
                 type="button"
                 onClick={fetchJobs}
-                className="ml-2 underline text-red-200 hover:text-white"
+                style={{
+                  marginLeft: 8,
+                  textDecoration: "underline",
+                  background: "none",
+                  border: "none",
+                  color: "var(--rs-blueprint)",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: "inherit",
+                  padding: 0,
+                }}
               >
                 Retry
               </button>
             </div>
           )}
           {jobs && jobs.length === 0 && !error && (
-            <div className="px-4 py-3 text-xs text-zinc-500 italic">
-              No previous jobs yet.
-            </div>
+            <div className={s.jobsEmpty}>No previous jobs yet.</div>
           )}
           {jobs && jobs.length > 0 && (
-            <ul className="divide-y divide-zinc-800">
-              {jobs.map((j) => {
-                const isActive = j.id === activeJobId;
-                return (
-                  <li key={j.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(j.id)}
-                      className={[
-                        "w-full text-left px-4 py-2 text-xs flex flex-col gap-0.5 hover:bg-zinc-800/40",
-                        isActive ? "bg-zinc-800/60" : "",
-                      ].join(" ")}
-                      data-testid={`recent-job-${j.id}`}
+            <ul className={s.jobsList}>
+              {jobs.map((j) => (
+                <li key={j.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(j.id)}
+                    className={s.jobItem}
+                    data-active={j.id === activeJobId ? "true" : undefined}
+                    data-testid={`recent-job-${j.id}`}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                      }}
                     >
-                      <div className="flex items-baseline justify-between">
-                        <span className="font-mono text-zinc-300 truncate">
-                          {j.id.slice(0, 12)}…
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "baseline",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <span className={s.jobItemId}>
+                          Job {j.id.slice(0, 8)}
                         </span>
                         <span
-                          className={STATUS_TONE[j.status] ?? "text-zinc-300"}
+                          className={s.jobItemStatus}
+                          data-status={j.status}
                         >
-                          {j.status}
+                          {formatStatus(j.status)}
                         </span>
                       </div>
-                      <div className="flex items-baseline justify-between text-zinc-500">
-                        <span>{formatDate(j.createdAt)}</span>
+                      <div className={s.jobItemMeta}>
+                        <span>{formatRelativeDate(j.createdAt)}</span>
                         {j.costUsd > 0 && (
-                          <span className="font-mono">
-                            ${j.costUsd.toFixed(3)}
-                          </span>
+                          <>
+                            <span
+                              style={{
+                                width: 2,
+                                height: 2,
+                                borderRadius: 99,
+                                background: "var(--rs-text-mute)",
+                              }}
+                            />
+                            <span>${j.costUsd.toFixed(3)}</span>
+                          </>
                         )}
                       </div>
-                    </button>
-                  </li>
-                );
-              })}
+                    </div>
+                    <div
+                      style={{
+                        color: "var(--rs-text-mute)",
+                        transition: "transform 0.2s var(--rs-ease)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </div>
+                  </button>
+                </li>
+              ))}
             </ul>
           )}
         </div>

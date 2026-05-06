@@ -2,13 +2,12 @@
  * JobErrorBanner — terminal failure state.
  *
  * Renders only when `status === "FAILED"`. Surfaces the server's
- * `errorMessage` verbatim and offers a "Start a new brief" action that
- * clears the parent's selected `jobId`. We don't auto-retry — most
- * failures are spec-extraction issues that need a re-edited brief.
+ * `errorMessage` verbatim and offers a "Start a new brief" action.
  */
 
 "use client";
 
+import s from "@/app/dashboard/brief-renders/page.module.css";
 import type { BriefRenderJobView } from "@/features/brief-renders/hooks/useBriefRenderJob";
 
 export interface JobErrorBannerProps {
@@ -22,21 +21,17 @@ export function JobErrorBanner({ job, onDismiss }: JobErrorBannerProps) {
   return (
     <div
       role="alert"
-      className="bg-red-950 border border-red-700 rounded-lg p-4 space-y-3"
+      className={s.errorBanner}
       data-testid="job-error-banner"
     >
-      <div>
-        <div className="text-sm font-semibold text-red-100">
-          Job failed
-        </div>
-        <div className="text-sm text-red-200 mt-1">
-          {job.errorMessage ?? "An unknown error occurred."}
-        </div>
+      <div className={s.errorBannerTitle}>Job failed</div>
+      <div className={s.errorBannerMsg}>
+        {job.errorMessage ?? "An unknown error occurred."}
       </div>
       <button
         type="button"
         onClick={onDismiss}
-        className="text-xs underline text-red-200 hover:text-white"
+        className={s.errorBannerLink}
       >
         Start a new brief
       </button>

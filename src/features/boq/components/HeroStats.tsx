@@ -16,7 +16,17 @@ interface HeroStatsProps {
   benchmarkHigh: number;
   recalculated: boolean;
   costRange?: { totalLow: number; totalHigh: number; uncertaintyPercent: number };
+  projectDate?: string;
+  stalenessWarning?: { severity: string; years: number; message: string };
+  marketDataConfidence?: "live" | "cached" | "escalated" | "static";
 }
+
+const CONFIDENCE_BADGE: Record<string, { label: string; color: string; bg: string; tooltip: string }> = {
+  live:      { label: "LIVE",      color: "#059669", bg: "rgba(5,150,105,0.08)",  tooltip: "Market prices from AI web search — freshest available" },
+  cached:    { label: "CACHED",    color: "#D97706", bg: "rgba(217,119,6,0.08)",  tooltip: "Recent market prices from cache (≤7 days old)" },
+  escalated: { label: "ESCALATED", color: "#EA580C", bg: "rgba(234,88,12,0.08)",  tooltip: "Baseline rates escalated by inflation curves — no live market data" },
+  static:    { label: "STATIC",    color: "#DC2626", bg: "rgba(220,38,38,0.08)",  tooltip: "Using CPWD DSR baseline rates — live market data unavailable" },
+};
 
 function getCostPerM2Color(value: number, low: number, high: number): string {
   if (low === 0 && high === 0) return "#1A1A1A";
@@ -169,6 +179,7 @@ const cardVariants = {
 export function HeroStats({
   totalCost, costPerM2, hardCosts, ifcQualityScore,
   benchmarkLow, benchmarkHigh, recalculated, costRange,
+  projectDate, stalenessWarning, marketDataConfidence,
 }: HeroStatsProps) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-30px" });
@@ -178,6 +189,53 @@ export function HeroStats({
 
   return (
     <div ref={ref} className="px-6">
+      {/* Project date + escalation banner */}
+      {projectDate && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: stalenessWarning?.severity === "critical" ? "rgba(220,38,38,0.06)" : stalenessWarning?.severity === "warning" ? "rgba(217,119,6,0.06)" : "rgba(13,148,136,0.04)",
+            borderLeft: `3px solid ${stalenessWarning?.severity === "critical" ? "#DC2626" : stalenessWarning?.severity === "warning" ? "#D97706" : "#0D9488"}`,
+            fontSize: 12,
+            color: "#374151",
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 600 }}>
+              Estimate for construction starting {new Date(projectDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+            {marketDataConfidence && (() => {
+              const badge = CONFIDENCE_BADGE[marketDataConfidence] ?? CONFIDENCE_BADGE.static;
+              return (
+                <span
+                  title={badge.tooltip}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "2px 8px", borderRadius: 9999,
+                    fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                    color: badge.color, background: badge.bg,
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: badge.color }} />
+                  {badge.label}
+                </span>
+              );
+            })()}
+          </span>
+          {stalenessWarning && (
+            <span style={{ display: "block", marginTop: 3, fontSize: 11, color: stalenessWarning.severity === "critical" ? "#991B1B" : "#92400E" }}>
+              {stalenessWarning.message}
+            </span>
+          )}
+          {!stalenessWarning && (
+            <span style={{ display: "block", marginTop: 3, fontSize: 11, color: "#6B7280" }}>
+              Rate library: CPWD DSR 2025-26 (baseline April 2026)
+            </span>
+          )}
+        </div>
+      )}
       {/* Row 1: Total Cost — big hero card */}
       <motion.div
         variants={cardVariants} custom={0}

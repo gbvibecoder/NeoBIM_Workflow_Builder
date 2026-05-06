@@ -9,6 +9,7 @@ import {
   Loader2, CheckCircle2, Pencil,
 } from "lucide-react";
 import type { CreationMode } from "@/types/workflow";
+import { ProjectDatePill } from "@/features/canvas/components/toolbar/ProjectDatePill";
 import {
   useWorkflowStore,
   isUntitledWorkflow,
@@ -447,6 +448,11 @@ export function CanvasToolbar({
           <TBBtn onClick={onZoomOut} icon={<ZoomOut size={14} />} title={t('canvas.zoomOut')} />
           <TBBtn onClick={onZoomIn} icon={<ZoomIn size={14} />} title={t('canvas.zoomIn')} />
           <TBBtn onClick={onFitView} icon={<Maximize2 size={14} />} title={t('canvas.fitToScreen')} />
+
+          <Sep />
+
+          {/* Project Date — construction start date for BOQ escalation */}
+          <ProjectDatePill />
 
           <Sep />
 

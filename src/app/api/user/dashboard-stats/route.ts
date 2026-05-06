@@ -27,7 +27,7 @@ export async function GET() {
     const userId = session.user.id;
 
     // Parallel queries
-    const [user, achievements, workflowCount, executionCount, recentWorkflows, flashCompletion, referralBonus] =
+    const [user, achievements, workflowCount, executionCount, recentWorkflows, flashCompletion, referralBonus, recentOutputs, recentActivity] =
       await Promise.all([
         prisma.user.findUnique({
           where: { id: userId },
@@ -48,6 +48,7 @@ export async function GET() {
             name: true,
             updatedAt: true,
             tileGraph: true,
+            category: true,
             _count: { select: { executions: true } },
           },
         }),
@@ -55,6 +56,37 @@ export async function GET() {
           where: { userId, eventKey: todaysFlashEvent().eventKey },
         }),
         getReferralBonus(userId),
+        prisma.artifact.findMany({
+          where: {
+            execution: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
+            type: { in: ["IMAGE", "THREE_D", "FILE", "VIDEO"] },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+          select: {
+            id: true,
+            type: true,
+            dataUri: true,
+            createdAt: true,
+            execution: {
+              select: {
+                workflow: { select: { id: true, name: true, category: true } },
+              },
+            },
+          },
+        }),
+        prisma.execution.findMany({
+          where: { userId, workflow: { name: { not: "__standalone_tools__" } } },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            completedAt: true,
+            workflow: { select: { id: true, name: true, category: true } },
+          },
+        }),
       ]);
 
     const xp = user?.xp ?? 0;
@@ -90,6 +122,7 @@ export async function GET() {
       return {
         id: w.id,
         name: w.name,
+        category: w.category,
         updatedAt: w.updatedAt.toISOString(),
         nodeCount: Array.isArray(graph?.nodes) ? graph.nodes.length : 0,
         executionCount: w._count.executions,
@@ -112,6 +145,35 @@ export async function GET() {
       achievements: achievements.map((a) => ({ action: a.action, xp: a.xpAwarded, date: a.createdAt.toISOString() })),
       flashEvent,
       recentWorkflows: recent,
+      recentOutputs: recentOutputs.map((a) => {
+        const isStandalone = a.execution.workflow.name === "__standalone_tools__";
+        let displayName = a.execution.workflow.name;
+        let displayCategory = a.execution.workflow.category;
+        if (isStandalone) {
+          if (a.type === "VIDEO") { displayName = "3D Walkthrough"; displayCategory = "video"; }
+          else if (a.type === "THREE_D") { displayName = "3D Render"; displayCategory = "render"; }
+          else if (a.type === "IMAGE") { displayName = "Generated Image"; displayCategory = "render"; }
+          else { displayName = "Output"; displayCategory = displayCategory || "file"; }
+        }
+        return {
+          id: a.id,
+          type: a.type,
+          dataUri: a.dataUri,
+          createdAt: a.createdAt.toISOString(),
+          workflowId: a.execution.workflow.id,
+          workflowName: displayName,
+          workflowCategory: displayCategory,
+        };
+      }),
+      recentActivity: recentActivity.map((e) => ({
+        id: e.id,
+        status: e.status,
+        createdAt: e.createdAt.toISOString(),
+        completedAt: e.completedAt?.toISOString() ?? null,
+        workflowId: e.workflow.id,
+        workflowName: e.workflow.name,
+        workflowCategory: e.workflow.category,
+      })),
     });
     response.headers.set("Cache-Control", "private, max-age=30");
     return response;

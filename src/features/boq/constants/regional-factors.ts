@@ -15,26 +15,10 @@ export interface CountryFactor {
   exchangeRate: number;  // 1 USD = X local currency
 }
 
+// Indian-only product (Phase B). Non-India entries removed.
+// India entry kept for resolveProjectLocation() fallback.
 export const COUNTRY_FACTORS: CountryFactor[] = [
-  { country: "USA",           code: "US", factor: 1.00, currency: "USD", currencySymbol: "$",  exchangeRate: 1.00 },
-  { country: "India",         code: "IN", factor: 0.28, currency: "INR", currencySymbol: "₹",  exchangeRate: 83.50 },
-  { country: "UK",            code: "GB", factor: 1.15, currency: "GBP", currencySymbol: "£",  exchangeRate: 0.79 },
-  { country: "UAE",           code: "AE", factor: 0.85, currency: "AED", currencySymbol: "د.إ", exchangeRate: 3.67 },
-  { country: "Australia",     code: "AU", factor: 1.25, currency: "AUD", currencySymbol: "A$", exchangeRate: 1.53 },
-  { country: "Canada",        code: "CA", factor: 1.05, currency: "CAD", currencySymbol: "C$", exchangeRate: 1.36 },
-  { country: "Germany",       code: "DE", factor: 1.20, currency: "EUR", currencySymbol: "€",  exchangeRate: 0.92 },
-  { country: "Saudi Arabia",  code: "SA", factor: 0.75, currency: "SAR", currencySymbol: "﷼",  exchangeRate: 3.75 },
-  { country: "Singapore",     code: "SG", factor: 1.10, currency: "SGD", currencySymbol: "S$", exchangeRate: 1.34 },
-  { country: "Japan",         code: "JP", factor: 1.15, currency: "JPY", currencySymbol: "¥",  exchangeRate: 149.50 },
-  { country: "China",         code: "CN", factor: 0.45, currency: "CNY", currencySymbol: "¥",  exchangeRate: 7.24 },
-  { country: "South Korea",   code: "KR", factor: 0.90, currency: "KRW", currencySymbol: "₩",  exchangeRate: 1320.00 },
-  { country: "Brazil",        code: "BR", factor: 0.40, currency: "BRL", currencySymbol: "R$", exchangeRate: 4.97 },
-  { country: "Mexico",        code: "MX", factor: 0.35, currency: "MXN", currencySymbol: "$",  exchangeRate: 17.15 },
-  { country: "France",        code: "FR", factor: 1.18, currency: "EUR", currencySymbol: "€",  exchangeRate: 0.92 },
-  { country: "Netherlands",   code: "NL", factor: 1.15, currency: "EUR", currencySymbol: "€",  exchangeRate: 0.92 },
-  { country: "Qatar",         code: "QA", factor: 0.80, currency: "QAR", currencySymbol: "﷼",  exchangeRate: 3.64 },
-  { country: "Nigeria",       code: "NG", factor: 0.25, currency: "NGN", currencySymbol: "₦",  exchangeRate: 1550.00 },
-  { country: "South Africa",  code: "ZA", factor: 0.35, currency: "ZAR", currencySymbol: "R",  exchangeRate: 18.50 },
+  { country: "India",         code: "IN", factor: 1.00, currency: "INR", currencySymbol: "₹",  exchangeRate: 1.00 },
 ];
 
 // ─── City Tier Factors ───────────────────────────────────────────────────────

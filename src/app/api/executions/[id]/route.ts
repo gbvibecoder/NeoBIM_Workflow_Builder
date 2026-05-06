@@ -94,9 +94,56 @@ export async function PUT(req: NextRequest, { params }: Params) {
       },
     });
 
+    // Populate workflow thumbnail from first IMAGE artifact on success.
+    // Fire-and-forget so it doesn't block the response.
+    if (status === "SUCCESS" && execution.workflowId) {
+      populateWorkflowThumbnail(execution.workflowId, tileResults).catch(err =>
+        console.warn("[executions/PUT] thumbnail backfill:", err)
+      );
+    }
+
     return NextResponse.json({ execution });
   } catch (error) {
     console.error("[executions/PUT]", error);
     return NextResponse.json(formatErrorResponse(UserErrors.INTERNAL_ERROR), { status: 500 });
+  }
+}
+
+/**
+ * Extract the first image URL from tileResults and write it to Workflow.thumbnail.
+ * Only writes if thumbnail is currently null (idempotent).
+ */
+async function populateWorkflowThumbnail(
+  workflowId: string,
+  tileResults: unknown
+) {
+  const wf = await prisma.workflow.findUnique({
+    where: { id: workflowId },
+    select: { thumbnail: true },
+  });
+  if (wf?.thumbnail) return; // already set
+
+  // tileResults is a JSON array stored on the Execution row.
+  // Each entry may have .data.imageUrl, .data.url, or .data.dataUri for images.
+  if (!Array.isArray(tileResults)) return;
+
+  for (const result of tileResults as Record<string, unknown>[]) {
+    const type = (result.type as string)?.toLowerCase();
+    if (type !== "image") continue;
+
+    const data = result.data as Record<string, unknown> | undefined;
+    const url =
+      (data?.imageUrl as string) ??
+      (data?.url as string) ??
+      (data?.dataUri as string) ??
+      null;
+
+    if (url && typeof url === "string" && url.startsWith("http")) {
+      await prisma.workflow.update({
+        where: { id: workflowId },
+        data: { thumbnail: url },
+      });
+      return;
+    }
   }
 }

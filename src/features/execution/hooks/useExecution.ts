@@ -316,9 +316,13 @@ async function executeNode(
 
     let res: Response;
     try {
-      const inputData = {
+      // Import workflow store to read project date for BOQ escalation
+      const { projectDate } = (await import("@/features/workflows/stores/workflow-store")).useWorkflowStore.getState();
+
+      const inputData: Record<string, unknown> = {
         ...(previousArtifact?.data as Record<string, unknown> ?? { prompt: inputValue ?? "" }),
         ...nodeConfig,
+        _projectDate: projectDate,
       };
 
       // Apply user quantity overrides from TR-007 → TR-008 flow
@@ -460,29 +464,57 @@ async function executeNode(
           const rows: string[][] = [];
           const elements: Array<Record<string, unknown>> = [];
 
+          // Geometry fallback — imported from shared module (single source of truth)
+          const { estimateGeometryFromType, shouldUseGeometryFallback } = await import("@/features/boq/lib/geometry-fallback");
+
+          let estimatedFromCountTotal = 0;
+
           for (const [, agg] of typeAggregates) {
             const typeName = agg.elementType.replace("Ifc", "").replace("StandardCase", "").replace("BuildingElementProxy", "Proxy Element");
-            // Include storey and count in description for QS clarity
             const storeyLabel = agg.storey && agg.storey !== "Unassigned" ? ` — ${agg.storey}` : "";
             const description = `${typeName}${storeyLabel}`;
-            const primaryQty = agg.grossArea > 0 ? agg.grossArea : agg.volume > 0 ? agg.volume : agg.count;
-            const unit = agg.grossArea > 0 ? "m²" : agg.volume > 0 ? "m³" : "EA";
+
+            let primaryQty: number;
+            let unit: string;
+            let estimatedFromCount = false;
+
+            const fb = estimateGeometryFromType(agg.elementType, agg.count);
+            const useFallback = shouldUseGeometryFallback({ elementType: agg.elementType, count: agg.count, grossArea: agg.grossArea, volume: agg.volume });
+
+            if (!useFallback && agg.grossArea > 0) {
+              primaryQty = agg.grossArea; unit = "m²";
+            } else if (!useFallback && agg.volume > 0) {
+              primaryQty = agg.volume; unit = "m³";
+            } else if (fb) {
+              primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
+              estimatedFromCountTotal++;
+            } else {
+              primaryQty = agg.count; unit = "EA";
+            }
+
+            const estArea = estimatedFromCount ? fb?.estArea : undefined;
+            const estVolume = estimatedFromCount ? fb?.estVolume : undefined;
+            const displayArea = agg.grossArea || estArea || 0;
+            const displayVolume = agg.volume || estVolume || 0;
 
             rows.push([
               agg.divisionName, `${description} (${agg.count} nr)`,
-              agg.grossArea.toFixed(2), agg.openingArea.toFixed(2),
-              agg.netArea.toFixed(2), agg.volume.toFixed(2),
+              displayArea.toFixed(2), agg.openingArea.toFixed(2),
+              agg.netArea.toFixed(2), displayVolume.toFixed(2),
               primaryQty.toFixed(2), unit,
             ]);
 
             elements.push({
               description: `${description} (${agg.count} nr)`, category: agg.divisionName,
-              ifcType: agg.elementType, // Raw IFC type for rate mapping (e.g. "IfcWall", "IfcMember")
+              ifcType: agg.elementType,
               quantity: primaryQty, unit,
-              grossArea: agg.grossArea || undefined, netArea: agg.netArea || undefined,
-              openingArea: agg.openingArea || undefined, totalVolume: agg.volume || undefined,
+              grossArea: agg.grossArea || estArea || undefined,
+              netArea: agg.netArea || undefined,
+              openingArea: agg.openingArea || undefined,
+              totalVolume: agg.volume || estVolume || undefined,
               storey: agg.storey, elementCount: agg.count,
               materialLayers: agg.materialLayers,
+              estimatedFromCount: estimatedFromCount || undefined,
             });
           }
 
@@ -531,6 +563,7 @@ async function executeNode(
               aggregation: {
                 inputElements: Number(summary.processedElements ?? elements.length),
                 outputGroups: elements.length,
+                elementsEstimatedFromCount: estimatedFromCountTotal,
                 externalWalls: 0, internalWalls: 0, elementsLost: 0,
               },
             },

@@ -1607,38 +1607,6 @@ export default function LandingPage() {
                 {t('landing.watchDemos')}
               </Link>
 
-              {/* Book Demo CTA — visible, attractive, sends to /book-demo form */}
-              <Link
-                href="/book-demo"
-                onClick={() => trackLead({ content_name: "hero_cta_book_demo" })}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "10px 20px", borderRadius: 10,
-                  border: "1px solid rgba(79,138,255,0.35)",
-                  background: "linear-gradient(135deg, rgba(79,138,255,0.12), rgba(99,102,241,0.08))",
-                  color: "#A5B4FC", fontSize: 14, fontWeight: 700,
-                  textDecoration: "none", transition: "all 0.25s",
-                  boxShadow: "0 0 20px rgba(79,138,255,0.1)",
-                }}
-                onMouseEnter={e => {
-                  const el = e.currentTarget as HTMLElement;
-                  el.style.background = "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(99,102,241,0.15))";
-                  el.style.borderColor = "rgba(79,138,255,0.55)";
-                  el.style.boxShadow = "0 0 32px rgba(79,138,255,0.25)";
-                  el.style.color = "#C7D2FE";
-                }}
-                onMouseLeave={e => {
-                  const el = e.currentTarget as HTMLElement;
-                  el.style.background = "linear-gradient(135deg, rgba(79,138,255,0.12), rgba(99,102,241,0.08))";
-                  el.style.borderColor = "rgba(79,138,255,0.35)";
-                  el.style.boxShadow = "0 0 20px rgba(79,138,255,0.1)";
-                  el.style.color = "#A5B4FC";
-                }}
-              >
-                <Calendar size={15} />
-                {t('landing.bookDemo')}
-              </Link>
-
               {/* Explore Community CTA */}
               <a
                 href="#community"
@@ -2153,7 +2121,7 @@ export default function LandingPage() {
             { value: 12400, decimals: 0, suffix: '', prefix: '', label: t('landing.statDesigned'), color: '#B87333' },
             { value: 847, decimals: 0, suffix: '', prefix: '', label: t('landing.statExecuted'), color: '#00F5FF' },
             { value: 31, decimals: 0, suffix: '', prefix: '', label: t('landing.statNodes'), color: '#FFBF00' },
-            { value: 2.4, decimals: 1, suffix: 'M', prefix: '€', label: t('landing.statEstimated'), color: '#B87333' },
+            { value: 2.4, decimals: 1, suffix: 'M', prefix: '₹', label: t('landing.statEstimated'), color: '#B87333' },
           ].map((stat, i) => (
             <React.Fragment key={stat.label}>
               <motion.div variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.1, ease: smoothEase }} style={{ textAlign: 'center', minWidth: 120 }}>

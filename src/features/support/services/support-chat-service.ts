@@ -21,6 +21,7 @@ import type {
   SupportMessage,
   SupportMessageMeta,
 } from "@/types/support";
+import { FREE_TIER_EXECUTIONS, STRIPE_PLANS } from "@/features/billing/lib/plan-data";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ EXPORT NODES (Cyan):
 - EX-003 PDF Report Generator: Formatted PDF reports
 
 ══ PRICING PLANS ══
-- FREE (₹0): 3 lifetime executions, 3 workflows, 1 render
+- FREE (₹0): ${FREE_TIER_EXECUTIONS} lifetime executions, ${STRIPE_PLANS.FREE.limits.maxWorkflows} workflows, ${STRIPE_PLANS.FREE.limits.rendersPerMonth} render
 - MINI (₹99/mo): 10 executions/month, 10 workflows, 3 renders
 - STARTER (₹799/mo): 30 executions/month, 30 workflows, 3 video walkthroughs, 3 AI 3D models, 10 renders
 - PRO (₹1999/mo): 100 executions/month, 100 workflows, 7 video walkthroughs, 10 AI 3D models, 30 renders

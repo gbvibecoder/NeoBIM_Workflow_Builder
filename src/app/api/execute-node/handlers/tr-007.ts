@@ -7,6 +7,15 @@ import {
   type PipelineDiagnostics,
 } from "@/features/boq/services/pipeline-diagnostics";
 
+// Geometry fallback — imported from shared module (single source of truth)
+import {
+  GEOMETRY_FALLBACKS,
+  estimateGeometryFromType,
+  shouldUseGeometryFallback,
+} from "@/features/boq/lib/geometry-fallback";
+// Re-export for tests that import from this handler
+export { estimateGeometryFromType } from "@/features/boq/lib/geometry-fallback";
+
 /**
  * TR-007 — Quantity Extractor (real IFC parsing with net area calculations)
  * Pure copy from execute-node/route.ts (lines 1321-1746 of the pre-decomposition file).
@@ -59,6 +68,7 @@ export const handleTR007: NodeHandler = async (ctx) => {
     materialLayers?: Array<{name: string; thickness: number}>;
     coveringType?: string; concreteGrade?: string;
     isExternal?: boolean; ifcType?: string;
+    estimatedFromCount?: boolean;
   }> = [];
   let parseSummary = "";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -195,27 +205,37 @@ export const handleTR007: NodeHandler = async (ctx) => {
         else if (agg.isExternal === false) description += " (Internal)";
         let primaryQty: number;
         let unit: string;
+        let estimatedFromCount = false;
+
+        const fb = estimateGeometryFromType(agg.elementType, agg.count);
+        const useFallback = shouldUseGeometryFallback({ elementType: agg.elementType, count: agg.count, grossArea: agg.grossArea, volume: agg.volume });
+
         if (LINEAR_TYPES_P.has(agg.elementType) && agg.length > 0.5) {
           primaryQty = agg.length; unit = "Rmt";
         } else if (LINEAR_TYPES_P.has(agg.elementType) && agg.count > 0) {
           primaryQty = agg.count * (agg.elementType === "IfcRailing" ? 3.0 : 4.0); unit = "Rmt";
-        } else if (agg.grossArea > 0) {
+        } else if (!useFallback && agg.grossArea > 0) {
           primaryQty = agg.grossArea; unit = "m²";
-        } else if (agg.volume > 0) {
+        } else if (!useFallback && agg.volume > 0) {
           primaryQty = agg.volume; unit = "m³";
+        } else if (fb) {
+          primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
         } else {
           primaryQty = agg.count; unit = "EA";
         }
-        rows.push([agg.divisionName, description, agg.grossArea.toFixed(2), agg.openingArea.toFixed(2), agg.netArea.toFixed(2), agg.volume.toFixed(2), primaryQty.toFixed(2), unit]);
+        const estArea = estimatedFromCount ? fb?.estArea : undefined;
+        const estVolume = estimatedFromCount ? fb?.estVolume : undefined;
+        rows.push([agg.divisionName, description, (agg.grossArea || estArea || 0).toFixed(2), agg.openingArea.toFixed(2), agg.netArea.toFixed(2), (agg.volume || estVolume || 0).toFixed(2), primaryQty.toFixed(2), unit]);
         elements.push({
           description, category: agg.divisionName, quantity: primaryQty, unit,
-          grossArea: agg.grossArea || undefined, netArea: agg.netArea || undefined,
-          openingArea: agg.openingArea || undefined, totalVolume: agg.volume || undefined,
+          grossArea: agg.grossArea || estArea || undefined, netArea: agg.netArea || undefined,
+          openingArea: agg.openingArea || undefined, totalVolume: agg.volume || estVolume || undefined,
           storey: agg.storey, elementCount: agg.count, materialLayers: agg.materialLayers,
           ...(agg.coveringType ? { coveringType: agg.coveringType } : {}),
           ...(agg.concreteGrade ? { concreteGrade: agg.concreteGrade } : {}),
           ...(agg.isExternal !== undefined ? { isExternal: agg.isExternal } : {}),
           ifcType: agg.elementType,
+          estimatedFromCount: estimatedFromCount || undefined,
         });
       }
 
@@ -332,28 +352,37 @@ export const handleTR007: NodeHandler = async (ctx) => {
         // Railings and members: use length as primary quantity in Rmt
         let primaryQty: number;
         let unit: string;
+        let estimatedFromCount = false;
+
+        const fb = estimateGeometryFromType(agg.elementType, agg.count);
+        const useFallback = shouldUseGeometryFallback({ elementType: agg.elementType, count: agg.count, grossArea: agg.grossArea, volume: agg.volume });
+
         if (LINEAR_TYPES.has(agg.elementType) && agg.length > 0.5) {
           primaryQty = agg.length;
           unit = "Rmt";
         } else if (LINEAR_TYPES.has(agg.elementType) && agg.count > 0) {
-          // No usable length — estimate: 3m per railing, 4m per member
           primaryQty = agg.count * (agg.elementType === "IfcRailing" ? 3.0 : 4.0);
           unit = "Rmt";
-        } else if (agg.grossArea > 0) {
+        } else if (!useFallback && agg.grossArea > 0) {
           primaryQty = agg.grossArea;
           unit = "m²";
-        } else if (agg.volume > 0) {
+        } else if (!useFallback && agg.volume > 0) {
           primaryQty = agg.volume;
           unit = "m³";
+        } else if (fb) {
+          primaryQty = fb.primaryQty; unit = fb.unit; estimatedFromCount = true;
         } else {
           primaryQty = agg.count;
           unit = "EA";
         }
 
+        const estArea = estimatedFromCount ? fb?.estArea : undefined;
+        const estVolume = estimatedFromCount ? fb?.estVolume : undefined;
+
         rows.push([
           agg.divisionName, description,
-          agg.grossArea.toFixed(2), agg.openingArea.toFixed(2),
-          agg.netArea.toFixed(2), agg.volume.toFixed(2),
+          (agg.grossArea || estArea || 0).toFixed(2), agg.openingArea.toFixed(2),
+          agg.netArea.toFixed(2), (agg.volume || estVolume || 0).toFixed(2),
           primaryQty.toFixed(2), unit,
         ]);
 
@@ -362,10 +391,10 @@ export const handleTR007: NodeHandler = async (ctx) => {
           category: agg.divisionName,
           quantity: primaryQty,
           unit,
-          grossArea: agg.grossArea || undefined,
+          grossArea: agg.grossArea || estArea || undefined,
           netArea: agg.netArea || undefined,
           openingArea: agg.openingArea || undefined,
-          totalVolume: agg.volume || undefined,
+          totalVolume: agg.volume || estVolume || undefined,
           storey: agg.storey,
           elementCount: agg.count,
           materialLayers: agg.materialLayers,
@@ -373,6 +402,7 @@ export const handleTR007: NodeHandler = async (ctx) => {
           ...(agg.concreteGrade ? { concreteGrade: agg.concreteGrade } : {}),
           ...(agg.isExternal !== undefined ? { isExternal: agg.isExternal } : {}),
           ifcType: agg.elementType,
+          estimatedFromCount: estimatedFromCount || undefined,
         });
       }
 
@@ -515,6 +545,7 @@ export const handleTR007: NodeHandler = async (ctx) => {
   const elementsWithVolume = elements.filter(e => (e.totalVolume ?? 0) > 0).length;
   const elementsWithMaterial = elements.filter(e => Array.isArray(e.materialLayers) && e.materialLayers.length > 0).length;
   const elementsZero = elements.filter(e => (e.grossArea ?? 0) === 0 && (e.totalVolume ?? 0) === 0).length;
+  const elementsEstimatedFromCount = elements.filter(e => e.estimatedFromCount).length;
   const externalWalls = elements.filter(e => e.isExternal === true && (e.ifcType?.includes("Wall") ?? false)).length;
   const internalWalls = elements.filter(e => e.isExternal === false && (e.ifcType?.includes("Wall") ?? false)).length;
 
@@ -526,14 +557,19 @@ export const handleTR007: NodeHandler = async (ctx) => {
   diag.stages.aggregation = {
     inputElements: diag.stages.parsing.elementsFound,
     outputGroups: elements.length,
+    elementsEstimatedFromCount,
     externalWalls,
     internalWalls,
     elementsLost: Math.max(0, diag.stages.parsing.elementsFound - elements.reduce((s, e) => s + (e.elementCount ?? 0), 0)),
   };
 
-  addLog(diag, "tr-007-aggregate", "info", `Aggregated ${diag.stages.parsing.elementsFound} elements into ${elements.length} groups`, {
-    externalWalls, internalWalls, elementsWithArea, elementsWithVolume, elementsZero,
+  addLog(diag, "tr-007-aggregate", "info", `Aggregated ${diag.stages.parsing.elementsFound} elements into ${elements.length} groups${elementsEstimatedFromCount > 0 ? ` (${elementsEstimatedFromCount} estimated from count)` : ""}`, {
+    externalWalls, internalWalls, elementsWithArea, elementsWithVolume, elementsZero, elementsEstimatedFromCount,
   });
+
+  if (elementsEstimatedFromCount > 0) {
+    addLog(diag, "tr-007-aggregate", "warn", `${elementsEstimatedFromCount} element groups used geometry fallback (standard dimensions from element type × count). Verify quantities against model.`, {});
+  }
 
   if (elementsZero > 0) {
     addLog(diag, "tr-007-aggregate", "warn", `${elementsZero} elements have zero area & volume`, {

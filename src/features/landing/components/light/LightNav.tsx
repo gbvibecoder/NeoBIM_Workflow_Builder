@@ -5,7 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Menu, X, Sun, Moon } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
+import { LightLanguageSwitcher } from "./LightLanguageSwitcher";
+import { trackCTAClick } from "./LightTrackingEvents";
 
 export function LightNav() {
   const { t } = useLocale();
@@ -22,9 +23,8 @@ export function LightNav() {
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   const navLinks = [
-    { label: t("landing.features"), href: "#what-it-does" },
+    { label: t("landing.features"), href: "#four-surfaces" },
     { label: t("landing.pricing"), href: "#pricing" },
-    { label: t("landing.faqSection"), href: "#faq" },
   ];
 
   return (
@@ -134,7 +134,7 @@ export function LightNav() {
             marginLeft: "auto",
           }}
         >
-          <LanguageSwitcher />
+          <LightLanguageSwitcher />
           {/* Theme toggle pill */}
           <div className="ltheme-toggle">
             <span className="ltheme-toggle-active" aria-label="Light mode active">
@@ -146,6 +146,7 @@ export function LightNav() {
           </div>
           <Link
             href="/register"
+            onClick={() => trackCTAClick("Get Started Free", "nav")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -167,7 +168,7 @@ export function LightNav() {
                 "var(--light-accent)";
             }}
           >
-            {t("landing.getStarted")}
+            {t("light.heroPrimaryCTA")}
           </Link>
         </div>
 
@@ -262,7 +263,7 @@ export function LightNav() {
               fontFamily: "var(--font-dm-sans), sans-serif",
             }}
           >
-            {t("landing.getStartedFree")}
+            {t("light.heroPrimaryCTA")}
           </Link>
         </div>
       )}

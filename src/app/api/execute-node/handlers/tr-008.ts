@@ -1,14 +1,22 @@
 import {
   generateId,
-  findUnitRate,
   calculateTotalCost,
-  calculateLineItemCost,
   calculateEscalation,
   detectProjectType,
   buildDynamicDisclaimer,
   getCostBreakdown,
   detectRegionFromText,
 } from "./deps";
+import {
+  escalateValue,
+  getStalenessLevel,
+  IS1200_BASELINE,
+  MEP_BASELINE,
+  BENCHMARK_BASELINE,
+  MARKET_FALLBACK_BASELINE,
+  getCurvesForSubcategory,
+  getEscalationFactor,
+} from "@/features/boq/lib/dated-rate";
 import type { NodeHandler } from "./types";
 import {
   createDiagnostics,
@@ -164,6 +172,11 @@ export const handleTR008: NodeHandler = async (ctx) => {
   let escalationRate = 0.06;
   let contingencyPct = 0.10;
 
+  // ── Project date: user-provided construction start date, or today + 6 months ──
+  const projectDate: Date = inputData?._projectDate
+    ? new Date(inputData._projectDate as string)
+    : new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000); // default: ~6 months from now
+
   // ── Location-aware pricing (from IN-006 Location Input or text detection) ──
   // IN-006 stores JSON in inputData.content/prompt: { country, state, city, currency }
   let locationData: { country?: string; state?: string; city?: string; currency?: string; escalation?: string; contingency?: string; months?: string; soilType?: string; plotArea?: string } | null = null;
@@ -176,12 +189,14 @@ export const handleTR008: NodeHandler = async (ctx) => {
   // Import regional factors
   const { resolveProjectLocation } = await import("@/features/boq/constants/regional-factors");
 
-  let activeRegion = "USA (baseline)";
+  // Default to India — 95%+ of BuildFlow traffic is Indian AEC.
+  // Non-Indian projects override via the Location node (IN-006) below.
+  let activeRegion = "INDIA · BASELINE";
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let regionWasAutoDetected = true;
   let locationFactor = 1.0;
-  let currencySymbol = "$";
-  let currencyCode = "USD";
+  let currencySymbol = "₹";
+  let currencyCode = "INR";
   let exchangeRate = 1.0;
   let locationLabel = "";
 
@@ -206,16 +221,16 @@ export const handleTR008: NodeHandler = async (ctx) => {
     if (locationData.months != null) escalationMonths = Number(locationData.months);
   } else {
     // Fall back to text-based region detection
-    const regionInput = inputData?.region ?? inputData?.location ?? "USA (baseline)";
+    const regionInput = inputData?.region ?? inputData?.location ?? "INDIA · BASELINE";
     const upstreamNarrative = inputData?.content ?? inputData?.narrative ?? "";
-    const explicitRegion = regionInput !== "USA (baseline)" ? regionInput : "";
+    const explicitRegion = regionInput !== "INDIA · BASELINE" ? regionInput : "";
     const detectedRegion = detectRegionFromText(
       typeof explicitRegion === "string" && explicitRegion
         ? explicitRegion
         : (typeof upstreamNarrative === "string" ? upstreamNarrative : "")
     );
-    activeRegion = (typeof detectedRegion === "string" && detectedRegion) || (typeof regionInput === "string" ? regionInput : "USA (baseline)");
-    regionWasAutoDetected = !detectedRegion && regionInput === "USA (baseline)";
+    activeRegion = (typeof detectedRegion === "string" && detectedRegion) || (typeof regionInput === "string" ? regionInput : "INDIA · BASELINE");
+    regionWasAutoDetected = !detectedRegion && regionInput === "INDIA · BASELINE";
   }
 
   // Detect project type from description
@@ -273,6 +288,82 @@ export const handleTR008: NodeHandler = async (ctx) => {
       indianPricing.labor = Math.round(dynamicPWD * cityMult * 1000) / 1000;
     } else {
     }
+  }
+
+  // ── Escalation factor cache (per-subcategory, computed once per BOQ run) ──
+  // Escalates all rates from their CPWD DSR 2025-26 baseline to the project date.
+  // Cache avoids recomputing pow() for every line item.
+  const escalationCache = new Map<string, { total: number; material: number; labour: number }>();
+  function getEscalation(subcategory: string): { total: number; material: number; labour: number } {
+    let cached = escalationCache.get(subcategory);
+    if (!cached) {
+      const curves = getCurvesForSubcategory(subcategory);
+      cached = {
+        total: getEscalationFactor(curves.total, IS1200_BASELINE, projectDate),
+        material: getEscalationFactor(curves.material, IS1200_BASELINE, projectDate),
+        labour: getEscalationFactor(curves.labour, IS1200_BASELINE, projectDate),
+      };
+      escalationCache.set(subcategory, cached);
+    }
+    return cached;
+  }
+
+  // ── Auto-fire TR-015 (Market Intelligence) if not provided upstream ──
+  // Phase C: live market data is primary, escalated static is secondary.
+  let marketDataConfidence: "live" | "cached" | "escalated" | "static" = "static";
+  let marketDataSource: "ai-search" | "redis" | "postgres" | "fallback" = "fallback";
+  let marketDataAgeDays = 0;
+  let marketDataStrikes = 0;
+
+  if (!inputData._marketData && isIndianProject) {
+    const miCity = locationData?.city ?? "";
+    const miState = locationData?.state ?? "";
+    try {
+      const { getStrikeCount, isBlocked: isStrikeBlocked, recordStrike, clearStrikes } = await import("@/features/boq/services/market-intelligence-strike");
+      marketDataStrikes = await getStrikeCount(ctx.userId, miCity);
+
+      if (!isStrikeBlocked(marketDataStrikes)) {
+        const { fetchMarketPrices } = await import("@/features/boq/services/market-intelligence");
+        const marketResult = await fetchMarketPrices(miCity || "national-baseline", miState, buildingDescription, diag);
+        inputData._marketData = marketResult;
+
+        if (marketResult.agent_status === "success" && marketResult.search_count > 0) {
+          marketDataConfidence = "live";
+          marketDataSource = "ai-search";
+          await clearStrikes(ctx.userId, miCity);
+        } else if (marketResult.agent_status === "success" && marketResult.search_count === 0) {
+          marketDataConfidence = "cached";
+          marketDataSource = "redis";
+        } else if (marketResult.agent_status === "partial") {
+          marketDataConfidence = "cached";
+          marketDataSource = "postgres";
+        } else {
+          marketDataConfidence = "static";
+          marketDataSource = "fallback";
+          const strike = await recordStrike(ctx.userId, miCity);
+          marketDataStrikes = strike.count;
+        }
+
+        if (marketResult.fetched_at) {
+          marketDataAgeDays = Math.round((Date.now() - new Date(marketResult.fetched_at).getTime()) / 86400000);
+        }
+
+        addLog(diag, "tr-008-cost", "info", `Auto-fired TR-015: ${marketDataConfidence} (${marketDataSource}, ${marketDataAgeDays}d old, strikes: ${marketDataStrikes})`, {});
+      } else {
+        addLog(diag, "tr-008-cost", "warn", `TR-015 blocked: ${marketDataStrikes} strikes in last hour — using static rates`, {});
+      }
+    } catch (autoFireErr) {
+      addLog(diag, "tr-008-cost", "error", `Auto-fire failed: ${autoFireErr instanceof Error ? autoFireErr.message : String(autoFireErr)}`, {});
+      try {
+        const { recordStrike } = await import("@/features/boq/services/market-intelligence-strike");
+        const strike = await recordStrike(ctx.userId, locationData?.city ?? "");
+        marketDataStrikes = strike.count;
+      } catch { /* non-fatal */ }
+    }
+  } else if (inputData._marketData) {
+    marketDataConfidence = "live";
+    marketDataSource = "ai-search";
+    addLog(diag, "tr-008-cost", "info", "Market data provided by upstream TR-015 node", {});
   }
 
   // Expand elements with material layers into separate line items per layer
@@ -449,7 +540,9 @@ export const handleTR008: NodeHandler = async (ctx) => {
 
           // Apply category factor to material rate, labor factor to labour rate
           const laborFactor = ip?.labor ?? categoryFactor;
-          let adjRate = Math.round(rate.rate * categoryFactor * gradeMult * 100) / 100;
+          // Escalate base rate from CPWD DSR baseline to project date
+          const esc = getEscalation(rate.subcategory);
+          let adjRate = Math.round(rate.rate * esc.total * categoryFactor * gradeMult * 100) / 100;
 
           // Market rate override for steel — market rates are ALREADY city-specific
           // DO NOT apply PWD/regional/category factors on top of market rates
@@ -487,8 +580,8 @@ export const handleTR008: NodeHandler = async (ctx) => {
             labCost = Math.round(lineTot * (1 - matRatio) * 0.90 * 100) / 100; // 90% of remainder is labor
             eqpCost = Math.round((lineTot - matCost - labCost) * 100) / 100;
           } else {
-            matCost = Math.round(adjQty * rate.material * categoryFactor * gradeMult * 100) / 100;
-            labCost = Math.round(adjQty * rate.labour * laborFactor * gradeMult * 100) / 100;
+            matCost = Math.round(adjQty * rate.material * esc.material * categoryFactor * gradeMult * 100) / 100;
+            labCost = Math.round(adjQty * rate.labour * esc.labour * laborFactor * gradeMult * 100) / 100;
             eqpCost = Math.round((lineTot - matCost - labCost) * 100) / 100;
           }
 
@@ -553,7 +646,7 @@ export const handleTR008: NodeHandler = async (ctx) => {
           const qty2 = sourceArea > 0 ? sourceArea : sourceVolume > 0 ? sourceVolume : quantity;
           const unit2 = sourceArea > 0 ? "m²" : sourceVolume > 0 ? "m³" : "EA";
           const adjQty2 = Math.round(qty2 * (1 + waste) * 100) / 100;
-          const adjRate2 = Math.round(genericRate.rate * cf * 100) / 100;
+          const adjRate2 = Math.round(genericRate.rate * getEscalation(genericRate.subcategory).total * cf * 100) / 100;
           const lineTot2 = Math.round(adjQty2 * adjRate2 * 100) / 100;
           const matC2 = Math.round(lineTot2 * 0.55 * 100) / 100;
           const labC2 = Math.round(lineTot2 * 0.40 * 100) / 100;
@@ -577,98 +670,16 @@ export const handleTR008: NodeHandler = async (ctx) => {
       }
     }
 
-    // ── Standard path: USD rates with regional factor conversion (non-Indian projects only) ──
-    // Build specific search: try "Concrete Wall" before generic "Wall"
-    // Material/category context from TR-007 helps disambiguate rate matching
-    const specificDesc = elemCategory && !description.toLowerCase().includes(elemCategory.toLowerCase())
-      ? `${elemCategory} ${description}`
-      : description;
-    const unitRateData = findUnitRate(specificDesc) || findUnitRate(description);
-
-    if (unitRateData && unitRateData.category === "hard") {
-      // Select correct quantity and convert metric → imperial to match rate unit
-      const rateU = unitRateData.unit.toUpperCase();
-      let convertedQty = quantity;
-      let displayUnit = unitRateData.unit;
-
-      if (rateU === "CY" && sourceVolume > 0) {
-        // Rate expects volume in CY — use totalVolume (m³ → CY)
-        convertedQty = Math.round(sourceVolume * 1.30795 * 100) / 100;
-      } else if (rateU === "CY" && (sourceUnit === "m³" || sourceUnit === "m3")) {
-        convertedQty = Math.round(quantity * 1.30795 * 100) / 100;
-      } else if ((rateU === "SF" || rateU === "SFCA") && sourceArea > 0) {
-        // Rate expects area in SF — use grossArea (m² → SF)
-        convertedQty = Math.round(sourceArea * 10.7639 * 100) / 100;
-      } else if ((rateU === "SF" || rateU === "SFCA") && (sourceUnit === "m²" || sourceUnit === "m2")) {
-        convertedQty = Math.round(quantity * 10.7639 * 100) / 100;
-      } else if (rateU === "LF" && sourceUnit === "m") {
-        convertedQty = Math.round(quantity * 3.28084 * 100) / 100;
-      } else if (rateU === "TON" && sourceVolume > 0) {
-        // Steel: m³ → tonnage (7850 kg/m³ density)
-        convertedQty = Math.round(sourceVolume * 7.85 * 100) / 100;
-        displayUnit = "ton";
-      }
-
-      const lineItem = calculateLineItemCost(unitRateData, convertedQty, activeRegion, projectTypeInfo.type);
-
-      // Apply location-based factor (country × city tier) and convert currency
-      const lf = locationFactor; // 1.0 for USA baseline
-      const fx = exchangeRate;   // 1.0 for USD
-      const cs = currencySymbol; // "$" for USD
-      const adjRate = Math.round(lineItem.adjustedRate * lf * fx * 100) / 100;
-      const matCost = Math.round(lineItem.materialCost * lf * fx * 100) / 100;
-      const labCost = Math.round(lineItem.laborCost * lf * fx * 100) / 100;
-      const eqpCost = Math.round(lineItem.equipmentCost * lf * fx * 100) / 100;
-      const lineTot = Math.round(lineItem.lineTotal * lf * fx * 100) / 100;
-
-      hardCostSubtotal += lineTot;
-      totalMaterial += matCost;
-      totalLabor += labCost;
-      totalEquipment += eqpCost;
-
-      rows.push([
-        description,
-        displayUnit,
-        convertedQty.toFixed(2),
-        `${(lineItem.wasteFactor * 100).toFixed(0)}%`,
-        lineItem.totalQty.toFixed(2),
-        `${cs}${adjRate.toFixed(2)}`,
-        `${cs}${matCost.toFixed(2)}`,
-        `${cs}${labCost.toFixed(2)}`,
-        `${cs}${eqpCost.toFixed(2)}`,
-        `${cs}${lineTot.toFixed(2)}`,
-      ]);
-
-      boqLines.push({
-        division: unitRateData.subcategory,
-        csiCode: "00 00 00",
-        description,
-        unit: displayUnit,
-        quantity: convertedQty,
-        wasteFactor: lineItem.wasteFactor,
-        adjustedQty: lineItem.totalQty,
-        materialRate: Math.round(adjRate * getCostBreakdown(unitRateData.subcategory).material * 100) / 100,
-        laborRate: Math.round(adjRate * getCostBreakdown(unitRateData.subcategory).labor * 100) / 100,
-        equipmentRate: Math.round(adjRate * getCostBreakdown(unitRateData.subcategory).equipment * 100) / 100,
-        unitRate: adjRate,
-        materialCost: matCost,
-        laborCost: labCost,
-        equipmentCost: eqpCost,
-        totalCost: lineTot,
-        storey: elemStorey || undefined,
-        elementCount: elemCount || undefined,
-        is1200Code: isIndianProject ? "IS1200-CSI-MAPPED" : undefined,
-      });
-      pathUSD++; costUSD += lineTot;
-    } else {
-      // Fallback for unknown items — estimate with default waste
+    // ── Fallback for elements not matched by IS 1200 rate library ──
+    // Indian-only product: all elements should match IS 1200 rates above.
+    // This fallback catches edge cases (unmapped IFC types, custom elements).
+    {
       estimatedItemsCount++;
-      // For Indian projects: use ₹5,000/unit as reasonable fallback (not USD×0.266 which gives nonsense)
-      const fallbackRate = isIndianProject ? 5000 : 100 * locationFactor * exchangeRate;
+      const fallbackRate = escalateValue(5000, "construction-cpi-india", IS1200_BASELINE, projectDate);
       const defaultWaste = 0.10;
       const adjQty = quantity * (1 + defaultWaste);
       const lineTotal = adjQty * fallbackRate;
-      const breakdown = getCostBreakdown("Finishes"); // default
+      const breakdown = getCostBreakdown("Finishes"); // default M/L/E split
       hardCostSubtotal += lineTotal;
       totalMaterial += lineTotal * breakdown.material;
       totalLabor += lineTotal * breakdown.labor;
@@ -704,7 +715,7 @@ export const handleTR008: NodeHandler = async (ctx) => {
         laborCost: Math.round(lineTotal * breakdown.labor * 100) / 100,
         equipmentCost: Math.round(lineTotal * breakdown.equipment * 100) / 100,
         totalCost: Math.round(lineTotal * 100) / 100,
-        is1200Code: isIndianProject ? "IS1200-EST" : undefined,
+        is1200Code: "IS1200-EST",
       });
       pathFallback++; costFallback += Math.round(lineTotal * 100) / 100;
     }
@@ -913,7 +924,12 @@ export const handleTR008: NodeHandler = async (ctx) => {
     const el = e as Record<string, unknown>;
     return sum + (String(el.description ?? "").toLowerCase().includes("slab") ? Number(el.grossArea ?? 0) : 0);
   }, 0) || 500;
-  const floorCountForProv = new Set(elements.map((e: unknown) => (e as Record<string, unknown>).storey).filter(Boolean)).size || 1;
+  // Filter non-occupied storeys (basement, roof, mechanical) before counting for foundation type
+  const NON_OCCUPIED_STOREY = /^-\d|\b(found|footing|basement|roof|terrace|mechan|service|plant)/i;
+  const occupiedStoreys = new Set(
+    elements.map((e: unknown) => (e as Record<string, unknown>).storey as string).filter((s: string) => s && !NON_OCCUPIED_STOREY.test(s))
+  );
+  const floorCountForProv = occupiedStoreys.size || 1;
   const cityTierForProv = indianPricing?.cityTier ?? "city";
   const hasStructuralFoundation = !!(inputData?._hasStructuralFoundation);
   const hasMEPData = !!(inputData?._hasMEPData);
@@ -1126,6 +1142,12 @@ export const handleTR008: NodeHandler = async (ctx) => {
   const extSums = estimateExternalWorksCosts(gfaForProvisional, floorCountForProv, cityTierForProv, isIndianProject, (plotArea && plotArea > 0) ? plotArea : undefined);
 
   const allProvisional = [...foundSums, ...mepSums, ...extSums];
+  // Escalate provisional sums from their baseline to project date
+  const mepEscFactor = getEscalationFactor("mep-composite", MEP_BASELINE, projectDate);
+  for (const prov of allProvisional) {
+    prov.amount = Math.round(prov.amount * mepEscFactor);
+    prov.rate = Math.round(prov.rate * mepEscFactor);
+  }
   let provisionalTotal = 0;
 
   for (const prov of allProvisional) {
@@ -1244,7 +1266,9 @@ export const handleTR008: NodeHandler = async (ctx) => {
     let dynamicMin = Number(marketData?.minimum_cost_per_m2 ?? 0);
     // Sanity: if Claude returned per-sqft instead of per-m², convert (1 m² ≈ 10.76 sqft)
     if (dynamicMin > 0 && dynamicMin < 10000) dynamicMin = Math.round(dynamicMin * 10.764);
-    const staticMin = STATIC_FLOORS[btKey] ?? STATIC_FLOORS.commercial;
+    const rawStaticMin = STATIC_FLOORS[btKey] ?? STATIC_FLOORS.commercial;
+    // Escalate the static floor to the project date so the safety net keeps up with inflation
+    const staticMin = Math.round(rawStaticMin * getEscalationFactor("construction-cpi-india", BENCHMARK_BASELINE, projectDate));
     // Always use the HIGHER of dynamic and static — static is physical floor, dynamic is AI suggestion
     const minFloor = Math.max(dynamicMin, staticMin);
     // Diagnostic: dump all marketData keys that contain 'min' or 'bench' or 'range'
@@ -1307,8 +1331,34 @@ export const handleTR008: NodeHandler = async (ctx) => {
     gfaForProvisional,
     projectTypeInfo.type,
     indianPricing?.cityTier ?? cityTierForProv,
-    dynamicBench
+    dynamicBench,
+    projectDate
   );
+
+  // ── Benchmark hard-stop: if cost is far below absolute minimum, refuse to ship ──
+  // 30% grace below floor. If below that, something is genuinely broken.
+  if (benchmarkResult.severity === "critical" && benchmarkResult.costPerM2 > 0) {
+    const floorValue = benchmarkResult.benchmarkLow;
+    const graceFloor = Math.round(floorValue * 0.7);
+    if (benchmarkResult.costPerM2 < graceFloor) {
+      return {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "table",
+        data: {
+          _hardStop: true,
+          _hardStopReason: `Cost estimate ₹${benchmarkResult.costPerM2.toLocaleString("en-IN")}/m² is far below the minimum ₹${floorValue.toLocaleString("en-IN")}/m² for ${projectTypeInfo.type} construction in ${benchmarkResult.cityTier} city. The IFC model may have geometry issues, or the project type detection may be incorrect.`,
+          _projectDate: projectDate.toISOString().split("T")[0],
+          _marketDataConfidence: marketDataConfidence,
+          label: "Bill of Quantities — Hard Stop",
+          content: `Hard stop: cost ₹${benchmarkResult.costPerM2.toLocaleString("en-IN")}/m² below ₹${graceFloor.toLocaleString("en-IN")}/m² grace floor.`,
+        },
+        metadata: { real: true },
+        createdAt: new Date(),
+      };
+    }
+  }
 
   rows.push(["", "", "", "", "", "", "", "", "", ""]);
   rows.push(["SOFT COSTS", "", "", "", "", "", "", "", "", ""]);
@@ -1484,6 +1534,17 @@ export const handleTR008: NodeHandler = async (ctx) => {
 
     // Store on line (using the [key: string] index signature pattern)
     (line as Record<string, unknown>).confidence = { score, factors };
+
+    // Per-line provenance: tag with the rate source for trust signals
+    const lineDesc = line.description.toLowerCase();
+    const isSteel = lineDesc.includes("steel") || lineDesc.includes("rebar") || lineDesc.includes("railing");
+    const isProvisional = line.is1200Code === "PROV" || line.division.includes("PROVISIONAL");
+    const lineProvenance: string =
+      isProvisional ? marketDataConfidence  // provisionals inherit overall market confidence
+      : isSteel && steelFromMarket ? (marketDataConfidence === "live" ? "live" : "cached")
+      : hasMarketIntel ? "cached"  // IS1200 rates with market-adjusted PWD
+      : "escalated";  // pure IS1200 static + escalation
+    (line as Record<string, unknown>)._lineProvenance = lineProvenance;
   }
 
   // Count confidence distribution for disclaimer
@@ -1581,6 +1642,17 @@ export const handleTR008: NodeHandler = async (ctx) => {
     });
   }
 
+  // ── Rate staleness check ──
+  const staleness = getStalenessLevel(IS1200_BASELINE, projectDate);
+  if (staleness.severity === "critical") {
+    aaceInfo.class = "Class 5";
+    aaceInfo.accuracy = "±40-60%";
+    aaceInfo.confidence = "LOW";
+  }
+
+  // ── Hard-stop check: rates expired AND no live data ──
+  const hardStop = staleness.severity === "critical" && marketDataConfidence === "static" && marketDataStrikes >= 3;
+
   finalizeDiagnostics(diag);
 
   // Append a compact diagnostic summary into the NL summary so the
@@ -1613,6 +1685,13 @@ export const handleTR008: NodeHandler = async (ctx) => {
       _disclaimer: honestDisclaimer,
       _aaceClass: aaceInfo.class,
       _aaceAccuracy: aaceInfo.accuracy,
+      _projectDate: projectDate.toISOString().split("T")[0],
+      ...(staleness.severity !== "ok" && { _stalenessWarning: { severity: staleness.severity, years: staleness.years, message: staleness.message } }),
+      _marketDataConfidence: marketDataConfidence,
+      _marketDataSource: marketDataSource,
+      _marketDataAgeDays: marketDataAgeDays,
+      _marketDataStrikes: marketDataStrikes,
+      ...(hardStop && { _hardStop: true, _hardStopReason: staleness.severity === "critical" ? "Rate library baseline expired (>4 years) and live market data unavailable" : "Live market data unavailable for 3 consecutive attempts" }),
       content: nlSummaryWithDiag,
       _pricingMetadata: pricingMetadata,
       _modelQualityReport: modelQualityReport,

@@ -4,6 +4,14 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { LightHeroPipeline } from "./LightHeroPipeline";
+import { trackCTAClick } from "./LightTrackingEvents";
+import type { TranslationKey } from "@/lib/i18n";
+
+const TRUST_KEYS: TranslationKey[] = [
+  "light.heroTrust1",
+  "light.heroTrust2",
+  "light.heroTrust3",
+];
 
 export function LightHero() {
   const { t } = useLocale();
@@ -18,7 +26,7 @@ export function LightHero() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
+        justifyContent: "flex-start",
       }}
     >
       {/* Dot grid with radial fade mask — full viewport width */}
@@ -49,7 +57,7 @@ export function LightHero() {
           textAlign: "center",
           maxWidth: 1200,
           width: "100%",
-          padding: "160px 24px 64px",
+          padding: "clamp(48px, 8vh, 96px) 24px var(--light-section-pad)",
           margin: "0 auto",
         }}
       >
@@ -65,7 +73,7 @@ export function LightHero() {
             margin: 0,
           }}
         >
-          {t("light.heroLabel")}
+          {t("light.heroEyebrow")}
         </p>
 
         {/* h1 — editorial headline with italic emphasis */}
@@ -81,9 +89,10 @@ export function LightHero() {
             maxWidth: 900,
           }}
         >
-          {t("light.heroLine1")}{" "}
-          <em style={{ fontStyle: "italic" }}>{t("light.heroLine1Em")}</em>{" "}
-          {t("light.heroLine2")}
+          {t("light.heroHeadline1")}
+          <br />
+          {t("light.heroHeadline2")}{" "}
+          <em style={{ fontStyle: "italic" }}>{t("light.heroHeadlineEm")}</em>
         </h1>
 
         {/* Subtitle */}
@@ -94,11 +103,11 @@ export function LightHero() {
             lineHeight: 1.6,
             color: "var(--light-soft)",
             fontFamily: "var(--font-dm-sans), sans-serif",
-            maxWidth: 520,
+            maxWidth: 640,
             margin: "24px auto 0",
           }}
         >
-          {t("light.heroSubtitle")}
+          {t("light.heroSubhead")}
         </p>
 
         {/* CTA pair */}
@@ -115,6 +124,7 @@ export function LightHero() {
           {/* Primary CTA */}
           <Link
             href="/register"
+            onClick={() => trackCTAClick("Get Started Free", "hero_primary")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -138,36 +148,7 @@ export function LightHero() {
                 "var(--light-accent)";
             }}
           >
-            {t("landing.getStartedFree")}
-          </Link>
-
-          {/* Ghost CTA — Book Demo */}
-          <Link
-            href="/book-demo"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: 48,
-              padding: "0 24px",
-              borderRadius: 8,
-              background: "transparent",
-              color: "var(--light-accent)",
-              fontSize: 16,
-              fontWeight: 600,
-              textDecoration: "none",
-              fontFamily: "var(--font-dm-sans), sans-serif",
-              border: "1px solid var(--light-accent)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background =
-                "rgba(74, 107, 77, 0.06)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "transparent";
-            }}
-          >
-            {t("light.bookDemo")}
+            {t("light.heroPrimaryCTA")}
           </Link>
         </div>
 
@@ -182,13 +163,9 @@ export function LightHero() {
             flexWrap: "wrap",
           }}
         >
-          {[
-            t("light.trustFreeTier"),
-            t("landing.trustNoCreditCard"),
-            t("landing.trustCancelAnytime"),
-          ].map((signal) => (
+          {TRUST_KEYS.map((key) => (
             <span
-              key={signal}
+              key={key}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -203,7 +180,7 @@ export function LightHero() {
                 size={14}
                 style={{ color: "var(--light-accent)", flexShrink: 0 }}
               />
-              {signal}
+              {t(key)}
             </span>
           ))}
         </div>
@@ -213,17 +190,12 @@ export function LightHero() {
       <LightHeroPipeline />
 
       <style>{`
-        @media (max-width: 1024px) {
-          section[aria-label="Hero"] .light-reveal {
-            padding-top: 120px !important;
-          }
-        }
         @media (max-width: 768px) {
           section[aria-label="Hero"] {
             min-height: auto !important;
           }
           section[aria-label="Hero"] .light-reveal {
-            padding-top: 100px !important;
+            padding-top: 32px !important;
           }
           section[aria-label="Hero"] h1 {
             font-size: clamp(2rem, 7vw, 2.5rem) !important;
@@ -231,7 +203,7 @@ export function LightHero() {
         }
         @media (max-width: 480px) {
           section[aria-label="Hero"] .light-reveal {
-            padding: 100px 16px 48px !important;
+            padding: 32px 16px 48px !important;
           }
           .light-hero-ctas {
             flex-direction: column !important;

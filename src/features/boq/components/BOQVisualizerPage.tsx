@@ -13,7 +13,7 @@ import { IFCQualityCard } from "@/features/boq/components/IFCQualityCard";
 import { BOQTable } from "@/features/boq/components/BOQTable";
 import { NLSummary } from "@/features/boq/components/NLSummary";
 import { BOQFooter } from "@/features/boq/components/BOQFooter";
-import { ModelQualityCard } from "@/features/boq/components/ModelQualityCard";
+import { ModelCompletenessWarning } from "@/features/boq/components/ModelCompletenessWarning";
 import { PricingSourceBanner } from "@/features/boq/components/PricingSourceBanner";
 import { DataSourcesSummary } from "@/features/boq/components/DataSourcesSummary";
 import type { BOQData, PriceOverrides, RateOverride } from "@/features/boq/components/types";
@@ -21,6 +21,7 @@ import { DEFAULT_PRICES, recalculateLines, computeTotals } from "@/features/boq/
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { SectionFallback } from "@/features/boq/components/SectionFallback";
 import { InteractiveDotGrid } from "@/features/boq/components/InteractiveDotGrid";
+import { HardStopCard } from "@/features/boq/components/HardStopCard";
 
 interface BOQVisualizerPageProps {
   data: BOQData;
@@ -28,6 +29,12 @@ interface BOQVisualizerPageProps {
 }
 
 export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps) {
+  // Hard-stop check: if BOQ was blocked, show the stop card instead of the full visualizer
+  const dataAny = data as unknown as Record<string, unknown>;
+  if (dataAny._hardStop) {
+    return <HardStopCard reason={String(dataAny._hardStopReason ?? "Estimate unavailable — live market data and rate library both unusable.")} />;
+  }
+
   // Price control state
   const [prices, setPrices] = useState<PriceOverrides>(() => ({
     steel: data.market?.steelPerTonne ?? DEFAULT_PRICES.steel,
@@ -327,6 +334,9 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
             benchmarkHigh={data.benchmark.benchmarkHigh}
             recalculated={recalculated}
             costRange={data.costRange}
+            projectDate={(data as unknown as Record<string, unknown>)._projectDate as string | undefined}
+            stalenessWarning={(data as unknown as Record<string, unknown>)._stalenessWarning as { severity: string; years: number; message: string } | undefined}
+            marketDataConfidence={(data as unknown as Record<string, unknown>)._marketDataConfidence as "live" | "cached" | "escalated" | "static" | undefined}
           />
         </ErrorBoundary>
 
@@ -337,7 +347,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
               <DataSourcesSummary data={data} />
             </ErrorBoundary>
             <div className="flex flex-col gap-4">
-              {data.modelQualityReport && <ModelQualityCard report={data.modelQualityReport} />}
+              <ModelCompletenessWarning elementCoverage={data.ifcQuality?.elementCoverage ?? data.ifcQuality?.score ?? 100} />
               {data.pricingMetadata && <PricingSourceBanner metadata={data.pricingMetadata} />}
             </div>
           </div>

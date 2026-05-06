@@ -108,6 +108,29 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Phase B.3: Refresh FX rate (daily) ──
+  let fxResult = null;
+  try {
+    const { refreshFxCache } = await import("@/features/boq/services/live-fx");
+    fxResult = await refreshFxCache();
+    console.log(`[cron] FX refreshed: ₹${fxResult.inrPerUsd}/USD from ${fxResult.source}`);
+  } catch (fxErr) {
+    console.warn("[cron] FX refresh failed:", fxErr instanceof Error ? fxErr.message : fxErr);
+  }
+
+  // ── Phase B.3: Refresh CPI escalation curves (monthly — only on 1st of month) ──
+  let cpiResult = null;
+  if (new Date().getDate() <= 2) { // 1st or 2nd (handles timezone variance)
+    try {
+      const { refreshCpiCache, setLiveCurvesCache } = await import("@/features/boq/services/live-cpi");
+      cpiResult = await refreshCpiCache();
+      setLiveCurvesCache(cpiResult);
+      console.log(`[cron] CPI curves refreshed from ${cpiResult.source}`);
+    } catch (cpiErr) {
+      console.warn("[cron] CPI refresh failed:", cpiErr instanceof Error ? cpiErr.message : cpiErr);
+    }
+  }
+
   const totalDuration = Date.now() - runStart;
   console.log(
     `[cron/refresh-prices] Complete: ${successCount}/${results.length} success, ${failCount} failed, ${totalDuration}ms`
@@ -118,6 +141,8 @@ export async function GET(req: NextRequest) {
     success: successCount,
     failed: failCount,
     durationMs: totalDuration,
+    fx: fxResult ? { rate: fxResult.inrPerUsd, source: fxResult.source } : null,
+    cpi: cpiResult ? { source: cpiResult.source, ageDays: cpiResult.ageDays } : null,
     results,
   });
 }

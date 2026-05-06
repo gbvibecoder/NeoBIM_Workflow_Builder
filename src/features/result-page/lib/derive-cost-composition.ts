@@ -33,6 +33,13 @@ export interface CostComposition {
 
 const DIVISIONS = [
   {
+    label: "Overheads",
+    color: "#9CA3AF",
+    matches: ["architectural", "architect fee", "structural fee", "structural engineering", "mep engineering", "civil engineering",
+              "contingency", "overhead", "gc overhead", "permits", "inspection", "insurance", "bonding", "escalation",
+              "soft cost", "subtotal", "total project"],
+  },
+  {
     label: "Civil",
     color: "#94A3B8",
     matches: ["civil", "structural", "concrete", "rcc", "wall", "slab", "column", "beam", "footing", "foundation"],
@@ -60,11 +67,12 @@ const DIVISIONS = [
 ] as const;
 
 const STATIC_DEFAULTS: ReadonlyArray<CostSegment> = [
-  { label: "Civil", pct: 48, color: "#94A3B8" },
-  { label: "Steel", pct: 18, color: "#0EA5E9" },
+  { label: "Civil", pct: 32, color: "#94A3B8" },
+  { label: "Steel", pct: 16, color: "#0EA5E9" },
   { label: "MEP", pct: 14, color: "#7C3AED" },
   { label: "Finishings", pct: 12, color: "#D97706" },
   { label: "Labor", pct: 8, color: "#0D9488" },
+  { label: "Overheads", pct: 18, color: "#9CA3AF" },
 ];
 
 function tryLive(data: ResultPageData): CostComposition | null {
@@ -96,6 +104,8 @@ function tryLive(data: ResultPageData): CostComposition | null {
   let grandTotal = 0;
   for (const row of boqTable.rows) {
     const desc = String(row[descIdx] ?? "").toLowerCase();
+    // Skip section headers and subtotal rows — they double-count line items
+    if (desc.startsWith("──") || desc.startsWith("—") || desc.includes("subtotal") || desc.includes("hard costs") || desc.includes("total project")) continue;
     const raw = row[amountIdx];
     const amount =
       typeof raw === "number" ? raw : parseFloat(String(raw).replace(/[, ₹]/g, ""));

@@ -24,17 +24,24 @@ export default function DashboardLayout({
   // page redesign + 3D render wizard + light editors). UserMenu adopts a
   // light-tone trigger so the floating avatar reads cleanly against the
   // cream surface. Dark-surface pages (canvas, IFC viewer, immersive
-  // landing, settings) keep the dark-tone trigger.
+  // landing) keep the dark-tone trigger.
   const isLightSurface =
+    pathname === "/dashboard" ||
+    pathname === "/dashboard/workflows" ||
+    pathname === "/dashboard/feedback" ||
+    pathname === "/dashboard/billing" ||
+    pathname === "/dashboard/settings" ||
+    pathname === "/dashboard/admin/live-chat" ||
     pathname === "/dashboard/3d-render" ||
     pathname === "/dashboard/floor-plan" ||
+    pathname === "/dashboard/brief-renders" ||
     pathname.startsWith("/dashboard/results/");
   // BetaBanner: hidden on light surfaces (cream pages stay clean) and on
   // immersive landing.
   const hideBetaBanner = isImmersive || isLightSurface;
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ minHeight: "-webkit-fill-available", background: "#0a0c10" }}>
+    <div className="flex h-screen overflow-hidden" style={{ minHeight: "-webkit-fill-available", background: isLightSurface ? "#F6F4EE" : "#0a0c10" }}>
       <Sidebar />
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ transition: "flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>

@@ -88,6 +88,7 @@ export interface ParsingStage {
 export interface AggregationStage {
   inputElements: number;
   outputGroups: number;
+  elementsEstimatedFromCount?: number;
   externalWalls: number;
   internalWalls: number;
   elementsLost: number;
