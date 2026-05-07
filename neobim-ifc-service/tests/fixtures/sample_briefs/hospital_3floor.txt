@@ -1,0 +1,3 @@
+# TODO: real 3-floor hospital brief coming from Govind.
+# Phase 2A Slice 2A.3 placeholder.
+3-floor 50-bed multi-speciality hospital in Hyderabad. Ground floor: OPD, reception, pharmacy, lab. First floor: general wards. Second floor: OT, ICU, recovery rooms. RCC frame, NBC Group C compliance required.

@@ -62,6 +62,11 @@ analytics-logs/
 *.sh
 !scripts/check-no-deprecated-image-models.sh
 *.txt
+# Phase 2A Slice 2A.3 — sample brief fixtures are real test inputs, not
+# generated chat scratch. Whitelist them so the BriefAnalyst /
+# ProgramArchitect stages (Slices 2A.5 / 2A.6) can read deterministic
+# files in CI.
+!neobim-ifc-service/tests/fixtures/sample_briefs/*.txt
 *_SUMMARY.md
 *_REPORT.md
 *_COMPLETE.md

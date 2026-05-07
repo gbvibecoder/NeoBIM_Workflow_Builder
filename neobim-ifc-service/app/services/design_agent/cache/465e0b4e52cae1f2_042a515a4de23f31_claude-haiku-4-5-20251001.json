@@ -1,0 +1,81 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "2BHK apartment/duplex",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential (2BHK)",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 7.315,
+      "plot_length_m": 15.24,
+      "plot_area_sqm": 111.48,
+      "site_orientation": "N",
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "Contemporary residential",
+      "cultural_overlay": "vastu",
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "rcc_frame",
+      "foundation_hint": "isolated_pad",
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 2,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "living room",
+      "dining room",
+      "kitchen",
+      "powder room",
+      "master bedroom",
+      "second bedroom",
+      "common bathroom",
+      "balcony",
+      "stairs"
+    ],
+    "explicit_dimensions": {
+      "living room": "12×14 ft",
+      "dining room": "10×10 ft",
+      "kitchen": "10×8 ft",
+      "master bedroom": "12×12 ft",
+      "second bedroom": "10×12 ft",
+      "plot": "24×50 ft",
+      "total built area": "1200 sqft"
+    },
+    "user_priorities": [
+      "vastu-compliant layout",
+      "RCC frame construction",
+      "isolated footings"
+    ],
+    "raw_brief_summary": "2BHK residential duplex on a 24×50 ft (1200 sqft built) plot in Pune, north-facing. Ground floor contains living, dining, kitchen, and powder room; first floor has master and second bedroom, common bath, and balcony. Vastu-oriented with kitchen SE, master bedroom SW, and pooja room NE. RCC frame with isolated footings; target fidelity is design-development.",
+    "extraction_warnings": [
+      "Master bedroom listed as having attached bathroom but not separately enumerated in room list; assumed as part of master suite. Pooja room mentioned in vastu context but no dimensions or specific location provided beyond NE orientation. Powder room type not specified (assumed half-bath). Attic or additional storage not mentioned."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 644,
+    "output_tokens": 859,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7341,
+    "cost_usd_estimated": 0.014115,
+    "latency_ms": 8305.22920913063,
+    "created_at_iso": "2026-05-07T11:23:12.966099+00:00"
+  }
+}

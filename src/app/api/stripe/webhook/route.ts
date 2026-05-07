@@ -16,6 +16,14 @@ import { invalidateUserRoleCache } from '@/lib/auth';
 import { logAudit } from "@/lib/admin-server";
 import { trackServerPurchase } from "@/lib/server-conversions";
 import { getPlanValueINR } from "@/lib/plan-pricing";
+import { billingFeatureFlags } from '@/features/billing/lib/feature-flags';
+import {
+  billingGraceWindowFlagOff,
+  billingRolePreservedInGrace,
+  billingCancelWithNoPeriodEnd,
+  billingPastDuePreserved,
+} from '@/features/billing/lib/metrics';
+import { applyImmediateDowngrade } from '@/features/billing/lib/role-transitions';
 
 export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -107,6 +115,21 @@ export async function POST(req: NextRequest) {
         const customerId = typeof subscription.customer === 'string'
           ? subscription.customer
           : subscription.customer.id;
+
+        // Grace-aware termination intercept. Active / trialing / incomplete
+        // fall through to the existing updateUserSubscription path; the four
+        // cancel-class statuses route through the grace handler.
+        const status = subscription.status;
+        if (
+          status === 'canceled' ||
+          status === 'incomplete_expired' ||
+          status === 'unpaid' ||
+          status === 'past_due'
+        ) {
+          await handleStripeSubscriptionStatusEvent(customerId, subscription, event.id);
+          break;
+        }
+
         await updateUserSubscription(customerId, subscription);
         break;
       }
@@ -116,7 +139,7 @@ export async function POST(req: NextRequest) {
         const customerId = typeof subscription.customer === 'string'
           ? subscription.customer
           : subscription.customer.id;
-        await cancelUserSubscription(customerId);
+        await handleStripeSubscriptionDeleted(customerId, subscription, event.id);
         break;
       }
 
@@ -409,7 +432,181 @@ async function updateUserSubscription(
   }
 }
 
-async function cancelUserSubscription(stripeCustomerId: string) {
+/**
+ * Grace-aware handler for `customer.subscription.deleted`.
+ *
+ * Flag OFF: emit billing.grace_window_flag_off, run cancelUserSubscription_LEGACY
+ *           byte-for-byte unchanged. This is the rollback path.
+ *
+ * Flag ON:
+ *   - period_end missing → emit alert metric, refuse to act.
+ *   - period_end > now (cancel-immediately scenario can hit this) → preserve
+ *     role, refresh stripeCurrentPeriodEnd, emit preserved metric.
+ *   - period_end <= now (typical end-of-period cancel) → applyImmediateDowngrade.
+ *
+ * Exported for tests.
+ */
+export async function handleStripeSubscriptionDeleted(
+  customerId: string,
+  subscription: Stripe.Subscription,
+  webhookEventId: string,
+): Promise<void> {
+  const user = await prisma.user.findFirst({
+    where: { stripeCustomerId: customerId },
+    select: { id: true, email: true, name: true, role: true },
+  });
+
+  if (!billingFeatureFlags.graceWindowEnabled) {
+    billingGraceWindowFlagOff({
+      handler: 'stripe.customer.subscription.deleted',
+      userId: user?.id ?? null,
+      event: 'customer.subscription.deleted',
+    });
+    await cancelUserSubscription_LEGACY(customerId);
+    return;
+  }
+
+  if (!user) {
+    console.error('[STRIPE_WEBHOOK] User not found for customer:', customerId);
+    return;
+  }
+
+  const periodEndUnix =
+    subscription.items?.data?.[0]?.current_period_end ??
+    (subscription as unknown as { current_period_end?: number }).current_period_end;
+
+  if (!periodEndUnix || periodEndUnix <= 0) {
+    billingCancelWithNoPeriodEnd({
+      provider: 'stripe',
+      eventType: 'customer.subscription.deleted',
+      userId: user.id,
+      subscriptionId: subscription.id,
+    });
+    return;
+  }
+
+  const periodEnd = new Date(periodEndUnix * 1000);
+  if (periodEnd > new Date()) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { stripeCurrentPeriodEnd: periodEnd },
+    });
+    billingRolePreservedInGrace({
+      userId: user.id,
+      provider: 'stripe',
+      eventType: 'customer.subscription.deleted',
+      graceUntilIso: periodEnd.toISOString(),
+    });
+    return;
+  }
+
+  await applyImmediateDowngrade({
+    userId: user.id,
+    reason: 'cancel_event_grace_already_past',
+    triggeredBy: 'webhook',
+    providerEventId: webhookEventId,
+  });
+}
+
+/**
+ * Grace-aware handler for `customer.subscription.updated` events whose
+ * status is in {canceled, incomplete_expired, unpaid, past_due}. Other
+ * statuses (active/trialing/incomplete) bypass this and go directly to
+ * the existing updateUserSubscription path.
+ *
+ * Flag OFF: emit billing.grace_window_flag_off and call updateUserSubscription
+ *           unchanged. The legacy non-paid-status branch inside that function
+ *           handles the downgrade exactly as before.
+ *
+ * Flag ON:
+ *   - past_due → emit billing.past_due_preserved and return. Stripe Smart
+ *     Retries keep retrying for ~3 weeks; we never punish transient declines.
+ *   - canceled / incomplete_expired / unpaid:
+ *     period_end missing → alert, return.
+ *     period_end > now → preserve role, refresh stripeCurrentPeriodEnd.
+ *     period_end <= now → applyImmediateDowngrade.
+ *
+ * Exported for tests.
+ */
+export async function handleStripeSubscriptionStatusEvent(
+  customerId: string,
+  subscription: Stripe.Subscription,
+  webhookEventId: string,
+): Promise<void> {
+  const status = subscription.status;
+  const user = await prisma.user.findFirst({
+    where: { stripeCustomerId: customerId },
+    select: { id: true, email: true, name: true, role: true },
+  });
+
+  if (!billingFeatureFlags.graceWindowEnabled) {
+    billingGraceWindowFlagOff({
+      handler: `stripe.customer.subscription.updated.${status}`,
+      userId: user?.id ?? null,
+      event: 'customer.subscription.updated',
+    });
+    await updateUserSubscription(customerId, subscription);
+    return;
+  }
+
+  if (!user) {
+    console.error('[STRIPE_WEBHOOK] User not found for customer:', customerId);
+    return;
+  }
+
+  if (status === 'past_due') {
+    billingPastDuePreserved({
+      userId: user.id,
+      provider: 'stripe',
+    });
+    return;
+  }
+
+  // canceled / incomplete_expired / unpaid
+  const periodEndUnix =
+    subscription.items?.data?.[0]?.current_period_end ??
+    (subscription as unknown as { current_period_end?: number }).current_period_end;
+
+  if (!periodEndUnix || periodEndUnix <= 0) {
+    billingCancelWithNoPeriodEnd({
+      provider: 'stripe',
+      eventType: `customer.subscription.updated.${status}`,
+      userId: user.id,
+      subscriptionId: subscription.id,
+    });
+    return;
+  }
+
+  const periodEnd = new Date(periodEndUnix * 1000);
+  if (periodEnd > new Date()) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { stripeCurrentPeriodEnd: periodEnd },
+    });
+    billingRolePreservedInGrace({
+      userId: user.id,
+      provider: 'stripe',
+      eventType: `customer.subscription.updated.${status}`,
+      graceUntilIso: periodEnd.toISOString(),
+    });
+    return;
+  }
+
+  await applyImmediateDowngrade({
+    userId: user.id,
+    reason: 'cancel_event_grace_already_past',
+    triggeredBy: 'webhook',
+    providerEventId: webhookEventId,
+  });
+}
+
+/**
+ * LEGACY immediate-downgrade behaviour for customer.subscription.deleted.
+ * Preserved BYTE-FOR-BYTE so flipping BILLING_GRACE_WINDOW_ENABLED back to
+ * false instantly restores prior behaviour. Do NOT modify this function —
+ * it is the rollback path.
+ */
+async function cancelUserSubscription_LEGACY(stripeCustomerId: string) {
   const user = await prisma.user.findFirst({
     where: { stripeCustomerId },
     select: { id: true, email: true, name: true, role: true },

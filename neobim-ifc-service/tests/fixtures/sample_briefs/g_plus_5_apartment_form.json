@@ -1,0 +1,12 @@
+{
+  "_comment": "G+5 RCC apartment, Pune, 2BHK per floor",
+  "floors": 5,
+  "bhk_count": 2,
+  "location_city": "Pune",
+  "building_type": "residential",
+  "structural_system": "rcc",
+  "plot_dimensions_m": [12.0, 18.0],
+  "parking_required": true,
+  "site_orientation": "N",
+  "budget_inr_lakhs": 250
+}
