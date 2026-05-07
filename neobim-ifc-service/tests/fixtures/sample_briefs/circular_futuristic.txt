@@ -1,5 +1,1 @@
-# TODO: real circular futuristic brief coming from Govind.
-# Phase 2A Slice 2A.3 placeholder.
-# Once filled in, this file will exercise the BriefAnalyst stage
-# (Slice 2A.5) on a strongly narrative-leaning brief.
-30m diameter circular futuristic mixed-use building, 5 floors, located in Bangalore, with sky lobby on top floor.
+30-meter diameter circular building, 5 floors, located in Bangalore. Mixed-use: ground floor retail (cafe, gallery), floors 1-3 office workspace, floor 4 sky-lobby with terrace garden. Modern futuristic style with full-glass curtain wall facade. Sustainable design with rainwater harvesting and rooftop solar. Steel frame with composite slabs. Central core with 2 lifts and 1 stair. Underground parking for 30 cars.

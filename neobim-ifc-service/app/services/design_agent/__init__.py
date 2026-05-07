@@ -39,6 +39,11 @@ from app.services.design_agent.pdf_extractor import (
     extract_pdf_text,
     vision_extract_pdf,
 )
+from app.services.design_agent.stages.brief_analyst import (
+    BriefAnalystMetadata,
+    enrich_with_zone_lookups,
+    run_brief_analyst,
+)
 from app.services.design_agent.types import (
     BriefAnalysis,
     BriefForm,
@@ -82,6 +87,10 @@ __all__ = [
     "LLMResponseValidationError",
     "LLMRateLimited",
     "LLMAPIError",
+    # BriefAnalyst stage (Slice 2A.5)
+    "run_brief_analyst",
+    "enrich_with_zone_lookups",
+    "BriefAnalystMetadata",
     # Intake (Slice 2A.3)
     "parse_design_request",
     # Classifier (Slice 2A.2)

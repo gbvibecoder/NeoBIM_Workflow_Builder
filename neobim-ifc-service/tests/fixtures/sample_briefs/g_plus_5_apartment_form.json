@@ -1,8 +1,12 @@
 {
-  "_comment": "TODO: real G+5 apartment BriefForm coming from Govind. Phase 2A Slice 2A.3 placeholder.",
+  "_comment": "G+5 RCC apartment, Pune, 2BHK per floor",
   "floors": 5,
   "bhk_count": 2,
   "location_city": "Pune",
   "building_type": "residential",
-  "structural_system": "rcc"
+  "structural_system": "rcc",
+  "plot_dimensions_m": [12.0, 18.0],
+  "parking_required": true,
+  "site_orientation": "N",
+  "budget_inr_lakhs": 250
 }
