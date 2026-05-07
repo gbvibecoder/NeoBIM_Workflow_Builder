@@ -44,6 +44,10 @@ from app.services.design_agent.stages.brief_analyst import (
     enrich_with_zone_lookups,
     run_brief_analyst,
 )
+from app.services.design_agent.stages.program_architect import (
+    ProgramArchitectMetadata,
+    run_program_architect,
+)
 from app.services.design_agent.types import (
     BriefAnalysis,
     BriefForm,
@@ -91,6 +95,9 @@ __all__ = [
     "run_brief_analyst",
     "enrich_with_zone_lookups",
     "BriefAnalystMetadata",
+    # ProgramArchitect stage (Slice 2A.6)
+    "run_program_architect",
+    "ProgramArchitectMetadata",
     # Intake (Slice 2A.3)
     "parse_design_request",
     # Classifier (Slice 2A.2)
