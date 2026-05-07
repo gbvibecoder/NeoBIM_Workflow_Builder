@@ -22,6 +22,7 @@ later modules will be added to this barrel as they land — keeping the
 public surface in one place.
 """
 
+from app.services.design_agent.classifier import classify_brief
 from app.services.design_agent.types import (
     BriefAnalysis,
     BriefForm,
@@ -47,7 +48,8 @@ __all__ = [
     # Inputs
     "BriefForm",
     "DesignRequest",
-    # Classifier
+    # Classifier (Slice 2A.2)
+    "classify_brief",
     "BriefStyleWeights",
     # Brief analyst
     "BuildingClass",
