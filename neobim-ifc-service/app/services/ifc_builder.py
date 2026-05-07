@@ -25,19 +25,28 @@ from app.models.request import (
     MassingStorey,
 )
 from app.models.response import BuildFailure, EntityCounts
-from app.services.wall_builder import create_wall
-from app.services.slab_builder import create_slab
-from app.services.column_builder import create_column
-from app.services.opening_builder import create_window, create_door
-from app.services.space_builder import create_space
-from app.services.beam_builder import create_beam
-from app.services.stair_builder import create_stair
+from app.services.wall_builder import create_wall, create_wall_parametric
+from app.services.slab_builder import create_slab, create_slab_parametric
+from app.services.column_builder import create_column, create_column_parametric
+from app.services.opening_builder import (
+    create_door,
+    create_door_parametric,
+    create_opening_parametric,
+    create_window,
+    create_window_parametric,
+)
+from app.services.space_builder import create_space, create_space_parametric
+from app.services.beam_builder import create_beam, create_beam_parametric
+from app.services.stair_builder import create_stair, create_stair_parametric
 from app.services.mep_builder import (
-    create_duct,
-    create_pipe,
     create_cable_tray,
+    create_duct,
     create_equipment,
+    create_mep_equipment_parametric,
+    create_mep_segment_parametric,
     create_mep_system,
+    create_mep_terminal_parametric,
+    create_pipe,
 )
 from app.services.material_library import (
     create_material_layer_set,
@@ -168,6 +177,7 @@ def build_ifc(
     emit_mep_geometry: bool = False,
     rich_mode: str | None = None,
     rera_inputs: ReraInputs | None = None,
+    use_parametric_pipeline: bool = False,
 ) -> tuple[ifcopenshell.file, EntityCounts, list[BuildFailure]]:
     """Build a complete IFC4 model from MassingGeometry.
 
@@ -224,6 +234,12 @@ def build_ifc(
         )
         ifc_storey.GlobalId = derive_guid("IfcBuildingStorey", str(storey_data.index), storey_data.name)
         ifc_storey.Elevation = storey_data.elevation
+        # Slice 6 — IDS reduction: CompositionType is a required attribute
+        # the LOD300_STOREY_COMPOSITION_TYPE rule checks. Set on the
+        # parametric path only so legacy stays byte-equivalent for
+        # production users who haven't opted in.
+        if use_parametric_pipeline:
+            ifc_storey.CompositionType = "ELEMENT"
         ifc_storeys[storey_data.index] = ifc_storey
 
     if ifc_storeys:
@@ -246,6 +262,111 @@ def build_ifc(
                 model, get_wall_preset(building_type, is_partition)
             )
         return wall_mat_cache[is_partition]
+
+    # ── Phase 1 Slice 5 — full parametric pre-resolution ─────────
+    # When the feature flag is on, lift the legacy MassingGeometry into
+    # a BuildingModel once, then resolve placements + geometries for the
+    # whole graph. Per-type dispatch maps are populated below; the
+    # element-creation loop later picks the parametric builder whenever
+    # a matching node exists in the lifted graph, falling back to the
+    # legacy builder when the lift skipped a node (lift warnings will
+    # have been emitted in that case).
+    parametric_walls: dict[str, tuple[object, object, object]] = {}
+    parametric_slabs: dict[str, tuple[object, object, object]] = {}
+    parametric_columns: dict[str, tuple[object, object, object]] = {}
+    parametric_beams: dict[str, tuple[object, object, object]] = {}
+    parametric_rooms: dict[str, tuple[object, object, object]] = {}
+    parametric_stairs: dict[str, tuple[object, object, object]] = {}
+    # Door/Window dispatch carries the parent opening tuple so the
+    # orchestrator can create the opening + filler together in one branch.
+    parametric_doors: dict[str, tuple[object, object, object, object]] = {}
+    parametric_windows: dict[str, tuple[object, object, object, object]] = {}
+    parametric_mep_segments: dict[str, tuple[object, object, object]] = {}
+    parametric_mep_equipment: dict[str, tuple[object, object, object]] = {}
+    parametric_mep_terminals: dict[str, tuple[object, object, object]] = {}
+    bm = None  # Populated when use_parametric_pipeline=True; used for provenance.
+
+    if use_parametric_pipeline:
+        from app.models.request import ExportOptions as _Opts
+        from app.services.geometry_resolver import resolve_geometries
+        from app.services.massing_to_building_model import lift
+        from app.services.placement_resolver import resolve_placements
+
+        _opts = _Opts(
+            projectName=project_name,
+            buildingName=building_name,
+            siteName=site_name,
+        )
+        bm, _w = lift(geometry, _opts, build_id="parametric-bridge")
+        placements = resolve_placements(bm)
+        geometries = resolve_geometries(bm, placements)
+        bld = bm.project.site.building
+        # Walls + slabs + rooms + stairs live per-storey.
+        for storey_node in bld.storeys:
+            for w_node in storey_node.walls:
+                if w_node.id in placements and w_node.id in geometries:
+                    parametric_walls[w_node.id] = (
+                        w_node, placements[w_node.id], geometries[w_node.id]
+                    )
+            for s_node in storey_node.slabs:
+                if s_node.id in placements and s_node.id in geometries:
+                    parametric_slabs[s_node.id] = (
+                        s_node, placements[s_node.id], geometries[s_node.id]
+                    )
+            for r_node in storey_node.rooms:
+                if r_node.id in placements and r_node.id in geometries:
+                    parametric_rooms[r_node.id] = (
+                        r_node, placements[r_node.id], geometries[r_node.id]
+                    )
+            for st_node in storey_node.stairs:
+                if st_node.id in placements and st_node.id in geometries:
+                    parametric_stairs[st_node.id] = (
+                        st_node, placements[st_node.id], geometries[st_node.id]
+                    )
+        # Columns + beams live at structural_system level.
+        for c_node in bld.structural_system.columns:
+            if c_node.id in placements and c_node.id in geometries:
+                parametric_columns[c_node.id] = (
+                    c_node, placements[c_node.id], geometries[c_node.id]
+                )
+        for b_node in bld.structural_system.beams:
+            if b_node.id in placements and b_node.id in geometries:
+                parametric_beams[b_node.id] = (
+                    b_node, placements[b_node.id], geometries[b_node.id]
+                )
+        # Doors/windows: bundle with their parent opening so the orchestrator
+        # creates opening + filler together.
+        openings_by_id = {o.id: o for st in bld.storeys for o in st.openings}
+        opening_placements_by_id = {
+            o.id: placements.get(o.id) for o in openings_by_id.values()
+        }
+        for d_node in bld.doors:
+            opening = openings_by_id.get(d_node.in_opening_id)
+            opening_p = opening_placements_by_id.get(d_node.in_opening_id)
+            if opening is not None and opening_p is not None:
+                parametric_doors[d_node.id] = (d_node, opening, opening_p, opening.in_wall_id)
+        for w_node in bld.windows:
+            opening = openings_by_id.get(w_node.in_opening_id)
+            opening_p = opening_placements_by_id.get(w_node.in_opening_id)
+            if opening is not None and opening_p is not None:
+                parametric_windows[w_node.id] = (w_node, opening, opening_p, opening.in_wall_id)
+        # MEP — segments, equipment, terminals.
+        for sys in bld.mep_systems:
+            if sys.source is not None:
+                if sys.source.id in placements and sys.source.id in geometries:
+                    parametric_mep_equipment[sys.source.id] = (
+                        sys.source, placements[sys.source.id], geometries[sys.source.id]
+                    )
+            for seg in sys.distribution:
+                if seg.id in placements and seg.id in geometries:
+                    parametric_mep_segments[seg.id] = (
+                        seg, placements[seg.id], geometries[seg.id]
+                    )
+            for term in sys.terminals:
+                if term.id in placements and term.id in geometries:
+                    parametric_mep_terminals[term.id] = (
+                        term, placements[term.id], geometries[term.id]
+                    )
 
     # ── Element creation ─────────────────────────────────────────
     counts = EntityCounts()
@@ -282,7 +403,25 @@ def build_ifc(
             if not _element_passes_rich_mode(elem, rich_mode):
                 continue
             try:
-                ifc_wall = create_wall(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                if use_parametric_pipeline and elem.id in parametric_walls:
+                    wall_node, w_placement, w_geometry = parametric_walls[elem.id]
+                    ifc_wall = create_wall_parametric(
+                        wall_node,
+                        w_placement,
+                        w_geometry,
+                        model,
+                        body_context,
+                        ifc_storey,
+                        type_registry,
+                    )
+                else:
+                    ifc_wall = create_wall(
+                        model,
+                        elem,
+                        ifc_storey,
+                        body_context,
+                        storey_elevation=storey_elevation,
+                    )
                 wall_lookup[elem.id] = ifc_wall
                 wall_mat = _get_wall_mat(elem.properties.is_partition or False)
                 wall_sig = type_registry.signature(
@@ -323,11 +462,18 @@ def build_ifc(
 
             try:
                 if elem.type in ("slab", "roof"):
-                    ifc_slab = create_slab(
-                        model, elem, ifc_storey, body_context,
-                        footprint=geometry.footprint,
-                        elevation=storey_elevation if elem.type == "slab" else storey_elevation + storey_data.height,
-                    )
+                    if use_parametric_pipeline and elem.id in parametric_slabs:
+                        slab_node, sl_placement, sl_geometry = parametric_slabs[elem.id]
+                        ifc_slab = create_slab_parametric(
+                            slab_node, sl_placement, sl_geometry, model,
+                            body_context, ifc_storey, type_registry,
+                        )
+                    else:
+                        ifc_slab = create_slab(
+                            model, elem, ifc_storey, body_context,
+                            footprint=geometry.footprint,
+                            elevation=storey_elevation if elem.type == "slab" else storey_elevation + storey_data.height,
+                        )
                     is_roof = elem.type == "roof"
                     slab_layer_set = roof_mat if is_roof else slab_mat
                     slab_sig = type_registry.signature(
@@ -342,7 +488,14 @@ def build_ifc(
                     counts.IfcSlab += 1
 
                 elif elem.type == "column":
-                    ifc_col = create_column(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    if use_parametric_pipeline and elem.id in parametric_columns:
+                        col_node, c_placement, c_geometry = parametric_columns[elem.id]
+                        ifc_col = create_column_parametric(
+                            col_node, c_placement, c_geometry, model,
+                            body_context, ifc_storey, type_registry,
+                        )
+                    else:
+                        ifc_col = create_column(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                     col_sig = type_registry.signature(
                         type_class="IfcColumnType",
                         material_layer_set=None,
@@ -357,7 +510,21 @@ def build_ifc(
 
                 elif elem.type == "window":
                     parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
-                    ifc_win = create_window(model, elem, ifc_storey, body_context, parent_wall, storey_elevation=storey_elevation)
+                    if (
+                        use_parametric_pipeline
+                        and elem.id in parametric_windows
+                        and parent_wall is not None
+                    ):
+                        w_node, opening_node, op_placement, _wall_id = parametric_windows[elem.id]
+                        opening_entity = create_opening_parametric(
+                            opening_node, op_placement, parent_wall, model, body_context,
+                        )
+                        ifc_win = create_window_parametric(
+                            w_node, opening_node, opening_entity, model,
+                            body_context, ifc_storey, type_registry,
+                        )
+                    else:
+                        ifc_win = create_window(model, elem, ifc_storey, body_context, parent_wall, storey_elevation=storey_elevation)
                     win_sig = type_registry.signature(
                         type_class="IfcWindowType",
                         material_layer_set=None,
@@ -373,7 +540,21 @@ def build_ifc(
 
                 elif elem.type == "door":
                     parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
-                    ifc_door = create_door(model, elem, ifc_storey, body_context, parent_wall, storey_elevation=storey_elevation)
+                    if (
+                        use_parametric_pipeline
+                        and elem.id in parametric_doors
+                        and parent_wall is not None
+                    ):
+                        d_node, opening_node, op_placement, _wall_id = parametric_doors[elem.id]
+                        opening_entity = create_opening_parametric(
+                            opening_node, op_placement, parent_wall, model, body_context,
+                        )
+                        ifc_door = create_door_parametric(
+                            d_node, opening_node, opening_entity, model,
+                            body_context, ifc_storey, type_registry,
+                        )
+                    else:
+                        ifc_door = create_door(model, elem, ifc_storey, body_context, parent_wall, storey_elevation=storey_elevation)
                     door_sig = type_registry.signature(
                         type_class="IfcDoorType",
                         material_layer_set=None,
@@ -388,7 +569,36 @@ def build_ifc(
                         counts.IfcOpeningElement += 1
 
                 elif elem.type == "space":
-                    ifc_space = create_space(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    if use_parametric_pipeline and elem.id in parametric_rooms:
+                        r_node, r_placement, r_geometry = parametric_rooms[elem.id]
+                        ifc_space = create_space_parametric(
+                            r_node, r_placement, r_geometry, model,
+                            body_context, ifc_storey, type_registry,
+                        )
+                        # Slice 6 — IDS reduction: Qto_SpaceBaseQuantities
+                        # carries NetFloorArea (the rule checks this is
+                        # populated). Compute via shapely on the room
+                        # footprint (already validated by ROOM_BOUNDED).
+                        from shapely.geometry import Polygon as _Poly
+                        _poly = _Poly([(v.x, v.y) for v in r_node.footprint_polygon])
+                        _net_area = float(_poly.area)
+                        _height = float(r_geometry.extrusion_depth or 3.0)
+                        _qto = api.run(
+                            "pset.add_qto", model, product=ifc_space,
+                            name="Qto_SpaceBaseQuantities",
+                        )
+                        api.run(
+                            "pset.edit_qto", model, qto=_qto,
+                            properties={
+                                "Height": _height,
+                                "NetFloorArea": _net_area,
+                                "GrossFloorArea": _net_area,
+                                "GrossVolume": _net_area * _height,
+                                "NetVolume": _net_area * _height,
+                            },
+                        )
+                    else:
+                        ifc_space = create_space(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                     space_sig = type_registry.signature(
                         type_class="IfcSpaceType",
                         material_layer_set=None,
@@ -401,7 +611,14 @@ def build_ifc(
                     counts.IfcSpace += 1
 
                 elif elem.type == "beam":
-                    ifc_beam = create_beam(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    if use_parametric_pipeline and elem.id in parametric_beams:
+                        b_node, b_placement, b_geometry = parametric_beams[elem.id]
+                        ifc_beam = create_beam_parametric(
+                            b_node, b_placement, b_geometry, model,
+                            body_context, ifc_storey, type_registry,
+                        )
+                    else:
+                        ifc_beam = create_beam(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                     beam_sig = type_registry.signature(
                         type_class="IfcBeamType",
                         material_layer_set=None,
@@ -415,7 +632,14 @@ def build_ifc(
                     counts.IfcBeam += 1
 
                 elif elem.type == "stair":
-                    ifc_stair = create_stair(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    if use_parametric_pipeline and elem.id in parametric_stairs:
+                        st_node, st_placement, st_geometry = parametric_stairs[elem.id]
+                        ifc_stair = create_stair_parametric(
+                            st_node, st_placement, st_geometry, model,
+                            body_context, ifc_storey, type_registry,
+                        )
+                    else:
+                        ifc_stair = create_stair(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                     stair_sig = type_registry.signature(
                         type_class="IfcStairFlightType",
                         material_layer_set=None,
@@ -427,40 +651,72 @@ def build_ifc(
                     counts.IfcStairFlight += 1
 
                 elif elem.type == "duct":
-                    ifc_duct = create_duct(
-                        model, elem, ifc_storey, body_context,
-                        storey_elevation=storey_elevation,
-                        emit_geometry=emit_mep_geometry,
-                    )
+                    if use_parametric_pipeline and elem.id in parametric_mep_segments:
+                        seg_node, seg_p, seg_g = parametric_mep_segments[elem.id]
+                        ifc_duct = create_mep_segment_parametric(
+                            seg_node, seg_p, seg_g, model, body_context,
+                            ifc_storey, type_registry,
+                            emit_geometry=emit_mep_geometry,
+                        )
+                    else:
+                        ifc_duct = create_duct(
+                            model, elem, ifc_storey, body_context,
+                            storey_elevation=storey_elevation,
+                            emit_geometry=emit_mep_geometry,
+                        )
                     apply_color(model, ifc_duct, "duct", style_cache)
                     mep_elements["HVAC"].append(ifc_duct)
                     counts.IfcDuctSegment += 1
 
                 elif elem.type == "pipe":
-                    ifc_pipe = create_pipe(
-                        model, elem, ifc_storey, body_context,
-                        storey_elevation=storey_elevation,
-                        emit_geometry=emit_mep_geometry,
-                    )
+                    if use_parametric_pipeline and elem.id in parametric_mep_segments:
+                        seg_node, seg_p, seg_g = parametric_mep_segments[elem.id]
+                        ifc_pipe = create_mep_segment_parametric(
+                            seg_node, seg_p, seg_g, model, body_context,
+                            ifc_storey, type_registry,
+                            emit_geometry=emit_mep_geometry,
+                        )
+                    else:
+                        ifc_pipe = create_pipe(
+                            model, elem, ifc_storey, body_context,
+                            storey_elevation=storey_elevation,
+                            emit_geometry=emit_mep_geometry,
+                        )
                     apply_color(model, ifc_pipe, "pipe", style_cache)
                     mep_elements["Plumbing"].append(ifc_pipe)
                     counts.IfcPipeSegment += 1
 
                 elif elem.type == "cable-tray":
-                    ifc_tray = create_cable_tray(
-                        model, elem, ifc_storey, body_context,
-                        storey_elevation=storey_elevation,
-                        emit_geometry=emit_mep_geometry,
-                    )
+                    if use_parametric_pipeline and elem.id in parametric_mep_segments:
+                        seg_node, seg_p, seg_g = parametric_mep_segments[elem.id]
+                        ifc_tray = create_mep_segment_parametric(
+                            seg_node, seg_p, seg_g, model, body_context,
+                            ifc_storey, type_registry,
+                            emit_geometry=emit_mep_geometry,
+                        )
+                    else:
+                        ifc_tray = create_cable_tray(
+                            model, elem, ifc_storey, body_context,
+                            storey_elevation=storey_elevation,
+                            emit_geometry=emit_mep_geometry,
+                        )
                     apply_color(model, ifc_tray, "cable-tray", style_cache)
                     mep_elements["Electrical"].append(ifc_tray)
 
                 elif elem.type == "equipment":
-                    ifc_equip = create_equipment(
-                        model, elem, ifc_storey, body_context,
-                        storey_elevation=storey_elevation,
-                        emit_geometry=emit_mep_geometry,
-                    )
+                    if use_parametric_pipeline and elem.id in parametric_mep_equipment:
+                        eq_node, eq_p, eq_g = parametric_mep_equipment[elem.id]
+                        ifc_equip = create_mep_equipment_parametric(
+                            eq_node, eq_p, eq_g, model, body_context,
+                            ifc_storey, type_registry,
+                            emit_geometry=emit_mep_geometry,
+                        )
+                    else:
+                        ifc_equip = create_equipment(
+                            model, elem, ifc_storey, body_context,
+                            storey_elevation=storey_elevation,
+                            emit_geometry=emit_mep_geometry,
+                        )
                     apply_color(model, ifc_equip, "equipment", style_cache)
                     mep_elements["HVAC"].append(ifc_equip)
 
@@ -536,6 +792,37 @@ def build_ifc(
     inputs = rera_inputs or ReraInputs.from_options(None, None, None)
     attach_rera_psets(model, geometry.building_type, inputs)
 
+    # ── Slice 6 — IDS reduction: MEP PredefinedType on every segment ─
+    # Lift skips MEP segments that fail MEP_TERMINATES (no source / no
+    # terminal / cyclic), so those fall back to legacy create_duct /
+    # create_pipe / create_cable_tray, which don't set PredefinedType
+    # — and the IDS rule fires once per discipline that finds a
+    # segment without it. Parametric path post-process: ensure every
+    # segment carries the IFC4 RIGIDSEGMENT default. Gated by
+    # use_parametric_pipeline so legacy stays byte-equivalent.
+    if use_parametric_pipeline:
+        for _seg in model.by_type("IfcDuctSegment"):
+            if not _seg.PredefinedType:
+                _seg.PredefinedType = "RIGIDSEGMENT"
+        for _seg in model.by_type("IfcPipeSegment"):
+            if not _seg.PredefinedType:
+                _seg.PredefinedType = "RIGIDSEGMENT"
+        for _seg in model.by_type("IfcCableCarrierSegment"):
+            if not _seg.PredefinedType:
+                _seg.PredefinedType = "CABLETRAYSEGMENT"
+
+    # ── Slice 5 — Provenance Pset (parametric pipeline only) ─────
+    # Slice 3's stamp_provenance attaches Pset_BuildFlow_Provenance with
+    # the 15 fields (build_id, target_fidelity, fixture_match, IDS counts
+    # to be re-stamped post-Stage-2.5 in Slice 6, etc.). Adds 17 entities
+    # per fixture (1 IfcPropertySet + 1 IfcRelDefinesByProperties + 15
+    # IfcPropertySingleValue) — that's the documented expected delta vs
+    # legacy on the verification-gate entity counts.
+    if use_parametric_pipeline and bm is not None:
+        from app.services.provenance import stamp_provenance
+
+        stamp_provenance(model, bm.project.metadata.provenance, project)
+
     elapsed = round((time.monotonic() - start) * 1000, 1)
     log.info(
         "ifc_build_complete",
@@ -582,6 +869,7 @@ def build_multi_discipline(
             emit_mep_geometry=emit_mep_geometry,
             rich_mode=rich_mode,
             rera_inputs=rera_inputs,
+            use_parametric_pipeline=request.options.use_parametric_pipeline,
         )
 
         # Write to bytes

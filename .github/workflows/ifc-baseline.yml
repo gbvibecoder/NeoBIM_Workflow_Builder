@@ -77,6 +77,32 @@ jobs:
       - name: Run buildingSMART baseline drift gate
         run: pytest tests/test_buildingsmart_baseline.py -v
 
+      # ── Phase 1 (Slices 1–6) ─────────────────────────────────────────
+      # The Phase 1 parametric layer + lift + provenance + two-pass
+      # resolution + IDS reduction proof. Wired into per-PR CI per the
+      # Slice 6 spec so regressions land before merge, not after — the
+      # same gap that bit Phase 0.
+      - name: Run Phase 1 BuildingModel construction tests
+        run: pytest tests/test_building_model_construction.py -v
+
+      - name: Run Phase 1 MassingGeometry lift tests
+        run: pytest tests/test_massing_lift.py -v
+
+      - name: Run Phase 1 Provenance Pset tests
+        run: pytest tests/test_provenance_pset.py -v
+
+      - name: Run Phase 1 two-pass resolution tests
+        run: pytest tests/test_placement_resolver.py tests/test_geometry_resolver.py -v
+
+      - name: Run Phase 1 parametric builder tests
+        run: pytest tests/test_parametric_builders.py tests/test_wall_builder_parametric.py -v
+
+      - name: Run Phase 1 no-fallback-chains regression gate
+        run: pytest tests/test_no_fallback_chains.py -v
+
+      - name: Run Phase 1 IDS violation reduction gate (≥30%)
+        run: pytest tests/test_phase1_ids_violations_reduced.py -v
+
       - name: Emit entity counts for baseline run (artifact preview)
         if: always()
         run: |

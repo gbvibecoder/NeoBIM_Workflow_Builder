@@ -223,6 +223,7 @@ model Execution {
   metadata     Json?
   createdAt    DateTime        @default(now())
   artifacts    Artifact[]
+  buildingModel BuildingModel?
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   workflow     Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
@@ -231,6 +232,26 @@ model Execution {
   @@index([createdAt])
   @@index([status])
   @@map("executions")
+}
+
+// Phase 1 Slice 7 — DB-canonical persistence of the parametric
+// BuildingModel produced by the Python IFC service. The TS-side EX-001
+// handler writes here when the Python response carries
+// metadata.building_model_json. R2 holds the same JSON as a write-
+// through replica (r2Key); DB is the source of truth, R2 is for cheap
+// hot-reads + downstream pipelines (Phase 2 design agent input).
+model BuildingModel {
+  id           String   @id @default(cuid())
+  executionId  String   @unique
+  execution    Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  modelVersion String
+  graph        Json
+  r2Key        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([executionId])
+  @@map("building_models")
 }
 
 model Artifact {

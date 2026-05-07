@@ -12,6 +12,9 @@ dependencies = [
     "ifctester>=0.8.0",
     "boto3>=1.35.0",
     "structlog>=24.0",
+    # Phase 1 — needed by BuildingModel invariants ROOM_BOUNDED + FOOTPRINT_VALID
+    # for shapely.geometry.Polygon validity / signed-area checks.
+    "shapely>=2.0",
 ]
 
 [project.optional-dependencies]
