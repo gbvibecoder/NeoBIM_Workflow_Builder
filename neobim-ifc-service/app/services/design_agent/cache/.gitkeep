@@ -1,0 +1,14 @@
+# Phase 2A — design-agent LLM response cache.
+#
+# This directory is intentionally committed to the repository. The
+# Slice 2A.4 LLM client writes one JSON file per (prompt_hash,
+# schema_hash, model) tuple here, keyed by SHA-256. CI replays from
+# these cached responses, so test runs do NOT need ANTHROPIC_API_KEY.
+#
+# When the BriefAnalyst / ProgramArchitect prompts change, regenerate
+# the cache locally with ANTHROPIC_API_KEY set, then commit the new
+# files. Stale cache files are harmless (the new prompt_hash misses
+# them) but should be pruned to keep the repo size reasonable.
+#
+# Slice 2A.1 commits this .gitkeep so the directory exists — actual
+# cache JSON files arrive with Slice 2A.5 / 2A.6.
