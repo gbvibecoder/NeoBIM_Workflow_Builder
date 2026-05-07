@@ -229,10 +229,80 @@ def test_anthropic_model_names_canonical() -> None:
 
 
 def test_model_max_timeout_per_tier() -> None:
-    """Per-spec ceilings: Haiku 10s, Sonnet 20s, Opus 30s."""
-    assert MODEL_MAX_TIMEOUT["haiku-4.5"] == 10.0
-    assert MODEL_MAX_TIMEOUT["sonnet-4.6"] == 20.0
-    assert MODEL_MAX_TIMEOUT["opus-4.7"] == 30.0
+    """Per-tier ceilings (raised in Slice 2A.6 to accommodate larger
+    structured outputs like the ProgramArchitect's RoomProgram with
+    8-15 RoomSpec entries).
+
+    The 10/20/30s ceilings tuned for BriefAnalyst's smaller output
+    proved too tight for ProgramArchitect — Haiku needs 15-25s to
+    emit a fully populated RoomProgram. The new ceilings still
+    enforce the "no LLM call blocks a route forever" contract while
+    leaving headroom for the realistic single-call duration.
+    """
+    assert MODEL_MAX_TIMEOUT["haiku-4.5"] == 30.0
+    assert MODEL_MAX_TIMEOUT["sonnet-4.6"] == 30.0
+    assert MODEL_MAX_TIMEOUT["opus-4.7"] == 60.0
+
+
+def test_anthropic_client_max_retries_zero(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Regression: the Anthropic SDK client MUST be constructed with
+    ``max_retries=0``. Our :class:`LLMClient` owns retry policy; SDK-
+    internal retries silently stack on top, which in Slice 2A.6
+    amplified the 10s per-attempt timeout to 31s elapsed (3 attempts
+    × ~10s + backoff) and timed out every ProgramArchitect test.
+
+    A future SDK upgrade or import-path change must not silently
+    re-enable SDK retries. This test fails loudly if anyone removes
+    the kwarg.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake-key-for-test-only")
+
+    captured_kwargs: dict[str, Any] = {}
+
+    import anthropic as _anthropic_module
+
+    class _FakeAnthropic:
+        """Mimic the SDK's constructor signature; capture kwargs and
+        raise on any messages.create attempt so the test never makes
+        a real API call."""
+
+        def __init__(self, **kwargs: Any) -> None:
+            captured_kwargs.update(kwargs)
+
+        def __getattr__(self, name: str) -> Any:
+            raise RuntimeError(
+                f"Test fake Anthropic client: attribute {name!r} access "
+                f"means a real call would have been attempted."
+            )
+
+    monkeypatch.setattr(_anthropic_module, "Anthropic", _FakeAnthropic)
+
+    client = LLMClient(cache_dir=tmp_path)
+
+    # Trigger the cache-miss path which constructs the Anthropic
+    # client. The fake will RuntimeError on the messages.create
+    # attribute access AFTER the constructor is invoked, so the call
+    # raises but ``captured_kwargs`` is populated.
+    with pytest.raises((RuntimeError, LLMAPIError, AttributeError)):
+        client.call(
+            model="haiku-4.5",
+            system_prompt="x",
+            user_message="y",
+            response_schema=_MathResponse,
+            timeout_seconds=5.0,
+        )
+
+    assert "api_key" in captured_kwargs, (
+        "Anthropic() constructor was never called — test fake never "
+        "captured kwargs"
+    )
+    assert captured_kwargs.get("max_retries") == 0, (
+        f"Anthropic() must be constructed with max_retries=0 to keep "
+        f"SDK retries from amplifying our LLMClient's per-call "
+        f"timeout. Got max_retries={captured_kwargs.get('max_retries')!r}."
+    )
 
 
 def test_prompt_cache_min_token_constant_documented() -> None:

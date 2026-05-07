@@ -103,12 +103,21 @@ ANTHROPIC_MODEL_NAMES: dict[ModelKey, str] = {
 
 # Per-model wallclock ceiling. The caller's ``timeout_seconds`` is
 # clamped to this value so a single LLM call cannot block a route
-# handler longer than the spec'd ceiling: Haiku 10s, Sonnet 20s,
-# Opus 30s.
+# handler longer than the per-tier ceiling.
+#
+# Ceilings raised in Slice 2A.6 after ProgramArchitect tests showed
+# that BriefAnalyst's tight 10s budget did not generalise: a
+# 10-room RoomProgram (~140 nested fields) needs Haiku ~15-25s of
+# generation time alone. The new ceilings keep the "no LLM call
+# blocks a route forever" contract while giving structured-output
+# stages enough headroom; combined with ``max_retries=0`` on the
+# Anthropic client (so SDK-internal retries don't amplify the
+# timeout), a typical single-attempt call now either completes
+# inside the ceiling or fails cleanly at the boundary.
 MODEL_MAX_TIMEOUT: dict[ModelKey, float] = {
-    "haiku-4.5": 10.0,
-    "sonnet-4.6": 20.0,
-    "opus-4.7": 30.0,
+    "haiku-4.5": 30.0,
+    "sonnet-4.6": 30.0,
+    "opus-4.7": 60.0,
 }
 
 
@@ -503,7 +512,16 @@ class LLMClient:
         # anthropic is somehow not installed in a stripped-down env.
         import anthropic
 
-        client = anthropic.Anthropic(api_key=api_key)
+        # ``max_retries=0`` disables Anthropic SDK-internal retries on
+        # timeout / 5xx / rate-limit. Our :class:`LLMClient` owns the
+        # retry policy below — letting the SDK retry on top of that
+        # double-amplifies timeouts (Slice 2A.6 saw 31s elapsed for a
+        # 10s ceiling because the SDK silently retried 3x). The
+        # accompanying regression test
+        # ``test_anthropic_client_max_retries_zero`` pins the
+        # constructor kwarg so a future SDK upgrade can't silently
+        # re-enable retries.
+        client = anthropic.Anthropic(api_key=api_key, max_retries=0)
 
         system_param = self._build_system_param(system_prompt, cache_shared_context)
         messages_param = [{"role": "user", "content": user_message}]
