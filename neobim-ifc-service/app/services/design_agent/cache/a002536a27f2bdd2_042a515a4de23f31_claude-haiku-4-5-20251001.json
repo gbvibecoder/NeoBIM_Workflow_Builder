@@ -1,0 +1,61 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "apartment",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential apartment",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 12.0,
+      "plot_length_m": 18.0,
+      "plot_area_sqm": 216.0,
+      "site_orientation": "N",
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": null,
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "rcc_frame",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 5,
+    "floors_below_ground": 0,
+    "explicit_room_list": [],
+    "explicit_dimensions": {},
+    "user_priorities": [
+      "parking required"
+    ],
+    "raw_brief_summary": "A 5-storey residential apartment project in Pune on a 12 m × 18 m plot (216 sqm), oriented north, budgeted at ₹250 lakhs with a 2 BHK per floor unit, RCC structural frame, and dedicated parking provision. Seismic and wind design will apply per IS 1893 Zone III and IS 875 Zone 2 for Pune.",
+    "extraction_warnings": [
+      "BHK count (2) indicates a representative unit type; actual units per floor and total dwelling count not specified — architectural program to infer distribution. Budget stated in lakhs but cost per sqm and scope unclear. No explicit room dimensions, setbacks, FSI/FAR, or maximum height stated."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 577,
+    "output_tokens": 699,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7329,
+    "cost_usd_estimated": 0.013233,
+    "latency_ms": 6909.0017499402165,
+    "created_at_iso": "2026-05-07T11:23:28.134577+00:00"
+  }
+}
