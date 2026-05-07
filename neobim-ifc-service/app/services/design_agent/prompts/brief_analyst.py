@@ -301,32 +301,38 @@ Anthropic's tool_use API does NOT strictly enforce JSON-schema
 Pydantic, which rejects partial submissions with "Field required".
 Emit every field below, even when the value is empty / zero / null.
 
-Top-level fields (all required):
+Top-level fields (REQUIRED — emit them ALL, in EXACTLY this order):
 
-  * building_class      (object — primary_type, sub_type, nbc_group,
-                         nbc_subdivision; nbc_group nullable per the
-                         WHEN TO LEAVE nbc_group NULL section)
-  * site_context        (object — every nested field is Optional;
-                         populate what the brief states, leave null
-                         otherwise; do NOT guess seismic / wind zones)
-  * style_intent        (object — architectural_style required;
-                         cultural_overlay, massing_hint,
-                         facade_treatment Optional)
-  * structural_intent   (object — system defaults to "auto"; override
-                         on explicit brief signal)
-  * fidelity_hint       (object — derived from target_fidelity:
-                         concept = all false; design-development =
-                         mep_routing_required true; tender-ready = all
-                         three flags true)
-  * floors_above_ground (int 1..50 — required, never null)
-  * floors_below_ground (int 0..10 — emit 0 if no basement mentioned)
-  * explicit_room_list  (list[str] — emit empty list when none)
-  * explicit_dimensions (dict[str, str] — emit empty dict when none)
-  * user_priorities     (list[str] — emit empty list when none)
-  * raw_brief_summary   (str ≥ 1 char — your 2-3 sentence paraphrase
-                         of the brief in your own words; required)
-  * extraction_warnings (list[str] — emit empty list when nothing
-                         was missing or ambiguous)
+  1.  floors_above_ground (int 1..50, REQUIRED — NEVER omit, NEVER null)
+  2.  floors_below_ground (int 0..10, REQUIRED — emit 0 if no basement)
+  3.  building_class       (object — primary_type, sub_type, nbc_group,
+                            nbc_subdivision; nbc_group nullable per the
+                            WHEN TO LEAVE nbc_group NULL section)
+  4.  site_context         (object — every nested field is Optional;
+                            populate what the brief states, leave null
+                            otherwise; do NOT guess seismic / wind zones)
+  5.  style_intent         (object — architectural_style required;
+                            cultural_overlay, massing_hint,
+                            facade_treatment Optional)
+  6.  structural_intent    (object — system defaults to "auto"; override
+                            on explicit brief signal)
+  7.  fidelity_hint        (object — derived from target_fidelity:
+                            concept = all false; design-development =
+                            mep_routing_required true; tender-ready =
+                            all three flags true)
+  8.  explicit_room_list   (list[str] — emit empty list when none)
+  9.  explicit_dimensions  (dict[str, str] — emit empty dict when none)
+  10. user_priorities      (list[str] — emit empty list when none)
+  11. raw_brief_summary    (str ≥ 1 char — your 2-3 sentence paraphrase
+                            of the brief in your own words; required)
+  12. extraction_warnings  (list[str] — emit empty list when nothing
+                            was missing or ambiguous)
+
+The first two fields (``floors_above_ground``, ``floors_below_ground``)
+are listed FIRST because past models have shown a tendency to skip
+loose integer fields when transitioning between objects and lists.
+Emit them at the start of your tool input every time, before any
+nested object.
 
 CONCRETE EXAMPLES FOR EMPTY / SPARSE CASES
 ==========================================
@@ -354,11 +360,33 @@ meaningful value, emit the empty form — DO NOT omit the field:
     was missing, e.g.
       "extraction_warnings": ["Plot dimensions not specified."]
 
-  * Narrative-dominant briefs (style words, no numbers) still need
-    floors_above_ground. Infer from clear signals like "5 floors"
-    or "G+5"; if absent entirely, emit 1 (the schema's minimum
-    valid integer) and add a warning, e.g.
-      "extraction_warnings": ["Floor count not stated; defaulted to 1."]
+INDIAN "G+N" SHORTHAND → INTEGER FLOOR COUNT
+============================================
+The two integer floor-count fields are the most-commonly-omitted
+fields in past test runs. Every brief MUST emit BOTH. Use this
+mapping table — there is no ambiguity:
+
+  Brief says                         floors_above_ground  floors_below_ground
+  ---------------------------------  ------------------- -------------------
+  "G" / "single floor" / "G+0"               1                    0
+  "G+1" / "ground + first"                   2                    0
+  "G+2"                                       3                    0
+  "G+5"                                       6                    0
+  "G+9"                                      10                    0
+  "5 floors" / "5-storey" / "5 levels"       5                    0
+  "B+1, G+5"                                  6                    1
+  "B+2, G+10"                                11                    2
+  "no basement" or unspecified                                       0
+  Brief gives no floor count signal at all  → emit 1 + add warning
+    "extraction_warnings": ["Floor count not stated; defaulted to 1."]
+
+The ``G`` (ground floor) ALWAYS counts as one of
+``floors_above_ground``. So "G+5" means ground + 5 upper = 6 floors
+above ground.
+
+Emit BOTH integers in your tool input EVERY time, even when the
+brief is narrative-dominant. floors_below_ground = 0 is the correct
+emission for any brief that does not mention a basement.
 
 The schema rejects partial output. Emit every required field — empty
 values are fine; absent fields are NOT.
