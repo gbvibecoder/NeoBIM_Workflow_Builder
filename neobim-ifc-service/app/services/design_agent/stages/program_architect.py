@@ -57,7 +57,12 @@ from app.services.design_agent.types import (
 )
 
 
-_PROGRAM_ARCHITECT_TIMEOUT_S: float = 10.0
+# Slice 2A.6 — bumped from 10s after the LLMClient ceiling raise (Option D
+# infra change). 10s was the BriefAnalyst-fitted floor; ProgramArchitect's
+# RoomProgram with 8-15 RoomSpec entries needs Haiku 15-25s of generation
+# time. The LLMClient still clamps to MODEL_MAX_TIMEOUT["haiku-4.5"]=30s,
+# so this stays at the ceiling for safety.
+_PROGRAM_ARCHITECT_TIMEOUT_S: float = 30.0
 
 
 @dataclass(frozen=True)

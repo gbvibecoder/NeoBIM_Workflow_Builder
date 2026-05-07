@@ -160,11 +160,18 @@ CACHE_DIR: Path = Path(__file__).parent / "cache"
 PROMPT_CACHE_MIN_INPUT_TOKENS: int = 1024
 
 
-# Default ``max_tokens`` for the ``messages.create`` call. 4096 covers
-# every Phase 2A-shaped response (BriefAnalysis ~ 1500 tokens,
-# RoomProgram ~ 3000 tokens with 8-12 rooms). Increase only when a
-# specific stage needs a larger ceiling.
-_DEFAULT_MAX_TOKENS: int = 4096
+# Default ``max_tokens`` for the ``messages.create`` call.
+#
+# Bumped from 4096 -> 16384 in Slice 2A.6 after ProgramArchitect tests
+# truncated mid-tool-use: a 10-room RoomProgram with vastu notes,
+# adjacency arrays, and per-room nbc_min_area values exceeds the old
+# 4096 ceiling, Anthropic chops the response, and the resulting
+# tool_use block parses as an empty dict (LLMResponseValidationError
+# with "rooms field required"). 16384 accommodates ~30 rooms cleanly,
+# fits all four Anthropic models' supported max_tokens (Haiku 4.5 +
+# Sonnet 4.6 + Opus 4.7 all support 16K+), and is cost-neutral —
+# Anthropic only bills for actual output tokens, not the cap.
+_DEFAULT_MAX_TOKENS: int = 16384
 
 
 # ─── Custom errors ───────────────────────────────────────────────────
