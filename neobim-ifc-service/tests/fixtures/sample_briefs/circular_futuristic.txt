@@ -1,0 +1,5 @@
+# TODO: real circular futuristic brief coming from Govind.
+# Phase 2A Slice 2A.3 placeholder.
+# Once filled in, this file will exercise the BriefAnalyst stage
+# (Slice 2A.5) on a strongly narrative-leaning brief.
+30m diameter circular futuristic mixed-use building, 5 floors, located in Bangalore, with sky lobby on top floor.

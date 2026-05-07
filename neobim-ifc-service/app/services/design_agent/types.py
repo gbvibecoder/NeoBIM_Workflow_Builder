@@ -188,17 +188,68 @@ class BriefForm(BaseModel):
 class DesignRequest(BaseModel):
     """Top-level request envelope for ``POST /api/v1/design/analyze``.
 
-    ``build_id`` is a uuid4 the route handler stamps before passing to
-    classification. Tests construct a fixed ``build_id`` for determinism.
+    ``build_id`` is a uuid4 the intake layer stamps if missing
+    (Slice 2A.3); the route handler may override for retries with
+    server-stable identifiers. Tests construct a fixed ``build_id`` for
+    determinism.
+
+    ``extra="forbid"`` (Slice 2A.3) — a typo in the request envelope is
+    almost always a real client bug, so we surface it as a 422 instead of
+    silently dropping the field. The intake layer's
+    :func:`parse_design_request` strips the documented ``_comment`` key
+    BEFORE Pydantic validation, so test fixtures still load. Inner
+    ``BriefForm`` keeps the default ``extra="ignore"`` for forward
+    compatibility — the form schema grows new fields over time, and an
+    older client sending a field name the server does not yet know
+    should not be a hard error.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
     brief_pdf_url: Optional[str] = None
     brief_pdf_text: Optional[str] = None
     brief_form: Optional[BriefForm] = None
     brief_text: Optional[str] = None
     target_fidelity: TargetFidelity = "design-development"
     build_id: str = Field(min_length=1)
+
+
+# ─── PDF EXTRACTION WARNINGS (Slice 2A.3) ────────────────────────────
+
+
+ExtractionWarningCode = Literal[
+    "EMPTY_PAGE",          # page rendered but produced no extractable text
+    "VISION_REQUIRED",     # image-based PDF needs a Vision-capable LLM call
+    "MALFORMED_PDF",       # pypdf failed to parse the file
+    "PASSWORD_PROTECTED",  # encrypted PDF; we don't attempt to crack it
+    "MIXED_CONTENT",       # page has both extractable text and significant
+                           # raster content — the text alone may understate
+                           # the brief's actual content
+    "PARTIAL_EXTRACTION",  # at least one page failed but others succeeded;
+                           # the surviving text is returned, but downstream
+                           # consumers should treat it as incomplete
+]
+
+
+class ExtractionWarning(BaseModel):
+    """One non-fatal observation from :func:`extract_pdf_text`.
+
+    The PDF extractor returns a list of these alongside the extracted
+    text. Each warning carries a structured ``code`` so route handlers
+    can branch on category, the optional ``page_index`` (0-based) for
+    pinpoint debugging, and a free-text ``message`` with the specific
+    observation (e.g. "page 3 produced 12 chars; below 100-char
+    threshold").
+
+    The shape mirrors :class:`DesignContextValidationError` (rule_id /
+    page_index / message) — staying consistent with Phase 1's
+    structured-error envelope so route handlers don't carry two
+    different error grammars.
+    """
+
+    model_config = ConfigDict(frozen=True)
+    code: ExtractionWarningCode
+    page_index: Optional[int] = Field(default=None, ge=0)
+    message: str = Field(min_length=1)
 
 
 # ─── CLASSIFIER OUTPUT ───────────────────────────────────────────────
@@ -724,6 +775,9 @@ __all__ = [
     # Inputs
     "BriefForm",
     "DesignRequest",
+    # PDF extraction
+    "ExtractionWarning",
+    "ExtractionWarningCode",
     # Classifier
     "BriefStyleWeights",
     # Brief analyst

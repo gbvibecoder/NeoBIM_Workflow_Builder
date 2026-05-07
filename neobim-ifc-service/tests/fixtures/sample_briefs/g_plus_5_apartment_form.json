@@ -1,0 +1,8 @@
+{
+  "_comment": "TODO: real G+5 apartment BriefForm coming from Govind. Phase 2A Slice 2A.3 placeholder.",
+  "floors": 5,
+  "bhk_count": 2,
+  "location_city": "Pune",
+  "building_type": "residential",
+  "structural_system": "rcc"
+}
