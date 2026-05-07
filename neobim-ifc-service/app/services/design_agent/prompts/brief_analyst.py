@@ -294,6 +294,75 @@ DO NOT FABRICATE values. Better to leave null than to invent. The
 downstream BriefCritic stage in Phase 2C compares your extraction
 against the original brief and FLAGS hallucinations as a hard error.
 
+OUTPUT CHECKLIST — every BriefAnalysis field MUST appear in your tool input
+===========================================================================
+Anthropic's tool_use API does NOT strictly enforce JSON-schema
+"required" constraints — your output is validated downstream by
+Pydantic, which rejects partial submissions with "Field required".
+Emit every field below, even when the value is empty / zero / null.
+
+Top-level fields (all required):
+
+  * building_class      (object — primary_type, sub_type, nbc_group,
+                         nbc_subdivision; nbc_group nullable per the
+                         WHEN TO LEAVE nbc_group NULL section)
+  * site_context        (object — every nested field is Optional;
+                         populate what the brief states, leave null
+                         otherwise; do NOT guess seismic / wind zones)
+  * style_intent        (object — architectural_style required;
+                         cultural_overlay, massing_hint,
+                         facade_treatment Optional)
+  * structural_intent   (object — system defaults to "auto"; override
+                         on explicit brief signal)
+  * fidelity_hint       (object — derived from target_fidelity:
+                         concept = all false; design-development =
+                         mep_routing_required true; tender-ready = all
+                         three flags true)
+  * floors_above_ground (int 1..50 — required, never null)
+  * floors_below_ground (int 0..10 — emit 0 if no basement mentioned)
+  * explicit_room_list  (list[str] — emit empty list when none)
+  * explicit_dimensions (dict[str, str] — emit empty dict when none)
+  * user_priorities     (list[str] — emit empty list when none)
+  * raw_brief_summary   (str ≥ 1 char — your 2-3 sentence paraphrase
+                         of the brief in your own words; required)
+  * extraction_warnings (list[str] — emit empty list when nothing
+                         was missing or ambiguous)
+
+CONCRETE EXAMPLES FOR EMPTY / SPARSE CASES
+==========================================
+Models follow examples better than rules. When a field has no
+meaningful value, emit the empty form — DO NOT omit the field:
+
+  * Brief mentions no specific room sizes →
+      "explicit_dimensions": {{}}        (empty dict, NOT omitted)
+
+  * Brief lists no rooms by name →
+      "explicit_room_list": []          (empty list, NOT omitted)
+
+  * Brief gives no user priorities →
+      "user_priorities": []             (empty list, NOT omitted)
+
+  * No basement is mentioned →
+      "floors_below_ground": 0          (zero, NOT omitted)
+
+  * Everything extracted cleanly →
+      "extraction_warnings": []         (empty list, NOT omitted)
+
+  * A field truly cannot be extracted and you'd otherwise be tempted
+    to hallucinate → keep the field, set its value to null where
+    nullable, and add ONE entry to extraction_warnings naming what
+    was missing, e.g.
+      "extraction_warnings": ["Plot dimensions not specified."]
+
+  * Narrative-dominant briefs (style words, no numbers) still need
+    floors_above_ground. Infer from clear signals like "5 floors"
+    or "G+5"; if absent entirely, emit 1 (the schema's minimum
+    valid integer) and add a warning, e.g.
+      "extraction_warnings": ["Floor count not stated; defaulted to 1."]
+
+The schema rejects partial output. Emit every required field — empty
+values are fine; absent fields are NOT.
+
 OUTPUT
 ======
 Return ONLY through the submit_response tool. The tool input must
