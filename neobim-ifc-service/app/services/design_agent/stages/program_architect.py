@@ -5,11 +5,41 @@ produces a :class:`RoomProgram` that downstream Phase 2B agents
 (LayoutArchitect, StructuralEngineer, MEPEngineer) can build a
 floor plan from.
 
+Why Sonnet 4.6 (not Haiku 4.5)
+-------------------------------
+Slice 2A.5's BriefAnalyst runs cleanly on Haiku 4.5 (~30-field
+output, 5-10s per call). ProgramArchitect emits 5-10× more
+content — a fully-fleshed RoomProgram for a multi-floor mixed-use
+or 3-floor hospital is 8000-10000 output tokens (15+ rooms ×
+14 fields each + circulation + constraints + summary +
+warnings).
+
+Slice 2A.6 first-cache-generation runs found Haiku 4.5
+- repeatedly hit the 30s ceiling (~10000 tokens / ~80 tok/s ~= 125s);
+- occasionally dropped required schema fields under load (the
+  same brittle behaviour that took 4 commits to nail down for
+  BriefAnalyst).
+
+Sonnet 4.6 is the right model for this stage:
+- Tighter schema adherence on long structured outputs (Sonnet
+  is consistently more reliable about emitting every required
+  field at higher response sizes).
+- More concise responses (~30% fewer tokens for equivalent
+  semantic content) — a 10K-token Haiku response becomes a
+  ~7K-token Sonnet response, which fits the 60s ceiling
+  comfortably.
+- Cost is ~3× per call but absolute is trivial (~$0.13 for the
+  11-call cache regen vs ~$0.04 on Haiku).
+
+The MODEL_MAX_TIMEOUT["sonnet-4.6"] is bumped to 60s in this slice
+to give the largest expected outputs (G+5 form-only with 12+ rooms
+per BHK template) wallclock headroom.
+
 Flow
 ----
 1. Build system prompt + user message (per-call, embeds the analysis
    so the prompt branches on building type / vastu / floor count).
-2. Call Haiku 4.5 with a 10s wallclock ceiling.
+2. Call Sonnet 4.6 with a 60s wallclock ceiling.
 3. **Recovery**: if the LLM emits a sub-NBC room area
    (ROOM_AREA_RESPECTS_NBC fires inside Pydantic), catch the
    :class:`LLMResponseValidationError`, auto-correct the offending
@@ -57,12 +87,12 @@ from app.services.design_agent.types import (
 )
 
 
-# Slice 2A.6 — bumped from 10s after the LLMClient ceiling raise (Option D
-# infra change). 10s was the BriefAnalyst-fitted floor; ProgramArchitect's
-# RoomProgram with 8-15 RoomSpec entries needs Haiku 15-25s of generation
-# time. The LLMClient still clamps to MODEL_MAX_TIMEOUT["haiku-4.5"]=30s,
-# so this stays at the ceiling for safety.
-_PROGRAM_ARCHITECT_TIMEOUT_S: float = 30.0
+# Slice 2A.6 final tuning — 60s ceiling matches MODEL_MAX_TIMEOUT["sonnet-4.6"].
+# Sonnet generates ~7K tokens for a hospital / G+5 / multi-floor mixed-use
+# program in 30-50s; the 60s budget keeps every realistic single-call
+# duration under the ceiling with margin. See module docstring for the
+# Haiku -> Sonnet rationale.
+_PROGRAM_ARCHITECT_TIMEOUT_S: float = 60.0
 
 
 @dataclass(frozen=True)
@@ -97,7 +127,7 @@ def run_program_architect(
     auto_corrections = 0
     try:
         parsed, llm_metadata = llm_client.call(
-            model="haiku-4.5",
+            model="sonnet-4.6",
             system_prompt=system_prompt,
             user_message=user_message,
             response_schema=RoomProgram,
@@ -120,7 +150,7 @@ def run_program_architect(
         # zero accounting; the route handler will see auto_corrections
         # > 0 and know recovery happened.
         llm_metadata = LLMCallMetadata(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             input_tokens=0, output_tokens=0,
             cache_read_tokens=0, cache_creation_tokens=0,
             cost_usd_estimated=0.0,

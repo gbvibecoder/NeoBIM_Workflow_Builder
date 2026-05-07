@@ -240,7 +240,7 @@ def test_model_max_timeout_per_tier() -> None:
     leaving headroom for the realistic single-call duration.
     """
     assert MODEL_MAX_TIMEOUT["haiku-4.5"] == 30.0
-    assert MODEL_MAX_TIMEOUT["sonnet-4.6"] == 30.0
+    assert MODEL_MAX_TIMEOUT["sonnet-4.6"] == 60.0
     assert MODEL_MAX_TIMEOUT["opus-4.7"] == 60.0
 
 

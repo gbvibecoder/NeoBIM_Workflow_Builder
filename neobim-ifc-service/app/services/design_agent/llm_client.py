@@ -116,7 +116,7 @@ ANTHROPIC_MODEL_NAMES: dict[ModelKey, str] = {
 # inside the ceiling or fails cleanly at the boundary.
 MODEL_MAX_TIMEOUT: dict[ModelKey, float] = {
     "haiku-4.5": 30.0,
-    "sonnet-4.6": 30.0,
+    "sonnet-4.6": 60.0,
     "opus-4.7": 60.0,
 }
 
