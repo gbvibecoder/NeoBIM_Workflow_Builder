@@ -13,6 +13,13 @@ import {
 import { checkWebhookIdempotency, clearWebhookIdempotency } from '@/lib/webhook-idempotency';
 import { trackServerPurchase } from '@/lib/server-conversions';
 import { getPlanValueINR } from '@/lib/plan-pricing';
+import { billingFeatureFlags } from '@/features/billing/lib/feature-flags';
+import {
+  billingGraceWindowFlagOff,
+  billingRolePreservedInGrace,
+  billingCancelWithNoPeriodEnd,
+} from '@/features/billing/lib/metrics';
+import { applyImmediateDowngrade } from '@/features/billing/lib/role-transitions';
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -72,10 +79,7 @@ export async function POST(req: NextRequest) {
       case 'subscription.completed':
       case 'subscription.expired':
       case 'subscription.halted': {
-        const subscription = event.payload?.subscription?.entity;
-        if (!subscription?.id) break;
-
-        await cancelSubscription(subscription);
+        await handleRazorpaySubscriptionTermination(event, eventType, eventId);
         break;
       }
 
@@ -274,7 +278,116 @@ async function activateSubscription(subscription: {
   }
 }
 
-async function cancelSubscription(subscription: { id: string }) {
+/**
+ * Grace-aware termination handler for the 4 Razorpay cancel-class events
+ * (subscription.cancelled / .completed / .expired / .halted).
+ *
+ * Flag OFF: emit billing.grace_window_flag_off, run the legacy path
+ *           (cancelSubscription_LEGACY) byte-for-byte unchanged. Flipping
+ *           BILLING_GRACE_WINDOW_ENABLED back to 'false' instantly restores
+ *           prior behaviour — this is the rollback path.
+ *
+ * Flag ON: read subscription.current_end (Unix seconds Razorpay reports).
+ *   - currentEnd missing → refuse to act, emit billing.cancel_with_no_period_end
+ *   - currentEnd in the future → preserve role, refresh stripeCurrentPeriodEnd,
+ *     emit billing.role_preserved_in_grace. The hourly cron at
+ *     /api/cron/billing-grace-window-sweep downgrades when it actually expires.
+ *   - currentEnd in the past → applyImmediateDowngrade. A cancel event
+ *     arriving with a stale period_end deserves the same terminal action.
+ *
+ * Exported for unit tests; otherwise treat as module-internal.
+ */
+export async function handleRazorpaySubscriptionTermination(
+  event: {
+    payload?: {
+      subscription?: {
+        entity?: {
+          id?: string;
+          current_end?: number;
+          charge_at?: number;
+        };
+      };
+    };
+  },
+  eventType: string,
+  webhookEventId: string,
+): Promise<void> {
+  const entity = event.payload?.subscription?.entity;
+  const subscriptionId = entity?.id;
+  if (!subscriptionId) {
+    console.error('[RAZORPAY_WEBHOOK] Missing subscription ID in', eventType, 'payload');
+    return;
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { razorpaySubscriptionId: subscriptionId },
+    select: { id: true, email: true, name: true, role: true },
+  });
+
+  if (!user) {
+    console.error('[RAZORPAY_WEBHOOK] User not found for cancelled subscription:', subscriptionId);
+    return;
+  }
+
+  // ─── Kill switch ───────────────────────────────────────────────────
+  if (!billingFeatureFlags.graceWindowEnabled) {
+    billingGraceWindowFlagOff({
+      handler: `razorpay.${eventType}`,
+      userId: user.id,
+      event: eventType,
+    });
+    await cancelSubscription_LEGACY({ id: subscriptionId });
+    return;
+  }
+
+  // ─── Flag ON: grace-aware behaviour ────────────────────────────────
+  const currentEndUnix = entity?.current_end;
+  const currentEnd =
+    currentEndUnix && currentEndUnix > 0 ? new Date(currentEndUnix * 1000) : null;
+
+  if (!currentEnd) {
+    billingCancelWithNoPeriodEnd({
+      provider: 'razorpay',
+      eventType,
+      userId: user.id,
+      subscriptionId,
+    });
+    return;
+  }
+
+  const now = new Date();
+  if (currentEnd > now) {
+    // Inside paid grace window. Preserve role; refresh period_end so the
+    // cron's expired-user query has an accurate boundary.
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { stripeCurrentPeriodEnd: currentEnd },
+    });
+    billingRolePreservedInGrace({
+      userId: user.id,
+      provider: 'razorpay',
+      eventType,
+      graceUntilIso: currentEnd.toISOString(),
+    });
+    return;
+  }
+
+  // Period already past — terminal. Safe to downgrade.
+  await applyImmediateDowngrade({
+    userId: user.id,
+    reason: 'cancel_event_grace_already_past',
+    triggeredBy: 'webhook',
+    providerEventId: webhookEventId,
+  });
+}
+
+/**
+ * LEGACY immediate-downgrade behaviour. Preserved BYTE-FOR-BYTE so flipping
+ * BILLING_GRACE_WINDOW_ENABLED back to false instantly restores the prior
+ * (broken-but-known) behaviour. Do NOT modify this function — it is the
+ * rollback path.
+ */
+async function cancelSubscription_LEGACY(subscription: { id: string }) {
   const user = await prisma.user.findFirst({
     where: { razorpaySubscriptionId: subscription.id },
     select: { id: true, email: true, name: true, role: true },
