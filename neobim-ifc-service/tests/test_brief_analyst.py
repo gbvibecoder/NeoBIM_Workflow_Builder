@@ -325,6 +325,14 @@ def test_brief_analyst_circular_futuristic_bangalore() -> None:
     # Mixed-use or office (the brief explicitly mixes retail + office)
     assert analysis.building_class.primary_type in {"mixed_use", "office", "retail"}
 
+    # Slice 2A.5 schema fix — for mixed-use, nbc_group may be null
+    # (multi-group span) OR one of the contributing groups (E office,
+    # F mercantile, D assembly). Both are acceptable per the prompt.
+    assert analysis.building_class.nbc_group in {None, "E", "F", "D"}, (
+        f"unexpected nbc_group for mixed-use brief: "
+        f"{analysis.building_class.nbc_group!r}"
+    )
+
     # Bangalore: Zone II
     assert (analysis.site_context.location_city or "").lower().startswith(
         ("bang", "beng")
@@ -400,6 +408,12 @@ def test_brief_analyst_rejects_non_building() -> None:
     analysis, _meta = _run_or_skip(request, weights, pdf_text=None)
 
     assert analysis.building_class.primary_type == "unknown"
+    # Slice 2A.5 schema fix — non-building briefs MUST have nbc_group=null
+    # (NBC groups categorise buildings, not infrastructure).
+    assert analysis.building_class.nbc_group is None, (
+        f"non-building brief must have nbc_group=None; got "
+        f"{analysis.building_class.nbc_group!r}"
+    )
     # And a rejection note in extraction_warnings
     warnings_text = " ".join(analysis.extraction_warnings).lower()
     assert any(

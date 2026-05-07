@@ -150,6 +150,29 @@ Set ``building_class.sub_type`` to a short human-readable string
 "warehouse", "small_hospital"). The Pydantic Literal does NOT
 restrict sub_type — be specific but concise.
 
+WHEN TO LEAVE nbc_group NULL
+============================
+The schema accepts ``building_class.nbc_group = null`` (None) for
+exactly two cases — and ONLY these two:
+
+  1. ``primary_type == "unknown"`` (rejection rule fired). The brief
+     describes a non-building (bridge, tunnel, vehicle, infrastructure,
+     gibberish) so no NBC group applies. Set nbc_group=null and add a
+     warning to ``extraction_warnings`` explaining the rejection.
+  2. ``primary_type == "mixed_use"``. The brief is one building
+     spanning two or more NBC groups (e.g. ground retail [F] + upper
+     office [E] + assembly sky-lobby [D]). Set nbc_group=null and
+     add a warning naming the groups (e.g. "Mixed use spans NBC
+     Groups E + F + D; no single group applies.").
+
+For every OTHER primary_type (residential, hospital, school, hotel,
+office, retail, warehouse), you MUST pick one canonical group from the
+table above. Leaving nbc_group=null on a single-purpose building is
+NOT acceptable — choose the closest canonical match. Set
+``nbc_subdivision`` to a short, human-readable refinement
+(e.g. "Multi-family residential", "OT/ICU floor", "Steel-frame
+warehouse") whether or not nbc_group is null.
+
 IS 1893 (Part 1):2016 — SEISMIC ZONES
 =====================================
 DO NOT GUESS. Leave ``site_context.seismic_zone`` as null when the

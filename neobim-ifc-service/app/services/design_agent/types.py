@@ -323,12 +323,33 @@ class BriefStyleWeights(BaseModel):
 
 
 class BuildingClass(BaseModel):
-    """Detected building category, NBC India occupancy class, and load."""
+    """Detected building category, NBC India occupancy class, and load.
+
+    ``nbc_group`` is ``Optional`` (Slice 2A.5 schema fix) so the
+    BriefAnalyst can honestly emit ``null`` for the two cases where no
+    single NBC group applies:
+
+    * ``primary_type == "unknown"`` — non-building brief (bridge,
+      tunnel, vehicle, gibberish). The rejection rule on the
+      BriefAnalyst prompt fires and ``primary_type`` becomes "unknown";
+      ``nbc_group`` follows with ``None`` because NBC groups categorise
+      buildings, not infrastructure.
+    * ``primary_type == "mixed_use"`` — a single building spanning two
+      or more NBC groups (e.g. ground-floor retail [F] + upper-floor
+      office [E] + assembly sky-lobby [D]). Forcing one group would
+      misinform the StructuralEngineer (Phase 2B), which keys on the
+      group for seismic detailing class.
+
+    For every other ``primary_type`` (residential, hospital, school,
+    etc.), the BriefAnalyst MUST emit a canonical NBC group string —
+    leaving it null on a single-purpose building is a prompt failure,
+    not honesty.
+    """
 
     model_config = ConfigDict(frozen=True)
     primary_type: PrimaryBuildingType
     sub_type: str = Field(min_length=1)
-    nbc_group: NBCGroup
+    nbc_group: Optional[NBCGroup] = None
     nbc_subdivision: str = Field(min_length=1)
     occupancy_load_persons: Optional[int] = Field(default=None, ge=0)
 
