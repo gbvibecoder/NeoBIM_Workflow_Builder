@@ -72,6 +72,7 @@ _BARE_DIM_SCORE: float = 0.5         # AxB with no obvious context word
 _BHK_SCORE: float = 2.0              # "2BHK" — strong Indian residential shorthand
 _FORM_FIELD_SCORE: float = 2.5       # each explicitly-set BriefForm field
 _FLOOR_COUNT_SCORE: float = 0.7      # "5 floors", "G+3"
+_FLOOR_ORDINAL_SCORE: float = 0.5    # "top floor", "ground floor"
 _AREA_MENTION_SCORE: float = 0.7     # "1200 sqft", "120 sqm"
 _ENVELOPE_DIM_SCORE: float = 0.7     # "30m diameter", "15m wide"
 _BARE_METRIC_SCORE: float = 0.5      # "30m" with no descriptor (likely envelope)
@@ -92,13 +93,27 @@ SIGNAL_PLATEAU: float = 6.0          # raw-signal level at which confidence satu
 
 
 # Style / aesthetic words. Strong narrative signals.
+#
+# The "shape-style" cluster (circular, elliptical, hexagonal, etc.) is
+# a deliberate inclusion: in Indian architectural briefs these words
+# almost always carry stylistic intent, not just literal geometry —
+# "circular cafe" reads as an aesthetic claim, not a footprint
+# specification. "parametric" is included in the architectural sense
+# ("parametric facade") which collides nominally with the schema's
+# parametric *category* — that's fine, the brief is making a style
+# claim and the classifier scores it as such.
 _STYLE_WORDS: frozenset[str] = frozenset(
     {
+        # Aesthetic / period styles
         "modern", "futuristic", "traditional", "minimalist", "minimalistic",
         "industrial", "rustic", "luxurious", "luxury", "contemporary",
         "vintage", "mediterranean", "bohemian", "scandinavian", "japanese",
         "tropical", "victorian", "colonial", "zen", "biophilic",
         "vastu", "feng-shui",
+        # Shape-style descriptors (Slice 2A.2 follow-up)
+        "circular", "elliptical", "spherical", "hexagonal", "triangular",
+        "organic", "curvilinear", "free-form", "freeform", "geometric",
+        "parametric",
     }
 )
 
@@ -172,6 +187,16 @@ _FLOOR_RE: re.Pattern[str] = re.compile(
 
 # G+N building shorthand — "G+3", "G+5"
 _G_PLUS_N_RE: re.Pattern[str] = re.compile(r"\bG\s*\+\s*(\d+)\b", re.IGNORECASE)
+
+# Ordinal floor mention — "top floor", "ground floor", "first floor",
+# "basement level". A weaker parametric signal than a numeric floor
+# count (0.5 vs 0.7) because it conveys position, not building scale.
+_FLOOR_ORDINAL_RE: re.Pattern[str] = re.compile(
+    r"\b(?:top|ground|first|second|third|fourth|fifth|sixth|seventh|"
+    r"eighth|ninth|tenth|upper|lower|basement)\s+"
+    r"(?:floor|storey|story|level)\b",
+    re.IGNORECASE,
+)
 
 # Area mention — sqft, sqm, square feet/meters
 _AREA_RE: re.Pattern[str] = re.compile(
@@ -297,11 +322,17 @@ def _score_parametric(text: str, form: Optional[BriefForm]) -> tuple[float, list
         score += len(bhk_matches) * _BHK_SCORE
         signals.append(f"{len(bhk_matches)} BHK mention(s)")
 
-    # Floor count
+    # Floor count (numeric: "5 floors", "G+3")
     floor_matches = _FLOOR_RE.findall(text) + _G_PLUS_N_RE.findall(text)
     if floor_matches:
         score += len(floor_matches) * _FLOOR_COUNT_SCORE
         signals.append(f"{len(floor_matches)} floor-count mention(s)")
+
+    # Ordinal floor mention ("top floor", "ground floor")
+    ordinal_floor_matches = _FLOOR_ORDINAL_RE.findall(text)
+    if ordinal_floor_matches:
+        score += len(ordinal_floor_matches) * _FLOOR_ORDINAL_SCORE
+        signals.append(f"{len(ordinal_floor_matches)} ordinal floor mention(s)")
 
     # Area mention
     area_matches = _AREA_RE.findall(text)
