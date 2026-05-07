@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -49,6 +50,27 @@ from app.services.design_agent.types import ExtractionWarning
 
 
 log = logging.getLogger(__name__)
+
+
+# ─── Page marker format (Slice 2A.3 follow-up — public exports) ──────
+
+
+# Format string that produces the per-page header inserted into the
+# extractor's output. 1-based numbering matches how a user verbally
+# refers to pages. Example: ``=== Page 1 ===``. Exposed as a public
+# constant so the BriefAnalyst system prompt (Slice 2A.5) can embed
+# the literal format in its instructions and trust the markers will
+# match without drift.
+PAGE_MARKER_FORMAT: str = "=== Page {page_number} ==="
+
+# Compiled regex matching a page marker line. Capture group 1 yields
+# the 1-based page number as a string. Anchored at line start +
+# end via re.MULTILINE so consumers can ``finditer`` over a full
+# extracted document. Mirrors :data:`PAGE_MARKER_FORMAT` — drift
+# between the two is a bug; the slice's tests pin both.
+PAGE_MARKER_RE: re.Pattern[str] = re.compile(
+    r"^=== Page (\d+) ===$", re.MULTILINE
+)
 
 
 # ─── Tunable thresholds ───────────────────────────────────────────────
@@ -305,9 +327,9 @@ def extract_pdf_text(
         if warning is not None:
             warnings.append(warning)
         if text is None:
-            page_texts.append(f"=== Page {idx + 1} ===\n[extraction failed]")
+            page_texts.append(f"{PAGE_MARKER_FORMAT.format(page_number=idx + 1)}\n[extraction failed]")
             continue
-        page_texts.append(f"=== Page {idx + 1} ===\n{text.strip()}")
+        page_texts.append(f"{PAGE_MARKER_FORMAT.format(page_number=idx + 1)}\n{text.strip()}")
         if len(text.strip()) >= _NON_EMPTY_PAGE_MIN_CHARS:
             non_empty_chars.append(len(text.strip()))
 
@@ -352,4 +374,6 @@ __all__ = [
     "extract_pdf_text",
     "vision_extract_pdf",
     "VisionExtractionUnavailableError",
+    "PAGE_MARKER_FORMAT",
+    "PAGE_MARKER_RE",
 ]

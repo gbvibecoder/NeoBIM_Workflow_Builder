@@ -24,7 +24,11 @@ public surface in one place.
 
 from app.services.design_agent.classifier import classify_brief
 from app.services.design_agent.intake import parse_design_request
-from app.services.design_agent.pdf_extractor import extract_pdf_text
+from app.services.design_agent.pdf_extractor import (
+    PAGE_MARKER_FORMAT,
+    PAGE_MARKER_RE,
+    extract_pdf_text,
+)
 from app.services.design_agent.types import (
     BriefAnalysis,
     BriefForm,
@@ -56,6 +60,8 @@ __all__ = [
     "extract_pdf_text",
     "ExtractionWarning",
     "ExtractionWarningCode",
+    "PAGE_MARKER_FORMAT",
+    "PAGE_MARKER_RE",
     # Intake (Slice 2A.3)
     "parse_design_request",
     # Classifier (Slice 2A.2)

@@ -279,3 +279,20 @@ def test_intake_honours_explicit_target_fidelity() -> None:
         {"brief_text": "x", "target_fidelity": "tender-ready"}
     )
     assert req.target_fidelity == "tender-ready"
+
+
+# ─── auto_vision_retry flag (Slice 2A.3 follow-up) ───────────────────
+
+
+def test_intake_auto_vision_retry_defaults_false() -> None:
+    """Default behaviour: surface VISION_REQUIRED warning, do not auto-retry."""
+    req = parse_design_request({"brief_text": "x"})
+    assert req.auto_vision_retry is False
+
+
+def test_intake_auto_vision_retry_explicit_true_honoured() -> None:
+    """Client opts in to auto-retry → flag preserved."""
+    req = parse_design_request(
+        {"brief_text": "x", "auto_vision_retry": True}
+    )
+    assert req.auto_vision_retry is True

@@ -225,6 +225,46 @@ def test_all_sample_brief_fixtures_exist() -> None:
     assert not missing, f"missing fixtures: {sorted(missing)}"
 
 
+# ─── PAGE_MARKER constants (Slice 2A.3 follow-up) ─────────────────────
+
+
+def test_page_marker_format_produces_one_based_marker() -> None:
+    """PAGE_MARKER_FORMAT renders the 1-based ``=== Page N ===`` literal."""
+    from app.services.design_agent.pdf_extractor import PAGE_MARKER_FORMAT
+    assert PAGE_MARKER_FORMAT.format(page_number=1) == "=== Page 1 ==="
+    assert PAGE_MARKER_FORMAT.format(page_number=42) == "=== Page 42 ==="
+
+
+def test_page_marker_re_matches_format_output() -> None:
+    """PAGE_MARKER_RE recovers the page number from PAGE_MARKER_FORMAT.
+
+    Drift between the two would mean an extracted document's markers
+    no longer match the prompt's instructions in Slice 2A.5 — pin
+    both directions.
+    """
+    from app.services.design_agent.pdf_extractor import (
+        PAGE_MARKER_FORMAT, PAGE_MARKER_RE,
+    )
+    for n in (1, 7, 42, 1000):
+        line = PAGE_MARKER_FORMAT.format(page_number=n)
+        m = PAGE_MARKER_RE.search(line)
+        assert m is not None, f"PAGE_MARKER_RE missed line: {line!r}"
+        assert int(m.group(1)) == n
+
+
+def test_page_marker_re_finds_all_markers_in_extracted_text(tmp_path: Path) -> None:
+    """A multi-page extracted document produces markers PAGE_MARKER_RE
+    can finditer across — verifies the publicly-exported regex is
+    actually usable on real extractor output, not just synthetic
+    strings."""
+    from app.services.design_agent.pdf_extractor import PAGE_MARKER_RE
+    pages = ["page one body content " * 20, "page two body content " * 20]
+    pdf = _make_text_pdf(tmp_path / "marker.pdf", pages)
+    text, _ = extract_pdf_text(str(pdf))
+    page_numbers = [int(m.group(1)) for m in PAGE_MARKER_RE.finditer(text)]
+    assert page_numbers == [1, 2]
+
+
 def test_placeholder_pdf_extracts_with_no_warnings(tmp_path: Path) -> None:
     """The committed placeholder PDF parses cleanly via the extractor.
 

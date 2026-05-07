@@ -211,6 +211,15 @@ class DesignRequest(BaseModel):
     brief_text: Optional[str] = None
     target_fidelity: TargetFidelity = "design-development"
     build_id: str = Field(min_length=1)
+    # Phase 2A Slice 2A.3 follow-up: explicit-retry default for image-
+    # heavy PDFs. False (default) → ``extract_pdf_text`` surfaces
+    # ``VISION_REQUIRED`` warnings and the client decides whether to
+    # re-submit with this flag flipped. True → the route handler
+    # (Slice 2A.7) automatically calls ``vision_extract_pdf`` (Opus
+    # 4.7) on any VISION_REQUIRED warning. Default-off keeps cost
+    # predictable; opt-in convenience for clients that want to skip
+    # the round-trip.
+    auto_vision_retry: bool = False
 
 
 # ─── PDF EXTRACTION WARNINGS (Slice 2A.3) ────────────────────────────
