@@ -24,10 +24,8 @@
  * Run with: npx tsx scripts/restore-wrongly-downgraded-users.ts [--execute]
  */
 
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/db";
 import { deriveRoleFromPlan } from "@/features/billing/lib/role-transitions";
-
-const prisma = new PrismaClient();
 
 const DRY_RUN = !process.argv.includes("--execute");
 
