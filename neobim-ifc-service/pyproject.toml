@@ -19,6 +19,11 @@ dependencies = [
     # Image-based PDFs (avg < 100 chars/page) defer to the Vision-capable
     # Anthropic call wired in Slice 2A.4.
     "pypdf>=4.0",
+    # Phase 2A Slice 2A.4 — Anthropic SDK for the design-agent LLM
+    # stages (BriefAnalyst, ProgramArchitect, vision-fallback PDF
+    # extraction). >=0.40 lands tool_use + ephemeral prompt caching
+    # support that the cache layer relies on.
+    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]

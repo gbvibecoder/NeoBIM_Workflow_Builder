@@ -24,10 +24,20 @@ public surface in one place.
 
 from app.services.design_agent.classifier import classify_brief
 from app.services.design_agent.intake import parse_design_request
+from app.services.design_agent.llm_client import (
+    CircuitBreakerTripped,
+    LLMAPIError,
+    LLMCallMetadata,
+    LLMClient,
+    LLMRateLimited,
+    LLMResponseValidationError,
+    LLMUnavailableError,
+)
 from app.services.design_agent.pdf_extractor import (
     PAGE_MARKER_FORMAT,
     PAGE_MARKER_RE,
     extract_pdf_text,
+    vision_extract_pdf,
 )
 from app.services.design_agent.types import (
     BriefAnalysis,
@@ -62,6 +72,16 @@ __all__ = [
     "ExtractionWarningCode",
     "PAGE_MARKER_FORMAT",
     "PAGE_MARKER_RE",
+    # Vision extraction (Slice 2A.4 wires this through Opus 4.7)
+    "vision_extract_pdf",
+    # LLM client (Slice 2A.4)
+    "LLMClient",
+    "LLMCallMetadata",
+    "LLMUnavailableError",
+    "CircuitBreakerTripped",
+    "LLMResponseValidationError",
+    "LLMRateLimited",
+    "LLMAPIError",
     # Intake (Slice 2A.3)
     "parse_design_request",
     # Classifier (Slice 2A.2)

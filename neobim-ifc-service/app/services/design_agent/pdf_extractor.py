@@ -34,6 +34,7 @@ Layering rules (mirrors Phase 1)
 
 from __future__ import annotations
 
+import base64
 import io
 import logging
 import re
@@ -45,6 +46,7 @@ from typing import Optional
 
 import pypdf
 import pypdf.errors
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.design_agent.types import ExtractionWarning
 
@@ -88,40 +90,126 @@ _VISION_TRIGGER_AVG_CHARS: int = 100
 _NON_EMPTY_PAGE_MIN_CHARS: int = 1
 
 
-# ─── Vision extraction stub (Slice 2A.4 swaps the body) ──────────────
+# ─── Vision extraction (Slice 2A.4 — Claude Opus 4.7 via LLMClient) ──
 
 
 class VisionExtractionUnavailableError(NotImplementedError):
-    """Raised when an image-based PDF needs Vision but the LLM client
-    is not yet wired in.
+    """Defined for backwards compatibility with Slice 2A.3's stub-error
+    contract. The Slice 2A.4 wiring no longer raises this in the happy
+    path; instead, :func:`vision_extract_pdf` returns a
+    ``(empty_text, [ExtractionWarning])`` tuple on every failure mode
+    (mirroring the never-raise contract of :func:`extract_pdf_text`).
 
-    Slice 2A.3 raises this on the image-only path; Slice 2A.4 replaces
-    :func:`vision_extract_pdf` with a real Claude Vision implementation,
-    at which point this exception class is no longer raised in
-    production. We keep the class defined here so the symbol is
-    importable for tests + future fallbacks.
+    The class is kept exported for any future fallback paths that
+    want to signal "vision is required but unavailable" structurally.
     """
 
 
-def vision_extract_pdf(pdf_bytes: bytes) -> tuple[str, list[ExtractionWarning]]:
-    """Vision-fallback PDF extractor — STUB until Slice 2A.4.
+class _VisionExtractionResponse(BaseModel):
+    """Internal Pydantic envelope for the Vision call's tool-use output."""
 
-    When Slice 2A.4 (LLM client) lands, this function will base64-
-    encode the PDF and pass it to ``Claude Opus 4.7`` via the
-    Anthropic SDK's ``document`` content block, ask it to transcribe
-    the architectural content (drawings labels, dimensions, room
-    annotations) into structured prose, and return the result.
+    model_config = ConfigDict(frozen=True)
+    extracted_text: str = ""
+    warnings: list[str] = Field(default_factory=list)
 
-    For Slice 2A.3 we raise a clear, structured error so the route
-    handler can surface "this brief contains drawings; the AI needs
-    Vision to read them — please retry once Slice 2A.4 ships" rather
-    than silently returning an empty string.
+
+_VISION_SYSTEM_PROMPT: str = (
+    "You are an architectural-brief transcription assistant. Extract "
+    "every piece of information from the provided PDF — text, "
+    "dimensions, annotations, room labels, level markers — and return "
+    "as plain text with === Page N === markers (1-based) at the start "
+    "of each page so callers can attribute facts to specific pages. "
+    "Transcribe drawing annotations: dimensions, room labels, level "
+    "markers. Do not invent content; if a page is fully blank, return "
+    "an empty marker block for that page. Do not editorialize."
+)
+
+_VISION_USER_INSTRUCTION: str = (
+    "Extract all text and structural information from this "
+    "architectural brief PDF. Return as plain text with "
+    "=== Page N === markers per page. Transcribe drawing annotations "
+    "(dimensions, room labels, level markers). Do not invent content."
+)
+
+
+def vision_extract_pdf(
+    pdf_path_or_url: str,
+) -> tuple[str, list[ExtractionWarning]]:
+    """Vision-fallback PDF extractor using Claude Opus 4.7.
+
+    Reads PDF bytes via :func:`_read_pdf_bytes` (so it accepts the
+    same path/URL inputs as :func:`extract_pdf_text`), base64-encodes
+    them into the Anthropic ``document`` content block, and asks
+    Opus 4.7 to transcribe architectural content into plain text
+    with ``=== Page N ===`` markers (consistent with the text-only
+    path's marker format).
+
+    Never raises on the LLM call. Failure modes
+    (:class:`LLMUnavailableError` / :class:`CircuitBreakerTripped` /
+    :class:`LLMAPIError` / :class:`LLMResponseValidationError`) wrap
+    as ``ExtractionWarning(code="VISION_REQUIRED", ...)`` so the
+    route handler can surface a partial result rather than a 500.
+
+    Slice 2A.4: prompt + schema + LLM call wired. Slice 2A.5+ may
+    wire automated retry on cache miss when the route handler's
+    ``auto_vision_retry`` flag is true (Slice 2A.7's responsibility).
     """
-    raise VisionExtractionUnavailableError(
-        "Vision extraction requires LLM client (Slice 2A.4). "
-        "The PDF is image-heavy (avg < 100 chars/page) so pypdf alone "
-        "cannot recover its architectural content."
+    pdf_bytes, io_warnings = _read_pdf_bytes(pdf_path_or_url)
+    if not pdf_bytes:
+        return "", io_warnings
+
+    # Lazy import — keeps pdf_extractor a leaf during cache-only mode
+    # tests that don't want the LLM client's import surface.
+    from app.services.design_agent.llm_client import (
+        CircuitBreakerTripped,
+        LLMAPIError,
+        LLMClient,
+        LLMResponseValidationError,
+        LLMUnavailableError,
     )
+
+    user_message = [
+        {
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": base64.b64encode(pdf_bytes).decode("ascii"),
+            },
+        },
+        {"type": "text", "text": _VISION_USER_INSTRUCTION},
+    ]
+
+    client = LLMClient()
+    try:
+        response, _meta = client.call(
+            model="opus-4.7",
+            system_prompt=_VISION_SYSTEM_PROMPT,
+            user_message=user_message,
+            response_schema=_VisionExtractionResponse,
+            timeout_seconds=30.0,
+        )
+    except (
+        LLMUnavailableError,
+        CircuitBreakerTripped,
+        LLMAPIError,
+        LLMResponseValidationError,
+    ) as exc:
+        return "", [
+            ExtractionWarning(
+                code="VISION_REQUIRED",
+                message=(
+                    f"Vision extraction failed: {type(exc).__name__}: {exc}. "
+                    f"Set ANTHROPIC_API_KEY or check API status."
+                ),
+            )
+        ]
+
+    warnings = [
+        ExtractionWarning(code="VISION_REQUIRED", message=w)
+        for w in response.warnings
+    ]
+    return response.extracted_text, warnings
 
 
 # ─── URL / path resolution ────────────────────────────────────────────

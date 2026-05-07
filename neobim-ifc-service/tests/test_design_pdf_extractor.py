@@ -11,6 +11,7 @@ read against once Govind drops in real content.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -161,11 +162,58 @@ def test_extract_low_avg_chars_triggers_vision_required(tmp_path: Path) -> None:
     assert "VISION_REQUIRED" in codes
 
 
-def test_vision_extract_pdf_stub_raises_unavailable() -> None:
-    """The stub in Slice 2A.3 must clearly signal Slice 2A.4 ownership."""
-    with pytest.raises(VisionExtractionUnavailableError) as exc:
-        vision_extract_pdf(b"%PDF-1.4 fake")
-    assert "Slice 2A.4" in str(exc.value)
+def test_vision_extract_pdf_without_api_key_returns_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Slice 2A.4: no API key + cache miss → graceful warning, not raise.
+
+    Replaces the Slice 2A.3 stub-raises-NotImplementedError contract.
+    The new contract mirrors :func:`extract_pdf_text` — never raise on
+    failure; always return a structured ``ExtractionWarning``.
+    """
+    # Force cache miss by pointing LLMClient at an empty tmp directory
+    # AND making sure no cache hit can resolve. We do this by
+    # monkeypatching the default cache dir for the duration of this test.
+    from app.services.design_agent import llm_client as _llm
+    monkeypatch.setattr(_llm, "CACHE_DIR", tmp_path / "miss-cache")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    pdf = _make_text_pdf(
+        tmp_path / "small.pdf",
+        ["Tiny brief content for vision-fallback test."],
+    )
+    text, warnings = vision_extract_pdf(str(pdf))
+    assert text == ""
+    assert any(w.code == "VISION_REQUIRED" for w in warnings)
+    assert any("LLMUnavailableError" in w.message for w in warnings)
+
+
+def test_vision_extraction_unavailable_class_still_exported() -> None:
+    """Slice 2A.3's exception class stays in the surface for any future
+    fallback path that wants to signal 'vision required but unavailable'
+    structurally — Slice 2A.4 no longer raises it from
+    vision_extract_pdf, but the symbol is preserved."""
+    assert issubclass(VisionExtractionUnavailableError, NotImplementedError)
+
+
+@pytest.mark.skipif(
+    not os.getenv("ANTHROPIC_API_KEY"),
+    reason="needs ANTHROPIC_API_KEY for real Claude Vision call",
+)
+def test_vision_extract_pdf_with_api_key_extracts(tmp_path: Path) -> None:
+    """Slice 2A.4: with API key, vision_extract_pdf actually transcribes
+    PDF content via Opus 4.7. Skipped in cache-only CI."""
+    pdf = _make_text_pdf(
+        tmp_path / "vision.pdf",
+        [
+            "2BHK apartment, 24x50 ft plot, RCC frame, "
+            "Pune. Master bedroom 12x14 ft. Kitchen 8x10 ft."
+        ],
+    )
+    text, warnings = vision_extract_pdf(str(pdf))
+    assert text  # non-empty
+    # Vision API errors should not raise — they wrap as warnings
+    assert all(isinstance(w.code, str) for w in warnings)
 
 
 def test_extraction_warning_schema_immutable() -> None:
