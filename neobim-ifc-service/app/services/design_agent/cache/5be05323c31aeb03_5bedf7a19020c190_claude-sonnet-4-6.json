@@ -1,0 +1,189 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f4-r-master-bedroom-01",
+        "name": "Master Bedroom",
+        "usage": "master_bedroom",
+        "target_area_sqm": 14.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-master-bathroom-01",
+          "f4-r-balcony-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "South-west placement per Vastu; en-suite bathroom attached. Primary bedroom for the 2 BHK unit on the top floor."
+      },
+      {
+        "id": "f4-r-master-bathroom-01",
+        "name": "Master Bathroom (En-suite)",
+        "usage": "bathroom",
+        "target_area_sqm": 4.5,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-master-bedroom-01"
+        ],
+        "adjacency_forbidden": [
+          "f4-r-kitchen-01"
+        ],
+        "notes": "En-suite attached to master bedroom; includes shower, WC and vanity unit."
+      },
+      {
+        "id": "f4-r-bedroom-01",
+        "name": "Bedroom 2",
+        "usage": "bedroom",
+        "target_area_sqm": 10.5,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-common-bathroom-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Secondary bedroom for the 2 BHK unit; north-west or east facing preferred for morning light."
+      },
+      {
+        "id": "f4-r-common-bathroom-01",
+        "name": "Common Bathroom",
+        "usage": "bathroom",
+        "target_area_sqm": 3.5,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-bedroom-01"
+        ],
+        "adjacency_forbidden": [
+          "f4-r-kitchen-01"
+        ],
+        "notes": "Shared bathroom serving Bedroom 2 and study; NBC hygiene separation from kitchen maintained."
+      },
+      {
+        "id": "f4-r-study-01",
+        "name": "Study / Home Office",
+        "usage": "study",
+        "target_area_sqm": 7.5,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-facing for diffused natural light; doubles as guest room if needed."
+      },
+      {
+        "id": "f4-r-balcony-01",
+        "name": "Master Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 5.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-master-bedroom-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North or east-facing balcony off master bedroom; RERA carpet area excluded per definition."
+      },
+      {
+        "id": "f4-r-balcony-02",
+        "name": "Living Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 4.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-living-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-facing living balcony; RERA carpet area excluded per definition."
+      },
+      {
+        "id": "f4-r-living-01",
+        "name": "Living Room",
+        "usage": "living",
+        "target_area_sqm": 18.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-dining-01",
+          "f4-r-balcony-02",
+          "f4-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-east zone per Vastu; generous ceiling height suits top floor. Combined living-dining arrangement typical of 2 BHK."
+      },
+      {
+        "id": "f4-r-dining-01",
+        "name": "Dining Area",
+        "usage": "dining",
+        "target_area_sqm": 8.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-living-01",
+          "f4-r-kitchen-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Open-plan dining adjacent to kitchen and living per contemporary layout."
+      },
+      {
+        "id": "f4-r-kitchen-01",
+        "name": "Kitchen",
+        "usage": "kitchen",
+        "target_area_sqm": 7.5,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-dining-01"
+        ],
+        "adjacency_forbidden": [
+          "f4-r-master-bathroom-01",
+          "f4-r-common-bathroom-01"
+        ],
+        "notes": "South-east placement per Vastu (Agni corner); MEP wet wall to be coordinated with riser shaft."
+      },
+      {
+        "id": "f4-r-utility-01",
+        "name": "Utility / Wash Area",
+        "usage": "utility",
+        "target_area_sqm": 2.5,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-kitchen-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Service area for washing machine and drying; shares wet wall with kitchen."
+      },
+      {
+        "id": "f4-r-corridor-01",
+        "name": "Internal Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 5.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-living-01",
+          "f4-r-master-bedroom-01",
+          "f4-r-bedroom-01",
+          "f4-r-study-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central spine corridor distributing access to all bedrooms, study and staircase landing."
+      },
+      {
+        "id": "f4-r-terrace-01",
+        "name": "Private Terrace",
+        "usage": "external",
+        "target_area_sqm": 20.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Top-floor exclusive terrace accessible from the corridor or living area; waterproofing treatment as per IS 3067. Counts as external area under RERA."
+      }
+    ],
+    "floor_summary": "Floor 4 is the topmost residential floor of the 2 BHK apartment, featuring a master bedroom with en-suite bathroom, a second bedroom, a study/home office, open-plan living-dining-kitchen, utility area, two balconies, an internal corridor, and an exclusive private terrace befitting the top-floor position."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1101,
+    "output_tokens": 1825,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2464,
+    "cost_usd_estimated": 0.039918,
+    "latency_ms": 24424.610832938924,
+    "created_at_iso": "2026-05-08T11:33:22.105069+00:00"
+  }
+}

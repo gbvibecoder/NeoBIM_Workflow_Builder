@@ -1,0 +1,119 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f0-r-warehouse-01",
+        "name": "Main Warehouse Floor",
+        "usage": "warehouse_floor",
+        "target_area_sqm": 120.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-loading-bay-01",
+          "f0-r-loading-bay-02",
+          "f0-r-store-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Primary bulk storage area; 8 m clear steel-frame height; rectangular massing suits racking layout; seismic zone III detailing required at column bases."
+      },
+      {
+        "id": "f0-r-loading-bay-01",
+        "name": "Loading Bay 1",
+        "usage": "loading_bay",
+        "target_area_sqm": 24.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-warehouse-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Dock-level loading bay on south/east facade; metal panel shuttered opening; ramped approach from MIDC road."
+      },
+      {
+        "id": "f0-r-loading-bay-02",
+        "name": "Loading Bay 2",
+        "usage": "loading_bay",
+        "target_area_sqm": 24.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-warehouse-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Second dock-level loading bay; paired with Bay 1; allows simultaneous truck loading/unloading operations."
+      },
+      {
+        "id": "f0-r-office-01",
+        "name": "Warehouse Manager Office",
+        "usage": "office",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-warehouse-01",
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Manager cabin overlooking warehouse floor; glazed partition for sightlines; MEP provisions for workstation and CCTV monitoring."
+      },
+      {
+        "id": "f0-r-lobby-01",
+        "name": "Entry Lobby",
+        "usage": "lobby",
+        "target_area_sqm": 6.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-office-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Visitor and staff entry point; connected to manager office and exterior pedestrian access."
+      },
+      {
+        "id": "f0-r-store-01",
+        "name": "Ancillary Store / Packaging Materials",
+        "usage": "store",
+        "target_area_sqm": 8.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-warehouse-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Small enclosed store for packaging materials, consumables, and tools; lockable."
+      },
+      {
+        "id": "f0-r-bathroom-01",
+        "name": "Staff Toilet (Male)",
+        "usage": "bathroom",
+        "target_area_sqm": 3.5,
+        "floor_index": 0,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "f0-r-warehouse-01"
+        ],
+        "notes": "NBC Group H compliant; 1 WC + 1 urinal + 1 wash basin; near lobby corridor for accessibility."
+      },
+      {
+        "id": "f0-r-bathroom-02",
+        "name": "Staff Toilet (Female)",
+        "usage": "bathroom",
+        "target_area_sqm": 3.5,
+        "floor_index": 0,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "f0-r-warehouse-01"
+        ],
+        "notes": "NBC Group H compliant; 1 WC + 1 wash basin; placed adjacent to male toilet block for shared plumbing wall."
+      }
+    ],
+    "floor_summary": "Ground floor (floor 0) accommodates the full single-storey warehouse program: a large 120 sqm bulk-storage hall with 8 m clear steel-frame height, two dock-level loading bays opening to the exterior, a manager's office with warehouse sightlines, an entry lobby, an ancillary packaging store, and separate male/female staff toilets — all sized to NBC India 2016 Group H minima for Aurangabad MIDC seismic zone III."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1153,
+    "output_tokens": 1212,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2472,
+    "cost_usd_estimated": 0.030909,
+    "latency_ms": 18009.701790986583,
+    "created_at_iso": "2026-05-08T11:33:41.557441+00:00"
+  }
+}

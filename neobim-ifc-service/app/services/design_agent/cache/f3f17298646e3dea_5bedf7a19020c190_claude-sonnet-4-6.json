@@ -1,0 +1,124 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f1-r-master-bedroom-01",
+        "name": "Master Bedroom",
+        "usage": "master_bedroom",
+        "target_area_sqm": 13.4,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-master-bathroom-01",
+          "f1-r-balcony-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-common-bathroom-01"
+        ],
+        "notes": "Vastu: SW corner placement. Explicit dimension 12×12 ft (~13.4 sqm) per brief."
+      },
+      {
+        "id": "f1-r-master-bathroom-01",
+        "name": "Master Bathroom (En-suite)",
+        "usage": "bathroom",
+        "target_area_sqm": 4.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-master-bedroom-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-pooja-room-01"
+        ],
+        "notes": "Vastu: NW/W placement relative to master bedroom. En-suite attached to master bedroom."
+      },
+      {
+        "id": "f1-r-second-bedroom-01",
+        "name": "Second Bedroom",
+        "usage": "bedroom",
+        "target_area_sqm": 11.15,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-common-bathroom-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Explicit dimension 10×12 ft (~11.15 sqm) per brief. Positioned towards N or E per Vastu for secondary bedroom."
+      },
+      {
+        "id": "f1-r-common-bathroom-01",
+        "name": "Common Bathroom",
+        "usage": "bathroom",
+        "target_area_sqm": 3.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-second-bedroom-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-pooja-room-01",
+          "f1-r-master-bedroom-01"
+        ],
+        "notes": "Vastu: NW or W placement. Shared bathroom for second bedroom and study."
+      },
+      {
+        "id": "f1-r-study-01",
+        "name": "Study / Home Office",
+        "usage": "study",
+        "target_area_sqm": 5.5,
+        "floor_index": 1,
+        "adjacency_required": [],
+        "adjacency_forbidden": [],
+        "notes": "Vastu: N or E placement preferred for concentration and productivity."
+      },
+      {
+        "id": "f1-r-pooja-room-01",
+        "name": "Pooja Room",
+        "usage": "pooja_room",
+        "target_area_sqm": 1.8,
+        "floor_index": 1,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "f1-r-common-bathroom-01",
+          "f1-r-master-bathroom-01"
+        ],
+        "notes": "Vastu: NE corner placement. As mentioned in vastu context of brief."
+      },
+      {
+        "id": "f1-r-balcony-01",
+        "name": "Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 3.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "Outside",
+          "f1-r-master-bedroom-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Vastu: North or East-facing balcony preferred for north-facing plot in Pune."
+      },
+      {
+        "id": "f1-r-corridor-01",
+        "name": "First Floor Corridor / Landing",
+        "usage": "corridor",
+        "target_area_sqm": 4.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-master-bedroom-01",
+          "f1-r-second-bedroom-01",
+          "f1-r-study-01",
+          "f1-r-common-bathroom-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Landing and circulation spine connecting all first floor rooms. Stair head connects here (cross-floor link handled by composer)."
+      }
+    ],
+    "floor_summary": "Floor 1 is the private sleeping level of the 2BHK duplex, comprising a Vastu-SW master bedroom with en-suite bathroom, a north/east-oriented second bedroom served by a common bathroom, a study, a NE pooja room, a north-facing balcony, and a central corridor/landing linking all spaces."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1289,
+    "output_tokens": 1230,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2604,
+    "cost_usd_estimated": 0.032082,
+    "latency_ms": 17740.009207976982,
+    "created_at_iso": "2026-05-08T11:32:22.636505+00:00"
+  }
+}

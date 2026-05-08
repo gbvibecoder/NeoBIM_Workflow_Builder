@@ -1,0 +1,208 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f3-r-lobby-01",
+        "name": "Floor Lobby / Reception",
+        "usage": "lobby",
+        "target_area_sqm": 28.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-reception-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central core lobby serving lift and stair landings; curved to match circular floor plate."
+      },
+      {
+        "id": "f3-r-reception-01",
+        "name": "Reception / Welcome Desk",
+        "usage": "reception",
+        "target_area_sqm": 18.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Open-plan reception facing lift lobby; full-glass curtain-wall gives panoramic city views."
+      },
+      {
+        "id": "f3-r-office-01",
+        "name": "Open-Plan Office Zone A",
+        "usage": "office",
+        "target_area_sqm": 120.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-reception-01",
+          "f3-r-meeting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Primary open-plan workspace; perimeter band along glass curtain-wall for natural light; CPWD DSR 4.5 sqm/person yields ~26 persons."
+      },
+      {
+        "id": "f3-r-office-02",
+        "name": "Open-Plan Office Zone B",
+        "usage": "office",
+        "target_area_sqm": 90.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-reception-01",
+          "f3-r-meeting-02"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Secondary open-plan zone on opposite arc; mirrors Zone A for balanced occupancy distribution."
+      },
+      {
+        "id": "f3-r-meeting-01",
+        "name": "Meeting Room – Large (10-pax)",
+        "usage": "meeting_room",
+        "target_area_sqm": 30.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-office-01",
+          "f3-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Boardroom-style; glazed partition to office; acoustic treatment specified."
+      },
+      {
+        "id": "f3-r-meeting-02",
+        "name": "Meeting Room – Small (6-pax)",
+        "usage": "meeting_room",
+        "target_area_sqm": 18.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-office-02",
+          "f3-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Informal collaboration room; writeable walls; natural light via curtain-wall."
+      },
+      {
+        "id": "f3-r-study-01",
+        "name": "Focus / Study Pods",
+        "usage": "study",
+        "target_area_sqm": 16.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-office-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Quiet focus area subdivided into 3 individual pods; acoustic glazing panels."
+      },
+      {
+        "id": "f3-r-pantry-01",
+        "name": "Pantry / Kitchenette",
+        "usage": "pantry",
+        "target_area_sqm": 12.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-office-01",
+          "f3-r-office-02"
+        ],
+        "adjacency_forbidden": [
+          "f3-r-bathroom-01",
+          "f3-r-bathroom-02"
+        ],
+        "notes": "Centrally located pantry; MEP wet riser connection; sustainability brief requires water-efficient fittings."
+      },
+      {
+        "id": "f3-r-bathroom-01",
+        "name": "Male Toilet Block",
+        "usage": "bathroom",
+        "target_area_sqm": 18.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f3-r-pantry-01",
+          "f3-r-meeting-01",
+          "f3-r-meeting-02"
+        ],
+        "notes": "3 WC + 2 urinals + 2 wash basins; NBC Part 9 Section 2 occupant-load ratios; IGBC water fixtures."
+      },
+      {
+        "id": "f3-r-bathroom-02",
+        "name": "Female Toilet Block",
+        "usage": "bathroom",
+        "target_area_sqm": 18.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f3-r-pantry-01",
+          "f3-r-meeting-01",
+          "f3-r-meeting-02"
+        ],
+        "notes": "4 WC + 2 wash basins; adjacency to service corridor; IGBC water fixtures."
+      },
+      {
+        "id": "f3-r-bathroom-03",
+        "name": "Accessible / Gender-Neutral Toilet",
+        "usage": "bathroom",
+        "target_area_sqm": 4.5,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f3-r-pantry-01"
+        ],
+        "notes": "NBC Part 3 Sec 4 barrier-free provisions; 1800 mm turning circle; grab bars."
+      },
+      {
+        "id": "f3-r-corridor-01",
+        "name": "Service / Circulation Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 32.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-lobby-01",
+          "f3-r-bathroom-01",
+          "f3-r-bathroom-02",
+          "f3-r-bathroom-03",
+          "f3-r-store-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Curved arc corridor along inner core ring; min 1.8 m clear width per NBC egress norms; fire-rated walls."
+      },
+      {
+        "id": "f3-r-store-01",
+        "name": "Services / Utilities Store",
+        "usage": "store",
+        "target_area_sqm": 6.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "MEP maintenance store and janitorial room; locked access."
+      },
+      {
+        "id": "f3-r-balcony-01",
+        "name": "Perimeter Terrace / Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 35.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-office-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Curved external terrace wrapping arc of circular floor plate; steel-frame cantilevered slab; rainwater harvesting channels integrated in parapet; biophilic planting troughs."
+      }
+    ],
+    "floor_summary": "Floor 3 is a full office workspace floor accommodating open-plan zones, collaborative meeting rooms, focus pods, a central pantry, and a curved perimeter balcony with biophilic landscaping, all served by a circular core lobby and reception within the 30 m-diameter curtain-wall tower."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1244,
+    "output_tokens": 2067,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2482,
+    "cost_usd_estimated": 0.044045,
+    "latency_ms": 29946.78599992767,
+    "created_at_iso": "2026-05-08T13:19:02.157690+00:00"
+  }
+}

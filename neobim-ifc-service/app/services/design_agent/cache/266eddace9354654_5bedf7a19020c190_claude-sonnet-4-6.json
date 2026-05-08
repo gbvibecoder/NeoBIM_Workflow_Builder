@@ -1,0 +1,91 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f-1-r-parking-01",
+        "name": "Basement Parking",
+        "usage": "external",
+        "target_area_sqm": 550.0,
+        "floor_index": -1,
+        "adjacency_required": [
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Underground parking for 30 cars. Circular plan footprint (~706 sqm gross at 30m dia); net usable parking area accounts for ramps, drive aisles, and structural core. Provide natural ventilation via ramps or mechanical extraction per NBC Part 8 Sec 3. Seismic zone II detailing for RC retaining walls."
+      },
+      {
+        "id": "f-1-r-utility-01",
+        "name": "Electrical & MEP Utility Room",
+        "usage": "utility",
+        "target_area_sqm": 18.0,
+        "floor_index": -1,
+        "adjacency_required": [
+          "f-1-r-parking-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Houses main LT panel, DB boards, UPS, MEP risers, and rainwater harvesting sump/pump room. Central-core-adjacent for easy riser routing. MEP routing required per brief."
+      },
+      {
+        "id": "f-1-r-store-01",
+        "name": "Building Services Store",
+        "usage": "store",
+        "target_area_sqm": 12.0,
+        "floor_index": -1,
+        "adjacency_required": [
+          "f-1-r-utility-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "General storage for FF&E, cleaning materials, and building maintenance equipment. Located adjacent to utility room for operational efficiency."
+      },
+      {
+        "id": "f-1-r-loading-bay-01",
+        "name": "Loading Bay / Goods Entry",
+        "usage": "loading_bay",
+        "target_area_sqm": 24.0,
+        "floor_index": -1,
+        "adjacency_required": [
+          "Outside",
+          "f-1-r-store-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Dedicated goods vehicle access and unloading dock for retail and office supplies. Direct ramp access from ground level. Separate from car parking circulation."
+      },
+      {
+        "id": "f-1-r-lobby-01",
+        "name": "Basement Lobby / Lift Lobby",
+        "usage": "lobby",
+        "target_area_sqm": 20.0,
+        "floor_index": -1,
+        "adjacency_required": [
+          "f-1-r-parking-01",
+          "f-1-r-utility-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central core lift lobby at basement level connecting 2 lifts and 1 staircase to upper floors. Acts as transition node between parking and vertical circulation."
+      },
+      {
+        "id": "f-1-r-wc-01",
+        "name": "Basement Toilet / Sanitary Block",
+        "usage": "bathroom",
+        "target_area_sqm": 6.0,
+        "floor_index": -1,
+        "adjacency_required": [
+          "f-1-r-parking-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Accessible toilet facilities for parking users and building staff. Includes 1 accessible WC per NBC Part 3 universal access norms. Locate away from loading bay."
+      }
+    ],
+    "floor_summary": "Basement level (-1) serves as the underground parking podium for 30 cars, supported by MEP utility, rainwater harvesting infrastructure, building services store, goods loading bay, central lift lobby, and staff sanitary block — all within the 30 m diameter circular footprint."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1244,
+    "output_tokens": 991,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2481,
+    "cost_usd_estimated": 0.027901,
+    "latency_ms": 17625.417416915298,
+    "created_at_iso": "2026-05-08T11:32:44.934861+00:00"
+  }
+}

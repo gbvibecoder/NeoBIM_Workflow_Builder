@@ -1,0 +1,261 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f2-r-ot-01",
+        "name": "Operating Theatre 1",
+        "usage": "operation_theatre",
+        "target_area_sqm": 42.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-icu-01",
+          "f2-r-scrub-01",
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-bath-01",
+          "f2-r-bath-02"
+        ],
+        "notes": "Primary general OT; laminar-flow HVAC zone; positive pressure; sterile zone boundary at scrub bay"
+      },
+      {
+        "id": "f2-r-ot-02",
+        "name": "Operating Theatre 2",
+        "usage": "operation_theatre",
+        "target_area_sqm": 42.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-icu-01",
+          "f2-r-scrub-01",
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-bath-01",
+          "f2-r-bath-02"
+        ],
+        "notes": "Secondary / specialty OT (e.g. ortho/gynaec); shared scrub bay with OT-1; sterile zone"
+      },
+      {
+        "id": "f2-r-scrub-01",
+        "name": "Scrub Bay / Pre-Op Preparation",
+        "usage": "utility",
+        "target_area_sqm": 8.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-ot-01",
+          "f2-r-ot-02"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Shared scrub sink zone between the two OTs; stainless steel trough sinks; tiled splash zone"
+      },
+      {
+        "id": "f2-r-icu-01",
+        "name": "Intensive Care Unit (ICU)",
+        "usage": "icu",
+        "target_area_sqm": 48.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-ot-01",
+          "f2-r-ot-02",
+          "f2-r-recovery-01",
+          "f2-r-nurses-01",
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "6-bed open ICU at 8 sqm per bed (IPHS norm); central monitoring station; negative-pressure-capable HVAC"
+      },
+      {
+        "id": "f2-r-recovery-01",
+        "name": "Recovery / Post-Op Room",
+        "usage": "ward",
+        "target_area_sqm": 30.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-icu-01",
+          "f2-r-ot-01",
+          "f2-r-ot-02",
+          "f2-r-nurses-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "4-bed post-anaesthesia recovery unit; wheeled-stretcher clearance 1.2 m each side; piped O2 & suction"
+      },
+      {
+        "id": "f2-r-consultation-01",
+        "name": "Pre-Op Consultation Room",
+        "usage": "consultation",
+        "target_area_sqm": 12.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01",
+          "f2-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Anaesthesiology / surgical pre-op assessment; privacy required; natural light preferred"
+      },
+      {
+        "id": "f2-r-consultation-02",
+        "name": "Surgical Consultation Room",
+        "usage": "consultation",
+        "target_area_sqm": 12.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01",
+          "f2-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "General surgical / specialist review room adjacent to waiting area"
+      },
+      {
+        "id": "f2-r-nurses-01",
+        "name": "Nurses' Station",
+        "usage": "reception",
+        "target_area_sqm": 14.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-icu-01",
+          "f2-r-recovery-01",
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central nursing control for ICU and recovery; unobstructed sightlines to both units; medication storage alcove"
+      },
+      {
+        "id": "f2-r-store-01",
+        "name": "Sterile Supplies Store",
+        "usage": "store",
+        "target_area_sqm": 12.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-ot-01",
+          "f2-r-ot-02",
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "CSSD pass-through cupboards; temperature-controlled; no external windows; HEPA-filtered air supply"
+      },
+      {
+        "id": "f2-r-store-02",
+        "name": "Medical Equipment Store",
+        "usage": "store",
+        "target_area_sqm": 10.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Anaesthesia machines, ventilators, portable monitors; wide door (min 1.5 m) for equipment movement"
+      },
+      {
+        "id": "f2-r-pantry-01",
+        "name": "Staff Pantry",
+        "usage": "pantry",
+        "target_area_sqm": 6.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "For OT/ICU clinical staff; hot beverages and light snacks; not accessible to patients/visitors"
+      },
+      {
+        "id": "f2-r-waiting-01",
+        "name": "Relatives Waiting Lounge",
+        "usage": "lobby",
+        "target_area_sqm": 28.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01",
+          "f2-r-consultation-01",
+          "f2-r-consultation-02"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-ot-01",
+          "f2-r-ot-02",
+          "f2-r-icu-01"
+        ],
+        "notes": "Segregated from clinical zones; natural light from external wall; seating for ~20 persons"
+      },
+      {
+        "id": "f2-r-corridor-01",
+        "name": "Main Clinical Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 60.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-ot-01",
+          "f2-r-ot-02",
+          "f2-r-icu-01",
+          "f2-r-recovery-01",
+          "f2-r-nurses-01",
+          "f2-r-consultation-01",
+          "f2-r-consultation-02",
+          "f2-r-bath-01",
+          "f2-r-bath-02",
+          "f2-r-store-01",
+          "f2-r-store-02",
+          "f2-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Min 2.4 m clear width (NBC Group C hospital corridor); stretcher-accessible; separate clean and dirty sub-corridors where possible"
+      },
+      {
+        "id": "f2-r-bath-01",
+        "name": "Staff / Clinical Toilet Block (Male)",
+        "usage": "bathroom",
+        "target_area_sqm": 6.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-ot-01",
+          "f2-r-ot-02",
+          "f2-r-scrub-01"
+        ],
+        "notes": "For clinical staff; 2 WC + 1 urinal + wash basins; accessible compliant; NBC Group C"
+      },
+      {
+        "id": "f2-r-bath-02",
+        "name": "Staff / Clinical Toilet Block (Female)",
+        "usage": "bathroom",
+        "target_area_sqm": 6.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-ot-01",
+          "f2-r-ot-02",
+          "f2-r-scrub-01"
+        ],
+        "notes": "For clinical staff; 2 WC + wash basins; accessible compliant; placed away from OT sterile zone"
+      },
+      {
+        "id": "f2-r-bath-03",
+        "name": "Relatives / Visitor Toilet",
+        "usage": "bathroom",
+        "target_area_sqm": 4.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-waiting-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-ot-01",
+          "f2-r-ot-02"
+        ],
+        "notes": "Adjacent to relatives waiting lounge; NBC accessible toilet; segregated from clinical staff toilets"
+      }
+    ],
+    "floor_summary": "Floor 2 is the surgical and critical-care floor, housing two Operating Theatres with a shared scrub bay, a 6-bed ICU, a post-operative recovery room, pre-op consultation rooms, a central nurses' station, sterile and equipment stores, a relatives waiting lounge, staff pantry, and segregated toilet blocks — all arranged around a wide NBC-compliant clinical corridor."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1148,
+    "output_tokens": 2640,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2450,
+    "cost_usd_estimated": 0.052232,
+    "latency_ms": 35218.747083097696,
+    "created_at_iso": "2026-05-08T13:19:37.405760+00:00"
+  }
+}

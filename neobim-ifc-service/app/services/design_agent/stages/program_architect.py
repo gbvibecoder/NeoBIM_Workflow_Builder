@@ -96,10 +96,21 @@ from app.services.design_agent.types import (
 
 log = logging.getLogger(__name__)
 
-# Per-floor LLM call budget. Sized to fit the smaller per-floor output
-# comfortably below the LLMClient's per-model ceiling — we never use
-# the full ceiling, but the 30s budget accommodates the rare slow call.
-_FLOOR_CALL_TIMEOUT_S: float = 30.0
+# Per-floor LLM call budget. Set to the full Sonnet ceiling so even
+# the slowest individual floor (hospital top: OT + ICU + recovery +
+# corridor + bathroom = ~7 rooms with detailed adjacency, ~3-4K
+# output tokens at Sonnet's tool_use rate) gets full headroom. Calls
+# still run in parallel via the ThreadPoolExecutor below, so the
+# end-to-end stage wallclock is max(per-floor calls) — typically
+# 25-45s, never higher than the 60s ceiling.
+#
+# Initial Slice 2A.6 setting was 30s, picked tighter than the ceiling
+# on a hunch about typical per-floor output size. The first cache-
+# generation run timed out 3 of 11 tests on individual hospital /
+# mixed-use floors that genuinely needed 35-50s. Bumping to 60s
+# matches MODEL_MAX_TIMEOUT["sonnet-4.6"] and gives each floor full
+# budget without any cap stacking.
+_FLOOR_CALL_TIMEOUT_S: float = 60.0
 
 # Maximum number of floor-LLM calls dispatched concurrently. Buildings
 # beyond this cap (e.g. 20-floor towers) sequence in batches; the

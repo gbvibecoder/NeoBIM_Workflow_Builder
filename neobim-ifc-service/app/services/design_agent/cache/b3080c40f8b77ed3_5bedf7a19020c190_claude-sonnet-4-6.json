@@ -1,0 +1,139 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f0-r-lobby-01",
+        "name": "Entrance Lobby",
+        "usage": "lobby",
+        "target_area_sqm": 3.5,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-living-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Vastu: N-facing entrance, main door to the north as per site orientation. Acts as transition from street to living area."
+      },
+      {
+        "id": "f0-r-living-01",
+        "name": "Living Room",
+        "usage": "living",
+        "target_area_sqm": 15.6,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01",
+          "f0-r-dining-01",
+          "f0-r-balcony-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Vastu: N or E zone of floor plan. Explicit dimension 12×14 ft ≈ 15.6 sqm; north-facing for good light. Contemporary fenestration."
+      },
+      {
+        "id": "f0-r-dining-01",
+        "name": "Dining Room",
+        "usage": "dining",
+        "target_area_sqm": 9.3,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-living-01",
+          "f0-r-kitchen-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Explicit dimension 10×10 ft ≈ 9.3 sqm. Positioned between living and kitchen for easy circulation flow."
+      },
+      {
+        "id": "f0-r-kitchen-01",
+        "name": "Kitchen",
+        "usage": "kitchen",
+        "target_area_sqm": 7.43,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-dining-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-powder-01",
+          "f0-r-pooja-01"
+        ],
+        "notes": "Vastu: SE corner placement as per cultural overlay. Explicit dimension 10×8 ft ≈ 7.43 sqm. MEP: gas/water connections routed to SE core."
+      },
+      {
+        "id": "f0-r-powder-01",
+        "name": "Powder Room",
+        "usage": "powder_room",
+        "target_area_sqm": 2.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-kitchen-01",
+          "f0-r-pooja-01"
+        ],
+        "notes": "Vastu: NW or W zone placement for toilet per vastu norms. Half-bath (WC + wash basin) for ground-floor guests. MEP: wet riser from W side."
+      },
+      {
+        "id": "f0-r-pooja-01",
+        "name": "Pooja Room",
+        "usage": "pooja_room",
+        "target_area_sqm": 1.8,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-powder-01",
+          "f0-r-kitchen-01"
+        ],
+        "notes": "Vastu: NE corner placement as mandated. Small dedicated prayer niche; threshold raised 75 mm above floor level per tradition."
+      },
+      {
+        "id": "f0-r-balcony-01",
+        "name": "Front Balcony / Sit-out",
+        "usage": "balcony",
+        "target_area_sqm": 3.5,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-living-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-facing sit-out adjacent to living room; enhances cross-ventilation. Railing as per NBC Part 3 safety norms."
+      },
+      {
+        "id": "f0-r-parking-01",
+        "name": "Covered Parking",
+        "usage": "external",
+        "target_area_sqm": 13.5,
+        "floor_index": 0,
+        "adjacency_required": [
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Ground-floor covered parking for one car (standard 2.5×5 m stall). Located at frontage within setback; RERA excludes from carpet area."
+      },
+      {
+        "id": "f0-r-stairs-01",
+        "name": "Staircase & Landing",
+        "usage": "stairs_landing",
+        "target_area_sqm": 4.5,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Vastu: SW or S zone placement for staircase. RCC open-riser stair connecting ground to first floor; NBC tread 250 mm, riser 190 mm, min width 1.0 m."
+      }
+    ],
+    "floor_summary": "Ground floor of this north-facing Pune 2BHK duplex accommodates the public and semi-public programme — entrance lobby, vastu-aligned living (N), dining, SE kitchen, NE pooja room, NW powder room, front balcony, covered parking, and the RCC staircase (SW) — leaving all bedrooms and bathrooms to the first floor."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1289,
+    "output_tokens": 1468,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2603,
+    "cost_usd_estimated": 0.035648,
+    "latency_ms": 22397.021000040695,
+    "created_at_iso": "2026-05-08T11:32:27.293131+00:00"
+  }
+}

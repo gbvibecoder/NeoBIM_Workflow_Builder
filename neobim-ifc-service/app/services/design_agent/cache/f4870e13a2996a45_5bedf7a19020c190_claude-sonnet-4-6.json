@@ -1,0 +1,179 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f2-r-master-bed-01",
+        "name": "Master Bedroom",
+        "usage": "master_bedroom",
+        "target_area_sqm": 13.5,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-bath-master-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "South-west placement per Vastu for master bedroom. En-suite with attached bathroom. Natural light via north-facing plot orientation."
+      },
+      {
+        "id": "f2-r-bath-master-01",
+        "name": "Master Bathroom (En-suite)",
+        "usage": "bathroom",
+        "target_area_sqm": 4.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-master-bed-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-kitchen-01",
+          "f2-r-pooja-01"
+        ],
+        "notes": "En-suite attached to master bedroom. Wet area with natural exhaust provision."
+      },
+      {
+        "id": "f2-r-bed-01",
+        "name": "Bedroom 2",
+        "usage": "bedroom",
+        "target_area_sqm": 10.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-bath-common-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Second bedroom for 2 BHK unit. East-facing preferred for morning light per Vastu."
+      },
+      {
+        "id": "f2-r-bath-common-01",
+        "name": "Common Bathroom",
+        "usage": "bathroom",
+        "target_area_sqm": 3.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-bed-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-kitchen-01",
+          "f2-r-pooja-01"
+        ],
+        "notes": "Common bathroom accessible from Bedroom 2 and living area. Wet area with external exhaust duct."
+      },
+      {
+        "id": "f2-r-living-01",
+        "name": "Living Room",
+        "usage": "living",
+        "target_area_sqm": 18.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-dining-01",
+          "f2-r-balcony-01",
+          "f2-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-facing living room maximises natural light from site orientation. Opens to balcony."
+      },
+      {
+        "id": "f2-r-dining-01",
+        "name": "Dining Room",
+        "usage": "dining",
+        "target_area_sqm": 8.5,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-kitchen-01",
+          "f2-r-living-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Contiguous with kitchen and living room for open-plan contemporary feel."
+      },
+      {
+        "id": "f2-r-kitchen-01",
+        "name": "Kitchen",
+        "usage": "kitchen",
+        "target_area_sqm": 7.5,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-dining-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-bath-master-01",
+          "f2-r-bath-common-01",
+          "f2-r-pooja-01"
+        ],
+        "notes": "South-east corner per Vastu (Agni corner). Cross-ventilation with external exhaust. Utility/wash area adjacent."
+      },
+      {
+        "id": "f2-r-utility-01",
+        "name": "Utility / Wash Area",
+        "usage": "utility",
+        "target_area_sqm": 2.5,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-kitchen-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Service area for washing machine and mop sink. Adjacent to kitchen for plumbing stack consolidation."
+      },
+      {
+        "id": "f2-r-pooja-01",
+        "name": "Pooja Room",
+        "usage": "pooja_room",
+        "target_area_sqm": 1.5,
+        "floor_index": 2,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "f2-r-bath-master-01",
+          "f2-r-bath-common-01",
+          "f2-r-kitchen-01"
+        ],
+        "notes": "North-east (Ishan corner) placement per Vastu. Small dedicated prayer niche / room."
+      },
+      {
+        "id": "f2-r-balcony-01",
+        "name": "Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 4.5,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-living-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-facing balcony off living room. Provides passive ventilation and outdoor connection. Railing per IS 883 / NBC Part 4."
+      },
+      {
+        "id": "f2-r-lobby-01",
+        "name": "Entry Lobby / Foyer",
+        "usage": "lobby",
+        "target_area_sqm": 3.5,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-living-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Apartment entry foyer from staircase / lift landing. Transitional buffer zone between public corridor and private living area."
+      },
+      {
+        "id": "f2-r-corridor-01",
+        "name": "Internal Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 4.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-lobby-01",
+          "f2-r-master-bed-01",
+          "f2-r-bed-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Internal circulation spine linking bedrooms, bathrooms and living zones within the 2 BHK apartment."
+      }
+    ],
+    "floor_summary": "Floor 2 houses a single 2 BHK apartment with a north-facing living-balcony, open-plan dining-kitchen, master en-suite bedroom, second bedroom with common bathroom, pooja room in the north-east Vastu corner, and a utility-wash area — all organised around an internal corridor from the entry foyer."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1101,
+    "output_tokens": 1760,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2476,
+    "cost_usd_estimated": 0.038988,
+    "latency_ms": 23914.298332994804,
+    "created_at_iso": "2026-05-08T11:33:21.593907+00:00"
+  }
+}
