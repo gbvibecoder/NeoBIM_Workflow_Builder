@@ -1,0 +1,178 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f3-r-master-bed-01",
+        "name": "Master Bedroom",
+        "usage": "master_bedroom",
+        "target_area_sqm": 13.5,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-master-bath-01",
+          "f3-r-balcony-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "South-west zone preferred per Vastu for master bedroom; en-suite bathroom attached."
+      },
+      {
+        "id": "f3-r-master-bath-01",
+        "name": "Master Bathroom (En-suite)",
+        "usage": "bathroom",
+        "target_area_sqm": 4.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-master-bed-01"
+        ],
+        "adjacency_forbidden": [
+          "f3-r-kitchen-01"
+        ],
+        "notes": "En-suite to master bedroom; MEP wet-stack aligned with floors below."
+      },
+      {
+        "id": "f3-r-bed-02",
+        "name": "Bedroom 2",
+        "usage": "bedroom",
+        "target_area_sqm": 10.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-common-bath-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Secondary bedroom; north or east orientation preferred for natural light."
+      },
+      {
+        "id": "f3-r-common-bath-01",
+        "name": "Common Bathroom",
+        "usage": "bathroom",
+        "target_area_sqm": 3.5,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-bed-02"
+        ],
+        "adjacency_forbidden": [
+          "f3-r-kitchen-01"
+        ],
+        "notes": "Shared bathroom accessible from bedroom 2 and corridor; MEP wet-stack aligned."
+      },
+      {
+        "id": "f3-r-kitchen-01",
+        "name": "Kitchen",
+        "usage": "kitchen",
+        "target_area_sqm": 7.5,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-dining-01",
+          "f3-r-utility-01"
+        ],
+        "adjacency_forbidden": [
+          "f3-r-master-bath-01",
+          "f3-r-common-bath-01"
+        ],
+        "notes": "South-east zone per Vastu for Agni corner; cross-ventilated with exhaust provision."
+      },
+      {
+        "id": "f3-r-dining-01",
+        "name": "Dining Area",
+        "usage": "dining",
+        "target_area_sqm": 7.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-kitchen-01",
+          "f3-r-living-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Open-plan dining contiguous with living and kitchen for contemporary layout."
+      },
+      {
+        "id": "f3-r-living-01",
+        "name": "Living Room",
+        "usage": "living",
+        "target_area_sqm": 18.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-dining-01",
+          "f3-r-balcony-01",
+          "f3-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-east facing living room for maximum morning light and Vastu compliance."
+      },
+      {
+        "id": "f3-r-balcony-01",
+        "name": "Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 5.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-living-01",
+          "f3-r-master-bed-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-facing balcony off living and master bedroom; railing per NBC Part 3 Table 1."
+      },
+      {
+        "id": "f3-r-lobby-01",
+        "name": "Entry Lobby / Foyer",
+        "usage": "lobby",
+        "target_area_sqm": 3.5,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-living-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Entry foyer connecting stair/lift landing to the apartment interior."
+      },
+      {
+        "id": "f3-r-corridor-01",
+        "name": "Internal Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 4.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-lobby-01",
+          "f3-r-master-bed-01",
+          "f3-r-bed-02",
+          "f3-r-common-bath-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Internal circulation spine linking lobby to bedrooms and bathrooms; min 1.2 m clear width per NBC."
+      },
+      {
+        "id": "f3-r-utility-01",
+        "name": "Utility / Washing Area",
+        "usage": "utility",
+        "target_area_sqm": 2.5,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-kitchen-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Attached utility behind kitchen for washing machine and service storage; MEP drain stack aligned."
+      },
+      {
+        "id": "f3-r-store-01",
+        "name": "Store Room",
+        "usage": "store",
+        "target_area_sqm": 2.0,
+        "floor_index": 3,
+        "adjacency_required": [
+          "f3-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "General storage accessible from corridor."
+      }
+    ],
+    "floor_summary": "Floor 3 houses a complete 2 BHK apartment unit with master bedroom (en-suite), second bedroom, open-plan living-dining-kitchen, balcony, common bathroom, utility, store, and internal lobby/corridor — sized generously above NBC minima and oriented per Vastu guidelines on a north-facing 12 m × 18 m plot in Pune."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1101,
+    "output_tokens": 1679,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2476,
+    "cost_usd_estimated": 0.037773,
+    "latency_ms": 23204.15454194881,
+    "created_at_iso": "2026-05-08T11:33:20.883915+00:00"
+  }
+}

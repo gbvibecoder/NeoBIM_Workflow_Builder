@@ -1,0 +1,213 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f0-r-lobby-01",
+        "name": "Main Entrance Lobby",
+        "usage": "lobby",
+        "target_area_sqm": 45.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "Outside",
+          "f0-r-reception-01",
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Grand circular entrance lobby aligned with building centroid; glass curtain-wall frontage; provides access to retail units, lifts and staircore. Vastu — northeast orientation preferred for main entry in Bangalore."
+      },
+      {
+        "id": "f0-r-reception-01",
+        "name": "Ground Floor Reception / Concierge",
+        "usage": "reception",
+        "target_area_sqm": 18.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01",
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central concierge serving all building users; staffed desk with visitor management. NBC Group F (retail/commercial) reception norm applied."
+      },
+      {
+        "id": "f0-r-cafe-01",
+        "name": "Café / Coffee Shop",
+        "usage": "shop",
+        "target_area_sqm": 90.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "Outside",
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Retail café unit on perimeter arc; full-glass curtain-wall façade giving street presence. NBC Group F retail minimum applied; area sized for seating of ~40 covers."
+      },
+      {
+        "id": "f0-r-gallery-01",
+        "name": "Art Gallery / Exhibition Space",
+        "usage": "showroom",
+        "target_area_sqm": 120.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "Outside",
+          "f0-r-lobby-01",
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Open-plan gallery for rotating art/product exhibitions; curved perimeter wall follows circular building geometry; natural daylighting via full-height glazing."
+      },
+      {
+        "id": "f0-r-stock-01",
+        "name": "Stock Room / Back-of-House Store",
+        "usage": "stock_room",
+        "target_area_sqm": 15.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-cafe-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Shared back-of-house storage for café and gallery consumables; no external glazing required."
+      },
+      {
+        "id": "f0-r-corridor-01",
+        "name": "Circulation Corridor (Ring)",
+        "usage": "corridor",
+        "target_area_sqm": 55.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01",
+          "f0-r-cafe-01",
+          "f0-r-gallery-01",
+          "f0-r-wc-male-01",
+          "f0-r-wc-female-01",
+          "f0-r-wc-accessible-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Annular ring corridor following circular plan geometry; connects all ground-floor tenancies and core. Minimum clear width 1.8 m (NBC ambulatory + wheel-chair); total area reflects full arc length."
+      },
+      {
+        "id": "f0-r-wc-male-01",
+        "name": "Male Toilet Block",
+        "usage": "bathroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-cafe-01",
+          "f0-r-gallery-01"
+        ],
+        "notes": "NBC Part 9 – 3 WCs + 3 urinals + 2 washbasins for estimated 100 male occupants on ground floor."
+      },
+      {
+        "id": "f0-r-wc-female-01",
+        "name": "Female Toilet Block",
+        "usage": "bathroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-cafe-01",
+          "f0-r-gallery-01"
+        ],
+        "notes": "NBC Part 9 – 4 WCs + 2 washbasins for estimated 100 female occupants on ground floor."
+      },
+      {
+        "id": "f0-r-wc-accessible-01",
+        "name": "Accessible / Unisex Toilet",
+        "usage": "powder_room",
+        "target_area_sqm": 4.5,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-cafe-01",
+          "f0-r-gallery-01"
+        ],
+        "notes": "NBC / Harmonized Guidelines for persons with disability; 1.8 m × 2.5 m clear internal min; grab rails, turning radius 1500 mm."
+      },
+      {
+        "id": "f0-r-pantry-01",
+        "name": "Ground Floor Pantry / Kitchenette",
+        "usage": "pantry",
+        "target_area_sqm": 8.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01",
+          "f0-r-stock-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-wc-male-01",
+          "f0-r-wc-female-01",
+          "f0-r-wc-accessible-01"
+        ],
+        "notes": "Shared prep/pantry for café support and building staff; NBC hygiene separation from toilets maintained."
+      },
+      {
+        "id": "f0-r-mech-01",
+        "name": "Ground Floor Electrical / BMS Room",
+        "usage": "utility",
+        "target_area_sqm": 18.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Houses main LV switchboard, BMS panels, and metering for all tenants. MEP routing required (brief fidelity hint). Rainwater harvesting header tank connection stub-out here."
+      },
+      {
+        "id": "f0-r-security-01",
+        "name": "Security / Guard Room",
+        "usage": "office",
+        "target_area_sqm": 9.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "24-hour manned security post adjacent to main lobby; direct sightline to entrance and vehicle drop-off."
+      },
+      {
+        "id": "f0-r-parking-dropoff-01",
+        "name": "Surface Drop-off / External Forecourt",
+        "usage": "external",
+        "target_area_sqm": 180.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "Outside",
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Circular driveway forecourt; accessible drop-off bay; connects to basement ramp (B1 level underground parking for 30 cars). Permeable paving + rainwater collection point."
+      },
+      {
+        "id": "f0-r-balcony-01",
+        "name": "Perimeter Planter / Outdoor Threshold",
+        "usage": "balcony",
+        "target_area_sqm": 30.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "Outside",
+          "f0-r-gallery-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Exterior green threshold band wrapping gallery arc; native planting for urban heat-island mitigation; also serves as rainwater catchment plinth edge."
+      }
+    ],
+    "floor_summary": "Ground floor of the circular mixed-use tower accommodates a grand entrance lobby, concierge reception, street-facing café, art gallery with perimeter glazing, back-of-house support spaces, accessible public toilets, a BMS/electrical room, security post, and a landscaped external forecourt with drop-off, collectively activating the public retail-and-gallery programme of the building."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1244,
+    "output_tokens": 2267,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2469,
+    "cost_usd_estimated": 0.046996,
+    "latency_ms": 29828.96599988453,
+    "created_at_iso": "2026-05-08T13:19:02.038837+00:00"
+  }
+}

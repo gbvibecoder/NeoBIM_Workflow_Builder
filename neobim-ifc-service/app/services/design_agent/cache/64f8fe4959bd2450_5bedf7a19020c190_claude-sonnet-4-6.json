@@ -1,0 +1,205 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f4-r-lobby-01",
+        "name": "Sky Lobby / Reception",
+        "usage": "lobby",
+        "target_area_sqm": 45.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-corridor-01",
+          "f4-r-terrace-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central sky-lobby acting as the social heart of the top floor; full-height glass curtain-wall providing panoramic views over Bangalore. Vastu: reception/entry positioned facing east where circular geometry permits."
+      },
+      {
+        "id": "f4-r-master-bed-01",
+        "name": "Master Bedroom",
+        "usage": "master_bedroom",
+        "target_area_sqm": 22.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-master-bath-01",
+          "f4-r-balcony-01"
+        ],
+        "adjacency_forbidden": [
+          "f4-r-bathroom-01"
+        ],
+        "notes": "Premium master suite on top residential floor; curved perimeter wall with floor-to-ceiling glass; south-west quadrant of circular plate for privacy."
+      },
+      {
+        "id": "f4-r-master-bath-01",
+        "name": "Master Bathroom (En-suite)",
+        "usage": "bathroom",
+        "target_area_sqm": 8.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-master-bed-01"
+        ],
+        "adjacency_forbidden": [
+          "f4-r-kitchen-01"
+        ],
+        "notes": "En-suite to master bedroom; wet-zone with natural ventilation shaft in core."
+      },
+      {
+        "id": "f4-r-bedroom-01",
+        "name": "Bedroom 1",
+        "usage": "bedroom",
+        "target_area_sqm": 14.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Secondary bedroom with curved exterior glazing; north-east quadrant for morning light."
+      },
+      {
+        "id": "f4-r-bedroom-02",
+        "name": "Bedroom 2",
+        "usage": "bedroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Third bedroom / guest room; north-west quadrant of floor plate."
+      },
+      {
+        "id": "f4-r-bathroom-01",
+        "name": "Common Bathroom",
+        "usage": "bathroom",
+        "target_area_sqm": 5.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f4-r-kitchen-01",
+          "f4-r-master-bed-01"
+        ],
+        "notes": "Shared bathroom for Bedroom 1 & 2; inner zone adjacent to service core."
+      },
+      {
+        "id": "f4-r-study-01",
+        "name": "Study / Home Office",
+        "usage": "study",
+        "target_area_sqm": 10.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Quiet work zone; east-facing for morning natural light; double-glazed for acoustic separation from sky-lobby."
+      },
+      {
+        "id": "f4-r-kitchen-01",
+        "name": "Kitchen",
+        "usage": "kitchen",
+        "target_area_sqm": 10.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-dining-01"
+        ],
+        "adjacency_forbidden": [
+          "f4-r-bathroom-01",
+          "f4-r-master-bath-01"
+        ],
+        "notes": "Open-plan kitchen; service connections via central core; exhaust shaft integrated with MEP riser."
+      },
+      {
+        "id": "f4-r-dining-01",
+        "name": "Dining Area",
+        "usage": "dining",
+        "target_area_sqm": 12.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-kitchen-01",
+          "f4-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Dining flows into sky-lobby / lounge zone; curved glazed wall provides views."
+      },
+      {
+        "id": "f4-r-balcony-01",
+        "name": "Private Balcony (Master Suite)",
+        "usage": "balcony",
+        "target_area_sqm": 8.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-master-bed-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Cantilevered curved balcony off master bedroom; glass railing per NBC Part 4 Cl. 5; seismic zone II detailing."
+      },
+      {
+        "id": "f4-r-terrace-01",
+        "name": "Terrace Garden / Sky Garden",
+        "usage": "external",
+        "target_area_sqm": 120.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-lobby-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Wrap-around terrace garden on top floor; rainwater harvesting planters integrated; preparation layer for rooftop solar panels above; soft-scape with native Bangalore species; full circular perimeter per massing intent."
+      },
+      {
+        "id": "f4-r-corridor-01",
+        "name": "Central Corridor / Landing",
+        "usage": "corridor",
+        "target_area_sqm": 18.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-lobby-01",
+          "f4-r-master-bed-01",
+          "f4-r-bedroom-01",
+          "f4-r-bedroom-02",
+          "f4-r-study-01",
+          "f4-r-bathroom-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Radial corridor wrapping central core; 1.5 m clear min per NBC Part 3; connects all residential rooms to core lifts and stair."
+      },
+      {
+        "id": "f4-r-utility-01",
+        "name": "Utility / Laundry",
+        "usage": "utility",
+        "target_area_sqm": 4.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Laundry and domestic storage; inner zone near service shaft; MEP connections for washing appliances."
+      },
+      {
+        "id": "f4-r-store-01",
+        "name": "Store",
+        "usage": "store",
+        "target_area_sqm": 3.0,
+        "floor_index": 4,
+        "adjacency_required": [
+          "f4-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "General storage for residents; inner dark zone; NBC min 1.0 sqm, sized up for usability."
+      }
+    ],
+    "floor_summary": "Floor 4 is the premium residential top floor of the circular mixed-use tower, featuring a sky-lobby opening onto a wrap-around terrace garden, a master suite with en-suite and private balcony, two additional bedrooms sharing a common bathroom, a study, open-plan kitchen-dining, and service spaces — all arranged radially around the central steel core with full-glass curtain-wall façade views over Bangalore."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1244,
+    "output_tokens": 2068,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2470,
+    "cost_usd_estimated": 0.044014,
+    "latency_ms": 24741.748333210126,
+    "created_at_iso": "2026-05-08T11:32:52.062392+00:00"
+  }
+}

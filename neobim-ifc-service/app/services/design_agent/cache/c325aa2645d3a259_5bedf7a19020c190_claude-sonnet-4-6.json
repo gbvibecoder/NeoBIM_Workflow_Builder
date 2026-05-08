@@ -1,0 +1,193 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f1-r-master-bedroom-01",
+        "name": "Master Bedroom",
+        "usage": "master_bedroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-bathroom-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "South-west placement per Vastu; en-suite bathroom adjacent. Natural light via north-facing plot — window on east/south wall preferred."
+      },
+      {
+        "id": "f1-r-bathroom-01",
+        "name": "Master Bathroom (En-suite)",
+        "usage": "bathroom",
+        "target_area_sqm": 3.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-master-bedroom-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-kitchen-01",
+          "f1-r-pooja-01"
+        ],
+        "notes": "En-suite to master bedroom; wet wall shared with bedroom to minimise plumbing runs."
+      },
+      {
+        "id": "f1-r-bedroom-01",
+        "name": "Bedroom 2",
+        "usage": "bedroom",
+        "target_area_sqm": 10.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-bathroom-02"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Secondary bedroom; north-west or east placement per Vastu for occupant well-being."
+      },
+      {
+        "id": "f1-r-bathroom-02",
+        "name": "Common Bathroom",
+        "usage": "bathroom",
+        "target_area_sqm": 2.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-bedroom-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-kitchen-01",
+          "f1-r-pooja-01"
+        ],
+        "notes": "Common bathroom accessible from corridor; wet wall shared with Bedroom 2."
+      },
+      {
+        "id": "f1-r-living-01",
+        "name": "Living Room",
+        "usage": "living",
+        "target_area_sqm": 18.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-dining-01",
+          "f1-r-balcony-01",
+          "f1-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-east corner preferred per Vastu; opens to balcony and connects to dining. Primary social space."
+      },
+      {
+        "id": "f1-r-dining-01",
+        "name": "Dining Area",
+        "usage": "dining",
+        "target_area_sqm": 8.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-kitchen-01",
+          "f1-r-living-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Open-plan connection to living room; direct access to kitchen for serving convenience."
+      },
+      {
+        "id": "f1-r-kitchen-01",
+        "name": "Kitchen",
+        "usage": "kitchen",
+        "target_area_sqm": 7.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-dining-01",
+          "f1-r-utility-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-bathroom-01",
+          "f1-r-bathroom-02",
+          "f1-r-pooja-01"
+        ],
+        "notes": "South-east placement per Vastu (fire zone). MEP wet stack to align vertically across floors. Utility/washing adjacent."
+      },
+      {
+        "id": "f1-r-utility-01",
+        "name": "Utility / Washing Area",
+        "usage": "utility",
+        "target_area_sqm": 2.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-kitchen-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Adjacent to kitchen for wet services; provision for washing machine and mop sink."
+      },
+      {
+        "id": "f1-r-pooja-01",
+        "name": "Pooja Room",
+        "usage": "pooja_room",
+        "target_area_sqm": 1.5,
+        "floor_index": 1,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "f1-r-bathroom-01",
+          "f1-r-bathroom-02",
+          "f1-r-kitchen-01"
+        ],
+        "notes": "North-east corner of apartment per Vastu (Ishan kona). Small dedicated space with threshold."
+      },
+      {
+        "id": "f1-r-balcony-01",
+        "name": "Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 4.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-living-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-facing balcony off living room; provides natural light, ventilation, and outdoor connection."
+      },
+      {
+        "id": "f1-r-lobby-01",
+        "name": "Entry Lobby / Foyer",
+        "usage": "lobby",
+        "target_area_sqm": 3.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-living-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Transition space from stair/lift landing into apartment; shoe storage niche provision recommended."
+      },
+      {
+        "id": "f1-r-corridor-01",
+        "name": "Internal Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 4.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-master-bedroom-01",
+          "f1-r-bedroom-01",
+          "f1-r-bathroom-02",
+          "f1-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Private circulation spine connecting bedrooms and bathrooms to the living/entry zone."
+      },
+      {
+        "id": "f1-r-store-01",
+        "name": "Store / Linen Cupboard",
+        "usage": "store",
+        "target_area_sqm": 1.5,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Accessible from corridor; used for linen, seasonal items, and general storage."
+      }
+    ],
+    "floor_summary": "Floor 1 contains a single 2 BHK apartment unit comprising a master bedroom with en-suite bathroom, a second bedroom with access to a common bathroom, open-plan living and dining spaces, a Vastu-compliant kitchen with utility area, a pooja room, a north-facing balcony, an entry foyer, internal corridor, and a store — all sized at or above NBC India 2016 minimums within the 12 m × 18 m plot footprint."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1101,
+    "output_tokens": 1885,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2476,
+    "cost_usd_estimated": 0.040863,
+    "latency_ms": 25859.72445900552,
+    "created_at_iso": "2026-05-08T11:33:23.539250+00:00"
+  }
+}

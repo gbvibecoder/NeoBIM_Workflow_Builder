@@ -1,0 +1,167 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f1-r-lobby-01",
+        "name": "Lift & Stair Lobby",
+        "usage": "lobby",
+        "target_area_sqm": 18.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-reception-01",
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central core lobby serving 2 lifts and 1 stair in the circular tower core. Fire-rated lobby per NBC Part 4."
+      },
+      {
+        "id": "f1-r-reception-01",
+        "name": "Office Reception",
+        "usage": "reception",
+        "target_area_sqm": 22.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-lobby-01",
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Welcoming reception for office tenants on floor 1; glass curtain-wall exposure gives brand visibility."
+      },
+      {
+        "id": "f1-r-corridor-01",
+        "name": "Perimeter Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 38.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-lobby-01",
+          "f1-r-reception-01",
+          "f1-r-office-01",
+          "f1-r-office-02",
+          "f1-r-office-03",
+          "f1-r-meeting-01",
+          "f1-r-pantry-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Circular perimeter circulation corridor wrapping the central core; width ≥ 1.8 m per NBC office egress norms."
+      },
+      {
+        "id": "f1-r-office-01",
+        "name": "Open-Plan Office Zone A",
+        "usage": "office",
+        "target_area_sqm": 120.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01",
+          "f1-r-meeting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Primary open-plan workspace; north-west quadrant of floor plate. 5 sqm/person per CPWD DSR. Full glass façade maximises daylighting per sustainable design brief."
+      },
+      {
+        "id": "f1-r-office-02",
+        "name": "Open-Plan Office Zone B",
+        "usage": "office",
+        "target_area_sqm": 100.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01",
+          "f1-r-meeting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Secondary open-plan workspace; south-east quadrant. Flexible demountable partitioning per IS 14660."
+      },
+      {
+        "id": "f1-r-office-03",
+        "name": "Cabin Offices",
+        "usage": "office",
+        "target_area_sqm": 45.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Three enclosed private cabins (~15 sqm each) for senior staff; acoustic partitions."
+      },
+      {
+        "id": "f1-r-meeting-01",
+        "name": "Meeting Room",
+        "usage": "meeting_room",
+        "target_area_sqm": 30.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01",
+          "f1-r-office-01",
+          "f1-r-office-02"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Large boardroom-style meeting room; acoustic treatment; AV provisions; seats 14-16 persons."
+      },
+      {
+        "id": "f1-r-pantry-01",
+        "name": "Office Pantry",
+        "usage": "pantry",
+        "target_area_sqm": 10.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-bathroom-01"
+        ],
+        "notes": "Kitchenette with sink, microwave provision, and storage; serves entire floor. NBC hygiene separation from washrooms maintained."
+      },
+      {
+        "id": "f1-r-bathroom-01",
+        "name": "Male Washroom",
+        "usage": "bathroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-pantry-01"
+        ],
+        "notes": "Male WC block — 2 WCs + 2 urinals + 2 WHBs per NBC Part 9 Sec 1 (office occupancy). Core-side placement away from curtain wall."
+      },
+      {
+        "id": "f1-r-bathroom-02",
+        "name": "Female Washroom",
+        "usage": "bathroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f1-r-pantry-01"
+        ],
+        "notes": "Female WC block — 3 WCs + 2 WHBs per NBC Part 9 Sec 1. Core-side placement. Accessible cubicle included per NBC disability norms."
+      },
+      {
+        "id": "f1-r-store-01",
+        "name": "IT / Services Store",
+        "usage": "store",
+        "target_area_sqm": 6.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Lockable store for IT equipment, stationery, and MEP access; fire-rated door."
+      }
+    ],
+    "floor_summary": "Floor 1 is the first dedicated office workspace level of the circular mixed-use tower, comprising open-plan and cabin offices, a boardroom, reception, pantry, and compliant washroom facilities arranged around a central core with perimeter circular circulation corridor."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1244,
+    "output_tokens": 1684,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2482,
+    "cost_usd_estimated": 0.0383,
+    "latency_ms": 25045.051290886477,
+    "created_at_iso": "2026-05-08T13:18:57.253980+00:00"
+  }
+}

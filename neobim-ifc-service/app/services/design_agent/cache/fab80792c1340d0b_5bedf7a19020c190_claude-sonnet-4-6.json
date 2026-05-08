@@ -1,0 +1,194 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f0-r-lobby-01",
+        "name": "Entrance Lobby",
+        "usage": "lobby",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-parking-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Main building entrance lobby facing north as per site orientation. Leads to staircase and parking. Vastu: main door north-facing is auspicious."
+      },
+      {
+        "id": "f0-r-parking-01",
+        "name": "Covered Parking",
+        "usage": "external",
+        "target_area_sqm": 72.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Dedicated covered parking for residents as per user priority. Sized to accommodate ~3 cars (approx. 24 sqm per car bay). Occupies a significant portion of the ground floor footprint."
+      },
+      {
+        "id": "f0-r-living-01",
+        "name": "Living Room",
+        "usage": "living",
+        "target_area_sqm": 18.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-dining-01",
+          "f0-r-balcony-01",
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-bathroom-01"
+        ],
+        "notes": "Primary living space for ground floor unit. North-facing to leverage site orientation for natural light."
+      },
+      {
+        "id": "f0-r-dining-01",
+        "name": "Dining Room",
+        "usage": "dining",
+        "target_area_sqm": 10.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-kitchen-01",
+          "f0-r-living-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Open or semi-open dining adjacent to kitchen and living for contemporary layout."
+      },
+      {
+        "id": "f0-r-kitchen-01",
+        "name": "Kitchen",
+        "usage": "kitchen",
+        "target_area_sqm": 8.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-dining-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-bathroom-01",
+          "f0-r-powder-01"
+        ],
+        "notes": "Modular kitchen with utility/service access. South-east placement preferred per Vastu. MEP routing for water, gas, and exhaust required."
+      },
+      {
+        "id": "f0-r-bedroom-01",
+        "name": "Bedroom 1",
+        "usage": "bedroom",
+        "target_area_sqm": 10.5,
+        "floor_index": 0,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "f0-r-kitchen-01"
+        ],
+        "notes": "Second bedroom of the 2 BHK ground floor unit. South-west placement preferred."
+      },
+      {
+        "id": "f0-r-master-bedroom-01",
+        "name": "Master Bedroom",
+        "usage": "master_bedroom",
+        "target_area_sqm": 14.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-master-bath-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-kitchen-01"
+        ],
+        "notes": "Master bedroom with en-suite bathroom. South-west placement as per Vastu for residential buildings."
+      },
+      {
+        "id": "f0-r-master-bath-01",
+        "name": "Master Bathroom (En-suite)",
+        "usage": "bathroom",
+        "target_area_sqm": 4.5,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-master-bedroom-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-kitchen-01"
+        ],
+        "notes": "En-suite attached to master bedroom. Full fittings: WC, wash basin, shower. MEP wet zone routing required."
+      },
+      {
+        "id": "f0-r-bathroom-01",
+        "name": "Common Bathroom",
+        "usage": "bathroom",
+        "target_area_sqm": 3.5,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-bedroom-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-kitchen-01"
+        ],
+        "notes": "Common bathroom serving Bedroom 1 and guests. Full fittings: WC, wash basin, shower."
+      },
+      {
+        "id": "f0-r-powder-01",
+        "name": "Powder Room",
+        "usage": "powder_room",
+        "target_area_sqm": 2.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-kitchen-01"
+        ],
+        "notes": "Guest powder room near entrance lobby. WC and wash basin only."
+      },
+      {
+        "id": "f0-r-balcony-01",
+        "name": "Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 5.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-living-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "North-facing balcony off the living room. Provides natural ventilation and outlook to the street."
+      },
+      {
+        "id": "f0-r-utility-01",
+        "name": "Utility / Service Area",
+        "usage": "utility",
+        "target_area_sqm": 3.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-kitchen-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Washing machine point, drying area, and service access. MEP connections for water supply and drainage."
+      },
+      {
+        "id": "f0-r-corridor-01",
+        "name": "Internal Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 6.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-living-01",
+          "f0-r-master-bedroom-01",
+          "f0-r-bedroom-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Internal circulation spine connecting bedrooms to living areas and staircase."
+      }
+    ],
+    "floor_summary": "Ground floor (Floor 0) houses the building's main entrance lobby, covered resident parking occupying a major portion of the footprint, and a single 2 BHK dwelling unit comprising living, dining, kitchen, master bedroom with en-suite, second bedroom with common bathroom, powder room, balcony, utility, and internal corridor — all arranged for north-site orientation with contemporary planning principles."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1101,
+    "output_tokens": 1858,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2463,
+    "cost_usd_estimated": 0.040409,
+    "latency_ms": 25247.84079217352,
+    "created_at_iso": "2026-05-08T11:33:22.925886+00:00"
+  }
+}

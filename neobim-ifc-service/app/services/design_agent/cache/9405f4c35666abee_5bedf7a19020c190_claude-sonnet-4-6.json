@@ -1,0 +1,173 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f1-r-ward-01",
+        "name": "General Ward 01",
+        "usage": "ward",
+        "target_area_sqm": 32.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "6-bed general ward; NBC IPHS minimum 7.5 sqm per bed; 6 beds @ ~5.3 sqm net = 32 sqm. Natural light and ventilation on external facade preferred."
+      },
+      {
+        "id": "f1-r-ward-02",
+        "name": "General Ward 02",
+        "usage": "ward",
+        "target_area_sqm": 32.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "6-bed general ward; same standard as Ward 01. External facade preferred for natural ventilation."
+      },
+      {
+        "id": "f1-r-ward-03",
+        "name": "General Ward 03",
+        "usage": "ward",
+        "target_area_sqm": 32.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "6-bed general ward; same standard as Ward 01. External facade preferred."
+      },
+      {
+        "id": "f1-r-ward-04",
+        "name": "General Ward 04",
+        "usage": "ward",
+        "target_area_sqm": 32.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "6-bed general ward; brings total ward beds on this floor to 24. External facade preferred."
+      },
+      {
+        "id": "f1-r-ward-05",
+        "name": "Semi-Private Ward 05",
+        "usage": "ward",
+        "target_area_sqm": 18.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "2-bed semi-private ward; 9 sqm per bed per IPHS. External window mandatory."
+      },
+      {
+        "id": "f1-r-ward-06",
+        "name": "Semi-Private Ward 06",
+        "usage": "ward",
+        "target_area_sqm": 18.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "2-bed semi-private ward; mirrors Ward 05 on opposite side of corridor."
+      },
+      {
+        "id": "f1-r-nurses-station",
+        "name": "Nurses' Station",
+        "usage": "office",
+        "target_area_sqm": 18.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01",
+          "f1-r-ward-01",
+          "f1-r-ward-02",
+          "f1-r-ward-03",
+          "f1-r-ward-04"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central nurses' station with clear sightlines down ward corridor. Includes duty desk, medication trolley bay and charting area. NBC Group C compliance."
+      },
+      {
+        "id": "f1-r-corridor-01",
+        "name": "Ward Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 72.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-ward-01",
+          "f1-r-ward-02",
+          "f1-r-ward-03",
+          "f1-r-ward-04",
+          "f1-r-ward-05",
+          "f1-r-ward-06",
+          "f1-r-nurses-station",
+          "f1-r-bathroom-01",
+          "f1-r-bathroom-02"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Main ward corridor; minimum 2.4 m clear width per NBC for hospital wards to allow stretcher/wheelchair movement. Total 72 sqm for a ~30 m run."
+      },
+      {
+        "id": "f1-r-bathroom-01",
+        "name": "Patient Toilet & Bathroom Block 01",
+        "usage": "bathroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Accessible patient bathrooms serving Wards 01-03; minimum 2 WC + 2 shower units per NBC IPHS. Wet area waterproofing mandatory."
+      },
+      {
+        "id": "f1-r-bathroom-02",
+        "name": "Patient Toilet & Bathroom Block 02",
+        "usage": "bathroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Accessible patient bathrooms serving Wards 04-06; minimum 2 WC + 2 shower units per NBC IPHS. Wet area waterproofing mandatory."
+      },
+      {
+        "id": "f1-r-store-01",
+        "name": "Ward Store / Linen Room",
+        "usage": "store",
+        "target_area_sqm": 10.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-nurses-station"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Linen, consumables and equipment storage for ward floor. Adjacent to nurses' station for controlled access."
+      },
+      {
+        "id": "f1-r-pantry-01",
+        "name": "Ward Pantry",
+        "usage": "pantry",
+        "target_area_sqm": 8.0,
+        "floor_index": 1,
+        "adjacency_required": [
+          "f1-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Patient meal plating, hot-case storage and utensil washing area. Complies with hospital kitchen hygiene separation requirements."
+      }
+    ],
+    "floor_summary": "Floor 1 is the general ward floor of the multi-speciality hospital, housing six inpatient wards (totalling approximately 50 beds), a central nurses' station, two accessible patient bathroom blocks, a ward corridor of stretcher-compliant width, a ward store/linen room, and a ward pantry — all designed to NBC Group C (Institutional) and IPHS standards."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1148,
+    "output_tokens": 1809,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2465,
+    "cost_usd_estimated": 0.039823,
+    "latency_ms": 24868.649458047003,
+    "created_at_iso": "2026-05-08T11:34:06.448880+00:00"
+  }
+}

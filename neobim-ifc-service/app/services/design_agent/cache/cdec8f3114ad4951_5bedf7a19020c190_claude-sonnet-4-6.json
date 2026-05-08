@@ -1,0 +1,166 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f2-r-lobby-01",
+        "name": "Floor Lobby / Lift Landing",
+        "usage": "lobby",
+        "target_area_sqm": 18.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central core lobby serving 2 lifts and 1 stair on this floor. Circular floor plate; lobby wraps core."
+      },
+      {
+        "id": "f2-r-corridor-01",
+        "name": "Main Circulation Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 28.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-lobby-01",
+          "f2-r-office-01",
+          "f2-r-office-02",
+          "f2-r-meeting-01",
+          "f2-r-meeting-02",
+          "f2-r-reception-01",
+          "f2-r-pantry-01",
+          "f2-r-bathroom-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Annular corridor around central core — characteristic of 30m circular floor plate. Provides access to all perimeter offices."
+      },
+      {
+        "id": "f2-r-reception-01",
+        "name": "Office Reception",
+        "usage": "reception",
+        "target_area_sqm": 18.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-lobby-01",
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Welcoming reception point for office tenants on this floor; glass curtain-wall facade provides natural light."
+      },
+      {
+        "id": "f2-r-office-01",
+        "name": "Open-Plan Office A",
+        "usage": "office",
+        "target_area_sqm": 85.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01",
+          "f2-r-meeting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Large open-plan workspace occupying north-east arc of circular floor plate; full-height glass curtain wall."
+      },
+      {
+        "id": "f2-r-office-02",
+        "name": "Open-Plan Office B",
+        "usage": "office",
+        "target_area_sqm": 80.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01",
+          "f2-r-meeting-02"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Second open-plan workspace on south-west arc; accommodates second tenant or department."
+      },
+      {
+        "id": "f2-r-meeting-01",
+        "name": "Meeting Room 1",
+        "usage": "meeting_room",
+        "target_area_sqm": 24.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-office-01",
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "8-person meeting room with glazed partition; perimeter location for natural light."
+      },
+      {
+        "id": "f2-r-meeting-02",
+        "name": "Meeting Room 2",
+        "usage": "meeting_room",
+        "target_area_sqm": 18.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-office-02",
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "6-person meeting room; smaller pod suited to informal huddles."
+      },
+      {
+        "id": "f2-r-pantry-01",
+        "name": "Pantry / Tea Point",
+        "usage": "pantry",
+        "target_area_sqm": 8.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-bathroom-01"
+        ],
+        "notes": "Shared pantry for both office zones; CPWD DSR provision per floor. MEP wet riser coordinated with structural core."
+      },
+      {
+        "id": "f2-r-bathroom-01",
+        "name": "Toilet Block (Common)",
+        "usage": "bathroom",
+        "target_area_sqm": 18.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f2-r-pantry-01"
+        ],
+        "notes": "Unisex toilet block with separate male/female/accessible compartments; NBC Part 9 plumbing fixtures per occupant load."
+      },
+      {
+        "id": "f2-r-store-01",
+        "name": "Service / Store Room",
+        "usage": "store",
+        "target_area_sqm": 6.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "f2-r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Housekeeping store, electrical DB, and janitor cupboard consolidated per NBC Part 8 MEP requirements."
+      },
+      {
+        "id": "f2-r-balcony-01",
+        "name": "External Terrace / Balcony Strip",
+        "usage": "balcony",
+        "target_area_sqm": 22.0,
+        "floor_index": 2,
+        "adjacency_required": [
+          "Outside",
+          "f2-r-office-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Curved external balcony following circular facade on north arc; supports passive cooling, Bangalore climate. Rainwater harvesting channel integrated along parapet."
+      }
+    ],
+    "floor_summary": "Floor 2 is a shared office workspace floor accommodating two open-plan tenant zones with dedicated meeting rooms, a central reception, pantry, common toilets, and a curved external balcony — all organised around the annular circulation corridor of the 30 m circular tower plate."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1244,
+    "output_tokens": 1623,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 2482,
+    "cost_usd_estimated": 0.037385,
+    "latency_ms": 23845.970042049885,
+    "created_at_iso": "2026-05-08T13:18:56.056971+00:00"
+  }
+}

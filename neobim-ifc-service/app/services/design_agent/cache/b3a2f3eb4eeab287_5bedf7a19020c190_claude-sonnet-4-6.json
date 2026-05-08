@@ -1,0 +1,264 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "f0-r-lobby-01",
+        "name": "Main Lobby",
+        "usage": "lobby",
+        "target_area_sqm": 60.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-reception-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Main public entry lobby; large, well-lit, connects to reception and all ground-floor departments. Faces main street entrance per Vastu (east-facing preferred in Hyderabad site)."
+      },
+      {
+        "id": "f0-r-reception-01",
+        "name": "Reception & Registration",
+        "usage": "reception",
+        "target_area_sqm": 30.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01",
+          "f0-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Central reception desk with patient registration counters; must be visible from main lobby. IPHS/NBC Group C norm."
+      },
+      {
+        "id": "f0-r-waiting-01",
+        "name": "OPD Waiting Area",
+        "usage": "lobby",
+        "target_area_sqm": 50.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-reception-01",
+          "f0-r-consult-01",
+          "f0-r-consult-02",
+          "f0-r-consult-03",
+          "f0-r-consult-04",
+          "f0-r-consult-05"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Shared OPD waiting zone serving all consultation rooms; seating for ~40 persons per IPHS norms."
+      },
+      {
+        "id": "f0-r-consult-01",
+        "name": "Consultation Room 1 — General Medicine",
+        "usage": "consultation",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "OPD consultation; natural light required; NBC min 9.0 sqm, sized to 12 sqm for adequate doctor-patient clearance."
+      },
+      {
+        "id": "f0-r-consult-02",
+        "name": "Consultation Room 2 — Cardiology",
+        "usage": "consultation",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "OPD consultation; natural light required."
+      },
+      {
+        "id": "f0-r-consult-03",
+        "name": "Consultation Room 3 — Orthopaedics",
+        "usage": "consultation",
+        "target_area_sqm": 14.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Slightly larger to accommodate examination table and plaster trolley."
+      },
+      {
+        "id": "f0-r-consult-04",
+        "name": "Consultation Room 4 — Gynaecology",
+        "usage": "consultation",
+        "target_area_sqm": 14.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Includes examination alcove; privacy-sensitive placement away from main lobby sight-lines."
+      },
+      {
+        "id": "f0-r-consult-05",
+        "name": "Consultation Room 5 — Paediatrics",
+        "usage": "consultation",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Child-friendly finishes; natural light."
+      },
+      {
+        "id": "f0-r-pharmacy-01",
+        "name": "Pharmacy",
+        "usage": "shop",
+        "target_area_sqm": 30.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01",
+          "f0-r-reception-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Retail pharmacy with dispensing counter and back-of-house cold-storage; directly accessible from lobby and OPD. IPHS/NBC Group C requirement."
+      },
+      {
+        "id": "f0-r-lab-01",
+        "name": "Pathology / Diagnostic Laboratory",
+        "usage": "office",
+        "target_area_sqm": 40.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-reception-01",
+          "f0-r-sample-collection-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Full pathology + biochemistry lab; MEP services (exhaust, biohazard drainage) required per NBC Part 9. Sized for 2 benches + equipment."
+      },
+      {
+        "id": "f0-r-sample-collection-01",
+        "name": "Sample Collection Room",
+        "usage": "consultation",
+        "target_area_sqm": 10.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lab-01",
+          "f0-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Phlebotomy / specimen collection; adjacent to lab for direct sample transfer."
+      },
+      {
+        "id": "f0-r-corridor-01",
+        "name": "Main OPD Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 60.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-lobby-01",
+          "f0-r-consult-01",
+          "f0-r-consult-02",
+          "f0-r-consult-03",
+          "f0-r-consult-04",
+          "f0-r-consult-05",
+          "f0-r-pharmacy-01",
+          "f0-r-lab-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Double-loaded corridor min 2.4 m clear width per NBC Group C hospital norm; stretcher-passable."
+      },
+      {
+        "id": "f0-r-bathroom-01",
+        "name": "Patient Toilet Block (Male)",
+        "usage": "bathroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-pharmacy-01",
+          "f0-r-lab-01"
+        ],
+        "notes": "Accessible toilets per NBC Part 3 / IS 11942; minimum 3 WCs + 2 urinals; cross-infection prevention — not adjacent to pharmacy or lab."
+      },
+      {
+        "id": "f0-r-bathroom-02",
+        "name": "Patient Toilet Block (Female)",
+        "usage": "bathroom",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-pharmacy-01",
+          "f0-r-lab-01"
+        ],
+        "notes": "Accessible female toilets; located opposite male block on same corridor node; NBC Group C compliance."
+      },
+      {
+        "id": "f0-r-nurses-station-01",
+        "name": "Ground Floor Nursing Station / Help Desk",
+        "usage": "reception",
+        "target_area_sqm": 12.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01",
+          "f0-r-waiting-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Secondary nurse/help desk for OPD floor management; visual control of waiting area."
+      },
+      {
+        "id": "f0-r-utility-01",
+        "name": "Housekeeping / Utility Store",
+        "usage": "utility",
+        "target_area_sqm": 6.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-pharmacy-01",
+          "f0-r-lab-01"
+        ],
+        "notes": "Soiled linen, housekeeping equipment; end-of-corridor location per infection-control zoning."
+      },
+      {
+        "id": "f0-r-pantry-01",
+        "name": "Staff Pantry",
+        "usage": "pantry",
+        "target_area_sqm": 8.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01"
+        ],
+        "adjacency_forbidden": [
+          "f0-r-bathroom-01",
+          "f0-r-bathroom-02"
+        ],
+        "notes": "Staff refreshment pantry; not adjacent to toilet blocks per NBC hygiene rules."
+      },
+      {
+        "id": "f0-r-stairs-01",
+        "name": "Main Staircase & Landing",
+        "usage": "stairs_landing",
+        "target_area_sqm": 18.0,
+        "floor_index": 0,
+        "adjacency_required": [
+          "f0-r-corridor-01",
+          "f0-r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Fire-rated stairwell per NBC Part 4; min 1.5 m clear tread width for hospital; connects G to F1 and F2."
+      }
+    ],
+    "floor_summary": "Ground floor houses the full outpatient department (OPD) — main public lobby, central reception, five multi-speciality consultation rooms, pharmacy, pathology laboratory with sample collection, accessible patient toilet blocks, nursing station, and support spaces — forming the primary public-access and diagnostic tier of the multi-speciality hospital."
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 21,
+    "output_tokens": 2671,
+    "cache_read_tokens": 2453,
+    "cache_creation_tokens": 1127,
+    "cost_usd_estimated": 0.04509,
+    "latency_ms": 30038.7616250664,
+    "created_at_iso": "2026-05-08T11:34:41.844590+00:00"
+  }
+}
