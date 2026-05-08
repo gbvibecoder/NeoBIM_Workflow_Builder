@@ -19,6 +19,12 @@ from app.services.design_agent.reference_data.seismic_zones_in import (
     lookup_seismic_zone,
     lookup_zone_factor,
 )
+from app.services.design_agent.reference_data.usage_defaults import (
+    USAGE_DEFAULTS,
+    UsageDefaults,
+    assert_usage_defaults_coverage,
+    get_usage_defaults,
+)
 from app.services.design_agent.reference_data.wind_zones_in import (
     IS_875_ZONES,
     VB_BY_ZONE,
@@ -43,4 +49,9 @@ __all__ = [
     "VB_BY_ZONE",
     "lookup_wind_zone",
     "lookup_basic_wind_speed_mps",
+    # Usage defaults (Slice 2A.6 restructure)
+    "USAGE_DEFAULTS",
+    "UsageDefaults",
+    "get_usage_defaults",
+    "assert_usage_defaults_coverage",
 ]
