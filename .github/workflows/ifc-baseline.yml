@@ -103,6 +103,44 @@ jobs:
       - name: Run Phase 1 IDS violation reduction gate (≥30%)
         run: pytest tests/test_phase1_ids_violations_reduced.py -v
 
+      # ── Phase 2A (Slices 1–7) ────────────────────────────────────────
+      # Design agent foundation layer. Tests run from the committed
+      # cache files (app/services/design_agent/cache/), so no API key
+      # is needed in CI. The classifier / intake / pdf_extractor /
+      # llm_client / brief_analyst / program_architect / endpoint
+      # tests all exercise the cache-only paths in CI; LLM-driven
+      # tests skip cleanly when ANTHROPIC_API_KEY is unset and no
+      # matching cache row exists.
+      - name: Run Phase 2A schema + reference data tests
+        run: pytest tests/test_design_types_and_reference.py -v
+
+      - name: Run Phase 2A classifier tests
+        run: pytest tests/test_design_classifier.py -v
+
+      - name: Run Phase 2A intake tests
+        run: pytest tests/test_design_intake.py -v
+
+      - name: Run Phase 2A PDF extractor tests
+        run: pytest tests/test_design_pdf_extractor.py -v
+
+      - name: Run Phase 2A LLM client tests (cache-only)
+        run: pytest tests/test_design_llm_client.py -v
+
+      - name: Run Phase 2A BriefAnalyst tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: pytest tests/test_brief_analyst.py -v
+
+      - name: Run Phase 2A ProgramArchitect tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: pytest tests/test_program_architect.py -v
+
+      - name: Run Phase 2A end-to-end design endpoint tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: pytest tests/test_design_endpoint.py -v
+
       - name: Emit entity counts for baseline run (artifact preview)
         if: always()
         run: |
