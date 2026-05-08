@@ -103,3 +103,4 @@ experiments/training-data/
 # tesseract.js English OCR weights — auto-downloaded at runtime to
 # the repo root when OCR first runs. Not a source artefact.
 eng.traineddata
+.env*.local
