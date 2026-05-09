@@ -232,7 +232,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Unknown error" }));
-        if (data.error === "PLAN_LIMIT" || data.error === "EMAIL_VERIFY") {
+        if (data.error === "PLAN_LIMIT") {
           useFloorPlanStore.setState({ isGenerating: false });
           setUpgradeBlock({ title: data.title, message: data.message, action: data.action, actionUrl: data.actionUrl });
           return;

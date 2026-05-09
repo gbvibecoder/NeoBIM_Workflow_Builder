@@ -6,7 +6,7 @@ import { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, STRIPE_PLANS, getNodeTypeLim
 import { getEffectiveLimits, type LegacyLimits } from "@/features/billing/lib/plan-helpers";
 
 interface ExecutionBlock {
-  type: "email_verification" | "plan_limit" | "node_limit";
+  type: "plan_limit" | "node_limit";
   title: string;
   message: string;
   action?: string;
@@ -27,23 +27,13 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
   const userRoleRaw = ((session.user as { role?: string }).role) || "FREE";
   const userEmail = session.user.email || "";
-  let emailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
+  const emailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
 
   // Admins bypass everything
   const isAdmin = isAdminUser(userEmail) || userRoleRaw === "PLATFORM_ADMIN" || userRoleRaw === "TEAM_ADMIN";
   const userRole = (userRoleRaw in STRIPE_PLANS ? userRoleRaw : "FREE") as keyof typeof STRIPE_PLANS;
   if (isAdmin) {
     return NextResponse.json({ canExecute: true, blocks: [], remaining: 999, limit: 999, emailVerified: true, role: userRole });
-  }
-
-  // JWT session can be stale for up to 60s after verification (NextAuth JWT
-  // refresh throttle). If session says unverified, double-check with DB.
-  if (!emailVerified) {
-    const dbUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { emailVerified: true },
-    });
-    emailVerified = !!dbUser?.emailVerified;
   }
 
   const { catalogueIds } = await req.json().catch(() => ({ catalogueIds: [] }));
@@ -76,16 +66,6 @@ export async function POST(req: NextRequest) {
         actionUrl: "/dashboard/billing",
       });
     }
-    // Verification gate: after (limit - 1) unverified executions, must verify for the last
-    else if (!emailVerified && lifetimeCount >= freeLimit - 1) {
-      blocks.push({
-        type: "email_verification",
-        title: "Verify your email",
-        message: `You've used ${lifetimeCount} of your ${freeLimit} free executions. Verify your email to unlock your final free workflow!`,
-        action: "Verify Email",
-        actionUrl: "/dashboard/settings",
-      });
-    }
 
     return NextResponse.json({
       canExecute: blocks.length === 0,
@@ -110,17 +90,6 @@ export async function POST(req: NextRequest) {
   });
 
   const remaining = planLimit < 0 ? 999 : Math.max(0, planLimit - executionCount);
-
-  // Paid users: require email verification (no trial)
-  if (!emailVerified) {
-    blocks.push({
-      type: "email_verification",
-      title: "Verify your email",
-      message: "Please verify your email address to run workflows. Check your inbox for the verification link.",
-      action: "Verify Email",
-      actionUrl: "/dashboard/settings",
-    });
-  }
 
   // Monthly plan limit
   if (planLimit >= 0 && executionCount >= planLimit) {
