@@ -55,88 +55,36 @@ export async function POST(req: NextRequest) {
   // client one — we add dbExecutionId alongside instead of repurposing.
   const { catalogueId, executionId, dbExecutionId, tileInstanceId, inputData, userApiKey } = await req.json();
 
-  // ── Email verification + FREE tier lifetime gate ──────────────────────────
+  // ── FREE tier lifetime cap ────────────────────────────────────────────────
   //
-  // FREE users get LIMITED LIFETIME executions (not monthly):
-  //   • (limit - 1) without email verification  → experience the product
-  //   • verify email gate                        → captures their email
-  //   • 1 more after verification                → total = FREE_TIER_EXECUTIONS, then must upgrade
-  //
-  // Paid users (MINI/STARTER/PRO): must verify email/phone, no trial.
-  // Their monthly limits are enforced by the Redis rate limiter below.
-  //
-  // The JWT session can be stale for up to 60s after verification (NextAuth
-  // refresh throttle). When session says "unverified", we double-check DB.
+  // FREE users get a hard lifetime cap (FREE_TIER_EXECUTIONS total runs);
+  // paid users (MINI/STARTER/PRO) are gated by the monthly Redis rate limiter
+  // below. Email verification is OPTIONAL — users can opt in from Settings,
+  // but it does not block execution.
   //
   // We count only COMPLETED executions (SUCCESS / PARTIAL) — not RUNNING —
   // so nodes within the current workflow don't block each other.
-  if (!isAdmin) {
-    let isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
-    let isPhoneVerified = !!(session.user as { phoneVerified?: boolean }).phoneVerified;
+  if (!isAdmin && userRole === "FREE") {
+    const lifetimeCompleted = await prisma.execution.count({
+      where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
+    });
 
-    // Session says unverified — but JWT could be stale. Confirm with DB.
-    if (!isEmailVerified && !isPhoneVerified) {
-      const dbUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { emailVerified: true, phoneVerified: true },
-      });
-      isEmailVerified = !!dbUser?.emailVerified;
-      isPhoneVerified = !!dbUser?.phoneVerified;
-    }
-
-    if (userRole === "FREE") {
-      // Count ALL completed executions (lifetime, not monthly)
-      const lifetimeCompleted = await prisma.execution.count({
-        where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
-      });
-
-      // Hard cap: FREE_TIER_EXECUTIONS lifetime executions for FREE tier
-      if (lifetimeCompleted >= FREE_TIER_EXECUTIONS) {
-        // Try consuming a referral bonus before rejecting
-        const usedBonus = await consumeReferralBonus(userId);
-        if (!usedBonus) {
-          return NextResponse.json(
-            formatErrorResponse({
-              title: "Free executions used",
-              message: `You've used all ${FREE_TIER_EXECUTIONS} free workflow executions. Upgrade to a paid plan to keep building amazing things!`,
-              code: "RATE_001",
-              action: "View Plans",
-              actionUrl: "/dashboard/billing",
-            }),
-            { status: 429 }
-          );
-        }
-        // Bonus consumed — allow execution to proceed
-        console.log(`[referral] FREE user ${userId} consumed referral bonus to execute`);
-      }
-
-      // Verification gate: (limit - 1) free without verification, then must verify for the last one
-      if (!isEmailVerified && !isPhoneVerified && lifetimeCompleted >= FREE_TIER_EXECUTIONS - 1) {
+    if (lifetimeCompleted >= FREE_TIER_EXECUTIONS) {
+      // Try consuming a referral bonus before rejecting
+      const usedBonus = await consumeReferralBonus(userId);
+      if (!usedBonus) {
         return NextResponse.json(
           formatErrorResponse({
-            title: "Email verification required",
-            message: `You've used ${FREE_TIER_EXECUTIONS - 1} of your ${FREE_TIER_EXECUTIONS} free executions. Verify your email to unlock your final free workflow!`,
-            code: "AUTH_001",
-            action: "Verify Email",
-            actionUrl: "/dashboard/settings",
+            title: "Free executions used",
+            message: `You've used all ${FREE_TIER_EXECUTIONS} free workflow executions. Upgrade to a paid plan to keep building amazing things!`,
+            code: "RATE_001",
+            action: "View Plans",
+            actionUrl: "/dashboard/billing",
           }),
-          { status: 403 }
+          { status: 429 }
         );
       }
-    } else {
-      // Paid users: email/phone verification required, no trial
-      if (!isEmailVerified && !isPhoneVerified) {
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "Email verification required",
-            message: "Please verify your email address before running workflows. Check your inbox for the verification link.",
-            code: "AUTH_001",
-            action: "Verify Email",
-            actionUrl: "/dashboard/settings",
-          }),
-          { status: 403 }
-        );
-      }
+      console.log(`[referral] FREE user ${userId} consumed referral bonus to execute`);
     }
   }
   const nodeStartTime = Date.now();
