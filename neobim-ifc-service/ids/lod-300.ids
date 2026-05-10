@@ -91,7 +91,7 @@
         </entity>
       </applicability>
       <requirements>
-        <property cardinality="required" dataType="IFCQUANTITYVOLUME">
+        <property cardinality="required" dataType="IFCVOLUMEMEASURE">
           <propertySet><simpleValue>Qto_SlabBaseQuantities</simpleValue></propertySet>
           <baseName><simpleValue>NetVolume</simpleValue></baseName>
         </property>
@@ -109,7 +109,7 @@
         </entity>
       </applicability>
       <requirements>
-        <property cardinality="required" dataType="IFCQUANTITYAREA">
+        <property cardinality="required" dataType="IFCAREAMEASURE">
           <propertySet><simpleValue>Qto_SlabBaseQuantities</simpleValue></propertySet>
           <baseName><simpleValue>NetArea</simpleValue></baseName>
         </property>
@@ -163,7 +163,7 @@
         </entity>
       </applicability>
       <requirements>
-        <property cardinality="required" dataType="IFCQUANTITYAREA">
+        <property cardinality="required" dataType="IFCAREAMEASURE">
           <propertySet><simpleValue>Qto_SpaceBaseQuantities</simpleValue></propertySet>
           <baseName><simpleValue>NetFloorArea</simpleValue></baseName>
         </property>

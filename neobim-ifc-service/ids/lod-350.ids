@@ -201,7 +201,7 @@
         </entity>
       </applicability>
       <requirements>
-        <property cardinality="required" dataType="IFCQUANTITYVOLUME">
+        <property cardinality="required" dataType="IFCVOLUMEMEASURE">
           <propertySet><simpleValue>Qto_SpaceBaseQuantities</simpleValue></propertySet>
           <baseName><simpleValue>GrossVolume</simpleValue></baseName>
         </property>
