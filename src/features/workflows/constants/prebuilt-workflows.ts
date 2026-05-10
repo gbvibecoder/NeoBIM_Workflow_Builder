@@ -28,6 +28,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     category: "Concept Design",
     complexity: "simple",
     estimatedRunTime: "~3 minutes",
+    requiredTier: "PRO",
     requiredInputs: ["Detailed PDF project brief"],
     expectedOutputs: [
       "Parsed brief text (faithful to original PDF)",
@@ -191,6 +192,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     category: "Visualization",
     complexity: "intermediate",
     estimatedRunTime: "~4 minutes",
+    requiredTier: "STARTER",
     requiredInputs: ["2D floor plan image (scan, screenshot, or export)"],
     expectedOutputs: [
       "Floor plan analysis with room-by-room breakdown",
@@ -417,6 +419,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     category: "Visualization",
     complexity: "simple",
     estimatedRunTime: "~4 minutes",
+    requiredTier: "STARTER",
     requiredInputs: ["At least one building photograph (old facade, existing building, or new building)"],
     expectedOutputs: [
       "Building analysis with detected style, materials & typology",
@@ -581,6 +584,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     category: "3D Modeling",
     complexity: "simple",
     estimatedRunTime: "~15 seconds",
+    requiredTier: "MINI",
     requiredInputs: ["2D floor plan image (scan, screenshot, or export)"],
     expectedOutputs: [
       "Floor plan analysis with room-by-room breakdown",
@@ -721,6 +725,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     category: "BIM Analysis",
     complexity: "simple",
     estimatedRunTime: "~30 seconds",
+    requiredTier: "STARTER",
     requiredInputs: ["IFC model file (.ifc)"],
     expectedOutputs: [
       "Clash detection report with severity classification",

@@ -242,6 +242,13 @@ const en = {
   'templates.templates': 'templates',
   'templates.noTemplates': 'No templates in this category',
   'templates.viewAll': 'View all templates →',
+  // Tier-locked template badges + tooltips
+  'templates.locked.badge.MINI': 'Upgrade to Mini',
+  'templates.locked.badge.STARTER': 'Upgrade to Starter',
+  'templates.locked.badge.PRO': 'Upgrade to Pro',
+  'templates.locked.badge.TEAM': 'Upgrade to Team',
+  'templates.locked.cta.upgradeTo': 'Upgrade to {tier}',
+  'templates.locked.tooltip': 'This template requires the {tier} plan or higher. Click to upgrade.',
 
   // ===== COMMUNITY =====
   'community.title': 'Community',
@@ -3490,6 +3497,13 @@ const de: Record<keyof typeof en, string | string[]> = {
   'templates.templates': 'Vorlagen',
   'templates.noTemplates': 'Keine Vorlagen in dieser Kategorie',
   'templates.viewAll': 'Alle Vorlagen anzeigen →',
+  // Tier-gesperrte Vorlagen-Badges und Tooltips
+  'templates.locked.badge.MINI': 'Auf Mini upgraden',
+  'templates.locked.badge.STARTER': 'Auf Starter upgraden',
+  'templates.locked.badge.PRO': 'Auf Pro upgraden',
+  'templates.locked.badge.TEAM': 'Auf Team upgraden',
+  'templates.locked.cta.upgradeTo': 'Auf {tier} upgraden',
+  'templates.locked.tooltip': 'Diese Vorlage erfordert mindestens den {tier}-Plan. Zum Upgraden klicken.',
 
   // ===== COMMUNITY =====
   'community.title': 'Community',
