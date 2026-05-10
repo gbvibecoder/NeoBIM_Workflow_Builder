@@ -24,9 +24,15 @@
  *     WHERE plan_changed_at = '2026-05-10'::date  -- adjust date as needed
  *     AND legacy_limits IS NULL;
  */
+import { config } from "dotenv";
+config({ path: ".env.local" });
 import { PrismaClient } from "@prisma/client";
+import { PrismaNeon } from "@prisma/adapter-neon";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaNeon({
+  connectionString: process.env.DATABASE_URL ?? "postgresql://placeholder/placeholder",
+});
+const prisma = new PrismaClient({ adapter, log: ["error"] });
 
 interface UserRow {
   id: string;
