@@ -51,6 +51,7 @@ from app.services.beam_builder import create_beam_parametric  # noqa: E402
 from app.services.column_builder import create_column_parametric  # noqa: E402
 from app.services.geometry_resolver import resolve_geometries  # noqa: E402
 from app.services.ids_validator import merge_results, validate_ifc  # noqa: E402
+from app.services.lift_cabin_emitter import emit_lift_cabins  # noqa: E402
 from app.services.material_library import (  # noqa: E402
     create_material_layer_set,
     get_roof_preset,
@@ -413,6 +414,19 @@ def build_ifc_from_building_model(bm: BuildingModel) -> ifcopenshell.file:
         )
         opening_entities[opening_id] = ifc_opening
 
+    # Slice T2.0.4.B — IFC-layer door operation override for lift doors.
+    # Any door whose connects_room_ids reference a Room with usage="lift"
+    # is overridden from SWING to SLIDING for the IFC export. We do
+    # this by mutating the in-memory Door copy passed to
+    # `create_door_parametric`, NOT by editing the BuildingModel — the
+    # snapshot stays byte-identical.
+    _lift_room_ids: set[str] = {
+        r.id
+        for st in bld.storeys
+        for r in st.rooms
+        if r.usage == "lift"
+    }
+
     # Doors
     for d_node in sorted(bld.doors, key=lambda d: d.id):
         parent_opening = openings_by_id.get(d_node.in_opening_id)
@@ -427,8 +441,21 @@ def build_ifc_from_building_model(bm: BuildingModel) -> ifcopenshell.file:
             None,
         )
         ifc_storey = ifc_storeys[host_storey_id] if host_storey_id else None
+
+        # Slice T2.0.4.B — override swing="sliding" for lift doors
+        # before dispatch. The existing _door_operation_type mapping
+        # in opening_builder translates this to SLIDING_TO_LEFT/RIGHT.
+        connects_lift = any(
+            rid in _lift_room_ids for rid in d_node.connects_room_ids
+        )
+        d_node_for_dispatch = (
+            d_node.model_copy(update={"swing": "sliding"})
+            if connects_lift
+            else d_node
+        )
+
         ifc_door = create_door_parametric(
-            d_node,
+            d_node_for_dispatch,
             parent_opening,
             parent_opening_entity,
             model,
@@ -593,6 +620,14 @@ def build_ifc_from_building_model(bm: BuildingModel) -> ifcopenshell.file:
 
     # Defensive: ensure every IfcRailing has PredefinedType set.
     fix_railing_predefined_types(model)
+
+    # ── Slice T2.0.4.B — IfcTransportElement (lift cabin) emission ─
+    # Emits one IfcTransportElement per Room with usage="lift". Returns
+    # an empty list for house / duplex templates (no lift rooms). Cabin
+    # carries Pset_TransportElementCommon + Lift-Cabin-Steel material.
+    emit_lift_cabins(
+        model, body_context, bm=bm, ifc_storeys=ifc_storeys,
+    )
 
     # ── Provenance Pset on IfcProject ─────────────────────────────
     initial_provenance = bm.project.metadata.provenance
