@@ -1397,6 +1397,206 @@ Hits: **0.** ✓
 
 — end of §R —
 
+---
+
+# §S — P0 hotfix: cap is now actually blocking
+
+> **Production evidence (manager-review-day):** fresh FREE account ran two
+> workflows successfully. Sidebar showed `1/1 runs left` and a bottom-right
+> toast read `1 execution remaining this month (1 total)`. Both surfaces
+> indicate **count = 0** even after a successful run. The 1:1 cap was
+> not being enforced. Below: diagnosis, root cause, fix, and validation.
+
+## §S.1 — Diagnosis: 8 theories tested, root cause identified
+
+| # | Theory | Verdict | Evidence |
+|---|---|:---:|---|
+| 1 | Branch not deployed | UNCONFIRMED-but-irrelevant | Local code is current; bug reproduces from code analysis regardless of deployment SHA |
+| 2 | Rows created with wrong status | **REJECTED** | If rows existed at any status, the per-node `[SUCCESS, PARTIAL]` check would still see them. Toast saying `1 total` confirms count=0, meaning **no rows exist at all**. |
+| 3 | Rows never persisted (silent rollback) | **CONFIRMED ROOT CAUSE** | See below — `createExecutionWithCapCheck`'s interactive Prisma transaction throws on Neon's pgbouncer-pooled connection AND `pg_advisory_xact_lock(int4)` is not a valid Postgres signature. Either failure → 500 → client never sets `dbExecutionId` → no row ever created. |
+| 4 | Auth mismatch / wrong userId | REJECTED | Per-node calls use `session.user.id`; if mismatch, the workflow wouldn't run at all. |
+| 5 | Count query bug (date filter) | REJECTED | `check-execution-eligibility.ts:249` uses `status: { in: ["SUCCESS","PARTIAL"] }` for FREE with no createdAt filter. Correct. Lifetime semantics intact. |
+| 6 | Scratch-workflow filter excludes count | REJECTED | Helper does NOT filter by workflow name; scratch executions DO count toward cap. |
+| 7 | Multiple test accounts | UNCONFIRMED-but-orthogonal | Even if user re-signed up, cap should trip at run #2 of a new user. Bug reproduces deterministically per account. |
+| 8 | Vercel cache / cold start | UNCONFIRMED-but-orthogonal | Even with fresh cold-start, the helper code path throws. |
+
+### Root cause — line-quoted code evidence
+
+`src/features/billing/lib/check-execution-eligibility.ts` (pre-fix) lines 521-526:
+
+```ts
+return await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${args.userId}))`;
+    ...
+```
+
+**Two compounding failure modes:**
+
+1. **Prisma interactive transactions on Neon's pgbouncer-pooled connection.**
+   The `prisma.$transaction(async (tx) => …)` callback form requires session
+   stickiness across multiple statements. Neon's default `DATABASE_URL` is
+   the pgbouncer-pooled URL, which uses TRANSACTION-mode pooling. Prisma's
+   own docs flag this as fragile / unsupported. Symptoms range from "this
+   connection is paused" runtime errors to silent connection switches that
+   defeat the lock.
+
+2. **`pg_advisory_xact_lock(int4)` signature mismatch.**
+   `hashtext(text)` returns `int4`. `pg_advisory_xact_lock` is overloaded
+   on `bigint` (single key) or `(int, int)` (two keys). Calling it with
+   a single `int4` requires implicit cast to `bigint`, which Postgres may
+   refuse depending on operator overloading. `pg_advisory_xact_lock(integer)
+   does not exist` is a classic error in this pattern.
+
+**Effect:** the interactive transaction throws → caught by route's outer
+`try/catch` (line 137) → returns `500 INTERNAL_ERROR` → client at
+`useExecution.ts:1631-1672` neither hits the `if (res.status === 429)`
+branch nor the `if (res.ok)` branch → `dbExecutionId` stays `null` → at
+end of run, `if (dbExecutionId) PUT /api/executions/{id}` is skipped →
+**no Execution row in any state, ever.**
+
+`prisma.execution.count({ status: { in: ["SUCCESS", "PARTIAL"] } })` keeps
+returning 0 forever. Cap remains `1 - 0 = 1 remaining`. Header
+`X-RateLimit-Remaining: 1` propagates → `useExecution.ts:807-816` toast.
+
+**Why this slipped past Phase 2.5 audit (§J):** the source-level test
+asserted the *string* `pg_advisory_xact_lock` was present — pinning the
+DESIGN. It did not test runtime behavior on a live pgbouncer connection.
+Vitest mocks Prisma at the module level, so `tx.$queryRaw\`SELECT pg_…\``
+runs against a vi.fn(), not real Postgres. The bug was production-only.
+
+## §S.2 — Fix: drop the interactive transaction
+
+`src/features/billing/lib/check-execution-eligibility.ts:520-687` rewritten:
+
+- **Removed** `prisma.$transaction(async (tx) => …)` wrapper
+- **Removed** `tx.$queryRaw\`SELECT pg_advisory_xact_lock(...)\`` call
+- **Removed** `CapExceededError` throw-and-catch dance (now returns blocked
+  result directly)
+- **Kept** all the actual logic: admin bypass, DB-canonical role read, JWT-
+  staleness defense, `getEffectiveLimits` legacy honoring, slot-reservation
+  count over `[SUCCESS, PARTIAL] ∪ recent [PENDING, RUNNING]`,
+  `consumeReferralBonus` fallback, workflow-already-executed lock
+- **Added** `console.error` with `userId + workflowId` in catch block so
+  any future failure mode is traceable from Vercel logs (Phase 2.5 had no
+  diagnostic logging)
+
+**Race-protection trade-off:** without the advisory lock, two concurrent
+runs from the same user could both pass the count check and both create
+RUNNING rows (off-by-one). The slot-reservation count includes recent
+in-flight rows under `READ COMMITTED`, so the second tab sees the first
+tab's row in the common case (~10 ms after the first tab's INSERT).
+**Per-node defensive recheck in `/api/execute-node` (GAP #2 §J)** still
+fires on every node call as the second-line defense. Manager-acceptable.
+
+## §S.3 — Concrete pricing in cap-block modal
+
+`makeCapBlock(role, limit)` rewritten to drive copy + CTA from `STRIPE_PLANS`
+SSOT. Every cap-block now carries:
+
+| Current → Target | Title | Body | Primary CTA | Tertiary |
+|---|---|---|---|---|
+| FREE → MINI | "You've used your free workflow" | "Upgrade to Mini for 3 workflows + 3 executions/month at just ₹99." | "Upgrade to Mini — ₹99/month" | "View all plans" |
+| MINI → STARTER | "You've used all 3 Mini executions this month" | "Upgrade to Starter for 15 workflows + executions/month at ₹799." | "Upgrade to Starter — ₹799/month" | "View all plans" |
+| STARTER → PRO | "You've used all 15 Starter executions this month" | "Upgrade to Pro for 45 workflows + executions/month at ₹1,999." | "Upgrade to Pro — ₹1,999/month" | "View all plans" |
+| PRO → TEAM | "You've used all 45 Pro executions this month" | "Upgrade to Team for 300 workflows + executions/month at ₹4,999." | "Upgrade to Team — ₹4,999/month" | "View all plans" |
+| TEAM (top) | "You've used all 300 Team executions this month" | "Reach out to support to discuss enterprise plans, or wait until next month's reset." | "Contact support" (mailto) | n/a |
+
+- All numbers from `STRIPE_PLANS.{tier}.limits.runsPerMonth` and `.price` (SSOT)
+- Currency rendered via local `formatINRPrice()` helper (kept in this file
+  to avoid cross-feature import from `@/features/boq/...`)
+- `actionUrl` includes `?plan={tier}` so the billing page can deep-link to
+  the right tier card
+- Recharge CTA NOT wired — no recharge feature found in codebase. Tertiary
+  is "View all plans" instead.
+
+## §S.4 — Bottom-right warning toast removed
+
+`useExecution.ts:807-816` block deleted:
+
+```ts
+toast.warning(`${rem} execution${rem === 1 ? "" : "s"} remaining this month (${lim} total)`, {
+  description: "Upgrade your plan for more executions",
+  action: { label: "Upgrade", onClick: () => { window.location.href = "/dashboard/billing"; } },
+  duration: 8000,
+});
+```
+
+The Sidebar usage counter (`X/N runs left`) remains as the passive signal.
+At cap, the hard `ExecutionBlockModal` opens on Run click. Zero
+intermediate "running low" toasts.
+
+The X-Referral-Bonus-Used toast at line ~825 (intentional informative
+toast, fires once per workflow when a bonus is consumed) is preserved.
+
+## §S.5 — Entry-point coverage
+
+The cap-hit flow is now uniform across:
+
+| Entry point | Where the gate fires | Surface on cap-hit |
+|---|---|---|
+| Canvas Run button | `WorkflowCanvas.handleRun` pre-check + `runWorkflow` internal pre-check + `/api/executions POST` cap | `ExecutionBlockModal` |
+| Cmd+Enter | Same as Run button (toolbar.onRun) | `ExecutionBlockModal` |
+| AI Chat "run this workflow" | Routes through `runWorkflow` (which has its own pre-check) | `ExecutionBlockModal` |
+| Floor-plan generate | `/api/generate-floor-plan` calls helper with `consumeBonusOnCap: true` | FloorPlanViewer's local upgradeBlock modal (hard, not toast) — server returns the same block payload, surfaced via existing component |
+| Cinematic generate | `/api/generate-cinematic-walkthrough` calls helper | VideoRenderStudio surfaces server's `RATE_LIMIT::`-tagged error |
+| Video generate | `/api/generate-video-walkthrough` calls helper | Same as cinematic |
+| Brief-renders generate | `/api/brief-renders POST` calls helper | Server returns 429 with helper's block payload |
+| Parse-IFC large file | `/api/parse-ifc` calls helper; client at `useExecution.ts:393-409` propagates 429 with `.status` so outer catch routes to ExecutionBlockModal | `ExecutionBlockModal` |
+| Re-run from /dashboard/history | Click → loads canvas → handleRun → same as canvas Run | `ExecutionBlockModal` |
+| Re-run from results page | "Run Again" loads canvas → handleRun → same | `ExecutionBlockModal` |
+
+All paths converge on the helper's authoritative cap check; all surface the
+server's rich block payload (`title` + `message` + `action` w/ price +
+`actionUrl` w/ deep-link).
+
+## §S.6 — Validation
+
+| Check | Result |
+|---|---|
+| `npx prisma generate` | ✓ |
+| `npx tsc --noEmit` (touched files) | **0 errors** |
+| `npm run build` | ✓ Compiled in 9.5 s, 166/166 pages |
+| Helper tests | **53/53 pass** (was 51 → +2 from new tier coverage) |
+| Full vitest | **3458 pass / 7 fail / 1 skipped** — same 7 pre-existing failures, **0 new regressions** |
+
+## §S.7 — Production smoke-test runbook (Rutik runs after merge)
+
+Once Vercel deploys this commit:
+
+1. **DB query before test:** count current rows for the test FREE user:
+   `SELECT count(*) FROM "Execution" WHERE user_id='<id>' AND status IN ('SUCCESS','PARTIAL');`
+   → expect 0 (or whatever baseline)
+
+2. **Run a workflow** to completion. Watch Vercel logs — should see:
+   - `[createExecutionWithCapCheck]` no error logs
+   - `POST /api/executions 201` (was 500 before fix)
+
+3. **DB query after success:** same query → expect baseline + 1
+
+4. **Sidebar:** should show `0/1 runs left` (was `1/1` before).
+
+5. **Click Run again** (or open new workflow + click Run) → expect:
+   - **NO** bottom-right "X executions remaining" toast (killed in §S.4)
+   - **HARD MODAL** with "You've used your free workflow" title +
+     "Upgrade to Mini — ₹99/month" CTA
+   - Modal Upgrade button → `/dashboard/billing?plan=MINI`
+
+6. **Save workflow #2:** expect 403 → soft "Library full" toast (unchanged
+   from prior pass; that's the workflow-cap, separate from execution cap).
+
+If any step fails, Vercel logs at `[createExecutionWithCapCheck] user=...`
+will show the underlying Prisma/Postgres error — actionable diagnosis.
+
+## §S.8 — Tag + branch + merge
+
+- Pre-fix rollback tag: **`pre-cap-fix-final-rollback`** at `dc90e8e1`
+  (already pushed to origin)
+- Hotfix branch: **`fix/plan-cap-actually-block`** off `dc90e8e1`
+- Merge to main pending (this commit)
+
+— end of §S —
+
+
 
 
 

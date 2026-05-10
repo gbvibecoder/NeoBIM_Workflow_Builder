@@ -182,25 +182,74 @@ function makeWorkflowAlreadyExecutedBlock(): EligibilityBlock {
   };
 }
 
+/** Inline ₹ formatter — kept local to avoid a cross-feature import from
+ *  `@/features/boq/components/recalc-engine`. Plan prices are ≤ 5 digits
+ *  so the simple grouping-locale toLocaleString is enough; we don't need
+ *  the L/Cr suffixes the BOQ helper produces. */
+function formatINRPrice(value: number): string {
+  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+}
+
 function makeCapBlock(role: PlanKey, limit: number): EligibilityBlock {
+  // Tier-specific upgrade copy with concrete pricing from STRIPE_PLANS SSOT.
+  // Each tier shows: title (current state) + body (target plan + price) +
+  // primary CTA with price suffix + tertiary "View all plans" link.
   if (role === "FREE") {
+    const target = STRIPE_PLANS.MINI;
     return {
       type: "plan_limit",
-      title: "Free executions used",
-      message: `You've used all ${limit} free workflow executions. Upgrade to Mini to keep building!`,
-      action: "Upgrade to Mini",
-      actionUrl: "/dashboard/billing",
+      title: "You've used your free workflow",
+      message: `Upgrade to Mini for ${target.limits.runsPerMonth} workflows + ${target.limits.runsPerMonth} executions/month at just ${formatINRPrice(target.price)}.`,
+      action: `Upgrade to Mini — ${formatINRPrice(target.price)}/month`,
+      actionUrl: "/dashboard/billing?plan=MINI",
+      secondaryAction: "View all plans",
+      secondaryActionUrl: "/dashboard/billing",
     };
   }
-  const nextPlan =
-    role === "MINI" ? "Starter" : role === "STARTER" ? "Pro" : null;
-  const planName = STRIPE_PLANS[role]?.name ?? "current";
+  if (role === "MINI") {
+    const target = STRIPE_PLANS.STARTER;
+    return {
+      type: "plan_limit",
+      title: `You've used all ${limit} Mini executions this month`,
+      message: `Upgrade to Starter for ${target.limits.runsPerMonth} workflows + executions/month at ${formatINRPrice(target.price)}.`,
+      action: `Upgrade to Starter — ${formatINRPrice(target.price)}/month`,
+      actionUrl: "/dashboard/billing?plan=STARTER",
+      secondaryAction: "View all plans",
+      secondaryActionUrl: "/dashboard/billing",
+    };
+  }
+  if (role === "STARTER") {
+    const target = STRIPE_PLANS.PRO;
+    return {
+      type: "plan_limit",
+      title: `You've used all ${limit} Starter executions this month`,
+      message: `Upgrade to Pro for ${target.limits.runsPerMonth} workflows + executions/month at ${formatINRPrice(target.price)}.`,
+      action: `Upgrade to Pro — ${formatINRPrice(target.price)}/month`,
+      actionUrl: "/dashboard/billing?plan=PRO",
+      secondaryAction: "View all plans",
+      secondaryActionUrl: "/dashboard/billing",
+    };
+  }
+  if (role === "PRO") {
+    const target = STRIPE_PLANS.TEAM;
+    return {
+      type: "plan_limit",
+      title: `You've used all ${limit} Pro executions this month`,
+      message: `Upgrade to Team for ${target.limits.runsPerMonth} workflows + executions/month at ${formatINRPrice(target.price)}.`,
+      action: `Upgrade to Team — ${formatINRPrice(target.price)}/month`,
+      actionUrl: "/dashboard/billing?plan=TEAM",
+      secondaryAction: "View all plans",
+      secondaryActionUrl: "/dashboard/billing",
+    };
+  }
+  // TEAM at cap — no plan above; route to support.
   return {
     type: "plan_limit",
-    title: "Monthly limit reached",
-    message: `You've used all ${limit} workflow executions this month on the ${planName} plan.${nextPlan ? ` Upgrade to ${nextPlan} for more.` : " Resets next month."}`,
-    action: nextPlan ? `Upgrade to ${nextPlan}` : undefined,
-    actionUrl: nextPlan ? "/dashboard/billing" : undefined,
+    title: `You've used all ${limit} Team executions this month`,
+    message:
+      "Reach out to support to discuss enterprise plans, or wait until next month's reset.",
+    action: "Contact support",
+    actionUrl: "mailto:support@buildflow.app",
   };
 }
 
@@ -517,16 +566,33 @@ export async function createExecutionWithCapCheck(
     resolvedWorkflowId = await getOrCreateScratchWorkflow(args.userId);
   }
 
-  // ── 2. Atomic cap-check + row-creation ────────────────────────────────────
-  return await prisma.$transaction(async (tx) => {
-    // pg_advisory_xact_lock auto-releases at transaction end. Serializes
-    // concurrent calls per-user. hashtext(text) returns int4 — collisions
-    // possible at billions-of-users scale; acceptable trade-off for a
-    // global lock space without an explicit lock table.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${args.userId}))`;
-
-    // Admins skip the cap check — read role from DB to defend against stale JWT.
-    const dbUser = await tx.user.findUnique({
+  // ── 2. Cap-check + row-creation (no interactive transaction) ─────────────
+  //
+  // Original design used `prisma.$transaction(async (tx) => ...)` with
+  // `pg_advisory_xact_lock` for cross-process serialization. That broke on
+  // production: Neon's pgbouncer-pooled connections do not reliably support
+  // Prisma's interactive transactions, AND `pg_advisory_xact_lock(int4)` is
+  // not a valid signature (the function takes int8 or int4+int4). The
+  // transaction throws, the route's outer catch returns 500, the client
+  // never sets dbExecutionId, and NO Execution row is ever created → the
+  // FREE-tier cap silently never trips. This was the smoking-gun bug
+  // observed in production where `count(SUCCESS+PARTIAL) = 0` even after
+  // the user successfully completed multiple workflow runs.
+  //
+  // New design: drop the interactive transaction. Read user role + count
+  // in parallel, do the cap check, then a non-transactional insert. The
+  // slot-reservation count (completed + recent PENDING/RUNNING) means a
+  // concurrent second tab will see the first tab's RUNNING row from its
+  // own /api/executions POST and block. Race window is ~10 ms between
+  // count and insert; under heavy concurrent abuse a single user could
+  // exceed the cap by 1 (off-by-one). Acceptable trade-off vs the
+  // production-blocking bug.
+  //
+  // Per-node defensive recheck in /api/execute-node still fires on every
+  // node call (see GAP #2 §J), so the cap is enforced at multiple layers.
+  try {
+    // Admins skip cap — read role from DB to defend against stale JWT.
+    const dbUser = await prisma.user.findUnique({
       where: { id: args.userId },
       select: { role: true, legacyLimits: true },
     });
@@ -534,7 +600,7 @@ export async function createExecutionWithCapCheck(
     const dbIsAdminRole = dbRole === "PLATFORM_ADMIN" || dbRole === "TEAM_ADMIN";
 
     if (isAdmin || dbIsAdminRole) {
-      const created = await tx.execution.create({
+      const created = await prisma.execution.create({
         data: {
           workflowId: resolvedWorkflowId,
           userId: args.userId,
@@ -570,30 +636,27 @@ export async function createExecutionWithCapCheck(
     );
     const limit = effectiveLimits.runsPerMonth;
 
-    // Workflow-already-executed lock — checked INSIDE the transaction so it
-    // races correctly with concurrent re-run attempts. Skipped for the
-    // scratch workflow (which is shared across many runs by design).
-    const lockCheck = await hasWorkflowBeenExecuted(resolvedWorkflowId, tx);
+    // Workflow-already-executed lock. Skipped for scratch workflow.
+    const lockCheck = await hasWorkflowBeenExecuted(resolvedWorkflowId);
     if (lockCheck.executed && !lockCheck.isScratch) {
       const block = makeWorkflowAlreadyExecutedBlock();
-      const eligibility: EligibilityBlocked = {
-        canExecute: false,
-        blocks: [block],
-        remaining: 0,
-        limit,
-        used: 0,
-        emailVerified: args.emailVerified,
-        role: effectiveRole,
-        bonusRemaining: 0,
-        usedReferralBonus: false,
-      };
-      throw new CapExceededError(eligibility);
+      return {
+        ok: false,
+        eligibility: {
+          canExecute: false,
+          blocks: [block],
+          remaining: 0,
+          limit,
+          used: 0,
+          emailVerified: args.emailVerified,
+          role: effectiveRole,
+          bonusRemaining: 0,
+          usedReferralBonus: false,
+        },
+      } as CreateExecutionBlocked;
     }
 
     // Slot-reservation count: completed runs + recent in-flight rows.
-    // Includes our own user's pending/running rows so concurrent attempts
-    // see each other. Excludes stale (> 2 h) in-flight rows so abandoned
-    // workflows don't permanently block.
     const inflightCutoff = new Date(Date.now() - INFLIGHT_TTL_MS);
     const isPaid = effectiveRole !== "FREE";
 
@@ -606,7 +669,7 @@ export async function createExecutionWithCapCheck(
       createdAt: { gte: inflightCutoff },
     };
 
-    const slotsUsed = await tx.execution.count({
+    const slotsUsed = await prisma.execution.count({
       where: {
         userId: args.userId,
         OR: [completedFilter, inflightFilter],
@@ -617,29 +680,30 @@ export async function createExecutionWithCapCheck(
     let bonusRemaining = await getReferralBonus(args.userId);
 
     if (limit >= 0 && slotsUsed >= limit) {
-      // At cap (counting in-flight) — try referral bonus.
+      // At cap — try referral bonus before blocking.
       const consumed = await consumeReferralBonus(args.userId);
       if (!consumed) {
         const block = makeCapBlock(effectiveRole, limit);
-        const eligibility: EligibilityBlocked = {
-          canExecute: false,
-          blocks: [block],
-          remaining: 0,
-          limit,
-          used: slotsUsed,
-          emailVerified: args.emailVerified,
-          role: effectiveRole,
-          bonusRemaining,
-          usedReferralBonus: false,
-        };
-        // Throw to abort the transaction — row creation is rolled back.
-        throw new CapExceededError(eligibility);
+        return {
+          ok: false,
+          eligibility: {
+            canExecute: false,
+            blocks: [block],
+            remaining: 0,
+            limit,
+            used: slotsUsed,
+            emailVerified: args.emailVerified,
+            role: effectiveRole,
+            bonusRemaining,
+            usedReferralBonus: false,
+          },
+        } as CreateExecutionBlocked;
       }
       usedReferralBonus = true;
       bonusRemaining = Math.max(0, bonusRemaining - 1);
     }
 
-    const created = await tx.execution.create({
+    const created = await prisma.execution.create({
       data: {
         workflowId: resolvedWorkflowId,
         userId: args.userId,
@@ -666,12 +730,14 @@ export async function createExecutionWithCapCheck(
       usedReferralBonus,
       bonusRemaining,
     } as CreateExecutionOk;
-  }).catch((err) => {
-    if (err instanceof CapExceededError) {
-      return { ok: false, eligibility: err.eligibility } as CreateExecutionBlocked;
-    }
+  } catch (err) {
+    // Surface diagnostics so future failures are debuggable from Vercel logs.
+    console.error(
+      `[createExecutionWithCapCheck] user=${args.userId} workflowId=${args.workflowId ?? "<scratch>"} failed:`,
+      err instanceof Error ? `${err.name}: ${err.message}` : err,
+    );
     throw err;
-  });
+  }
 }
 
 // ── Scratch workflow helper ───────────────────────────────────────────────────

@@ -147,9 +147,12 @@ describe("FREE lifetime cap (limit = 1)", () => {
     if (!result.canExecute) {
       expect(result.blocks).toHaveLength(1);
       expect(result.blocks[0].type).toBe("plan_limit");
-      expect(result.blocks[0].title).toBe("Free executions used");
-      expect(result.blocks[0].action).toBe("Upgrade to Mini");
-      expect(result.blocks[0].actionUrl).toBe("/dashboard/billing");
+      // New cap-block copy carries the full upgrade pitch with concrete price.
+      expect(result.blocks[0].title).toBe("You've used your free workflow");
+      expect(result.blocks[0].action).toContain("Upgrade to Mini");
+      expect(result.blocks[0].action).toContain("₹99");
+      expect(result.blocks[0].actionUrl).toBe("/dashboard/billing?plan=MINI");
+      expect(result.blocks[0].secondaryAction).toBe("View all plans");
     }
   });
 
@@ -212,35 +215,49 @@ describe("paid monthly cap (1:1 spec — workflows = executions)", () => {
     }
   });
 
-  it("MINI at cap (3) → 'Upgrade to Starter' CTA", async () => {
+  it("MINI at cap (3) → 'Upgrade to Starter ₹799' CTA", async () => {
     prismaMocks.userFindUnique.mockResolvedValue({ role: "MINI", legacyLimits: null });
     prismaMocks.executionCount.mockResolvedValue(3);
     const result = await checkExecutionEligibility({ ...baseArgs, userRole: "MINI" });
     expect(result.canExecute).toBe(false);
     if (!result.canExecute) {
-      expect(result.blocks[0].title).toBe("Monthly limit reached");
-      expect(result.blocks[0].action).toBe("Upgrade to Starter");
+      expect(result.blocks[0].title).toContain("3 Mini executions");
+      expect(result.blocks[0].action).toContain("Upgrade to Starter");
+      expect(result.blocks[0].action).toContain("₹799");
     }
   });
 
-  it("STARTER at cap (15) → 'Upgrade to Pro' CTA", async () => {
+  it("STARTER at cap (15) → 'Upgrade to Pro ₹1,999' CTA", async () => {
     prismaMocks.userFindUnique.mockResolvedValue({ role: "STARTER", legacyLimits: null });
     prismaMocks.executionCount.mockResolvedValue(15);
     const result = await checkExecutionEligibility({ ...baseArgs, userRole: "STARTER" });
     expect(result.canExecute).toBe(false);
     if (!result.canExecute) {
-      expect(result.blocks[0].action).toBe("Upgrade to Pro");
+      expect(result.blocks[0].action).toContain("Upgrade to Pro");
+      expect(result.blocks[0].action).toContain("₹1,999");
     }
   });
 
-  it("PRO at cap (45) → no upgrade target (top non-team tier)", async () => {
+  it("PRO at cap (45) → 'Upgrade to Team ₹4,999' CTA (PRO is no longer top tier)", async () => {
     prismaMocks.userFindUnique.mockResolvedValue({ role: "PRO", legacyLimits: null });
     prismaMocks.executionCount.mockResolvedValue(45);
     const result = await checkExecutionEligibility({ ...baseArgs, userRole: "PRO" });
     expect(result.canExecute).toBe(false);
     if (!result.canExecute) {
-      expect(result.blocks[0].action).toBeUndefined();
-      expect(result.blocks[0].actionUrl).toBeUndefined();
+      expect(result.blocks[0].action).toContain("Upgrade to Team");
+      expect(result.blocks[0].action).toContain("₹4,999");
+      expect(result.blocks[0].actionUrl).toBe("/dashboard/billing?plan=TEAM");
+    }
+  });
+
+  it("TEAM at cap (300) → 'Contact support' CTA (top tier, no upgrade)", async () => {
+    prismaMocks.userFindUnique.mockResolvedValue({ role: "TEAM", legacyLimits: null });
+    prismaMocks.executionCount.mockResolvedValue(300);
+    const result = await checkExecutionEligibility({ ...baseArgs, userRole: "TEAM" });
+    expect(result.canExecute).toBe(false);
+    if (!result.canExecute) {
+      expect(result.blocks[0].action).toBe("Contact support");
+      expect(result.blocks[0].actionUrl).toMatch(/^mailto:/);
     }
   });
 
@@ -445,24 +462,43 @@ describe("per-node-type peek", () => {
 // 8. Atomic create-execution + GAP #4 contract
 // ──────────────────────────────────────────────────────────────────────────────
 
-describe("createExecutionWithCapCheck atomic contract", () => {
-  it("uses pg_advisory_xact_lock inside a $transaction (GAP #4)", async () => {
-    // Read the helper source — assert lock keyword is present so the contract
-    // can't silently regress to a non-atomic implementation. Real concurrent-
-    // execution testing requires a Postgres docker container (out of scope
-    // for unit tests, but the lock keyword is enough to pin the design).
+describe("createExecutionWithCapCheck race-protection contract", () => {
+  // Phase 2.5 used pg_advisory_xact_lock inside an interactive Prisma
+  // transaction. That broke on Neon's pgbouncer-pooled connections AND
+  // pg_advisory_xact_lock(int4) is not a valid signature — production
+  // result was silent 500s and zero Execution rows ever created.
+  //
+  // New design: drop the interactive transaction. Race protection now
+  // relies on the slot-reservation count (completed runs ∪ recent in-
+  // flight PENDING/RUNNING rows). Concurrent tabs read sequentially under
+  // READ COMMITTED — the second tab sees the first tab's RUNNING row and
+  // blocks. Off-by-one race window is ~10 ms; per-node defensive recheck
+  // in /api/execute-node catches anything that slips through.
+
+  it("source no longer executes the failing pg_advisory_xact_lock call", async () => {
     const { readFileSync } = await import("fs");
     const path = await import("path");
     const src = readFileSync(
       path.join(process.cwd(), "src/features/billing/lib/check-execution-eligibility.ts"),
       "utf8",
     );
-    expect(src).toContain("pg_advisory_xact_lock");
-    expect(src).toContain("$transaction");
-    expect(src).toContain("hashtext(${args.userId})");
+    // Strip block + line comments so doc references to the old design don't
+    // false-trigger this assertion.
+    const codeOnly = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n")
+      .filter((l) => !l.trimStart().startsWith("//"))
+      .join("\n");
+    // Executable code must not contain the lock call OR the int4-signature
+    // hashtext template-literal pattern.
+    expect(codeOnly).not.toContain("pg_advisory_xact_lock");
+    expect(codeOnly).not.toContain("$queryRaw`SELECT pg_advisory_xact_lock");
+    // createExecutionWithCapCheck body should not re-introduce the
+    // interactive callback either.
+    expect(codeOnly).not.toMatch(/createExecutionWithCapCheck[\s\S]*\$transaction\(async/);
   });
 
-  it("slot-reservation count includes recent in-flight rows (GAP #4)", async () => {
+  it("slot-reservation count includes recent in-flight rows", async () => {
     const { readFileSync } = await import("fs");
     const path = await import("path");
     const src = readFileSync(
@@ -474,6 +510,19 @@ describe("createExecutionWithCapCheck atomic contract", () => {
     expect(src).toContain('"PENDING"');
     expect(src).toContain('"RUNNING"');
     expect(src).toContain("INFLIGHT_TTL_MS");
+  });
+
+  it("logs diagnostic context on failure for Vercel-log forensics", async () => {
+    const { readFileSync } = await import("fs");
+    const path = await import("path");
+    const src = readFileSync(
+      path.join(process.cwd(), "src/features/billing/lib/check-execution-eligibility.ts"),
+      "utf8",
+    );
+    // The error logger must include userId + workflowId in the message so
+    // future failures are debuggable from production logs.
+    expect(src).toMatch(/console\.error\([\s\S]*createExecutionWithCapCheck/);
+    expect(src).toMatch(/user=\$\{args\.userId\}/);
   });
 });
 
@@ -505,19 +554,22 @@ describe("FREE cap reads from SSOT only (GAP #1)", () => {
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe("per-plan parameterized matrix (1:1 spec)", () => {
+  // Each tier has a deterministic upgrade target + price; TEAM is the sole
+  // tier that routes to support instead of an upgrade CTA.
   const TIERS: Array<{
     role: "FREE" | "MINI" | "STARTER" | "PRO" | "TEAM";
     cap: number;
-    upgradeAction: string | undefined;
+    actionContains: string; // primary CTA must include this fragment
+    actionUrl: string;
   }> = [
-    { role: "FREE",    cap: 1,   upgradeAction: "Upgrade to Mini" },
-    { role: "MINI",    cap: 3,   upgradeAction: "Upgrade to Starter" },
-    { role: "STARTER", cap: 15,  upgradeAction: "Upgrade to Pro" },
-    { role: "PRO",     cap: 45,  upgradeAction: undefined },
-    { role: "TEAM",    cap: 300, upgradeAction: undefined },
+    { role: "FREE",    cap: 1,   actionContains: "Upgrade to Mini",    actionUrl: "/dashboard/billing?plan=MINI" },
+    { role: "MINI",    cap: 3,   actionContains: "Upgrade to Starter", actionUrl: "/dashboard/billing?plan=STARTER" },
+    { role: "STARTER", cap: 15,  actionContains: "Upgrade to Pro",     actionUrl: "/dashboard/billing?plan=PRO" },
+    { role: "PRO",     cap: 45,  actionContains: "Upgrade to Team",    actionUrl: "/dashboard/billing?plan=TEAM" },
+    { role: "TEAM",    cap: 300, actionContains: "Contact support",    actionUrl: "mailto:support@buildflow.app" },
   ];
 
-  for (const { role, cap, upgradeAction } of TIERS) {
+  for (const { role, cap, actionContains, actionUrl } of TIERS) {
     it(`${role}: cap-1 (count=${cap - 1}) → ALLOWED`, async () => {
       prismaMocks.userFindUnique.mockResolvedValue({ role, legacyLimits: null });
       prismaMocks.executionCount.mockResolvedValue(cap - 1);
@@ -529,18 +581,15 @@ describe("per-plan parameterized matrix (1:1 spec)", () => {
       }
     });
 
-    it(`${role}: at cap (count=${cap}) → BLOCKED with correct upgrade CTA`, async () => {
+    it(`${role}: at cap (count=${cap}) → BLOCKED with correct CTA`, async () => {
       prismaMocks.userFindUnique.mockResolvedValue({ role, legacyLimits: null });
       prismaMocks.executionCount.mockResolvedValue(cap);
       const result = await checkExecutionEligibility({ ...baseArgs, userRole: role });
       expect(result.canExecute).toBe(false);
       if (!result.canExecute) {
         expect(result.blocks[0].type).toBe("plan_limit");
-        if (upgradeAction) {
-          expect(result.blocks[0].action).toBe(upgradeAction);
-        } else {
-          expect(result.blocks[0].action).toBeUndefined();
-        }
+        expect(result.blocks[0].action).toContain(actionContains);
+        expect(result.blocks[0].actionUrl).toBe(actionUrl);
       }
     });
   }
