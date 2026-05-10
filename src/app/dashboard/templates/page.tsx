@@ -873,11 +873,9 @@ export default function TemplatesPage() {
             <div className={s.cardTags}>
               {wf.tags.slice(0, 3).map(tag => <span key={tag} className={s.tag}>{tag}</span>)}
             </div>
-            {isLocked && upgradeTarget ? (
-              <span className={s.cardTier} aria-hidden="true">
-                <Crown size={12} strokeWidth={2.2} /> {upgradeTarget.label.toUpperCase()}
-              </span>
-            ) : (
+            {/* Locked cards: tier is announced by the corner pill — no
+             * bottom-right caption (would be redundant + crowd the tags). */}
+            {!isLocked && (
               <span className={s.cardCta}>
                 Use template <ArrowRight size={13} />
               </span>

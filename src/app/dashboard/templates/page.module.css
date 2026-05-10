@@ -636,25 +636,20 @@
   outline-offset: 2px;
 }
 
-/* Art wrapper — lets us blur the illustration on hover when locked,
- * without blurring the crown pin or the gold reveal that sit above. */
+/* Art wrapper — pure layout role. Earlier iteration applied
+ * `filter: blur(3px) brightness(0.45)` here on `.card[data-locked]:hover`
+ * AND on `:focus-within` to drive the locked-card hover backdrop. The
+ * `:focus-within` branch leaked: any click on a locked card retained
+ * focus on the card (tabIndex={0}), which kept the filter active at rest.
+ * On iOS Safari, taps stick `:hover` *and* `:focus-within` for the same
+ * reason, so the artwork looked permanently broken until the user tapped
+ * elsewhere. The fix is to NOT mutate the artwork at all — the scrim
+ * inside TemplateLockBadge handles the hover backdrop via opacity, which
+ * has no failure mode under stuck focus. */
 .cardArt {
   position: absolute;
   inset: 0;
   z-index: 1;
-  transition:
-    filter 360ms ease,
-    transform 360ms ease;
-  will-change: filter;
-}
-
-.card[data-locked="true"]:hover .cardArt,
-.card[data-locked="true"]:focus-within .cardArt {
-  filter: blur(3px) brightness(0.45);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cardArt { transition: filter 200ms ease; }
 }
 
 .cardIllus {
@@ -843,21 +838,6 @@
 .cardCtaLocked {
   composes: cardCta;
   color: var(--rs-burnt);
-}
-
-/* Locked card footer caption — small "♔ PRO" tier indicator that replaces
- * the redundant "Upgrade to {tier} →" text (the gold center reveal owns
- * the CTA). Mono caps, dark gold, lightweight. */
-.cardTier {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--font-jetbrains, monospace);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.2em;
-  color: #8B6914;
-  user-select: none;
 }
 
 /* ── Closer CTA ───────────────────────────────────────────────── */
