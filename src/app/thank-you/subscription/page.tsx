@@ -12,33 +12,81 @@ import {
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { trackAdsConversion, trackPurchase } from "@/lib/meta-pixel";
 import { getPurchaseEventId, getPlanValueINR } from "@/lib/plan-pricing";
+import { STRIPE_PLANS } from "@/features/billing/lib/plan-data";
+import { toPlanKey, formatPlanLimit, type PlanKey } from "@/features/billing/lib/plan-helpers";
 
-/* ── Plan data ───────────────────────────────────────────────── */
-const PLANS: Record<string, {
-  name: string; color: string; rgb: string; executions: string;
-  features: string[]; icon: React.ReactNode;
-}> = {
-  MINI: {
-    name: "Mini", color: "#4F8AFF", rgb: "79,138,255", executions: "10/month",
-    icon: <Zap size={22} />,
-    features: ["10 workflow executions", "3 concept renders", "JSON/CSV export", "Community templates"],
-  },
-  STARTER: {
-    name: "Starter", color: "#8B5CF6", rgb: "139,92,246", executions: "30/month",
-    icon: <Rocket size={22} />,
-    features: ["30 workflow executions", "10 concept renders", "3 video walkthroughs", "3 AI 3D models", "IFC/PDF/OBJ export"],
-  },
-  PRO: {
-    name: "Pro", color: "#F59E0B", rgb: "245,158,11", executions: "100/month",
-    icon: <Crown size={22} />,
-    features: ["100 workflow executions", "30 concept renders", "7 video walkthroughs", "10 AI 3D models", "Priority execution & support"],
-  },
-  TEAM_ADMIN: {
-    name: "Team", color: "#10B981", rgb: "16,185,129", executions: "Unlimited",
-    icon: <Sparkles size={22} />,
-    features: ["Unlimited executions", "Unlimited renders", "15 video walkthroughs", "30 AI 3D models", "5 team members", "Dedicated support"],
-  },
+/* ── Plan display derivation ─────────────────────────────────────────────
+ *
+ * Earlier iteration hardcoded a per-plan features dictionary inline. That
+ * dictionary drifted from `STRIPE_PLANS` (the SSOT) during the §J pricing
+ * migration — every paying user landed on a thank-you page that
+ * advertised pre-migration limits (PRO=100 runs vs actual 45; MINI=10 vs
+ * actual 3). See F-1.1 in PROD_AUDIT_2026-05-10.md.
+ *
+ * Fix: derive everything from STRIPE_PLANS. Per-tier *aesthetics* (color,
+ * rgb, icon) are pure UI choices that don't drift with pricing so they
+ * stay mapped here; everything else comes from the SSOT.
+ *
+ * `getPlanDisplay` is exported so the unit test in
+ * tests/unit/thank-you-derivation.test.ts can pin the matrix against
+ * STRIPE_PLANS without rendering the full page.
+ */
+
+const TIER_AESTHETICS: Record<
+  Exclude<PlanKey, "FREE">,
+  { color: string; rgb: string; icon: React.ReactNode }
+> = {
+  MINI: { color: "#4F8AFF", rgb: "79,138,255", icon: <Zap size={22} /> },
+  STARTER: { color: "#8B5CF6", rgb: "139,92,246", icon: <Rocket size={22} /> },
+  PRO: { color: "#F59E0B", rgb: "245,158,11", icon: <Crown size={22} /> },
+  TEAM: { color: "#10B981", rgb: "16,185,129", icon: <Sparkles size={22} /> },
 };
+
+export interface PlanDisplay {
+  name: string;
+  color: string;
+  rgb: string;
+  executions: string;
+  features: string[];
+  icon: React.ReactNode;
+}
+
+export function getPlanDisplay(planKeyRaw: string | null | undefined): PlanDisplay | null {
+  // `toPlanKey` handles TEAM_ADMIN → TEAM and unknown → FREE.
+  const key = toPlanKey(planKeyRaw);
+  // FREE doesn't show a "thank you for paying" card.
+  if (key === "FREE") return null;
+
+  const spec = STRIPE_PLANS[key];
+  const aesthetic = TIER_AESTHETICS[key];
+  const l = spec.limits;
+
+  const features: string[] = [];
+  features.push(`${formatPlanLimit(l.runsPerMonth)} workflow executions per month`);
+  features.push(`${formatPlanLimit(l.rendersPerMonth)} concept renders`);
+  if (l.videoPerMonth > 0) features.push(`${formatPlanLimit(l.videoPerMonth)} video walkthroughs`);
+  if (l.modelsPerMonth > 0) features.push(`${formatPlanLimit(l.modelsPerMonth)} AI 3D models`);
+  if (l.floorPlansPerMonth > 0) features.push(`${formatPlanLimit(l.floorPlansPerMonth)} floor plans`);
+  features.push(
+    l.maxWorkflows < 0
+      ? "Unlimited saved workflows"
+      : `Up to ${l.maxWorkflows} saved workflows`,
+  );
+  features.push(
+    l.maxNodesPerWorkflow < 0
+      ? "Unlimited nodes per workflow"
+      : `Up to ${l.maxNodesPerWorkflow} nodes per workflow`,
+  );
+
+  return {
+    name: spec.name,
+    color: aesthetic.color,
+    rgb: aesthetic.rgb,
+    icon: aesthetic.icon,
+    executions: `${formatPlanLimit(l.runsPerMonth)}/month`,
+    features,
+  };
+}
 
 /* ── Main ────────────────────────────────────────────────────── */
 export default function SubscriptionThankYouPage() {
@@ -56,7 +104,11 @@ function Content() {
 
   const planFromUrl = searchParams.get("plan")?.toUpperCase() || "";
   const userRole = (session?.user as { role?: string })?.role || "FREE";
-  const plan = PLANS[planFromUrl] || PLANS[userRole] || null;
+  // Prefer the URL param (the plan the user just paid for) over the role
+  // (which may lag the JWT by a few seconds while the webhook lands).
+  // Either source resolves through `toPlanKey` so TEAM_ADMIN, lowercase
+  // inputs, and unknown values all degrade gracefully to null.
+  const plan = getPlanDisplay(planFromUrl) ?? getPlanDisplay(userRole);
   const accent = plan?.color || "#4F8AFF";
   const accentRgb = plan?.rgb || "79,138,255";
 
