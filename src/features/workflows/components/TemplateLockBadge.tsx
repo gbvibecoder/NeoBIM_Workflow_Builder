@@ -1,30 +1,36 @@
 /**
  * Lock affordance for templates the user can't access yet.
  *
- * Renders TWO layers, both absolutely positioned inside the parent
- * `.cardIllus` container:
+ * Three layers, all absolutely positioned inside the parent `.cardIllus`:
  *
- *   1. **Crown pin** (always visible) — small cream circle in the top-right,
- *      a quiet "this is locked" indicator that doesn't dominate the card.
+ *   1. **Tier pill** (always visible) — gold gradient pill in the top-right
+ *      corner with the tier label ("MINI" / "STARTER" / "PRO" / "TEAM") plus
+ *      a Crown (PRO / TEAM) or Lock (MINI / STARTER) icon. The pill *itself*
+ *      announces the requirement, so the user can tell PRO from STARTER from
+ *      MINI at a glance without reading the card body.
  *
- *   2. **Hover reveal** — chunky dark-gold pill button + sub-line, centered
- *      over the card art. The parent CSS module (`page.module.css`) drives
- *      the show/hide via `.card[data-locked="true"]:hover` selectors so the
- *      reveal stays in lockstep with the image-blur on the same hover.
+ *   2. **Scrim** — translucent diagonal gradient that fades in on parent
+ *      hover. Keeps the artwork *visible underneath* (≈45 % darken) so the
+ *      gold button + sub-line read cleanly against the backdrop without
+ *      destroying the illustration. (Earlier iteration applied
+ *      `filter: blur(3px) brightness(0.45)` directly to the art layer; that
+ *      leaked to the resting state via `:focus-within` after any click.
+ *      Scrim doesn't have that failure mode — see §Y.)
  *
- * The whole component renders pointer-events:none — the click is owned by
- * the parent card so any click on a locked card opens checkout, not just
- * a bullseye on the button.
+ *   3. **Hover reveal** — chunky dark-gold pill button + sub-line, centered
+ *      over the card art. Driven by `.card[data-locked="true"]:hover` /
+ *      `:focus-within` selectors in this module so the reveal stays in
+ *      lockstep with the scrim fade.
  *
- * Accessibility: aria-hidden on decorative parts, but the parent card
- * announces "Premium template — requires {tier}. Click to upgrade."
+ * All three are pointer-events:none — clicks belong to the parent card.
  *
- * Reduced-motion: when `(prefers-reduced-motion: reduce)` is on, all
- * transforms collapse to opacity-only fades (driven by CSS).
+ * Mobile: `@media (hover: none)` shows the scrim + reveal persistently so
+ * the affordance is reachable on touch devices where `:hover` is unreliable.
+ * The card's onClick still fires `openInlineUpgradeCheckout` either way.
  *
- * Source of truth for tier label + price: STRIPE_PLANS via
- * getUpgradeTargetForTemplate(). This component takes pre-computed
- * `label` + `price` props so it never imports billing config directly.
+ * Reduced-motion: scale + bounce + shine all collapse to opacity-only fades.
+ *
+ * SSOT for tier label + price: STRIPE_PLANS via getUpgradeTargetForTemplate().
  */
 "use client";
 
@@ -52,19 +58,24 @@ function formatINR(n: number): string {
 
 export function TemplateLockBadge({ tier, label, price }: TemplateLockBadgeProps) {
   const Icon = tier === "PRO" || tier === "TEAM" ? Crown : Lock;
+  const tierUpper = label.toUpperCase();
 
   return (
     <>
-      {/* Crown pin — always visible, sits on top of the art */}
+      {/* Gold tier pill — always visible in the top-right corner */}
       <div
         className={s.pin}
         aria-label={`Premium template — requires ${label}`}
         role="img"
       >
-        <Icon size={14} strokeWidth={2.2} aria-hidden="true" />
+        <Icon size={12} strokeWidth={2.4} className={s.pinIcon} aria-hidden="true" />
+        <span className={s.pinLabel}>{tierUpper}</span>
       </div>
 
-      {/* Center reveal — fades in on parent card hover */}
+      {/* Translucent scrim — image stays readable underneath */}
+      <div className={s.scrim} aria-hidden="true" />
+
+      {/* Center reveal — fades in on parent card hover (or always on mobile) */}
       <div className={s.reveal} aria-hidden="true">
         <div className={s.cta}>
           <span className={s.ctaIcon}>

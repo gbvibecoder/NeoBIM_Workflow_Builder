@@ -2416,6 +2416,102 @@ that was reverted) — their roles will still update correctly.
 
 — end of §X (lock-to-checkout direct shipped) —
 
+# §Y — Lock-badge visual hotfix (IMPLEMENTED)
+
+**Branch:** `fix/template-lock-visual-hotfix`
+**Rollback tag:** `pre-template-lock-hotfix-rollback` (= `2f999858`, the §X-final SHA)
+**Date:** 2026-05-10
+**Phase:** SHIP
+
+## §Y.1 — What broke in §X
+
+User report after the §X deploy:
+
+> "Locked cards look broken/loading, not premium."
+
+Three concrete bugs:
+
+| # | Symptom | Root cause |
+|---|---|---|
+| 1 | `filter: blur(3px) brightness(0.45)` was firing at REST, not just on hover | The CSS rule was scoped `.card[data-locked="true"]:hover .cardArt, :focus-within .cardArt`. Tabbing to or clicking a card triggers `:focus-within` (the card has `tabIndex={0}`), which kept the filter active after the click. On iOS Safari, taps stick `:hover` *and* `:focus-within` for the same reason — so the artwork looked permanently broken until the user tapped elsewhere. |
+| 2 | Corner badge was an empty cream circle with a tiny lock outline — no tier text | §X's `TemplateLockBadge.tsx` rendered a 34×34 `s.pin` containing only `<Icon>`. Users couldn't tell PRO from STARTER from MINI without reading the bottom-right "STARTER" caption — which was itself crowding the tag row. |
+| 3 | Hover destroyed the artwork | The blur+brightness combo was the design miss the user flagged: *"the gold button itself is loud — the backdrop doesn't need to scream."* |
+
+Plus a fourth issue surfaced under the lens: the hover-only reveal was
+**unreachable on touch devices**. iOS users tapping a locked card got
+straight to Razorpay (the click handler still fired) but never saw the
+gold button affordance, so they didn't know upgrade was the action.
+
+## §Y.2 — Patch
+
+| File | Change |
+|---|---|
+| `src/features/workflows/components/TemplateLockBadge.tsx` | Replaced icon-only pin with a substantial gold pill carrying the tier label as text (`MINI` / `STARTER` / `PRO` / `TEAM`). Crown for PRO/TEAM, Lock for MINI/STARTER. Added a `<div className={s.scrim} aria-hidden="true" />` element between pin and reveal. |
+| `src/features/workflows/components/TemplateLockBadge.module.css` | Replaced `.pin` (circle) with the gold-pill spec (`F4C460 → C9941E → 9C6F0F` gradient, JetBrains Mono caps, `scale(1.06)` on hover, drop-shadow on icon). Added `.scrim` rule (`linear-gradient(135deg, rgba(20,20,30,.55), rgba(40,30,10,.55))`, opacity 0 → 1 on `:hover` / `:focus-within`). Added `@media (hover: none)` block that pins scrim + reveal to `opacity:1` so the affordance is always visible on touch devices. |
+| `src/app/dashboard/templates/page.module.css` | **Deleted** the `.card[data-locked="true"]:hover .cardArt` and `:focus-within .cardArt` selectors (the blur leak). `.cardArt` keeps only its layout role. Removed unused `.cardTier` (the bottom-right caption from §X). |
+| `src/app/dashboard/templates/page.tsx` | Removed the redundant `<span className={s.cardTier}>` from `cardFoot`. Locked cards now show only the tag row in their footer — the corner pill is the tier announcement. |
+| `tests/unit/template-lock-badge.test.tsx` (new) | 11 tests covering: tier-pill text per tier, aria-label tier-name inclusion, INR price formatting (`₹1,999` not `₹1999`), CTA "Upgrade to {label}" copy. |
+
+## §Y.3 — Why the scrim instead of blur (architectural delta)
+
+A `filter:blur+brightness` on the art element directly mutates the
+artwork. That has **two failure modes**:
+
+1. **Stuck hover/focus**: `:focus-within` + `:hover` both stick post-click
+   on multiple platforms (iOS Safari, focus traps, click-then-blur loops).
+   Once stuck, the artwork stays broken.
+2. **Performance**: `filter` triggers a composited layer with each repaint.
+   On low-end Android, hovering a 5-card grid stutters.
+
+A scrim is **opacity-driven on a separate sibling element**. The art is
+never touched. Stuck `:focus-within` just keeps the scrim visible — which
+is a *reasonable* state (user can see exactly where focus lives) and
+non-destructive. Repaints are limited to the scrim element, not the art.
+
+This is the same pattern the canvas-side `ExecutionBlockModal` uses:
+opacity layers, not filters. Consistency with what works.
+
+## §Y.4 — Edge-case re-audit
+
+| ID | Scenario | Status |
+|---|---|---|
+| Free-accessible card (no lock) | Renders identically to pre-§W | ✓ verified — `isLocked` is false, badge isn't mounted, no `data-locked` attribute, none of the §Y CSS rules match |
+| FREE user / PRO template | Pill: gold, "PRO" text, Crown icon. Reveal: "Upgrade to Pro" + "₹1,999/month · unlocks all Pro templates" | ✓ verified by `template-lock-badge.test.tsx` |
+| MINI user / STARTER template | Pill: gold, "STARTER" text, Lock icon. Reveal: "Upgrade to Starter" + "₹799/month" | ✓ verified |
+| PRO user / PRO template | No pill, no scrim, no reveal — `canAccessTemplate` returns true, badge isn't mounted | ✓ verified by `template-access.test.ts` |
+| Admin (PLATFORM_ADMIN) | No pill regardless of tier | ✓ verified by `template-access.test.ts` (admin bypass) |
+| `prefers-reduced-motion: reduce` | Pill scale + reveal bounce + shine all disabled; opacity-only fades | ✓ media query in module.css |
+| Mobile (`hover: none`) | Scrim + reveal pinned to `opacity:1`; tap on card → `openInlineUpgradeCheckout` | ✓ media query in module.css; click handler unchanged |
+| Stuck-focus repro (click card → dismiss modal → see card at rest) | Artwork stays sharp; scrim visible (because focus-within triggers it, intentionally) — non-destructive | ✓ deleted blur, scrim is opacity-only |
+
+## §Y.5 — Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | ✓ EXIT 0 (incl `tests/`) |
+| `npx vitest run tests/unit/template-lock-badge.test.tsx` | ✓ 11/11 |
+| `npx vitest run` (full) | ✓ 3505/3513 (+11 vs §X baseline of 3494/3502); same 7 pre-existing failures |
+| `npx eslint <changed-files>` | ✓ 0 errors / 0 new warnings on changed files |
+| `npm run build` | ✓ production build succeeds |
+
+## §Y.6 — Rollback
+
+Tag `pre-template-lock-hotfix-rollback` points at `2f999858` (the §X-final
+state). Revert path:
+
+```
+git revert <merge-sha>          # cleanest — keeps §X intact, reverts only §Y
+# OR, if §Y itself is corrupt:
+git reset --hard pre-template-lock-hotfix-rollback
+git push --force-with-lease origin main   # requires explicit user authorization
+```
+
+The patch is purely CSS + component + test. No DB changes, no server
+routes touched. Reverting affects only the visual layer; the inline
+checkout flow keeps working.
+
+— end of §Y (lock-badge visual hotfix shipped) —
+
 
 
 
