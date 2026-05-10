@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly requests south-facing entry on a south-facing plot. Template defaults to north-facing entry; a 180° rotation aligns the entry to the south edge where the access road is located.",
+    "mirror_axis": "none",
+    "rotation": "180",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3880,
+    "output_tokens": 126,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.00451,
+    "latency_ms": 2862.5235420186073,
+    "created_at_iso": "2026-05-10T18:11:51.559769+00:00"
+  }
+}

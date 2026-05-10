@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Site orientation is unspecified in the brief; the template defaults to north-facing entry, which is the standard assumption for Pune residential plots absent explicit direction. No mirror or rotation requested.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3914,
+    "output_tokens": 123,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004529,
+    "latency_ms": 1736.7384161334485,
+    "created_at_iso": "2026-05-10T18:12:06.200800+00:00"
+  }
+}

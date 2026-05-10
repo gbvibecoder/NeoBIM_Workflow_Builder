@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly requests \"internal layout mirrored north to south\" with \"kitchen at the rear (south wall)\" while entry stays on the north side. This is a Y-axis mirror (N-S flip) of the default template, no rotation needed.",
+    "mirror_axis": "Y",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3886,
+    "output_tokens": 137,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004571,
+    "latency_ms": 2778.347499901429,
+    "created_at_iso": "2026-05-10T18:11:48.692387+00:00"
+  }
+}

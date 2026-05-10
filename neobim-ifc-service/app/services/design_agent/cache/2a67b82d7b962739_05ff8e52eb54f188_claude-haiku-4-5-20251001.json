@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly requests \"mirror image — flipped\" of the standard 3BHK duplex layout. No rotation requested; site is north-facing (matching template default). E-W mirror (mirror_axis=X) is the standard default for ambiguous \"flipped\" requests in residential Indian layouts.",
+    "mirror_axis": "X",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3871,
+    "output_tokens": 148,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004611,
+    "latency_ms": 2541.1685830913484,
+    "created_at_iso": "2026-05-10T18:11:45.910373+00:00"
+  }
+}

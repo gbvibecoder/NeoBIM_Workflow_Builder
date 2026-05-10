@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "refuse",
+    "reasoning": "The brief explicitly requests swapping the positions of the kitchen and pooja room within the duplex layout. Room-swap operations (moving specific functional spaces relative to each other while keeping orientation intact) are not supported in v1, which only applies uniform mirror and rotation transforms to the entire building.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": "Room swap operations deferred to v2; the v1 adapter only supports whole-building mirror + rotate transforms. Swapping kitchen and pooja requires per-room topology edits that preserve orientation.",
+    "suggested_action": "ship_as_is"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3891,
+    "output_tokens": 226,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005021,
+    "latency_ms": 2556.3999169971794,
+    "created_at_iso": "2026-05-10T18:12:13.291712+00:00"
+  }
+}

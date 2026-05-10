@@ -908,6 +908,157 @@ class MatchFailed(BaseModel):
     suggested_action: SuggestedAction = "ask_user_clarification"
 
 
+# ─── ADAPTATION PLANNER (Slice 2B.2) ─────────────────────────────────
+#
+# The adapter v1 turns "I want this template, but mirrored / rotated"
+# briefs into a deterministic transform on the matched BuildingModel
+# *before* IFC export. AI's role here is once again narrow: the planner
+# LLM classifies which combination of mirror + rotate the user wants.
+# The geometry transformation itself is pure Python math in
+# ``app/services/design_agent/transforms.py``; nothing about coordinates
+# or polygon vertices ever passes through the LLM.
+#
+# v1 covers six transforms:
+#   * mirror across X (flip east↔west)
+#   * mirror across Y (flip north↔south)
+#   * rotate 90° / 180° / 270° clockwise around the plot centre
+#   * combined mirror + rotate (canonical order: mirror first, rotate
+#     second — order matters because the two operations don't commute)
+#
+# v2 (deferred) covers vastu interpretation, room swaps, asymmetric
+# layouts. The planner emits :class:`AdaptationFailed` for those briefs
+# so the user gets a "we don't yet support that" signal instead of a
+# silently-wrong building.
+
+
+class TransformAxis(str, Enum):
+    """Axis for the mirror operation.
+
+    Naming follows the user-facing semantics in the implementation
+    prompt — ``X`` flips east↔west, ``Y`` flips north↔south. The
+    underlying math is symmetric: ``mirror_X`` reflects every point's
+    x-coordinate around the plot's x-centre; ``mirror_Y`` reflects y.
+
+    Subclassing ``str`` makes the values JSON-serialisable verbatim
+    (``"X"`` / ``"Y"``) so cache files store them readably.
+    """
+
+    X = "X"  # Flip east↔west
+    Y = "Y"  # Flip north↔south
+
+
+class TransformRotation(str, Enum):
+    """Rotation angle in degrees clockwise around the plot centre.
+
+    ``NONE`` is the identity (used when only a mirror is requested).
+    The four discrete angles cover the full set of orientation-
+    preserving 90-multiple rotations a residential brief is likely to
+    request — "south-facing plot" (180°), "east-facing plot" (90°
+    clockwise from a north-facing template), "west-facing plot" (270°).
+
+    Free angles (e.g. 30°) are intentionally NOT supported in v1: they
+    misalign walls with the project grid, complicate furniture-layout
+    re-evaluation, and rarely come up in practice for residential
+    Indian briefs.
+    """
+
+    NONE = "0"
+    CW_90 = "90"
+    CW_180 = "180"
+    CW_270 = "270"
+
+
+class AdaptationPlan(BaseModel):
+    """Sequence of transforms to apply to a matched BuildingModel.
+
+    The plan is the public contract between the adaptation planner LLM
+    (Phase B) and the pure-math transforms module (Phase A). Every
+    field is small, scalar / enum, and frozen so the plan is cheap to
+    cache and compare.
+
+    Application order is fixed: **mirror first, then rotate**. The two
+    operations do not commute in general — applying them in different
+    orders yields different output buildings — so the plan pins one
+    canonical order. The matching adapter
+    :func:`app.services.design_agent.transforms.apply_adaptations`
+    enforces this order.
+
+    A plan with ``mirror_axis=None`` and ``rotation=NONE`` is the no-op
+    plan; ``apply_adaptations`` recognises it and returns the input
+    BuildingModel unchanged (byte-identical, same id-graph).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mirror_axis: Optional[TransformAxis] = None
+    rotation: TransformRotation = TransformRotation.NONE
+    reasoning: str = Field(..., min_length=10)
+
+    @property
+    def is_noop(self) -> bool:
+        """True iff the plan applies neither a mirror nor a rotation.
+
+        Callers use this to short-circuit the transform pipeline so
+        the no-op path stays byte-identical to slice 2B.1's output —
+        no winding reversals, no Pydantic re-validation, no cost.
+        """
+        return (
+            self.mirror_axis is None
+            and self.rotation == TransformRotation.NONE
+        )
+
+
+class AdaptationFailed(BaseModel):
+    """Planner refusal — emitted when no clean transform fits the brief.
+
+    Three suggested actions, mirroring the matcher's refusal envelope
+    so the route handler can branch uniformly:
+
+    * ``ship_as_is`` (default) — the user's request is unclear or
+      v2-only (vastu interpretation, room swaps). The transformed-IFC
+      pipeline falls back to the matcher's default layout so the user
+      still receives a buildable IFC instead of an HTTP 4xx.
+    * ``ask_user_clarification`` — request is ambiguous and the user
+      could clarify in plain language ("did you mean rotated 180° or
+      mirrored E-W?").
+    * ``fallback_to_design_agent`` — reserved for v2 once a non-
+      template AI fallback path exists. v1 never emits this value.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    reason: str = Field(..., min_length=1)
+    suggested_action: Literal[
+        "ship_as_is",
+        "ask_user_clarification",
+        "fallback_to_design_agent",
+    ] = "ship_as_is"
+
+
+class AdaptationPlannerMetadata(BaseModel):
+    """Per-call accounting record for the adaptation planner stage.
+
+    Mirrors :class:`TemplateMatcherMetadata` so the route handler can
+    sum cost / latency across stages without a custom aggregator.
+    Pydantic-not-dataclass so the metadata can be model_dumped into the
+    /api/v1/design/generate response body alongside other Pydantic
+    objects without hitting dataclass-vs-BaseModel asymmetry.
+
+    ``refused`` is True when the planner's output is an
+    :class:`AdaptationFailed` (the user's brief is unclear or v2-only).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    llm_model_used: str
+    llm_input_tokens: int = Field(ge=0)
+    llm_output_tokens: int = Field(ge=0)
+    llm_cost_usd: float = Field(ge=0.0)
+    elapsed_ms: float = Field(ge=0.0)
+    cache_hit: bool
+    refused: bool
+
+
 # ─── Internal helpers ────────────────────────────────────────────────
 
 
@@ -974,6 +1125,12 @@ __all__ = [
     "MatchResult",
     "MatchFailed",
     "SuggestedAction",
+    # Adaptation planner (Slice 2B.2)
+    "TransformAxis",
+    "TransformRotation",
+    "AdaptationPlan",
+    "AdaptationFailed",
+    "AdaptationPlannerMetadata",
     # Literal aliases (re-exported for downstream typing)
     "SiteOrientation",
     "SeismicZone",

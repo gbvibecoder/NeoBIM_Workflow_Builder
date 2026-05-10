@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "User explicitly requests \"mirrored — flipped east to west\" with \"kitchen on the opposite side\". This is a straightforward E-W mirror (mirror_axis=X) with no rotation needed, as the plot is already north-facing and the user does not request a rotation of the entry point.",
+    "mirror_axis": "X",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3902,
+    "output_tokens": 148,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004642,
+    "latency_ms": 6161.5066670347005,
+    "created_at_iso": "2026-05-10T18:11:43.365042+00:00"
+  }
+}

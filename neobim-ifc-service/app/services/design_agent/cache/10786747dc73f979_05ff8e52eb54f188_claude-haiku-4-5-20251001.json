@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly requests \"entry door on the west side\" and site_orientation confirms \"W\" (west-facing). This requires a 270° clockwise rotation from the template's default north-facing entry to align the entry onto the west edge.",
+    "mirror_axis": "none",
+    "rotation": "270",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3886,
+    "output_tokens": 135,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004561,
+    "latency_ms": 2140.691875014454,
+    "created_at_iso": "2026-05-10T18:11:55.447192+00:00"
+  }
+}
