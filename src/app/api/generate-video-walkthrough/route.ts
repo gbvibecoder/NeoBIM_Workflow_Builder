@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
+import { checkExecutionEligibility, getOrCreateScratchWorkflow } from "@/features/billing/lib/check-execution-eligibility";
 import { formatErrorResponse } from "@/lib/user-errors";
 import { submitDualWalkthrough } from "@/features/3d-render/services/video-service";
 import { logger } from "@/lib/logger";
@@ -65,16 +67,54 @@ export async function POST(req: NextRequest) {
   // Rate limit: 3 video generations per hour. Videos are expensive (Kling
   // pro is $0.10/sec → ~$1.50 per 15s walkthrough), so we keep this much
   // tighter than the 10/min on /api/generate-3d-render.
-  const rl = await checkEndpointRateLimit(session.user.id, "generate-video-walkthrough", 3, "1 h");
-  if (!rl.success) {
-    return NextResponse.json(
-      formatErrorResponse({
-        title: "Too many video requests",
-        message: "You can generate up to 3 video walkthroughs per hour. Please try again later.",
-        code: "RATE_001",
-      }),
-      { status: 429 },
-    );
+  const userRole = ((session.user as { role?: string }).role) || "FREE";
+  const isAdmin = isAdminUser(session.user.email ?? undefined) || userRole === "PLATFORM_ADMIN" || userRole === "TEAM_ADMIN";
+
+  if (!isAdmin) {
+    const rl = await checkEndpointRateLimit(session.user.id, "generate-video-walkthrough", 3, "1 h");
+    if (!rl.success) {
+      return NextResponse.json(
+        formatErrorResponse({
+          title: "Too many video requests",
+          message: "You can generate up to 3 video walkthroughs per hour. Please try again later.",
+          code: "RATE_001",
+        }),
+        { status: 429 },
+      );
+    }
+
+    // Global execution-cap gate (unified with workflow runs / cinematic /
+    // floor-plan / parse-ifc). FREE/MINI have videoPerMonth=0 so they're
+    // already blocked by the per-feature cap; this adds the global cap as
+    // a defensive backup so video runs count against the shared pool.
+    const eligibility = await checkExecutionEligibility({
+      userId: session.user.id,
+      userRole,
+      userEmail: session.user.email,
+      emailVerified: !!(session.user as { emailVerified?: boolean }).emailVerified,
+      intent: { kind: "workflow-run" },
+      options: { consumeBonusOnCap: true },
+    });
+    if (!eligibility.canExecute) {
+      const block = eligibility.blocks[0];
+      return NextResponse.json(
+        formatErrorResponse({
+          title: block.title,
+          message: block.message,
+          code: "RATE_001",
+          action: block.action,
+          actionUrl: block.actionUrl,
+        }),
+        {
+          status: 429,
+          headers: {
+            "X-Plan-Limit": String(eligibility.limit),
+            "X-Plan-Used": String(eligibility.used),
+            "X-Plan-Remaining": String(eligibility.remaining),
+          },
+        },
+      );
+    }
   }
 
   let body: {
@@ -161,6 +201,27 @@ export async function POST(req: NextRequest) {
   // ── Kling image2video path ──
   try {
     const submitted = await submitDualWalkthrough(klingImage, richDescription, "pro");
+    // Record this video submission as an Execution so it counts toward the
+    // user's global plan cap (admins skipped above). Kling jobs can still
+    // fail downstream — that's tracked separately via VideoJob status.
+    if (!isAdmin) {
+      try {
+        const wfId = await getOrCreateScratchWorkflow(session.user.id);
+        await prisma.execution.create({
+          data: {
+            workflowId: wfId,
+            userId: session.user.id,
+            status: "SUCCESS",
+            startedAt: new Date(),
+            completedAt: new Date(),
+            tileResults: [],
+            metadata: { tool: "video-walkthrough", exteriorTaskId: submitted.exteriorTaskId, interiorTaskId: submitted.interiorTaskId },
+          },
+        });
+      } catch (recordErr) {
+        console.error("[video-walkthrough] Failed to record execution:", recordErr);
+      }
+    }
     return NextResponse.json({
       status: "processing",
       pipeline: "kling-dual",

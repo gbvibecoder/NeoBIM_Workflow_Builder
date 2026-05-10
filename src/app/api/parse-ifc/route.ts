@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
+import { checkExecutionEligibility } from "@/features/billing/lib/check-execution-eligibility";
 import { safeErrorMessage } from "@/lib/safe-error";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
@@ -160,6 +161,50 @@ export async function POST(req: NextRequest) {
   const rateLimit = await checkEndpointRateLimit(session.user.id, "parse-ifc", 10, "1 m");
   if (!rateLimit.success) {
     return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Too many requests. Please wait a moment.", code: "RATE_001" }), { status: 429 });
+  }
+
+  // ── Plan-cap gate (centralized helper). The "exclude RUNNING" filter
+  //    naturally allows mid-workflow parse-ifc calls (the workflow's
+  //    Execution row is in RUNNING state and doesn't count toward the cap),
+  //    but blocks NEW runs that would push the user past their cap.
+  //    No bonus consumption here — bonuses are owned by execute-node /
+  //    generate-floor-plan, which are the authoritative gates for those
+  //    intents. parse-ifc fails closed if the user is over cap.
+  const userRole = (session.user as { role?: string }).role ?? "FREE";
+  const userEmail = session.user.email ?? "";
+  const isAdmin =
+    isAdminUser(userEmail) ||
+    userRole === "PLATFORM_ADMIN" ||
+    userRole === "TEAM_ADMIN";
+  if (!isAdmin) {
+    const eligibility = await checkExecutionEligibility({
+      userId: session.user.id,
+      userRole,
+      userEmail,
+      emailVerified: !!(session.user as { emailVerified?: boolean }).emailVerified,
+      intent: { kind: "ifc-parse" },
+      options: { consumeBonusOnCap: false },
+    });
+    if (!eligibility.canExecute) {
+      const block = eligibility.blocks[0];
+      return NextResponse.json(
+        formatErrorResponse({
+          title: block.title,
+          message: block.message,
+          code: "RATE_001",
+          action: block.action,
+          actionUrl: block.actionUrl,
+        }),
+        {
+          status: 429,
+          headers: {
+            "X-Plan-Limit": String(eligibility.limit),
+            "X-Plan-Used": String(eligibility.used),
+            "X-Plan-Remaining": String(eligibility.remaining),
+          },
+        },
+      );
+    }
   }
 
   try {

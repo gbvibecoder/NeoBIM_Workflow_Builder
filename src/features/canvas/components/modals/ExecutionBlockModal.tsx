@@ -10,6 +10,10 @@ interface RateLimitInfo {
   message: string;
   action?: string;
   actionUrl?: string;
+  /** Optional second CTA (used by workflow_already_executed block to show
+   *  both "Create new workflow" and "Upgrade plan"). */
+  secondaryAction?: string;
+  secondaryActionUrl?: string;
 }
 
 interface ExecutionBlockModalProps {
@@ -39,6 +43,18 @@ const EMAIL_SUBTEXTS = [
 // ── Creative config per block type ──────────────────────────────────────────
 function getBlockPersonality(title: string) {
   const t = title.toLowerCase();
+  // workflow_already_executed: "Workflow already executed" — detected via
+  // the unique "already executed" / "run is complete" phrasing the helper
+  // uses for that block type.
+  if (t.includes("already executed") || t.includes("already been run") || t.includes("run is complete"))
+    return {
+      headline: "This workflow's run is complete",
+      subtext: "Each saved workflow can be executed once. Create a new workflow to run again, or upgrade your plan for more workflow slots.",
+      dismissText: "I'll come back later",
+      gradient: ["#10B981", "#3B82F6"],
+      accentRgb: "16,185,129",
+      type: "workflow_done" as const,
+    };
   if (t.includes("verify"))
     return {
       headline: "",  // overridden by random selection
@@ -104,6 +120,12 @@ const FEATURE_HIGHLIGHTS: Record<string, Array<{ icon: string; text: string }>> 
     { icon: "\uD83C\uDFAC", text: "Access video walkthroughs & 3D models" },
     { icon: "\uD83D\uDCE9", text: "Get notified when workflows complete" },
     { icon: "\u26A1", text: "Literally takes 10 seconds" },
+  ],
+  workflow_done: [
+    { icon: "\u2728", text: "Each workflow runs once \u2014 clean lifecycle" },
+    { icon: "\uD83D\uDCDD", text: "Open a fresh canvas to start a new run" },
+    { icon: "\uD83D\uDCC8", text: "View results from your completed runs" },
+    { icon: "\uD83D\uDC51", text: "Upgrade for more workflow slots" },
   ],
 };
 
@@ -557,7 +579,7 @@ function GenericBlockContent({
           </div>
         </div>
 
-        {/* CTA */}
+        {/* Primary CTA */}
         {rateLimitHit.action && rateLimitHit.actionUrl && (
           <Link
             href={rateLimitHit.actionUrl}
@@ -577,6 +599,28 @@ function GenericBlockContent({
             {personality.type === "node" ? <Crown size={17} /> : <Zap size={17} />}
             {rateLimitHit.action}
             <ArrowRight size={15} />
+          </Link>
+        )}
+        {/* Secondary CTA — workflow_already_executed shows BOTH "Create new workflow" + "Upgrade" */}
+        {rateLimitHit.secondaryAction && rateLimitHit.secondaryActionUrl && (
+          <Link
+            href={rateLimitHit.secondaryActionUrl}
+            onClick={onDismiss}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              width: "100%", padding: "12px 20px", borderRadius: 12,
+              background: "rgba(255,255,255,0.04)",
+              color: "#C0C0D8", fontSize: 13, fontWeight: 600,
+              textDecoration: "none",
+              border: `1px solid rgba(${personality.accentRgb}, 0.18)`,
+              transition: "all 0.15s",
+              marginTop: 10,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "#F0F2F8"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "#C0C0D8"; }}
+          >
+            {rateLimitHit.secondaryAction}
+            <ArrowRight size={13} />
           </Link>
         )}
         <div style={{ textAlign: "center", marginTop: 10 }}>

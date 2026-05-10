@@ -1609,8 +1609,8 @@ export default function BlogArticle() {
             <p>
               They currently have 13 workflow templates covering concept design, visualisation, BIM export, cost estimation,
               and 3D modelling. They&apos;ve got 30+ AI nodes, and the community can request and vote on new workflows.
-              The pricing starts at free — two executions to try the platform — and goes up to ₹1,999/month for the
-              pro tier with 100 executions and priority support.
+              The pricing starts at free — one lifetime execution to try the platform — and goes up to ₹1,999/month for the
+              pro tier with 45 workflows + executions and priority support.
             </p>
           </Reveal>
 

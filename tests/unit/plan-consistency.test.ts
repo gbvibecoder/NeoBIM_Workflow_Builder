@@ -134,7 +134,7 @@ describe("plan-helpers", () => {
 
   it("getPlanLimits returns limits sub-object", () => {
     const limits = getPlanLimits("STARTER");
-    expect(limits.runsPerMonth).toBe(30);
+    expect(limits.runsPerMonth).toBe(15);
     expect(limits.videoPerMonth).toBe(2);
   });
 
@@ -163,7 +163,8 @@ describe("plan-helpers", () => {
   it("interpolatePlanString replaces all tokens", () => {
     const template = "{executions} runs, {renders} renders, {videos} videos, {models} models, {workflows} workflows";
     const result = interpolatePlanString(template, "STARTER");
-    expect(result).toBe("30 runs, 8 renders, 2 videos, 2 models, 15 workflows");
+    // 1:1 spec: STARTER = 15 workflows + 15 executions
+    expect(result).toBe("15 runs, 8 renders, 2 videos, 2 models, 15 workflows");
   });
 
   it("interpolatePlanString handles large values", () => {
@@ -201,22 +202,26 @@ describe("Parameterized i18n strings — all consumers interpolate", () => {
 });
 
 // ── F. check-execution-eligibility uses STRIPE_PLANS ──────────────────────
+//
+// The eligibility logic now lives in
+// `src/features/billing/lib/check-execution-eligibility.ts` (the centralized
+// helper used by /api/check-execution-eligibility, /api/execute-node,
+// /api/generate-floor-plan, and /api/parse-ifc). The grandfathering invariant
+// must be enforced by that helper — assert against it directly.
 
 describe("check-execution-eligibility uses STRIPE_PLANS", () => {
-  it("does not contain hardcoded limit: 3", () => {
+  it("route does not contain hardcoded limit: 3", () => {
     const src = readSrc("app/api/check-execution-eligibility/route.ts");
-    // Look for `limit: 3` or `>= 3` or `- lifetimeCount` with a 3
     const codeLines = src.split("\n").filter(
       (l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*")
     );
     const codeOnly = codeLines.join("\n");
-    // Should NOT have raw `3 -` or `>= 3` or `limit: 3`
     expect(codeOnly).not.toMatch(/\b3\s*-\s*lifetimeCount/);
     expect(codeOnly).not.toMatch(/\blimit:\s*3\b/);
   });
 
-  it("references getEffectiveLimits for grandfathering", () => {
-    const src = readSrc("app/api/check-execution-eligibility/route.ts");
+  it("centralized helper references getEffectiveLimits for grandfathering", () => {
+    const src = readSrc("features/billing/lib/check-execution-eligibility.ts");
     expect(src).toContain("getEffectiveLimits");
   });
 });

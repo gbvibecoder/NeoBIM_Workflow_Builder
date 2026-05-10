@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
 import { prisma } from "@/lib/db";
+import { checkExecutionEligibility, getOrCreateScratchWorkflow } from "@/features/billing/lib/check-execution-eligibility";
 import { formatErrorResponse } from "@/lib/user-errors";
 import { logger } from "@/lib/logger";
 import { generateId } from "@/lib/utils";
@@ -53,33 +54,15 @@ import {
  */
 export const maxDuration = 300;
 
-/** Record standalone tool use as an Execution for dashboard + admin visibility. */
+/** Record standalone tool use as an Execution for dashboard + admin visibility.
+ *  Uses the shared scratch workflow helper so cinematic runs count toward the
+ *  global per-user execution cap (FREE = 1, MINI = 6, etc.) — not just the
+ *  per-feature 5/hour endpoint limit. */
 async function recordToolExecution(userId: string, toolName: string) {
   try {
-    let wf = await prisma.workflow.findFirst({
-      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: null },
-      select: { id: true },
-    });
-    if (!wf) {
-      const legacy = await prisma.workflow.findFirst({
-        where: { ownerId: userId, name: "__standalone_tools__" },
-        select: { id: true },
-      });
-      if (legacy) {
-        wf = await prisma.workflow.update({
-          where: { id: legacy.id },
-          data: { deletedAt: null },
-          select: { id: true },
-        });
-      } else {
-        wf = await prisma.workflow.create({
-          data: { ownerId: userId, name: "__standalone_tools__", description: "Auto-created for standalone tool usage tracking" },
-          select: { id: true },
-        });
-      }
-    }
+    const workflowId = await getOrCreateScratchWorkflow(userId);
     await prisma.execution.create({
-      data: { workflowId: wf.id, userId, status: "SUCCESS", startedAt: new Date(), completedAt: new Date(), tileResults: [], metadata: { tool: toolName } },
+      data: { workflowId, userId, status: "SUCCESS", startedAt: new Date(), completedAt: new Date(), tileResults: [], metadata: { tool: toolName } },
     });
     console.log(`[recordToolExecution] Recorded ${toolName} for user ${userId}`);
   } catch (err) {
@@ -148,6 +131,39 @@ export async function POST(req: NextRequest) {
           code: "RATE_001",
         }),
         { status: 429 },
+      );
+    }
+
+    // Global execution-cap gate (unified with workflow runs / floor-plan /
+    // parse-ifc). Cinematic is Starter+ only, but Starter has 30/month etc.
+    // Bonus consumed by recordToolExecution at the end (atomic enough — the
+    // per-feature 5/h cap above prevents abuse).
+    const eligibility = await checkExecutionEligibility({
+      userId: session.user.id,
+      userRole,
+      userEmail: session.user.email,
+      emailVerified: !!(session.user as { emailVerified?: boolean }).emailVerified,
+      intent: { kind: "workflow-run" },
+      options: { consumeBonusOnCap: true },
+    });
+    if (!eligibility.canExecute) {
+      const block = eligibility.blocks[0];
+      return NextResponse.json(
+        formatErrorResponse({
+          title: block.title,
+          message: block.message,
+          code: "RATE_001",
+          action: block.action,
+          actionUrl: block.actionUrl,
+        }),
+        {
+          status: 429,
+          headers: {
+            "X-Plan-Limit": String(eligibility.limit),
+            "X-Plan-Used": String(eligibility.used),
+            "X-Plan-Remaining": String(eligibility.remaining),
+          },
+        },
       );
     }
   }

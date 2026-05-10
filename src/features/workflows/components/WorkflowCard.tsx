@@ -65,11 +65,17 @@ export function WorkflowCard({
           <div className={s.workflowCardStripe} style={{ background: `linear-gradient(90deg, ${cat.gradientFrom}, ${cat.gradientTo})` }} />
           <WorkflowPreview workflowId={workflow.id} thumbnailUrl={workflow.thumbnail} category={cat} variant={viewMode === "list" ? "small" : "small"} />
 
-          {/* Status pill */}
-          {lastRun.status && !selectMode && (
-            <div className={s.workflowCardStatus} data-status={lastRun.status.toLowerCase()}>
+          {/* Execution-state badge (1:1-spec UX polish — distinguishes
+           *  "already executed" lock state from "available for retry" state).
+           *  Tooltip carries the "Open to view results" hint per §P spec. */}
+          {!selectMode && (
+            <div
+              className={s.workflowCardStatus}
+              data-status={(lastRun.status ?? "available").toLowerCase()}
+              title={statusTooltip(lastRun.status)}
+            >
               <span className={s.statusDot} />
-              {statusLabel(lastRun.status)}
+              {statusBadge(lastRun.status)}
             </div>
           )}
 
@@ -169,5 +175,37 @@ function statusLabel(st: string): string {
     case "PARTIAL": return "Partial";
     case "RUNNING": return "Running";
     default: return st;
+  }
+}
+
+/**
+ * Enhanced badge label per §P UX polish — communicates the lock state
+ * (workflow already executed vs available for retry) at a glance.
+ */
+function statusBadge(st: string | null): string {
+  switch (st) {
+    case "SUCCESS":   return "✓ Executed";
+    case "PARTIAL":   return "⚠ Partial";
+    case "RUNNING":   return "● Running";
+    case "PENDING":   return "● Pending";
+    case "FAILED":    return "↻ Retry";
+    case "CANCELLED": return "↻ Retry";
+    default:          return "⚡ Available";
+  }
+}
+
+function statusTooltip(st: string | null): string {
+  switch (st) {
+    case "SUCCESS":
+    case "PARTIAL":
+      return "This workflow has been executed. Open to view results.";
+    case "RUNNING":
+    case "PENDING":
+      return "This workflow is currently running.";
+    case "FAILED":
+    case "CANCELLED":
+      return "Previous run failed — retry available.";
+    default:
+      return "Available to run.";
   }
 }

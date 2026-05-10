@@ -407,8 +407,8 @@ describe("D. Edge cases", () => {
   });
 
   it("null/undefined role → FREE limits", () => {
-    expect(getPlanLimits(null).runsPerMonth).toBe(2);
-    expect(getPlanLimits(undefined).runsPerMonth).toBe(2);
+    expect(getPlanLimits(null).runsPerMonth).toBe(1);
+    expect(getPlanLimits(undefined).runsPerMonth).toBe(1);
   });
 
   it("formatPlanLimit(-1) = ∞, never '-1'", () => {
@@ -429,7 +429,7 @@ describe("D. Edge cases", () => {
 
   it("interpolatePlanString with unknown plan key → FREE values", () => {
     const result = interpolatePlanString("{executions} runs", "BOGUS");
-    expect(result).toBe("2 runs");
+    expect(result).toBe("1 runs");
   });
 });
 
@@ -473,9 +473,10 @@ describe("E. LightPricing — DOM render", () => {
     }
 
     assertNoPlaceholders(text, "LightPricing");
-    expect(text).toContain("10");  // MINI
-    expect(text).toContain("30");  // STARTER
-    expect(text).toContain("100"); // PRO
+    // 1:1 spec — workflows = executions per tier
+    expect(text).toContain("3");   // MINI
+    expect(text).toContain("15");  // STARTER
+    expect(text).toContain("45");  // PRO
   });
 });
 
@@ -497,11 +498,11 @@ describe("E. Scene4_Pricing — DOM render", () => {
     expect(text).toContain("99");
     expect(text).toContain("799");
     expect(text).toContain("1999");
-    // Feature counts
-    expect(text).toMatch(/10.*workflow/i);
+    // Feature counts (1:1 spec — workflows = executions per tier)
+    expect(text).toMatch(/3.*workflow/i);
     expect(text).toMatch(/3.*render/i);
-    expect(text).toMatch(/3.*walkthrough/i); // STARTER videos
-    expect(text).toMatch(/7.*walkthrough/i); // PRO videos
+    expect(text).toMatch(/2.*walkthrough/i); // STARTER videos = 2
+    expect(text).toMatch(/7.*walkthrough/i); // PRO videos = 7
   });
 });
 
