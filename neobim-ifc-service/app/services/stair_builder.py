@@ -179,6 +179,21 @@ def create_stair_parametric(
     ys = [p.y for p in stair.plan_polygon]
     width = min(max(xs) - min(xs), max(ys) - min(ys))
 
+    # Slice T2.0.1.1 — IFC axis configuration for the stepped stair
+    # body. The polyline above is constructed in (x, z) world-intent
+    # coords (x = run direction, "z" = vertical rise). IFC profiles
+    # always live in the local XY plane; to make local Y map to world Z
+    # (so the polyline's "rise" axis becomes vertical), we set
+    # Axis=(0,-1,0) — local Z = world -Y. The right-handed cross
+    # gives Local Y = (0,-1,0) × (1,0,0) = (0,0,1) = world +Z, exactly
+    # what we want. ExtrudedDirection=(0,0,-1) is local -Z = world +Y,
+    # so the body extends laterally for the stair WIDTH along world Y.
+    # Pre-fix: Position had no Axis (defaulted to (0,0,1)), so local Y
+    # = (0,1,0) = world Y. Polyline's "rise" was interpreted as world Y
+    # (lateral, not vertical), and ExtrudedDirection=(0,1,0) extruded
+    # along the SAME local Y axis as the profile — collapsing the body
+    # into a flat shape with z=[0,0]. The diagnostic at
+    # `scripts/inspect_g5_balconies.py` caught this.
     solid = ifc_file.create_entity(
         "IfcExtrudedAreaSolid",
         SweptArea=profile,
@@ -187,12 +202,15 @@ def create_stair_parametric(
             Location=ifc_file.create_entity(
                 "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0)
             ),
+            Axis=ifc_file.create_entity(
+                "IfcDirection", DirectionRatios=(0.0, -1.0, 0.0)
+            ),
             RefDirection=ifc_file.create_entity(
                 "IfcDirection", DirectionRatios=(1.0, 0.0, 0.0)
             ),
         ),
         ExtrudedDirection=ifc_file.create_entity(
-            "IfcDirection", DirectionRatios=(0.0, 1.0, 0.0)
+            "IfcDirection", DirectionRatios=(0.0, 0.0, -1.0)
         ),
         Depth=width,
     )
