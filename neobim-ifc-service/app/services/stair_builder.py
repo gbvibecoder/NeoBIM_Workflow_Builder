@@ -6,6 +6,29 @@ Phase 7's IFC4 hardening — this builder produces a single IfcStairFlight
 matching the legacy output, but riser_count / riser_height come from
 the BuildingModel (already validated by STAIR_RISE_MATCHES) instead of
 free-form props.
+
+Slice T2.0.4.A — STAIR_FLIGHT_CLEARANCE_M lateral inset
+-------------------------------------------------------
+The pre-fix flight extruded across the full lateral span of its plan
+polygon, leaving the south shaft wall touching the flight (0 mm gap)
+and the north wall at the polygon edge. The diagnostic at
+``scripts/inspect_stair_shaft_clearance.py`` quantifies this on the
+3BHK G+5 tower (5 flights × multiple touching wall pairs).
+
+The fix applies a 150 mm lateral inset INSIDE the IfcExtrudedAreaSolid's
+local frame so the flight's external IfcLocalPlacement origin (used by
+the placement resolver and any cross-product references) stays
+unchanged. The inset shrinks ``Depth`` by 2 × 150 mm and shifts the
+extrusion start by +150 mm in world Y via the swept solid's local
+``Position.Location`` (which, after the T2.0.1.1 axis flip, maps
+local −Z to world +Y).
+
+Run-direction (X) overhang — where the flight's total_run
+(``riser_count × tread_depth``) exceeds the shaft's inner X dimension —
+is *not* addressed here. That requires a BuildingModel-level change to
+the templates' stair plan_polygon and is deferred to a future slice.
+NBC-India residential minimum stair width is 900 mm; the inset takes
+the 3BHK G+5 example from 1.365 m to 1.065 m, comfortably above NBC.
 """
 
 from __future__ import annotations
@@ -17,6 +40,12 @@ import ifcopenshell.api as api
 
 from app.models.request import GeometryElement
 from app.utils.guid import derive_guid
+
+
+# Lateral clearance inset between the IfcStairFlight and its enclosing
+# shaft walls. 150 mm matches the spec; tunable but pinned by
+# `test_stair_flight_clearance_from_shaft_walls`.
+STAIR_FLIGHT_CLEARANCE_M: float = 0.150
 
 if TYPE_CHECKING:
     from app.domain.building_model import Stair
@@ -177,7 +206,17 @@ def create_stair_parametric(
     # IfcStair composite).
     xs = [p.x for p in stair.plan_polygon]
     ys = [p.y for p in stair.plan_polygon]
-    width = min(max(xs) - min(xs), max(ys) - min(ys))
+    raw_width = min(max(xs) - min(xs), max(ys) - min(ys))
+
+    # Slice T2.0.4.A — lateral clearance inset.
+    # Shrink the extrusion depth by 2 × CLEARANCE so the flight clears
+    # the south + north shaft walls. NBC India residential minimum
+    # stair width is 0.9 m; the diagnostic at
+    # `scripts/inspect_stair_shaft_clearance.py` shows current
+    # plan_polygon widths of 1.0-1.5 m, so a 0.3 m total inset stays
+    # well above NBC. Defensive floor guards against future templates
+    # that author a narrower polygon.
+    width = max(raw_width - 2.0 * STAIR_FLIGHT_CLEARANCE_M, 0.9)
 
     # Slice T2.0.1.1 — IFC axis configuration for the stepped stair
     # body. The polyline above is constructed in (x, z) world-intent
@@ -194,13 +233,37 @@ def create_stair_parametric(
     # along the SAME local Y axis as the profile — collapsing the body
     # into a flat shape with z=[0,0]. The diagnostic at
     # `scripts/inspect_g5_balconies.py` caught this.
+    #
+    # Slice T2.0.4.A — Position.Location shifts the swept solid's
+    # profile origin to apply the lateral clearance inset INSIDE the
+    # stair entity's local frame, leaving the entity's external
+    # IfcLocalPlacement origin unchanged (so cross-product references
+    # to placement.origin keep working).
+    #
+    # Location is a TRANSLATION in the *entity-local* coordinate system
+    # (the parent of the profile). With no entity rotation in our
+    # ObjectPlacement, entity-local Y = world Y. So Location.y = +0.150
+    # shifts the extrusion start by +150 mm in world Y. Combined with
+    # the 2 × CLEARANCE depth reduction above, the flight clears 150 mm
+    # from the south shaft wall and 150 mm from the north shaft wall.
+    #
+    # Note: this is *entity-local Y translation*, NOT the rotated
+    # profile-local Z. The Axis/RefDirection rotation only affects the
+    # orientation of the SWEPT PROFILE inside the entity-local frame —
+    # it does NOT rotate the Location vector. An earlier attempt at
+    # Location.z=-CLEARANCE (under the misread that local−Z=world+Y
+    # for translation purposes) shifted the stair *vertically* below
+    # the storey floor; the diagnostic at
+    # `scripts/inspect_stair_shaft_clearance.py` caught this in a single
+    # round-trip.
     solid = ifc_file.create_entity(
         "IfcExtrudedAreaSolid",
         SweptArea=profile,
         Position=ifc_file.create_entity(
             "IfcAxis2Placement3D",
             Location=ifc_file.create_entity(
-                "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0)
+                "IfcCartesianPoint",
+                Coordinates=(0.0, STAIR_FLIGHT_CLEARANCE_M, 0.0),
             ),
             Axis=ifc_file.create_entity(
                 "IfcDirection", DirectionRatios=(0.0, -1.0, 0.0)
