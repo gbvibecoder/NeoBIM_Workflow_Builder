@@ -11,7 +11,17 @@ type TrackableEvent =
   | "node_used"
   | "feature_used"
   | "template_loaded"
-  | "regeneration_used";
+  | "regeneration_used"
+  // Template-lock-to-checkout funnel — see §X.
+  // seen → hovered → clicked → opened → completed (or dismissed/failed).
+  | "template_lock_seen"
+  | "template_lock_hovered"
+  | "template_upgrade_clicked"
+  | "razorpay_checkout_opened"
+  | "razorpay_checkout_completed"
+  | "razorpay_checkout_dismissed"
+  | "razorpay_checkout_failed"
+  | "upgrade_verified";
 
 interface TrackPayload {
   event: TrackableEvent;

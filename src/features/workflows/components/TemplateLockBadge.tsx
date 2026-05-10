@@ -1,57 +1,85 @@
 /**
- * Gold "Upgrade to {tier}" lock badge for templates the user can't access yet.
+ * Lock affordance for templates the user can't access yet.
  *
- * Sits in the top-right corner of a template card. The visual language is
- * deliberately premium — gold gradient + warm border + Crown/Lock glyph — so
- * locked tiles read as aspirational rather than punitive.
+ * Renders TWO layers, both absolutely positioned inside the parent
+ * `.cardIllus` container:
  *
- * Source of truth for tier names + pricing: STRIPE_PLANS via
- * getUpgradeTargetForTemplate (template-access.ts).
+ *   1. **Crown pin** (always visible) — small cream circle in the top-right,
+ *      a quiet "this is locked" indicator that doesn't dominate the card.
+ *
+ *   2. **Hover reveal** — chunky dark-gold pill button + sub-line, centered
+ *      over the card art. The parent CSS module (`page.module.css`) drives
+ *      the show/hide via `.card[data-locked="true"]:hover` selectors so the
+ *      reveal stays in lockstep with the image-blur on the same hover.
+ *
+ * The whole component renders pointer-events:none — the click is owned by
+ * the parent card so any click on a locked card opens checkout, not just
+ * a bullseye on the button.
+ *
+ * Accessibility: aria-hidden on decorative parts, but the parent card
+ * announces "Premium template — requires {tier}. Click to upgrade."
+ *
+ * Reduced-motion: when `(prefers-reduced-motion: reduce)` is on, all
+ * transforms collapse to opacity-only fades (driven by CSS).
+ *
+ * Source of truth for tier label + price: STRIPE_PLANS via
+ * getUpgradeTargetForTemplate(). This component takes pre-computed
+ * `label` + `price` props so it never imports billing config directly.
  */
 "use client";
 
 import { Crown, Lock } from "lucide-react";
 import type { TemplateTier } from "@/features/billing/lib/template-access";
+import s from "@/features/workflows/components/TemplateLockBadge.module.css";
 
 interface TemplateLockBadgeProps {
   tier: TemplateTier;
   /** Plan display label, e.g. "Pro" / "Starter" — typically from
    *  STRIPE_PLANS[tier].name via getUpgradeTargetForTemplate. */
   label: string;
-  /** Optional className for absolute-positioning inside a card. */
-  className?: string;
+  /** Monthly price in INR (₹). Rendered in the sub-line beneath the CTA. */
+  price: number;
 }
 
-export function TemplateLockBadge({ tier, label, className }: TemplateLockBadgeProps) {
+/** Indian-locale grouping for INR display (₹1,999 / ₹2,999 / ₹4,999). */
+function formatINR(n: number): string {
+  try {
+    return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n);
+  } catch {
+    return String(n);
+  }
+}
+
+export function TemplateLockBadge({ tier, label, price }: TemplateLockBadgeProps) {
   const Icon = tier === "PRO" || tier === "TEAM" ? Crown : Lock;
+
   return (
-    <div
-      className={className}
-      role="status"
-      aria-label={`Upgrade to ${label} to unlock`}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "5px 10px",
-        borderRadius: 999,
-        background: "linear-gradient(135deg, #FFF8DC 0%, #FAEBD7 100%)",
-        border: "1px solid rgba(184, 134, 11, 0.35)",
-        color: "#8B6914",
-        fontFamily:
-          "var(--font-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, monospace",
-        fontSize: 10.5,
-        fontWeight: 700,
-        letterSpacing: 0.2,
-        lineHeight: 1,
-        whiteSpace: "nowrap",
-        boxShadow: "0 1px 2px rgba(184, 134, 11, 0.18)",
-        pointerEvents: "none",
-        userSelect: "none",
-      }}
-    >
-      <Icon size={11} strokeWidth={2.4} aria-hidden="true" />
-      <span>Upgrade to {label}</span>
-    </div>
+    <>
+      {/* Crown pin — always visible, sits on top of the art */}
+      <div
+        className={s.pin}
+        aria-label={`Premium template — requires ${label}`}
+        role="img"
+      >
+        <Icon size={14} strokeWidth={2.2} aria-hidden="true" />
+      </div>
+
+      {/* Center reveal — fades in on parent card hover */}
+      <div className={s.reveal} aria-hidden="true">
+        <div className={s.cta}>
+          <span className={s.ctaIcon}>
+            <Crown size={16} strokeWidth={2.4} aria-hidden="true" />
+          </span>
+          <span className={s.ctaLabel}>Upgrade to {label}</span>
+          <span className={s.shine} aria-hidden="true" />
+        </div>
+        <div className={s.sub}>
+          <strong className={s.subPrice}>₹{formatINR(price)}</strong>
+          <span className={s.subSep}>/month</span>
+          <span className={s.subDot}>·</span>
+          <span>unlocks all {label} templates</span>
+        </div>
+      </div>
+    </>
   );
 }

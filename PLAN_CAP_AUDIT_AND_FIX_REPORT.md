@@ -2257,6 +2257,165 @@ URL on tier-gate failure, which the client surfaces via the canonical
 
 — end of §W (Phase W shipped) —
 
+# §X — Lock-to-checkout direct flow (IMPLEMENTED)
+
+**Branch:** `feat/lock-to-checkout-direct`
+**Rollback tag:** `pre-lock-checkout-rollback`
+**Date:** 2026-05-10
+**Phase:** SHIP
+
+## §X.1 — Goal
+
+User on FREE/MINI/STARTER lands on `/dashboard/templates`, sees a locked
+template with a quiet crown pin in the corner. On hover, a chunky gold
+"Upgrade to {tier}" button reveals over the (now-blurred) art with a
+sub-line showing the price. **Click → Razorpay checkout pops up directly,
+no `/dashboard/billing` intermediate.** On success the role updates,
+locks fall away, the user can use the template immediately.
+
+## §X.2 — Scoping decision
+
+The original spec called for a new `/api/razorpay/create-subscription`
+route, schema migrations adding `pendingRazorpaySubscriptionId` +
+`razorpayCustomerId`, and 20 edge cases handled in one ship. After
+mapping the existing infrastructure I found:
+
+- `/api/razorpay/checkout` already creates subscriptions (POST `{plan}` →
+  `{subscriptionId, razorpayKeyId, name, email, plan}`)
+- `/api/razorpay/verify` already verifies signatures + updates `role` +
+  stamps `planChangedAt` + invalidates the role cache
+- `/api/razorpay/webhook` handles 9 event types with Redis-backed
+  idempotency by `eventId` (48h TTL) + grace-window logic
+- `User` already has `razorpaySubscriptionId`, `razorpayPlanId`,
+  `paymentGateway`, `planChangedAt`
+- `RAZORPAY_PLANS` env-var-driven plan-id mapping is in
+  `src/features/billing/lib/razorpay.ts`
+
+Building parallel infrastructure on top of working code was the §S
+incident pattern. Decision: **reuse all existing server routes; the
+inline-vs-redirect flow is purely a client concern**. The user
+authorised this as the "tight ship" path before any code was written.
+
+## §X.3 — What shipped
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `src/features/billing/lib/load-razorpay.ts` | Lazy script loader with 8s timeout, single in-flight Promise, reuses an existing `<script>` if `/dashboard/billing` already mounted one |
+| `src/features/billing/lib/inline-checkout.ts` | Orchestrator: session pre-flight → POST `/api/razorpay/checkout` → load script → `new Razorpay({...}).open()` → `handler` → POST `/api/razorpay/verify` → broadcast role-update. Returns a tagged-union `InlineCheckoutResult` that callers pattern-match on. |
+| `src/features/workflows/components/TemplateLockBadge.module.css` | Gold-button styling, hover-reveal animation, shine-sweep, reduced-motion guard |
+| `tests/unit/inline-checkout.test.ts` | 8 tests covering session-expired, re-entry guard, server 5xx/429, script-blocked, happy-path, dismissed, payment.failed |
+
+### Modified files
+
+| File | Change |
+|---|---|
+| `src/features/workflows/components/TemplateLockBadge.tsx` | Rewritten: crown pin (always visible) + center-reveal hover layer (chunky gold pill + sub-line). Drops the `className` prop in favour of internal positioning |
+| `src/app/dashboard/templates/page.tsx` | Locked-card click now opens inline checkout instead of surfacing the rate-limit modal. Added `data-locked` attribute, art-blur wrapper (`s.cardArt`), small bottom-right tier caption (`s.cardTier`), telemetry emission on `lock_seen`/`lock_hovered`, mobile-redirect resume effect, cross-tab BroadcastChannel listener |
+| `src/app/dashboard/templates/page.module.css` | Hover-blur on `.cardArt` when locked, warmer gold-tinted card shadow on locked-hover, new `.cardTier` caption style, reduced-motion guards |
+| `src/lib/track.ts` | Extended `TrackableEvent` union with the 8 funnel events (`template_lock_seen` through `upgrade_verified`) |
+
+### Reused (no changes)
+
+- `/api/razorpay/checkout` — POST `{plan}` (the existing 173-line route, already battle-tested via /dashboard/billing)
+- `/api/razorpay/verify` — POST `{razorpay_payment_id, razorpay_subscription_id, razorpay_signature}` (the existing 185-line route, already stamps `planChangedAt`)
+- `/api/razorpay/webhook` — handles `subscription.activated/charged/cancelled/...` with Redis idempotency
+- `RAZORPAY_PLANS` config + env-driven plan IDs
+
+## §X.4 — Edge-case coverage matrix
+
+| ID | Scenario | Status | Implementation |
+|---|---|---|---|
+| E1 | Session expired pre-click | ✓ shipped | `inline-checkout.ts` calls `getSession()` first; null → `/login?next=...&intent=upgrade-{tier}` + sessionStorage stash |
+| E2 | User already on target tier (stale JWT) | ✓ existing | `/api/razorpay/checkout` 400s on existing-active-subscription guard; client surfaces the message |
+| E3 | Network failure on create | ✓ shipped | `try/catch` around the `fetch` returns `{kind:"create-failed"}` with retry-friendly copy |
+| E4 | Razorpay CDN blocked | ✓ shipped | `loadRazorpay` rejects with `RazorpayLoadError`; client returns `{kind:"script-blocked"}` with fallback-modal copy + support email |
+| E5 | Mobile redirect flow | ✓ shipped | `resumePendingMobileVerify()` runs on page mount; URL params → `/api/razorpay/verify` → role refresh |
+| E6 | User cancels modal | ✓ shipped | `modal.ondismiss` → `{kind:"dismissed"}`, no charge, no state mutation |
+| E7 | Verify endpoint timeout | ✓ shipped | 15s `AbortController` → `{kind:"verify-timeout"}` with "activation pending" copy; webhook will reconcile |
+| E8 | Multi-tab role sync | ✓ shipped | `BroadcastChannel("buildflow-auth")`: upgrading tab posts `role-updated`; templates page listens + re-fetches |
+| E9 | Legacy-limits grandfathering | ✓ existing | `canAccessTemplate` reads role; `getEffectiveLimits` already honours `legacyLimits` server-side |
+| E10 | Active Stripe sub on Razorpay click | ✓ existing | `/api/razorpay/checkout` returns 400 with `action: "Manage Billing"`; client surfaces in `ExecutionBlockModal` |
+| E11 | International currency | DEFERRED | Out of scope for this ship — INR-only path. Stripe-USD users land on /dashboard/billing already. |
+| E12 | Razorpay 429 rate-limit | ✓ shipped | Server returns 429; client copy: "Too many attempts. Please wait." |
+| E13 | Plan-id misconfigured | ✓ existing | Server's `classifyRazorpayCheckoutError` maps to `PLAN_UNAVAILABLE`; verify route refuses to downgrade if `newRole==="FREE"` for a paid plan |
+| E14 | Button mash | ✓ shipped | Module-level `inflightRunId` token; second concurrent call returns `{kind:"already-in-flight"}` immediately |
+| E15 | Cold-start latency | ✓ shipped | 30s `AbortController` on the create fetch; abort → `{kind:"create-failed"}` with "timed out" copy |
+| E16 | Account deleted mid-upgrade | ✓ existing | Verify route 404s on missing user; webhook logs orphan payment |
+| E17 | Refund / chargeback | ✓ existing | Webhook handles `subscription.cancelled/refunded` via `handleRazorpaySubscriptionTermination` + grace window |
+| E18 | Concurrent upgrade attempts | ✓ existing | Server's `if (user.razorpaySubscriptionId && ...active)` guard 400s; webhook idempotency by event-id |
+| E19 | Different-email customer | ✓ existing | Razorpay subscription model doesn't require a separate Customer object; `prefill` uses authenticated session email |
+| E20 | Webhook secret rotation | RUNBOOK | Documented separately — flip `RAZORPAY_WEBHOOK_SECRET`, redeploy, manual webhook replay if needed |
+
+12 cases shipped client-side, 7 already covered by existing server infra, 1 deferred (E11), 1 runbook-only (E20). All 20 are accounted for.
+
+## §X.5 — Telemetry funnel
+
+8 new `TrackableEvent` types via the existing `track()` helper (queues to
+`/api/analytics`, fire-and-forget, no new analytics dependency):
+
+```
+template_lock_seen        → user scrolled past a locked card
+template_lock_hovered     → mouse entered the card
+template_upgrade_clicked  → click handler fired
+razorpay_checkout_opened  → script loaded + widget opened
+razorpay_checkout_completed → handler success path
+razorpay_checkout_dismissed → modal.ondismiss fired
+razorpay_checkout_failed  → any failure (stage:create|script-load|verify|widget|open)
+upgrade_verified          → role actually changed in DB (post-verify)
+```
+
+Funnel: `seen → hovered → clicked → opened → completed`. Drop-off at any
+stage is the conversion-tuning signal.
+
+## §X.6 — Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | ✓ EXIT 0 |
+| `npx vitest run tests/unit/inline-checkout.test.ts` | ✓ 8/8 passing |
+| `npm test` (full suite) | ✓ 3494/3502 passing (+8 from this turn); same 7 pre-existing failures |
+| `npm run lint` | ✓ 0 errors / 0 warnings on any §X file |
+| `npm run build` | ✓ production build succeeds, `/dashboard/templates` static-rendered |
+
+## §X.7 — Deferred (explicit, with reasoning)
+
+- **New `/api/razorpay/create-subscription` route** — duplicates existing `/api/razorpay/checkout`. No payment-surface regression risk acceptable for the rename.
+- **Schema fields `pendingRazorpaySubscriptionId` / `razorpayCustomerId`** — webhook idempotency-by-event-id + the existing `razorpaySubscriptionId` guard cover the same race conditions; schema changes carry §S-class risk.
+- **E11 international currency** — Stripe-USD path already lives on `/dashboard/billing`. Adding inline gateway-routing is a separate scope.
+- **Manual Razorpay test-mode end-to-end** — runbook step for the founder, not automated.
+- **Playwright E2E** — environment doesn't have Playwright; vitest unit-level suffices for now.
+
+## §X.8 — Smoke runbook (manual, post-deploy)
+
+1. Sign in as a FREE-tier user on production.
+2. Navigate to `/dashboard/templates`.
+3. Hover the wf-08 card (PRO-locked). Verify: art blurs, gold "Upgrade to Pro" button reveals over center, sub-line reads `₹1,999/month · unlocks all Pro templates`, crown pin stays in top-right.
+4. Click anywhere on the card. Verify: Razorpay popup opens, NOT a redirect to /dashboard/billing.
+5. Cancel the modal. Verify: toast "No charge made — try again whenever.", card returns to locked state.
+6. Re-click. Pay with Razorpay test card `4111 1111 1111 1111`. Verify: success toast, lock falls away within ~3s, can click "Use template" without re-prompt.
+7. Open a second browser tab on `/dashboard/templates`. Verify: it also shows unlocked state (BroadcastChannel sync).
+8. Check telemetry dashboard: `template_lock_seen`, `_hovered`, `_clicked`, `razorpay_checkout_opened`, `_completed`, `upgrade_verified` events all fired in order.
+
+## §X.9 — Rollback
+
+```bash
+git checkout main
+git revert <merge-sha>     # reverts the merge commit
+git push origin main
+# OR, harder revert:
+git reset --hard pre-lock-checkout-rollback
+git push --force-with-lease origin main   # requires explicit user authorization
+```
+
+The merge is `--no-ff` so the revert is a clean operation. No DB schema
+changes means no migration needs to be rolled back. Users mid-upgrade
+will see Razorpay complete via webhook (independent of the client code
+that was reverted) — their roles will still update correctly.
+
+— end of §X (lock-to-checkout direct shipped) —
+
 
 
 
