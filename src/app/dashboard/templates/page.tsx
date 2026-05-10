@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
-import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap } from "lucide-react";
+import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap, Crown } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useWorkflowStore, selectLoadFromTemplate } from "@/features/workflows/stores/workflow-store";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,12 @@ import { BriefRendersTemplateCard } from "@/features/brief-renders/components/Br
 import { canAccessTemplate, getUpgradeTargetForTemplate } from "@/features/billing/lib/template-access";
 import { TemplateLockBadge } from "@/features/workflows/components/TemplateLockBadge";
 import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
+import {
+  openInlineUpgradeCheckout,
+  resumePendingMobileVerify,
+} from "@/features/billing/lib/inline-checkout";
+import { track } from "@/lib/track";
+import { toast } from "sonner";
 import s from "./page.module.css";
 
 interface RateLimitInfo {
@@ -598,6 +604,46 @@ export default function TemplatesPage() {
     fetch("/api/user/dashboard-stats").then(r => r.ok ? r.json() : null).then(d => { if (d?.userRole) setUserRole(d.userRole); }).catch(() => {});
   }, []);
 
+  // E5 — mobile redirect-flow resume. If the URL carries
+  // razorpay_payment_id, the user just returned from a redirected checkout;
+  // call /api/razorpay/verify and refresh the role.
+  useEffect(() => {
+    let cancelled = false;
+    resumePendingMobileVerify().then((r) => {
+      if (cancelled || !r.attempted || !r.result) return;
+      if (r.result.kind === "success") {
+        toast.success("Upgrade complete — your templates are unlocking.");
+        fetch("/api/user/dashboard-stats")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((d) => { if (d?.userRole) setUserRole(d.userRole); })
+          .catch(() => {});
+      } else if (r.result.kind === "verify-failed") {
+        toast.error(r.result.userMessage);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // E8 — cross-tab role sync. Another tab finished an upgrade → broadcast
+  // arrives → we re-fetch our role so the lock state updates here too.
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const ch = new BroadcastChannel("buildflow-auth");
+    const onMessage = (ev: MessageEvent) => {
+      if (ev.data?.type === "role-updated") {
+        fetch("/api/user/dashboard-stats")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((d) => { if (d?.userRole) setUserRole(d.userRole); })
+          .catch(() => {});
+      }
+    };
+    ch.addEventListener("message", onMessage);
+    return () => {
+      ch.removeEventListener("message", onMessage);
+      ch.close();
+    };
+  }, []);
+
   useEffect(() => {
     if (!showSort) return;
     const h = (e: MouseEvent) => { if (sortRef.current && !sortRef.current.contains(e.target as Node)) setShowSort(false); };
@@ -631,20 +677,86 @@ export default function TemplatesPage() {
     return list;
   }, [activeCategory, sortBy]);
 
+  // Funnel telemetry — fire `template_lock_seen` once per locked template
+  // per page mount. The Set survives until full unmount, so re-renders
+  // (filter changes, scroll, etc.) don't re-emit. If the user upgrades and
+  // their role drops some locks, those are simply no-ops on next pass.
+  const seenRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!filtered.length) return;
+    for (const wf of filtered) {
+      if (canAccessTemplate(userRole, wf.requiredTier)) continue;
+      if (seenRef.current.has(wf.id)) continue;
+      seenRef.current.add(wf.id);
+      track("template_lock_seen", {
+        templateId: wf.id,
+        requiredTier: wf.requiredTier,
+        currentTier: userRole,
+      });
+    }
+  }, [filtered, userRole]);
+
   const handleUse = async (wf: WorkflowTemplate) => {
-    // Client-side tier gate — surfaces the canonical ExecutionBlockModal
-    // so the experience matches the canvas-side block. The server route
-    // re-checks this; the client check is UX only.
+    // Locked path → inline Razorpay checkout (no /dashboard/billing redirect).
+    // The client gate is UX only; the server route /api/workflows/from-template
+    // is the authoritative tier check.
     if (!canAccessTemplate(userRole, wf.requiredTier)) {
       const target = getUpgradeTargetForTemplate(userRole, wf.requiredTier);
-      const tierLabel = target?.label ?? "Pro";
-      setRateLimitHit({
-        title: `Template not available on your plan`,
-        message: `"${wf.name}" needs the ${tierLabel} plan. Upgrade to unlock it and the rest of the ${tierLabel} catalogue.`,
-        action: `Upgrade to ${tierLabel}`,
-        actionUrl: "/dashboard/billing",
+      if (!target) return;
+
+      const result = await openInlineUpgradeCheckout({
+        targetTier: target.tier,
+        templateId: wf.id,
+        currentTier: userRole,
       });
-      return;
+
+      switch (result.kind) {
+        case "success": {
+          toast.success(`Welcome to ${target.label}! Unlocking your templates…`);
+          track("upgrade_verified", {
+            fromRole: result.previousRole,
+            toRole: result.role,
+            source: "template_lock_inline",
+            templateId: wf.id,
+          });
+          // The DB has the new role; refresh dashboard-stats so the page's
+          // userRole state reflects it without requiring a hard reload.
+          fetch("/api/user/dashboard-stats")
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (d?.userRole) setUserRole(d.userRole);
+            })
+            .catch(() => {});
+          return;
+        }
+        case "dismissed":
+          toast("No charge made — try again whenever.");
+          return;
+        case "session-expired":
+          // Helper has already redirected to /login.
+          return;
+        case "already-in-flight":
+        case "create-failed":
+        case "script-blocked":
+        case "payment-failed":
+        case "verify-failed":
+        case "verify-timeout":
+          // Surface in the canonical ExecutionBlockModal — same UI as
+          // canvas-side rate-limit blocks. action wired to billing page
+          // as the tier-aware fallback.
+          setRateLimitHit({
+            title:
+              result.kind === "script-blocked"
+                ? "Payment provider blocked"
+                : result.kind === "verify-timeout"
+                  ? "Activation pending"
+                  : "Couldn't complete upgrade",
+            message: result.userMessage,
+            action: "Open billing page",
+            actionUrl: "/dashboard/billing",
+          });
+          return;
+      }
     }
 
     // Server creates the Workflow row and re-validates the tier — this
@@ -712,11 +824,19 @@ export default function TemplatesPage() {
       <div
         key={wf.id}
         className={s.card}
+        data-locked={isLocked ? "true" : undefined}
         role="article"
-        aria-label={wf.name}
+        aria-label={
+          isLocked && upgradeTarget
+            ? `${wf.name} \u2014 premium template, requires ${upgradeTarget.label}. Click to upgrade.`
+            : wf.name
+        }
         tabIndex={0}
         onClick={() => handleUse(wf)}
         onKeyDown={e => { if (e.key === "Enter") handleUse(wf); }}
+        onMouseEnter={() => {
+          if (isLocked) track("template_lock_hovered", { templateId: wf.id });
+        }}
         style={{ animationDelay: `${idx * 0.08}s` }}
       >
         <div className={isDarkIllus ? s.cardIllusDark : s.cardIllus}>
@@ -724,12 +844,18 @@ export default function TemplatesPage() {
             <span className={isDarkIllus ? s.cardCornerDarkDot : isCostCard ? s.cardCornerCostDot : s.cardCornerDot} />
             {wf.category}
           </div>
+          <div className={s.cardArt}>
+            {IllusComp && <IllusComp />}
+          </div>
           {isLocked && upgradeTarget ? (
-            <TemplateLockBadge tier={upgradeTarget.tier} label={upgradeTarget.label} className={s.cardLock} />
+            <TemplateLockBadge
+              tier={upgradeTarget.tier}
+              label={upgradeTarget.label}
+              price={upgradeTarget.price}
+            />
           ) : (
             <span className={isDarkIllus ? s.cardNumLight : s.cardNum}>{String(idx + 1).padStart(2, "0")}</span>
           )}
-          {IllusComp && <IllusComp />}
         </div>
         <div className={s.cardContent}>
           <div className={s.cardMeta}>
@@ -747,9 +873,15 @@ export default function TemplatesPage() {
             <div className={s.cardTags}>
               {wf.tags.slice(0, 3).map(tag => <span key={tag} className={s.tag}>{tag}</span>)}
             </div>
-            <span className={isLocked ? s.cardCtaLocked : s.cardCta}>
-              {isLocked && upgradeTarget ? `Upgrade to ${upgradeTarget.label}` : "Use template"} <ArrowRight size={13} />
-            </span>
+            {isLocked && upgradeTarget ? (
+              <span className={s.cardTier} aria-hidden="true">
+                <Crown size={12} strokeWidth={2.2} /> {upgradeTarget.label.toUpperCase()}
+              </span>
+            ) : (
+              <span className={s.cardCta}>
+                Use template <ArrowRight size={13} />
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1115,7 +1247,10 @@ export default function TemplatesPage() {
                       <span>{featuredWf.estimatedRunTime}</span>
                     </div>
                     {featuredIsLocked && featuredUpgradeTarget && (
-                      <TemplateLockBadge tier={featuredUpgradeTarget.tier} label={featuredUpgradeTarget.label} className={s.lockBadge} />
+                      <span className={s.lockBadge}>
+                        <Crown size={11} strokeWidth={2.4} aria-hidden="true" />
+                        <span>{featuredUpgradeTarget.label.toUpperCase()}</span>
+                      </span>
                     )}
                     <h2 className={s.featuredTitle}>
                       {(() => { const parts = featuredWf.name.split("\u2192").map(x => x.trim()); return parts.length >= 2 ? <>{parts[0]} <em>&rarr; {parts.slice(1).join(" \u2192 ")}</em></> : featuredWf.name; })()}
