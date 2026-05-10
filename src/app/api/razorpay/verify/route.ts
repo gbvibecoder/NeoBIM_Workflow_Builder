@@ -153,6 +153,9 @@ export async function POST(req: Request) {
         ...(isRoleChange && {
           legacyLimits: Prisma.DbNull,
           legacyLimitsSetAt: null,
+          // Stamp planChangedAt so check-execution-eligibility scopes the
+          // post-upgrade execution count to "since this upgrade" — see §T.
+          planChangedAt: new Date(),
         }),
       },
     });

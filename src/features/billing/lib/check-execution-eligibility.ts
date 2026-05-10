@@ -118,6 +118,45 @@ function monthStart(): Date {
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
+/**
+ * Compute the start of the user's CURRENT BILLING PERIOD.
+ *
+ * Semantics:
+ *   • FREE tier:
+ *       Returns epoch (1970-01-01) so the count effectively spans lifetime.
+ *       FREE has a lifetime cap, not a monthly one — never reset.
+ *
+ *   • Paid tiers (MINI/STARTER/PRO/TEAM):
+ *       Returns max(planChangedAt, calendar-month-start).
+ *       This means:
+ *         a) After a plan upgrade (FREE→MINI, MINI→STARTER, etc.) the
+ *            period starts AT THE UPGRADE TIME, so pre-upgrade executions
+ *            do NOT pollute the new tier's quota — fixes the P0 bug
+ *            documented in §T of PLAN_CAP_AUDIT_AND_FIX_REPORT.md.
+ *         b) On every renewal (calendar rollover), the period rolls to
+ *            the new month start. planChangedAt stays at the original
+ *            upgrade timestamp (months ago), so calendar-month wins.
+ *         c) Mid-month upgrade MINI→STARTER: planChangedAt = now() means
+ *            the user gets a fresh full STARTER quota immediately —
+ *            industry-standard "rewards upgrades" semantic.
+ *         d) Renewal vs upgrade: webhooks only set planChangedAt on
+ *            isRoleChange=true (upgrade or downgrade), not on plain
+ *            renewals — so renewals correctly reset via calendar month.
+ *         e) Null planChangedAt fallback: paid users from before this
+ *            field existed will fall back to monthStart, which matches
+ *            pre-fix behavior. Backfill script in §T.3 (this report)
+ *            populates planChangedAt for them.
+ */
+function getCurrentBillingPeriodStart(
+  role: PlanKey,
+  planChangedAt: Date | null,
+): Date {
+  if (role === "FREE") return new Date(0); // epoch — lifetime
+  const monStart = monthStart();
+  if (!planChangedAt) return monStart;
+  return planChangedAt > monStart ? planChangedAt : monStart;
+}
+
 const SCRATCH_WORKFLOW_NAME_LITERAL = "__standalone_tools__";
 
 /**
@@ -358,28 +397,20 @@ export async function checkExecutionEligibility(
     return adminBypass(toPlanKey(args.userRole), args.emailVerified);
   }
 
-  // Read DB role + legacyLimits + completed-execution count in parallel.
-  // DB role wins over JWT role (JWT can be stale up to 15s after a sub change).
-  const completedWhere: Prisma.ExecutionWhereInput = {
-    userId: args.userId,
-    status: { in: ["SUCCESS", "PARTIAL"] },
-  };
-
-  // For paid plans we only count this calendar month (monthly cap).
-  // For FREE we count lifetime (no created-at filter).
-  const jwtPlanKey = toPlanKey(args.userRole);
-  const isJwtPaid = jwtPlanKey !== "FREE";
-  if (isJwtPaid) {
-    completedWhere.createdAt = { gte: monthStart() };
-  }
-
-  const [dbUser, completedCount] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: args.userId },
-      select: { role: true, legacyLimits: true, email: true },
-    }),
-    prisma.execution.count({ where: completedWhere }),
-  ]);
+  // Read DB role + legacyLimits + planChangedAt before counting so the
+  // count window can be scoped to the user's CURRENT BILLING PERIOD.
+  // (Pre-fix this used a calendar-month start for paid users, which
+  // included pre-upgrade FREE-tier executions and silently stole from
+  // the post-upgrade quota — see §T of PLAN_CAP_AUDIT_AND_FIX_REPORT.md.)
+  const dbUser = await prisma.user.findUnique({
+    where: { id: args.userId },
+    select: {
+      role: true,
+      legacyLimits: true,
+      email: true,
+      planChangedAt: true,
+    },
+  });
 
   // DB-canonical role check (defends against JWT staleness for both
   // upgrade-just-happened and downgrade-just-happened windows).
@@ -389,18 +420,20 @@ export async function checkExecutionEligibility(
   }
   const effectiveRole = toPlanKey(dbRoleRaw);
 
-  // If the JWT role disagreed with DB and we counted with the wrong window
-  // (paid → FREE, or FREE → paid), recount with the correct filter.
-  let trueCount = completedCount;
-  const isDbPaid = effectiveRole !== "FREE";
-  if (isDbPaid !== isJwtPaid) {
-    const recountWhere: Prisma.ExecutionWhereInput = {
-      userId: args.userId,
-      status: { in: ["SUCCESS", "PARTIAL"] },
-    };
-    if (isDbPaid) recountWhere.createdAt = { gte: monthStart() };
-    trueCount = await prisma.execution.count({ where: recountWhere });
-  }
+  // Compute the period start for THIS user, then count completed
+  // executions strictly since that boundary.
+  const periodStart = getCurrentBillingPeriodStart(
+    effectiveRole,
+    dbUser?.planChangedAt ?? null,
+  );
+  const completedWhere: Prisma.ExecutionWhereInput = {
+    userId: args.userId,
+    status: { in: ["SUCCESS", "PARTIAL"] },
+    // For FREE periodStart is epoch — the createdAt filter is a no-op.
+    // For paid it's max(planChangedAt, monthStart).
+    createdAt: { gte: periodStart },
+  };
+  const trueCount = await prisma.execution.count({ where: completedWhere });
 
   const effectiveLimits = getEffectiveLimits(
     effectiveRole,
@@ -592,9 +625,10 @@ export async function createExecutionWithCapCheck(
   // node call (see GAP #2 §J), so the cap is enforced at multiple layers.
   try {
     // Admins skip cap — read role from DB to defend against stale JWT.
+    // planChangedAt drives the period-scoped count below.
     const dbUser = await prisma.user.findUnique({
       where: { id: args.userId },
-      select: { role: true, legacyLimits: true },
+      select: { role: true, legacyLimits: true, planChangedAt: true },
     });
     const dbRole = dbUser?.role ?? args.userRole;
     const dbIsAdminRole = dbRole === "PLATFORM_ADMIN" || dbRole === "TEAM_ADMIN";
@@ -658,11 +692,16 @@ export async function createExecutionWithCapCheck(
 
     // Slot-reservation count: completed runs + recent in-flight rows.
     const inflightCutoff = new Date(Date.now() - INFLIGHT_TTL_MS);
-    const isPaid = effectiveRole !== "FREE";
+    // Period-scoped count — see getCurrentBillingPeriodStart for the
+    // FREE-vs-paid + planChangedAt vs monthStart precedence rules.
+    const periodStart = getCurrentBillingPeriodStart(
+      effectiveRole,
+      dbUser?.planChangedAt ?? null,
+    );
 
     const completedFilter: Prisma.ExecutionWhereInput = {
       status: { in: ["SUCCESS", "PARTIAL"] },
-      ...(isPaid ? { createdAt: { gte: monthStart() } } : {}),
+      createdAt: { gte: periodStart },
     };
     const inflightFilter: Prisma.ExecutionWhereInput = {
       status: { in: ["PENDING", "RUNNING"] },

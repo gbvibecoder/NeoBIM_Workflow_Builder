@@ -214,12 +214,18 @@ async function activateSubscription(subscription: {
       razorpayPlanId: planId || null,
       paymentGateway: 'razorpay',
       stripeCurrentPeriodEnd: currentPeriodEnd,
-      // Only clear legacy limits when the role actually changes (upgrade/downgrade).
-      // Renewals (same role) must preserve legacyLimits so grandfathered users keep
-      // their pre-migration limits.
+      // On role change: clear legacy limits + stamp planChangedAt so the
+      // execution-count helper scopes paid-tier counts to "since this
+      // upgrade" (not since calendar-month start, which would include
+      // pre-upgrade FREE executions and silently steal from the user's
+      // paid quota — see §T of PLAN_CAP_AUDIT_AND_FIX_REPORT.md).
+      // Renewals (same role): preserve legacyLimits + planChangedAt so
+      // grandfathered users keep their pre-migration limits and the
+      // billing period rolls based on calendar month.
       ...(isRoleChange && {
         legacyLimits: Prisma.DbNull,
         legacyLimitsSetAt: null,
+        planChangedAt: new Date(),
       }),
     },
   });
@@ -412,6 +418,9 @@ async function cancelSubscription_LEGACY(subscription: { id: string }) {
       ...(isRoleChange && {
         legacyLimits: Prisma.DbNull,
         legacyLimitsSetAt: null,
+        // Stamp the downgrade time so any subsequent upgrade starts a
+        // fresh period from THE UPGRADE event, not from this cancellation.
+        planChangedAt: new Date(),
       }),
     },
   });

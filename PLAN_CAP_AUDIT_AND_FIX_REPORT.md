@@ -1596,6 +1596,192 @@ will show the underlying Prisma/Postgres error — actionable diagnosis.
 
 — end of §S —
 
+---
+
+# §T — P0 hotfix: pre-upgrade rows polluting post-upgrade quota
+
+> **Production evidence:** new FREE signup → ran 1 workflow → upgraded to MINI →
+> ran 2 more → billing page showed `3 of 3 runs used this month` and the next
+> attempt was hard-blocked. User paid ₹99 for 3 executions but only got 2.
+> Refund-trigger if not fixed before the manager review.
+
+## §T.1 — Root cause
+
+Pre-fix `check-execution-eligibility.ts:362-374`:
+
+```ts
+const completedWhere: Prisma.ExecutionWhereInput = {
+  userId: args.userId,
+  status: { in: ["SUCCESS", "PARTIAL"] },
+};
+const isJwtPaid = jwtPlanKey !== "FREE";
+if (isJwtPaid) {
+  completedWhere.createdAt = { gte: monthStart() };  // ← THE BUG
+}
+```
+
+For paid users, the count window started at the **calendar-month boundary**, not at the user's plan-upgrade timestamp. Concrete reproduction:
+
+```
+2026-05-08 14:00  user signs up FREE
+2026-05-08 14:30  runs workflow A → Execution row #1 SUCCESS
+2026-05-08 15:00  hits FREE cap → upgrades to MINI
+2026-05-08 15:05  runs workflow B → row #2 SUCCESS
+2026-05-08 15:08  runs workflow C → row #3 SUCCESS
+2026-05-08 15:10  cap-check on workflow D
+                    monthStart = 2026-05-01
+                    count(userId, status IN [SUCCESS,PARTIAL], createdAt ≥ 2026-05-01)
+                    = 3   ← INCLUDES row #1 from FREE tier
+                    limit = 3 (MINI)
+                    BLOCKED
+```
+
+The same bug existed in `createExecutionWithCapCheck` (line 699) and the client-side billing page (line 122). All three surfaces used `monthStart()` and would show "3 of 3" when the user had only paid for 2.
+
+**Schema gap:** `User` had no field tracking when the role last changed. `stripeCurrentPeriodEnd` exists but only Stripe writes it; Razorpay and manual role-edits don't update it consistently.
+
+## §T.2 — Fix design
+
+New helper `getCurrentBillingPeriodStart(role, planChangedAt)`:
+
+| Role | Returns | Reason |
+|---|---|---|
+| FREE | epoch (1970-01-01) | Lifetime cap, never resets |
+| Paid + null planChangedAt | calendar `monthStart()` | Pre-fix fallback for grandfathered users |
+| Paid + planChangedAt | `max(planChangedAt, monthStart())` | Mid-month upgrade → fresh quota; renewals → calendar rollover |
+
+The `max()` semantic gives the "industry-standard" result:
+- **Mid-month upgrade** (FREE → MINI today, monthStart was 7 days ago): planChangedAt > monthStart → user gets a full MINI quota effective from upgrade time
+- **Calendar renewal** (MINI for 3 months, June 1 rolls over): monthStart > planChangedAt → period rolls to June 1, fresh quota, even though planChangedAt is months ago
+- **Cancellation + re-subscribe** later: cancellation set planChangedAt=cancelTime; re-subscribe sets planChangedAt=newSubTime. Always uses the most recent role-change.
+
+## §T.3 — Schema migration
+
+`prisma/migrations/20260510170000_add_plan_changed_at/migration.sql`:
+
+```sql
+ALTER TABLE "users" ADD COLUMN "plan_changed_at" TIMESTAMP(3);
+```
+
+`prisma/schema.prisma` `User` model:
+```prisma
+planChangedAt DateTime? @map("plan_changed_at")
+```
+
+Added by hand-creating the migration directory (avoided `prisma migrate dev` because the dev-DB has migrations applied that aren't local — would have prompted for a destructive reset, which the project's CLAUDE.md flags as previously-data-losing). Apply with `npx prisma migrate deploy` in CI/prod.
+
+**Backfill script (read-only output):** `scripts/backfill-plan-changed-at.ts` — for existing paying subscribers without `planChangedAt`, prints `UPDATE` SQL using `min(stripeCurrentPeriodEnd - 30d, createdAt)` as a conservative estimate (wider window than necessary, won't accidentally exclude legitimate pre-period rows). Idempotent. Manual runbook in script header.
+
+## §T.4 — Webhook handler updates
+
+Stamped `planChangedAt: new Date()` at every role-change site:
+
+| File · Line | Event | Trigger |
+|---|---|---|
+| `razorpay/webhook/route.ts:212-225` | Subscription activate | when `isRoleChange` |
+| `razorpay/webhook/route.ts:411-424` | Subscription cancel (legacy) | when `isRoleChange` |
+| `razorpay/verify/route.ts:148-157` | Verify → role assignment | when `user.role !== newRole` |
+| `stripe/webhook/route.ts:245-258` | Subscription terminal/past_due | when downgrading to FREE |
+| `stripe/webhook/route.ts:354-367` | Subscription create/update | when `previousRole !== plan` |
+| `stripe/webhook/route.ts:625-638` | Subscription cancellation | when downgrading to FREE |
+
+**Renewals (same role) preserve planChangedAt** — the `isRoleChange` guard around the assignment ensures plain renewals don't reset the period.
+
+`/api/user/profile` GET response now includes `planChangedAt` so client-side billing UI can use the same period boundary.
+
+## §T.5 — Helper refactor diff
+
+`check-execution-eligibility.ts`:
+
+- Added `getCurrentBillingPeriodStart(role, planChangedAt)` (local helper, no exports needed)
+- `checkExecutionEligibility`:
+  - Read `planChangedAt` in the user.findUnique select
+  - Removed `isJwtPaid` heuristic + the recount-on-mismatch branch (period boundary now correct from the get-go regardless of JWT staleness — DB role drives both period and limit)
+  - Single count query with `createdAt: { gte: periodStart }` always (epoch for FREE = no-op)
+- `createExecutionWithCapCheck`:
+  - Read `planChangedAt` in the user.findUnique select
+  - Replaced `isPaid ? { createdAt: { gte: monthStart() } } : {}` with `createdAt: { gte: periodStart }`
+
+## §T.6 — UI copy updates
+
+`/dashboard/billing` page (line 110-153):
+
+- Computes `periodStart = max(planChangedAt, monthStart())` for paid users
+- Filters executions with `e.startedAt >= periodStart` instead of monthStart
+- Falls back to monthStart-only if `/api/user/profile` fetch fails (matches pre-fix behavior; server is still authoritative)
+
+Sidebar usage counter (`Sidebar.tsx`) — already SSOT-driven via `PLAN_EXEC_LIMITS` and reads completed-count from `/api/user/dashboard-stats`. The SERVER-SIDE count helper change automatically flows to all clients consuming the helper's response.
+
+ExecutionBlockModal copy (in §S already): "You've used all 3 Mini executions this month" — semantically `this month` is now correct because the period IS the calendar month after the user has held the plan past the calendar boundary; for new mid-month subscribers it's "since upgrade" but that's still "this month" colloquially. No copy change needed.
+
+## §T.7 — Test matrix (helper unit tests)
+
+Added 6 new scenarios in `tests/unit/check-execution-eligibility.test.ts`:
+
+| Scenario | What it asserts |
+|---|---|
+| **A** — fresh paid user, no planChangedAt | period = `monthStart()` (legacy fallback) |
+| **B** — FREE→MINI upgrade w/ prior FREE exec | period = `planChangedAt` (THE BUG — pre-upgrade row excluded) |
+| **D** — paid user, planChangedAt months ago | period = `monthStart()` (renewal rollover, calendar wins) |
+| **F** — FREE user | period = epoch (lifetime preserved) |
+| **F-2** — FREE user with planChangedAt set (post-downgrade) | period = epoch (FREE always lifetime, planChangedAt ignored) |
+| **H** — workflow lock + paid period | workflow-already-executed lock fires regardless of cap state |
+
+Each scenario captures the actual `where.createdAt.gte` argument passed to `prisma.execution.count` and asserts it matches the expected period boundary.
+
+**Also fixed:** previous JWT-staleness tests used `mockResolvedValueOnce(X).mockResolvedValueOnce(Y)` for the old helper's 2-query flow. New helper does 1 query. The leftover `Y` was contaminating downstream tests (the `ifc-parse intent does NOT trigger per-node checks` test was returning `canExecute: false` because the queue still had `2`). Switched to `mockResolvedValue` (single) + `afterAll(mockReset)` defensive clear.
+
+**Validation:** `npx tsc --noEmit` 0 errors on touched files. `npm run build` ✓ Compiled in 9.7 s, 166/166 pages. **Helper tests: 59/59 pass** (was 53 → +6). Full suite: **3464 pass / 7 fail / 1 skipped** — same 7 pre-existing failures, 0 new regressions.
+
+**Test-infrastructure caveat (acknowledging the lesson from §S):** these tests still mock Prisma at the module level. They CAN'T detect `pg_advisory_xact_lock`-style runtime errors that only surface against real Postgres. They CAN detect the kind of bug fixed here (wrong filter passed to count) because the assertion captures the exact `where` argument. Real-DB integration testing remains a documented gap; not blocked by it for this hotfix because the bug is fully captured at the call-argument level.
+
+## §T.8 — Production smoke-test runbook
+
+After deploy:
+
+```bash
+# 1. Apply schema migration
+npx prisma migrate deploy
+
+# 2. Backfill existing paying users
+npx tsx scripts/backfill-plan-changed-at.ts > /tmp/backfill-pca.sql
+# review every UPDATE statement
+psql "$DATABASE_URL" < /tmp/backfill-pca.sql
+
+# 3. Verify backfill
+psql "$DATABASE_URL" -c "SELECT count(*) FROM users WHERE plan_changed_at IS NOT NULL AND role IN ('MINI','STARTER','PRO','TEAM_ADMIN');"
+
+# 4. Reproduce the bug-fix on a fresh test account:
+#    a. Signup FREE
+#    b. Run workflow → DB row #1 (status=SUCCESS, role=FREE at runtime)
+#    c. Upgrade to MINI via Razorpay or admin override
+#    d. Verify in DB: SELECT plan_changed_at FROM users WHERE id='<id>'
+#       → should be ~now (not null, not pre-upgrade timestamp)
+#    e. Run workflow → DB row #2
+#    f. /dashboard/billing should show "1 of 3 runs used this month" (NOT 2 of 3)
+#    g. Run workflow → DB row #3
+#    h. /dashboard/billing should show "2 of 3 runs used this month"
+#    i. Run workflow → DB row #4
+#    j. /dashboard/billing should show "3 of 3 runs used this month" → cap hit
+#    k. Total DB executions = 4, but post-upgrade count = 3 ✓
+```
+
+## §T.9 — Rollback
+
+Pre-fix tag: `pre-billing-period-fix-rollback` at `0d03e839` (already pushed).
+
+```bash
+# Forward fix (preferred):
+git revert <merge-commit-sha>
+git push origin main
+
+# Schema rollback if needed:
+psql "$DATABASE_URL" -c "ALTER TABLE \"users\" DROP COLUMN \"plan_changed_at\";"
+```
+
+— end of §T —
+
+
 
 
 
