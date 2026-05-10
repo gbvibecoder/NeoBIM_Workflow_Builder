@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { checkRateLimit, logRateLimitHit, isExecutionAlreadyCounted, isAdminUser, checkNodeTypeLimit, consumeReferralBonus } from "@/lib/rate-limit";
+import { isExecutionAlreadyCounted, isAdminUser, checkNodeTypeLimit, markExecutionBonusBlessed, isExecutionBonusBlessed } from "@/lib/rate-limit";
 import { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, getNodeTypeLimits } from "@/features/billing/lib/stripe";
-import { FREE_TIER_EXECUTIONS } from "@/features/billing/lib/plan-data";
+import { checkExecutionEligibility } from "@/features/billing/lib/check-execution-eligibility";
 import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import {
@@ -55,38 +55,6 @@ export async function POST(req: NextRequest) {
   // client one — we add dbExecutionId alongside instead of repurposing.
   const { catalogueId, executionId, dbExecutionId, tileInstanceId, inputData, userApiKey } = await req.json();
 
-  // ── FREE tier lifetime cap ────────────────────────────────────────────────
-  //
-  // FREE users get a hard lifetime cap (FREE_TIER_EXECUTIONS total runs);
-  // paid users (MINI/STARTER/PRO) are gated by the monthly Redis rate limiter
-  // below. Email verification is OPTIONAL — users can opt in from Settings,
-  // but it does not block execution.
-  //
-  // We count only COMPLETED executions (SUCCESS / PARTIAL) — not RUNNING —
-  // so nodes within the current workflow don't block each other.
-  if (!isAdmin && userRole === "FREE") {
-    const lifetimeCompleted = await prisma.execution.count({
-      where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
-    });
-
-    if (lifetimeCompleted >= FREE_TIER_EXECUTIONS) {
-      // Try consuming a referral bonus before rejecting
-      const usedBonus = await consumeReferralBonus(userId);
-      if (!usedBonus) {
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "Free executions used",
-            message: `You've used all ${FREE_TIER_EXECUTIONS} free workflow executions. Upgrade to a paid plan to keep building amazing things!`,
-            code: "RATE_001",
-            action: "View Plans",
-            actionUrl: "/dashboard/billing",
-          }),
-          { status: 429 }
-        );
-      }
-      console.log(`[referral] FREE user ${userId} consumed referral bonus to execute`);
-    }
-  }
   const nodeStartTime = Date.now();
 
   // ── Detailed file logging (dev only) ──
@@ -97,76 +65,113 @@ export async function POST(req: NextRequest) {
   let rateLimitRemaining: number | null = null;
   let rateLimitTotal: number | null = null;
 
+  // Bonus consumption flags — surfaced via response headers so the client
+  // can toast "1 referral bonus used — N remaining" exactly once per
+  // workflow run (gated by the alreadyCounted dedup below).
+  let referralBonusUsed = false;
+  let referralBonusRemaining = 0;
+
   // Hoisted to outer scope so the regen-count check below can read it.
-  // Stays false for admins (they bypass that check too) and for the first
-  // node call of the execution (the fast-path skip).
+  // Stays false for admins (they bypass) and on the first node call of the
+  // execution (the fast-path skip — eligibility check fires here).
   let alreadyCounted = false;
 
+  // ── Plan-cap gate (DEFENSIVE — runs on EVERY node call) ───────────────────
+  //
+  // Per-node defensive recheck:
+  //   1. First node of execution: consume bonus on cap-hit, mark execution
+  //      "bonus-blessed" if consumed. Subsequent nodes inherit the blessing.
+  //   2. Subsequent nodes:
+  //      a. If blessed (first-node consumed a bonus) → skip cap check.
+  //      b. Otherwise re-check cap. If another tab pushed user over cap
+  //         mid-flight, this halts the in-flight workflow on the NEXT node.
+  //         Bonus is NOT re-consumed on subsequent nodes (consumeBonusOnCap=false).
+  //
+  // Cost: one DB count per node (~5-10ms). For typical 5-node workflows
+  // that's <50ms total — the billing-correctness guarantee is worth it.
   if (!isAdmin) {
-    // Apply rate limiting — count once per workflow execution, not per node.
-    // The first node in a workflow run consumes the rate limit slot.
-    // Subsequent nodes in the same execution (same executionId) pass through.
     try {
       alreadyCounted = executionId
         ? await isExecutionAlreadyCounted(userId, executionId)
         : false;
 
-      // FREE users are gated by the lifetime DB check above — skip Redis.
-      // Paid users (MINI/STARTER/PRO) use the monthly Redis sliding window.
-      if (!alreadyCounted && userRole !== "FREE") {
-        const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
+      const blessed = alreadyCounted && executionId
+        ? await isExecutionBonusBlessed(userId, executionId)
+        : false;
 
-        if (!rateLimitResult.success) {
-          // Try consuming a referral bonus execution before rejecting
-          const usedBonus = await consumeReferralBonus(userId);
-          if (!usedBonus) {
-            const resetDate = new Date(rateLimitResult.reset);
-            const msUntilReset = resetDate.getTime() - Date.now();
-            const daysUntilReset = Math.ceil(msUntilReset / (1000 * 60 * 60 * 24));
+      if (!blessed) {
+        const eligibility = await checkExecutionEligibility({
+          userId,
+          userRole,
+          userEmail,
+          emailVerified: !!(session.user as { emailVerified?: boolean }).emailVerified,
+          intent: { kind: "workflow-run", catalogueIds: [catalogueId] },
+          // Only the FIRST node may consume a bonus. Subsequent nodes get
+          // a read-only check (any cap-hit halts the loop, no bonus thrash).
+          options: { consumeBonusOnCap: !alreadyCounted },
+        });
 
-            // Log the rate limit hit
-            logRateLimitHit(userId, userRole, rateLimitResult.remaining);
-            await logRateLimit(executionId, false, {
-              remaining: rateLimitResult.remaining, limit: rateLimitResult.limit,
-              reset: rateLimitResult.reset, userRole,
-            });
+        if (!eligibility.canExecute) {
+          const block = eligibility.blocks[0];
+          await logRateLimit(executionId, false, {
+            remaining: eligibility.remaining,
+            limit: eligibility.limit,
+            reset: 0,
+            userRole: alreadyCounted ? `${userRole} (mid-flight halt)` : userRole,
+          });
+          return NextResponse.json(
+            formatErrorResponse({
+              title: block.title,
+              message: block.message,
+              code: "RATE_001",
+              action: block.action,
+              actionUrl: block.actionUrl,
+            }),
+            {
+              status: 429,
+              headers: {
+                "X-Plan-Limit": String(eligibility.limit),
+                "X-Plan-Used": String(eligibility.used),
+                "X-Plan-Remaining": String(eligibility.remaining),
+                ...(alreadyCounted ? { "X-Plan-Halt-Reason": "mid-flight-cap" } : {}),
+              },
+            },
+          );
+        }
 
-            // FREE users never reach here (gated by lifetime DB check above)
-            const rateLimitError = userRole === "MINI"
-              ? UserErrors.RATE_LIMIT_MINI(daysUntilReset)
-              : userRole === "STARTER"
-              ? UserErrors.RATE_LIMIT_STARTER(daysUntilReset)
-              : UserErrors.RATE_LIMIT_PRO(daysUntilReset);
+        rateLimitRemaining = eligibility.remaining;
+        rateLimitTotal = eligibility.limit;
 
-            return NextResponse.json(
-              formatErrorResponse(rateLimitError),
-              {
-                status: 429,
-                headers: {
-                  "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                  "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-                  "X-RateLimit-Reset": rateLimitResult.reset.toString(),
-                }
-              }
-            );
-          }
-          // Bonus consumed — allow execution to proceed
+        if (eligibility.usedReferralBonus && executionId) {
+          referralBonusUsed = true;
+          referralBonusRemaining = eligibility.bonusRemaining;
+          // Bless this execution so subsequent nodes don't re-block on the
+          // same at-cap state (bonus consumption doesn't decrement count).
+          await markExecutionBonusBlessed(userId, executionId);
+          console.log(
+            `[referral] user=${userId} exec=${executionId} consumed bonus, remaining=${eligibility.bonusRemaining}`,
+          );
         }
 
         await logRateLimit(executionId, true, {
-          remaining: rateLimitResult.remaining, limit: rateLimitResult.limit,
-          reset: rateLimitResult.reset, userRole,
+          remaining: eligibility.remaining,
+          limit: eligibility.limit,
+          reset: 0,
+          userRole,
         });
-        rateLimitRemaining = rateLimitResult.remaining;
-        rateLimitTotal = rateLimitResult.limit;
+      } else {
+        await logRateLimit(executionId, true, { skipped: true, userRole: `${userRole} (bonus-blessed)` });
       }
-
     } catch (error) {
-      console.error("[execute-node] Rate limit check failed:", error);
+      console.error("[execute-node] Eligibility check failed:", error);
       await logNodeError(executionId, catalogueId, tileInstanceId, error, Date.now() - nodeStartTime);
       return NextResponse.json(
-        formatErrorResponse({ title: "Service unavailable", message: "Rate limit service temporarily unavailable. Please try again in a moment.", code: "RATE_LIMIT_UNAVAILABLE" }),
-        { status: 503 }
+        formatErrorResponse({
+          title: "Service unavailable",
+          message: "Plan-cap service temporarily unavailable. Please try again in a moment.",
+          code: "RATE_LIMIT_UNAVAILABLE",
+        }),
+        { status: 503 },
       );
     }
   } else {
@@ -345,6 +350,10 @@ export async function POST(req: NextRequest) {
     const successHeaders: Record<string, string> = {};
     if (rateLimitRemaining !== null) successHeaders["X-RateLimit-Remaining"] = String(rateLimitRemaining);
     if (rateLimitTotal !== null) successHeaders["X-RateLimit-Limit"] = String(rateLimitTotal);
+    if (referralBonusUsed) {
+      successHeaders["X-Referral-Bonus-Used"] = "1";
+      successHeaders["X-Referral-Bonus-Remaining"] = String(referralBonusRemaining);
+    }
     return NextResponse.json({ artifact }, { headers: successHeaders });
   } catch (err) {
     // Handle APIError (user-friendly errors)

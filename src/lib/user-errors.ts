@@ -2,7 +2,7 @@
  * User-friendly error messages for API failures
  * Maps error types to actionable user messages
  */
-import { FREE_TIER_EXECUTIONS } from "@/features/billing/lib/plan-data";
+import { FREE_TIER_EXECUTIONS, STRIPE_PLANS } from "@/features/billing/lib/plan-data";
 
 export interface UserError {
   title: string;
@@ -69,7 +69,7 @@ export const UserErrors = {
 
   RATE_LIMIT_MINI: (resetDays: number): UserError => ({
     title: "Monthly limit reached",
-    message: `Mini plan: 10 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
+    message: `Mini plan: ${STRIPE_PLANS.MINI.limits.runsPerMonth} executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
     action: "Upgrade to Starter",
     actionUrl: "/dashboard/billing",
     code: "RATE_001",
@@ -77,7 +77,7 @@ export const UserErrors = {
 
   RATE_LIMIT_STARTER: (resetDays: number): UserError => ({
     title: "Monthly limit reached",
-    message: `Starter plan: 30 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
+    message: `Starter plan: ${STRIPE_PLANS.STARTER.limits.runsPerMonth} executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
     action: "Upgrade to Pro",
     actionUrl: "/dashboard/billing",
     code: "RATE_001",
@@ -85,7 +85,7 @@ export const UserErrors = {
 
   RATE_LIMIT_PRO: (resetDays: number): UserError => ({
     title: "Monthly limit reached",
-    message: `Pro plan: 100 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
+    message: `Pro plan: ${STRIPE_PLANS.PRO.limits.runsPerMonth} executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
     code: "RATE_002",
   }),
 

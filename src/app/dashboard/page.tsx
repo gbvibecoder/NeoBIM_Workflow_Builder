@@ -8,6 +8,7 @@ import { FeaturedWorkflowsSection } from "@/features/dashboard/components/v2/Fea
 import { RecentWorkflowsSection } from "@/features/dashboard/components/v2/RecentWorkflowsSection";
 import { ActivityFeed } from "@/features/dashboard/components/v2/ActivityFeed";
 import { SuggestWorkflowBanner } from "@/features/dashboard/components/v2/SuggestWorkflowBanner";
+import { PLAN_EXEC_LIMITS } from "@/constants/limits";
 import s from "@/features/dashboard/components/v2/dashboard.module.css";
 
 // ─── Types (preserved from V1) ──────────────────────────────────────────────
@@ -54,7 +55,8 @@ interface DashboardData {
   }>;
 }
 
-const PLAN_LIMITS: Record<string, number> = { FREE: 3, MINI: 10, STARTER: 30, PRO: 100 };
+// Removed local stale PLAN_LIMITS map — now reads from PLAN_EXEC_LIMITS
+// (SSOT-driven via STRIPE_PLANS in src/constants/limits.ts).
 
 const DEFAULT_DATA: DashboardData = {
   userName: null, userRole: "FREE",
@@ -84,7 +86,7 @@ export default function DashboardPage() {
 
   // ── Derived values (preserved from V1) ──
   const role = data.userRole ?? "FREE";
-  const effectiveLimit = (PLAN_LIMITS[role] ?? 5) + (data.referralBonus ?? 0);
+  const effectiveLimit = (PLAN_EXEC_LIMITS[role] ?? PLAN_EXEC_LIMITS.FREE) + (data.referralBonus ?? 0);
   const used = data.executionCount;
   const firstName = data.userName?.split(" ")[0] || "there";
   const planLabel = role === "PLATFORM_ADMIN" ? "Admin" : role === "TEAM_ADMIN" ? "Team" : role.charAt(0) + role.slice(1).toLowerCase();

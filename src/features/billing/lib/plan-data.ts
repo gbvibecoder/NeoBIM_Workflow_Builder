@@ -27,13 +27,13 @@ export const STRIPE_PLANS = {
     currency: '₹',
     priceId: null as string | null,
     features: [
-      '2 lifetime executions',
+      '1 lifetime execution',
       'Basic tiles & nodes',
       'Community templates',
       '1 concept render',
     ],
     limits: {
-      runsPerMonth: 2,
+      runsPerMonth: 1,
       maxWorkflows: 1,
       maxNodesPerWorkflow: 5,
       videoPerMonth: 0,
@@ -49,14 +49,14 @@ export const STRIPE_PLANS = {
     currency: '₹',
     priceId: process.env.STRIPE_MINI_PRICE_ID as string | undefined,
     features: [
-      '6 executions per month',
+      '3 workflows + executions',
       'Basic tiles & nodes',
       'Community templates',
       '3 concept renders',
       'JSON/CSV export',
     ],
     limits: {
-      runsPerMonth: 6,
+      runsPerMonth: 3,
       maxWorkflows: 3,
       maxNodesPerWorkflow: 12,
       videoPerMonth: 0,
@@ -72,7 +72,7 @@ export const STRIPE_PLANS = {
     currency: '₹',
     priceId: process.env.STRIPE_STARTER_PRICE_ID as string | undefined,
     features: [
-      '30 executions per month',
+      '15 workflows + executions',
       'All tiles & nodes',
       'Private workflows',
       '2 video walkthroughs',
@@ -82,7 +82,7 @@ export const STRIPE_PLANS = {
       'Email support',
     ],
     limits: {
-      runsPerMonth: 30,
+      runsPerMonth: 15,
       maxWorkflows: 15,
       maxNodesPerWorkflow: 25,
       videoPerMonth: 2,
@@ -98,8 +98,7 @@ export const STRIPE_PLANS = {
     currency: '₹',
     priceId: process.env.STRIPE_PRICE_ID as string | undefined,
     features: [
-      '100 executions per month',
-      '45 workflows',
+      '45 workflows + executions',
       '7 video walkthroughs',
       '10 AI 3D models',
       '25 concept renders',
@@ -107,7 +106,7 @@ export const STRIPE_PLANS = {
       'Priority support',
     ],
     limits: {
-      runsPerMonth: 100,
+      runsPerMonth: 45,
       maxWorkflows: 45,
       maxNodesPerWorkflow: -1,
       videoPerMonth: 7,
@@ -124,7 +123,7 @@ export const STRIPE_PLANS = {
     priceId: process.env.STRIPE_TEAM_PRICE_ID as string | undefined,
     features: [
       'Everything in Pro',
-      'Unlimited workflows',
+      '300 workflows + executions',
       '20 video walkthroughs',
       '30 AI 3D models',
       '60 concept renders',
@@ -134,7 +133,7 @@ export const STRIPE_PLANS = {
     ],
     limits: {
       runsPerMonth: 300,
-      maxWorkflows: -1,
+      maxWorkflows: 300,
       maxNodesPerWorkflow: -1,
       teamMembers: 5,
       videoPerMonth: 20,

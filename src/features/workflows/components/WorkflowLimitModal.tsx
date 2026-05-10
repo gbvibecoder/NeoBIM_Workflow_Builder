@@ -51,7 +51,7 @@ export function WorkflowLimitModal({ currentCount, userRole, onUpgrade, onDismis
             ))}
           </div>
           <button className={s.modalBtnUpgrade} onClick={onUpgrade}>
-            <Zap size={18} /> Upgrade &amp; Build Unlimited <ArrowRight size={16} />
+            <Zap size={18} /> Upgrade for {STRIPE_PLANS.PRO.limits.maxWorkflows} workflows <ArrowRight size={16} />
           </button>
           <button className={s.modalDismiss} onClick={onDismiss}>
             I&apos;ll manage with {max} for now

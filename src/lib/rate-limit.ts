@@ -229,6 +229,44 @@ export async function isExecutionAlreadyCounted(
   }
 }
 
+/**
+ * Mark an execution as "bonus-blessed" — it consumed a referral bonus on
+ * its first node and should be allowed to complete the rest of its nodes
+ * without re-tripping the cap (which would be at-cap due to the bonus
+ * not affecting the count).
+ *
+ * Set when /api/execute-node consumes a bonus on the first node call.
+ * Read on subsequent node calls so the per-node defensive recheck doesn't
+ * halt a workflow that was supposed to be allowed via bonus.
+ */
+export async function markExecutionBonusBlessed(
+  userId: string,
+  executionId: string,
+): Promise<void> {
+  if (!executionId) return;
+  try {
+    const key = `exec-bonus-blessed:${userId}:${executionId}`;
+    await redis.set(key, "1", { ex: 2592000 });
+  } catch {
+    // Non-fatal — worst case the workflow halts mid-flight after bonus consumption,
+    // which is annoying but not a billing leak.
+  }
+}
+
+export async function isExecutionBonusBlessed(
+  userId: string,
+  executionId: string,
+): Promise<boolean> {
+  if (!executionId) return false;
+  try {
+    const key = `exec-bonus-blessed:${userId}:${executionId}`;
+    return !!(await redis.get(key));
+  } catch {
+    // On Redis error, fail-closed (treat as not blessed → re-check cap)
+    return false;
+  }
+}
+
 // ─── Generic endpoint rate limiter ──────────────────────────────────────────
 
 /**

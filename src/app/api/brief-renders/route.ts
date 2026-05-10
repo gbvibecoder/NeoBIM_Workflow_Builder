@@ -30,6 +30,7 @@ import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import { shouldUserSeeBriefRenders } from "@/features/brief-renders/services/brief-pipeline/canary";
 import { getBriefRendersMonthlyLimit } from "@/features/billing/lib/stripe";
+import { checkExecutionEligibility, getOrCreateScratchWorkflow } from "@/features/billing/lib/check-execution-eligibility";
 
 export const maxDuration = 30;
 
@@ -284,6 +285,41 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Global execution-cap gate (unified with workflow runs / cinematic /
+  // video / floor-plan / parse-ifc). Brief-renders has its own per-feature
+  // counter above; this adds the global cap as the unifying limit so a
+  // user's brief-render runs count from the same pool as their workflow runs.
+  if (!isAdmin) {
+    const eligibility = await checkExecutionEligibility({
+      userId,
+      userRole: role,
+      userEmail: session.user.email,
+      emailVerified: !!(session.user as { emailVerified?: boolean }).emailVerified,
+      intent: { kind: "brief-render" },
+      options: { consumeBonusOnCap: true },
+    });
+    if (!eligibility.canExecute) {
+      const block = eligibility.blocks[0];
+      return NextResponse.json(
+        formatErrorResponse({
+          title: block.title,
+          message: block.message,
+          code: "RATE_001",
+          action: block.action,
+          actionUrl: block.actionUrl,
+        }),
+        {
+          status: 429,
+          headers: {
+            "X-Plan-Limit": String(eligibility.limit),
+            "X-Plan-Used": String(eligibility.used),
+            "X-Plan-Remaining": String(eligibility.remaining),
+          },
+        },
+      );
+    }
+  }
+
   // Create the row. `effectiveRequestId` equals `requestId` for fresh
   // calls; differs only when a cached terminal-failure row was found
   // above and we're spawning a retry against the same client key.
@@ -295,6 +331,28 @@ export async function POST(req: NextRequest) {
       status: "QUEUED",
     },
   });
+
+  // Record this brief-render submission as an Execution so it counts toward
+  // the user's global plan cap. The BriefRenderJob row tracks the per-feature
+  // pipeline state; the Execution row is the unified billing-counter entry.
+  if (!isAdmin) {
+    try {
+      const wfId = await getOrCreateScratchWorkflow(userId);
+      await prisma.execution.create({
+        data: {
+          workflowId: wfId,
+          userId,
+          status: "SUCCESS",
+          startedAt: new Date(),
+          completedAt: new Date(),
+          tileResults: [],
+          metadata: { tool: "brief-render", jobId: job.id, requestId: effectiveRequestId },
+        },
+      });
+    } catch (recordErr) {
+      console.error("[brief-renders] Failed to record execution:", recordErr);
+    }
+  }
 
   // Dispatch the worker. If QStash fails, the row stays QUEUED — a
   // future cron sweep can retry. Phase 4 will harden this by attempting
