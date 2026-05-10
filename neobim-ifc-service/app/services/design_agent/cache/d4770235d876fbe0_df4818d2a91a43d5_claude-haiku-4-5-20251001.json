@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.88,
+    "reasoning": "The brief explicitly requests a single-floor 2BHK home with living, dining, kitchen, 2 bedrooms, and 2 baths — matching the build_2bhk_pune_house template exactly. The 1500 sqft (139.35 sqm) plot area falls within the house template's typical range; since explicit dimensions are absent, I default to the template's typical minimum (6.0 x 12.0 m). Pune context and seismic/wind zones match the baseline.",
+    "template_id": "build_2bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 6.0,
+      "plot_length_m": 12.0,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 664,
+    "output_tokens": 290,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002796,
+    "latency_ms": 3583.555042045191,
+    "created_at_iso": "2026-05-10T15:29:29.786863+00:00"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.88,
+    "reasoning": "Brief explicitly requests a 2BHK G+1 duplex on a 24x50 ft plot (7.32 x 15.24 m). Form factor (duplex), BHK count (2), and storey structure (G+1) all match build_2bhk_pune_duplex exactly. Plot dimensions convert cleanly from feet to metres. While the brief specifies Mumbai and wind_zone=3 (vs Pune baseline), the template dispatcher applies deterministic zone lookups; the core residential geometry is identical across both cities.",
+    "template_id": "build_2bhk_pune_duplex",
+    "parameters": {
+      "plot_width_m": 7.32,
+      "plot_length_m": 15.24,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 3,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 634,
+    "output_tokens": 298,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002806,
+    "latency_ms": 3255.9382079634815,
+    "created_at_iso": "2026-05-10T15:29:52.109152+00:00"
+  }
+}

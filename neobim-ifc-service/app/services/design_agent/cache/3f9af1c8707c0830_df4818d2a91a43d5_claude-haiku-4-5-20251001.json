@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "The brief explicitly requests a 1BHK apartment block with stilt parking and 11 habitable floors above — a perfect fit for the build_1bhk_pune_tower template. The plot dimensions (7.32 x 12.2 m) align exactly with the tower candidate's typical range, and the seismic/wind zones are already populated from the upstream BriefAnalyst.",
+    "template_id": "build_1bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 7.32,
+      "plot_length_m": 12.2,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 11,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 641,
+    "output_tokens": 310,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002873,
+    "latency_ms": 2971.064415993169,
+    "created_at_iso": "2026-05-10T15:29:39.006086+00:00"
+  }
+}

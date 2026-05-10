@@ -200,7 +200,20 @@ def resolve_geometries(
             next_storey = storeys_by_index.get(highest.index + 1)
             if next_storey is not None:
                 slab_above = _floor_slab_on(next_storey)
-                top_z = slab_above.bottom_z if slab_above is not None else wall.top_z
+                # Slice T2.0.1.1 — respect wall.top_z when it's BELOW the
+                # slab above. Parapets / half-walls / counters / railings
+                # have wall.top_z deliberately set below ceiling height;
+                # the previous unconditional override stretched them to
+                # the slab bottom, hiding the architectural intent. Use
+                # the smaller of the two so:
+                #   * Full-height walls (wall.top_z == slab_above.bottom_z)
+                #     are unchanged.
+                #   * Short walls (wall.top_z < slab_above.bottom_z) keep
+                #     their declared height.
+                if slab_above is not None:
+                    top_z = min(slab_above.bottom_z, wall.top_z)
+                else:
+                    top_z = wall.top_z
             else:
                 top_z = wall.top_z
             depth = top_z - base_z

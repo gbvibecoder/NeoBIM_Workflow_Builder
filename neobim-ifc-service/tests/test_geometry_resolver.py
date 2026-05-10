@@ -183,3 +183,108 @@ def test_resolve_geometries_is_deterministic():
     assert g1.keys() == g2.keys()
     for k in g1:
         assert g1[k] == g2[k]
+
+
+# ─── Slice T2.0.1.1 — short walls (parapet / half-wall / counter / railing) ─
+
+
+def test_geometry_resolver_respects_short_walls():
+    """Slice T2.0.1.1 — when wall.top_z is BELOW the slab above (a parapet,
+    half-wall, counter, or railing), the resolved geometry must keep the
+    wall's declared height. Pre-fix the resolver unconditionally
+    overrode top_z with slab_above.bottom_z, stretching parapets to
+    full ceiling height."""
+    from app.domain.building_model import (
+        Building, BuildingModel, Foundation, Project, ProjectMetadata,
+        Provenance, ReraData, Roof, Site, Slab, Storey, StructuralSystem,
+    )
+    from app.templates._common import (
+        make_external_wall, make_isolated_pad_footing, make_rcc_column,
+        make_rectangular_polygon_ccw, make_slab_layers,
+    )
+    from app.domain.building_model import Vec2
+
+    # Two-storey building with a 1.0 m parapet on the south wall of the
+    # ground floor (deliberately shorter than the slab above at z=2.85).
+    rect = make_rectangular_polygon_ccw(0.0, 5.0, 0.0, 5.0)
+    storey0 = Storey(
+        id="s0", name="GF", elevation=0.0, actual_height=3.0, index=0,
+        rooms=[], walls=[
+            make_external_wall(
+                wall_id="wall-parapet", name="Parapet South",
+                host_storey_id="s0",
+                start=Vec2(x=0, y=0), end=Vec2(x=5, y=0),
+                base_z=0.0, top_z=1.0,  # 1m parapet, NOT 2.85m
+            ),
+            make_external_wall(
+                wall_id="wall-fullheight", name="Full N",
+                host_storey_id="s0",
+                start=Vec2(x=5, y=5), end=Vec2(x=0, y=5),
+                base_z=0.0, top_z=2.85,  # full height, matches slab above
+            ),
+        ],
+        slabs=[Slab(
+            id="slab-s0", host_storey_id="s0", footprint_polygon=rect,
+            top_z=0.0, bottom_z=-0.15, layers=make_slab_layers(),
+            predefined_type="FLOOR",
+        )],
+        stairs=[], openings=[],
+    )
+    storey1 = Storey(
+        id="s1", name="FF", elevation=3.0, actual_height=3.0, index=1,
+        rooms=[], walls=[],
+        slabs=[Slab(
+            id="slab-s1", host_storey_id="s1", footprint_polygon=rect,
+            top_z=3.0, bottom_z=2.85, layers=make_slab_layers(),
+            predefined_type="FLOOR",
+        )],
+        stairs=[], openings=[],
+    )
+    col = make_rcc_column(column_id="c1", host_storey_id="s0",
+                          location=Vec2(x=2.5, y=2.5), base_z=-0.5, top_z=3.0)
+    ftg = make_isolated_pad_footing(footing_id="f1", supports_column_id="c1",
+                                     location=Vec2(x=2.5, y=2.5),
+                                     top_z=-0.5, bottom_z=-1.1)
+    building = Building(
+        id="b1", name="ShortWallTest",
+        envelope_polygon=rect,
+        structural_system=StructuralSystem(
+            id="ss-1", columns=[col], beams=[], allows_slanted=False),
+        mep_systems=[], storeys=[storey0, storey1],
+        foundation=Foundation(id="fd-1", footings=[ftg]),
+        roof=Roof(id="r-1", type="flat"),
+        doors=[], windows=[],
+    )
+    site = Site(id="site-1", name="P", true_north_deg=0.0,
+                terrain_polygon=[], building=building)
+    prov = Provenance(
+        input_contract_version="Tier2Template-1.0.0",
+        target_fidelity="LOD-300",
+        generated_at="2026-05-10T00:00:00Z",
+        build_id="short-wall-test",
+        source_contract="BuildingModel",
+    )
+    metadata = ProjectMetadata(
+        rera=ReraData(seismic_zone="III", wind_zone=2, nbc_occupancy_group="A-1"),
+        permits=[], cobie_defaults={}, provenance=prov,
+    )
+    project = Project(id="p1", name="ShortWallTest",
+                      site=site, metadata=metadata)
+    bm = BuildingModel.build({"project": project.model_dump()})
+
+    from app.services.placement_resolver import resolve_placements
+    placements = resolve_placements(bm)
+    geos = resolve_geometries(bm, placements)
+
+    parapet = geos["wall-parapet"]
+    fullheight = geos["wall-fullheight"]
+    # Parapet: extrusion_depth = 1.0 m (NOT 2.85 m, the slab-above bottom).
+    assert parapet.extrusion_depth == pytest.approx(1.0), (
+        f"parapet wall got stretched to {parapet.extrusion_depth} m "
+        f"(expected 1.0 m — Slice T2.0.1.1 fix should respect wall.top_z)"
+    )
+    # Full-height: unchanged, still 2.85 m.
+    assert fullheight.extrusion_depth == pytest.approx(2.85), (
+        f"full-height wall got {fullheight.extrusion_depth} m "
+        f"(expected 2.85 m — fix must not affect full-height walls)"
+    )

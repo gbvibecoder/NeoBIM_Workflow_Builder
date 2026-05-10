@@ -55,6 +55,7 @@ schema validation.
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -765,6 +766,148 @@ class DesignContext(BaseModel):
         return _build_unwrapping(cls, data)
 
 
+# ─── TEMPLATE MATCHER (Slice 2B.1) ───────────────────────────────────
+#
+# The matcher is the bridge between the AI-extracted BriefAnalysis and
+# the deterministic Tier-2 template builders. AI re-enters here only in
+# a *classification* role — it never picks coordinates or generates
+# geometry. The single LLM call emits one of the nine ``TemplateId``
+# values plus the parameter overrides extracted from the brief; the
+# downstream dispatcher (template_dispatcher.dispatch_template) calls
+# the matching builder. Geometry stays Phase 1 deterministic.
+
+
+class TemplateId(str, Enum):
+    """The nine callable Tier-2 template builders the matcher selects from.
+
+    Each enum value is the *exact* public function name in
+    :mod:`app.templates`. The dispatcher in
+    :mod:`app.services.design_agent.template_dispatcher` resolves the
+    enum back to the callable. Tower variants (G+5 / G+11 / G+23) are
+    NOT separate ids — they are parameter overrides on the single
+    ``BHK*_PUNE_TOWER`` builder via
+    :attr:`TemplateParameters.habitable_floor_count`. This keeps the
+    matcher's classification space at exactly nine and avoids combinatorial
+    explosion in the few-shot prompt.
+
+    Subclassing ``str`` (not just ``Enum``) makes the values JSON-
+    serialisable verbatim — the cache files committed with this slice
+    store ``"template_id": "build_2bhk_pune_tower"`` directly, not
+    ``"TemplateId.BHK2_PUNE_TOWER"``.
+    """
+
+    BHK1_PUNE_HOUSE = "build_1bhk_pune_house"
+    BHK1_PUNE_DUPLEX = "build_1bhk_pune_duplex"
+    BHK1_PUNE_TOWER = "build_1bhk_pune_tower"
+    BHK2_PUNE_HOUSE = "build_2bhk_pune_house"
+    BHK2_PUNE_DUPLEX = "build_2bhk_pune_duplex"
+    BHK2_PUNE_TOWER = "build_2bhk_pune_tower"
+    BHK3_PUNE_HOUSE = "build_3bhk_pune_house"
+    BHK3_PUNE_DUPLEX = "build_3bhk_pune_duplex"
+    BHK3_PUNE_TOWER = "build_3bhk_pune_tower"
+
+
+SuggestedAction = Literal[
+    "reject",
+    "ask_user_clarification",
+    "fallback_to_design_agent",
+]
+
+
+class TemplateParameters(BaseModel):
+    """Inputs passed verbatim to a Tier-2 template builder.
+
+    The matcher LLM populates these from a :class:`BriefAnalysis`. Tower-
+    only fields (``habitable_floor_count`` / ``has_stilt_parking`` /
+    ``stilt_height_m``) are silently ignored when the resolved
+    ``template_id`` refers to a house or duplex builder — the
+    dispatcher branches on the template family before assembling the
+    builder kwargs.
+
+    ``has_balcony`` is reserved for slice 2B.2 (the FLAT-room adapter).
+    The current Tier-2 tower builders pin balcony presence inside the
+    floor-unit selection (see ``_*_pune_flat_floor_unit.py``); the
+    dispatcher in this slice ignores the field but the matcher prompt
+    is allowed to populate it for forward-compatibility.
+
+    Defaults match the Pune baseline (seismic zone III, wind zone 2)
+    that all twelve P1.6 templates were tuned against. The matcher
+    prompt overrides via the deterministic city → zone lookup pre-baked
+    into :class:`BriefAnalysis.site_context` (the BriefAnalyst stage's
+    ``enrich_with_zone_lookups``), so values reaching the dispatcher are
+    already canonicalised.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    plot_width_m: float = Field(..., gt=0)
+    plot_length_m: float = Field(..., gt=0)
+    floor_height_m: float = Field(default=3.0, gt=0)
+
+    # Tower-only — dispatcher ignores for house / duplex.
+    habitable_floor_count: Optional[int] = Field(default=None, ge=1, le=30)
+    has_stilt_parking: Optional[bool] = None
+    stilt_height_m: Optional[float] = Field(default=None, gt=0)
+
+    # Site (defaults match Pune; overridden via BriefAnalysis enrichment).
+    seismic_zone: SeismicZone = "III"
+    wind_zone: int = Field(default=2, ge=1, le=6)
+
+    # FLAT-specific reserved flag (slice 2B.2 adapter consumes; this
+    # slice's dispatcher ignores).
+    has_balcony: Optional[bool] = None
+
+
+class MatchResult(BaseModel):
+    """Successful matcher decision: a template + its parameters.
+
+    Emitted when the matcher's self-rated ``confidence`` clears the
+    threshold (default 0.6). ``reasoning`` is a 2-4 sentence justification
+    captured for audit / operator review — never used for branching.
+
+    Per-call LLM accounting (model, latency, tokens, cost) lives on the
+    sibling :class:`TemplateMatcherMetadata` dataclass returned alongside
+    by :func:`run_template_matcher` (slice 2B.1.B). Splitting the two
+    keeps :class:`MatchResult` cache-stable: the metadata's
+    ``latency_ms`` jitters per call and cannot live on a frozen Pydantic
+    model that round-trips through committed cache files.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    template_id: TemplateId
+    parameters: TemplateParameters
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    reasoning: str = Field(..., min_length=10)
+
+
+class MatchFailed(BaseModel):
+    """Matcher refusal — emitted when no template clears the threshold.
+
+    Surfaced by the route handler as HTTP 422 with ``suggested_action``
+    indicating how to re-engage the user:
+
+    * ``ask_user_clarification`` (default) — under-specified brief; ask
+      for plot dimensions, floor count, or BHK.
+    * ``reject`` — clearly out-of-scope (commercial, > 3BHK, hospital,
+      cylindrical); no clarification will help.
+    * ``fallback_to_design_agent`` — reserved for slice 2B.5 once the
+      AI fallback path exists. Slice 2B.1 never emits this value.
+
+    ``best_template_attempted`` and ``best_confidence`` carry the LLM's
+    closest-fit signal so operators can see why the threshold was missed
+    without re-running the matcher with a lower bar.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    reason: str = Field(..., min_length=1)
+    best_template_attempted: Optional[TemplateId] = None
+    best_confidence: float = Field(..., ge=0.0, le=1.0)
+    threshold_required: float = Field(default=0.6, ge=0.0, le=1.0)
+    suggested_action: SuggestedAction = "ask_user_clarification"
+
+
 # ─── Internal helpers ────────────────────────────────────────────────
 
 
@@ -825,6 +968,12 @@ __all__ = [
     "RoomProgram",
     # Final hand-off
     "DesignContext",
+    # Template matcher (Slice 2B.1)
+    "TemplateId",
+    "TemplateParameters",
+    "MatchResult",
+    "MatchFailed",
+    "SuggestedAction",
     # Literal aliases (re-exported for downstream typing)
     "SiteOrientation",
     "SeismicZone",

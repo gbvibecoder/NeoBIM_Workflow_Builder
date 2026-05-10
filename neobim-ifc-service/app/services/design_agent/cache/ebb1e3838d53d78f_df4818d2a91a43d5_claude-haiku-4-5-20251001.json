@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "The brief explicitly specifies a 3BHK G+1 duplex with pooja room for a joint family in Pune. The plot dimensions (36x65 ft = 10.97 x 19.81 m) fall squarely within the build_3bhk_pune_duplex typical range (10.0 x 18.0 .. 13.0 x 24.0 m). The room program matches the template: ground floor (living + dining + kitchen + 1 bedroom + bath + pooja) and first floor (master + 2nd bedroom + 2 baths + balcony).",
+    "template_id": "build_3bhk_pune_duplex",
+    "parameters": {
+      "plot_width_m": 10.97,
+      "plot_length_m": 19.81,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 705,
+    "output_tokens": 319,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002982,
+    "latency_ms": 2749.060709029436,
+    "created_at_iso": "2026-05-10T15:29:32.546471+00:00"
+  }
+}

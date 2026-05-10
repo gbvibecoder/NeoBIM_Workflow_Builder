@@ -1,0 +1,22 @@
+{
+  "response": {
+    "decision": "refuse",
+    "confidence": 0.01,
+    "reasoning": "The brief explicitly requests a commercial office building with three cabins, conference room, reception, and pantry. All nine candidate templates are exclusively residential (1BHK, 2BHK, 3BHK houses, duplexes, and towers). No candidate supports commercial/office use.",
+    "template_id": null,
+    "parameters": null,
+    "refusal_reason": "Office/commercial building. The catalogue covers only residential 1BHK/2BHK/3BHK independent houses, duplexes, and apartment towers. Commercial office spaces are outside the supported scope.",
+    "best_template_attempted": null,
+    "suggested_action": "reject"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 678,
+    "output_tokens": 235,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002535,
+    "latency_ms": 2859.843458980322,
+    "created_at_iso": "2026-05-10T15:30:33.896624+00:00"
+  }
+}

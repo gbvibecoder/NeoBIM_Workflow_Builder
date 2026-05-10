@@ -1,0 +1,63 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "duplex",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Two-family private dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 7.62,
+      "plot_length_m": 15.24,
+      "plot_area_sqm": 116.13,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "modern",
+      "cultural_overlay": null,
+      "massing_hint": null,
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 2,
+    "floors_below_ground": 0,
+    "explicit_room_list": [],
+    "explicit_dimensions": {},
+    "user_priorities": [],
+    "raw_brief_summary": "A modern 2BHK duplex (two-family dwelling) on a 24 ft × 50 ft Pune plot, with ground floor + one upper floor (G+1 = 2 storeys total). No explicit room program or dimensions beyond plot size provided.",
+    "extraction_warnings": [
+      "No explicit room list or room dimensions provided; downstream stages will infer the 2BHK program.",
+      "FSI/FAR not stated; local Pune building bye-laws will apply.",
+      "Max height not specified; G+1 typology suggests ~6–7 m typical for Pune duplex zoning.",
+      "Seismic zone III and wind zone 2 assigned from Pune city lookup; brief did not state zones explicitly.",
+      "No setbacks, orientation, foundation hint, or structural system detail provided; defaults applied."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 506,
+    "output_tokens": 720,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7328,
+    "cost_usd_estimated": 0.013266,
+    "latency_ms": 7313.849499914795,
+    "created_at_iso": "2026-05-10T15:23:22.035716+00:00"
+  }
+}

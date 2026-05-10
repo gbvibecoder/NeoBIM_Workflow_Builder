@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.93,
+    "reasoning": "The brief explicitly requests a single-storey 1BHK independent house for elderly parents with no stairs for accessibility. The plot dimensions (25 ft × 40 ft = 7.62 × 12.19 m) fall squarely within the build_1bhk_pune_house typical range (5.0–9.0 m × 9.0–14.0 m). This is a classic ground-floor-only bungalow scenario that matches the template description and target market perfectly.",
+    "template_id": "build_1bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 7.62,
+      "plot_length_m": 12.192,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 711,
+    "output_tokens": 289,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002838,
+    "latency_ms": 2977.4927920661867,
+    "created_at_iso": "2026-05-10T15:30:31.020581+00:00"
+  }
+}

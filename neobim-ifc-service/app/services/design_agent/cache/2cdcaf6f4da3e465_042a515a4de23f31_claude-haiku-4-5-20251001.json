@@ -1,0 +1,76 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "duplex",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Two-family residential (duplex)",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 7.62,
+      "plot_length_m": 15.24,
+      "plot_area_sqm": 116.13,
+      "site_orientation": "N",
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "modern",
+      "cultural_overlay": null,
+      "massing_hint": null,
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 2,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "ground-floor living room",
+      "ground-floor dining room",
+      "ground-floor kitchen",
+      "master bedroom",
+      "master bathroom",
+      "internal stair"
+    ],
+    "explicit_dimensions": {
+      "plot": "24 ft × 50 ft"
+    },
+    "user_priorities": [
+      "modern style",
+      "internal stair",
+      "ground-floor living + dining + kitchen",
+      "master bedroom + bath upstairs"
+    ],
+    "raw_brief_summary": "Two-bedroom duplex (G+1, 2 floors total) on a 24×50 ft north-facing Pune plot. Ground floor houses living, dining, and kitchen; first floor contains master bedroom and bathroom with an internal stair connecting both levels. Modern architectural style requested.",
+    "extraction_warnings": [
+      "Seismic zone inferred from Pune location; deterministic lookup will confirm Zone III per IS 1893. Wind zone inferred from Pune location; deterministic lookup will confirm Zone 2 or 3 per IS 875.",
+      "No explicit room dimensions (e.g. living room 4m×5m) provided; downstream stages will infer proportions.",
+      "No setback requirements, FSI/FAR, or max height constraint specified in brief.",
+      "Brief mentions '2BHK' but only explicitly lists 1 bedroom (master) + bath + common areas; second bedroom location not stated — assumed to be planned upstairs or program refinement needed in Phase 2C."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 534,
+    "output_tokens": 819,
+    "cache_read_tokens": 7328,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005362,
+    "latency_ms": 7972.52762503922,
+    "created_at_iso": "2026-05-10T15:23:33.648677+00:00"
+  }
+}

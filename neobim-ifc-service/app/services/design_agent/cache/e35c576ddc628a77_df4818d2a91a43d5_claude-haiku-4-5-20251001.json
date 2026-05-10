@@ -1,0 +1,22 @@
+{
+  "response": {
+    "decision": "refuse",
+    "confidence": 0.02,
+    "reasoning": "The brief explicitly requests a commercial office space with 3 cabins, conference room, reception, and pantry—this is office/commercial use (NBC F classification). The template catalogue covers only residential 1BHK/2BHK/3BHK independent houses, duplexes, and towers. No commercial template exists.",
+    "template_id": null,
+    "parameters": null,
+    "refusal_reason": "Brief requests a commercial office building (3 cabins, conference room, reception, pantry). The catalogue covers residential use only (1BHK/2BHK/3BHK homes and apartments).",
+    "best_template_attempted": null,
+    "suggested_action": "reject"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 639,
+    "output_tokens": 243,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002536,
+    "latency_ms": 2762.748792069033,
+    "created_at_iso": "2026-05-10T15:30:07.775522+00:00"
+  }
+}

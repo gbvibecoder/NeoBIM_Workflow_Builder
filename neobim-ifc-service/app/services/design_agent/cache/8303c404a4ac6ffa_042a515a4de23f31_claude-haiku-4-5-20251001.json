@@ -1,0 +1,66 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "apartment",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential apartment building",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": null,
+      "plot_length_m": null,
+      "plot_area_sqm": null,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": "plaster_paint"
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 6,
+    "floors_below_ground": 0,
+    "explicit_room_list": [],
+    "explicit_dimensions": {},
+    "user_priorities": [
+      "stilt parking provision",
+      "single flat per floor configuration"
+    ],
+    "raw_brief_summary": "A 3BHK apartment building in Pune with ground floor plus 5 upper floors (6 levels total), one 3-bedroom flat per floor, stilt-level parking, and plaster-painted exterior finish. Target fidelity is design-development.",
+    "extraction_warnings": [
+      "Seismic zone not explicitly stated; will be enriched from Pune lookup (typically Zone III).",
+      "Wind zone not explicitly stated; will be enriched from Pune lookup (typically Zone 2 inland).",
+      "Plot dimensions, maximum height, FSI/FAR, and setbacks not specified.",
+      "Foundation type not specified; inferred as 'auto' pending structural analysis.",
+      "Individual flat dimensions (carpet/built-up area) and detailed room sizes not provided."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 516,
+    "output_tokens": 719,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7310,
+    "cost_usd_estimated": 0.013248,
+    "latency_ms": 6958.157874876633,
+    "created_at_iso": "2026-05-10T15:25:19.133288+00:00"
+  }
+}

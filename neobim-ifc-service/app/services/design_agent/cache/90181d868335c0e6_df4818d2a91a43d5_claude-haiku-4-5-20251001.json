@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "Brief explicitly requests a 24-storey 3BHK premium residential apartment tower in Pune with one 3BHK flat per floor, lift + stair core, and stilt parking. This maps directly to build_3bhk_pune_tower with habitable_floor_count=23 (24 storeys total, excluding stilt). Plot dimensions (12.0 x 22.0 m) fall within the template's typical range (10.0 x 18.0 to 13.0 x 24.0 m).",
+    "template_id": "build_3bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 12.0,
+      "plot_length_m": 22.0,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 23,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 647,
+    "output_tokens": 348,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003069,
+    "latency_ms": 3390.4264578595757,
+    "created_at_iso": "2026-05-10T15:29:48.847139+00:00"
+  }
+}

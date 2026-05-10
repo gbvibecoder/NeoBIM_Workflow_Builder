@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.9,
+    "reasoning": "Brief explicitly requests a 1BHK apartment block (tower form factor) with G+3 configuration (3 habitable floors) and stilt parking in Pune. Plot dimensions 7.32 x 12.2 m match the typical range for 1BHK tower templates. The seismic zone III and wind zone 2 are already populated from the brief analysis and copied verbatim.",
+    "template_id": "build_1bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 7.32,
+      "plot_length_m": 12.2,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 3,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 638,
+    "output_tokens": 312,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.00288,
+    "latency_ms": 2945.416833041236,
+    "created_at_iso": "2026-05-10T15:30:05.007891+00:00"
+  }
+}

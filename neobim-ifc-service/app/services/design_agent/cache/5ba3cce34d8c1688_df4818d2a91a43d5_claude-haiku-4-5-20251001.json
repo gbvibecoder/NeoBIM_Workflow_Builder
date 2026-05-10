@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "Brief specifies a 2BHK duplex (G+1) on a 24×50 ft north-facing Pune plot with ground-floor living/dining/kitchen and first-floor master bedroom/bath connected by internal stair. This matches build_2bhk_pune_duplex exactly: two-storey form factor, 2-bedroom family, typical plot size (7.62 × 15.24 m after ft conversion), and all explicit rooms align with the template's layout. Seismic zone III and wind zone 2 are the Pune baseline.",
+    "template_id": "build_2bhk_pune_duplex",
+    "parameters": {
+      "plot_width_m": 7.62,
+      "plot_length_m": 15.24,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 720,
+    "output_tokens": 304,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002922,
+    "latency_ms": 3104.7850421164185,
+    "created_at_iso": "2026-05-10T15:30:25.089857+00:00"
+  }
+}

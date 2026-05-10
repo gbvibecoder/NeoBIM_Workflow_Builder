@@ -48,6 +48,21 @@ from app.services.design_agent.stages.program_architect import (
     ProgramArchitectMetadata,
     run_program_architect,
 )
+from app.services.design_agent.stages.template_matcher import (
+    TemplateMatcherMetadata,
+    run_template_matcher,
+)
+from app.services.design_agent.template_catalog import (
+    CATALOG,
+    BHKFamily,
+    FormFactor,
+    TemplateDescriptor,
+    descriptor_for,
+)
+from app.services.design_agent.template_dispatcher import (
+    dispatch_match,
+    dispatch_template,
+)
 from app.services.design_agent.types import (
     BriefAnalysis,
     BriefForm,
@@ -60,12 +75,17 @@ from app.services.design_agent.types import (
     ExtractionWarning,
     ExtractionWarningCode,
     FidelityHint,
+    MatchFailed,
+    MatchResult,
     ProgramConstraints,
     RoomProgram,
     RoomSpec,
     SiteContext,
     StructuralIntent,
     StyleIntent,
+    SuggestedAction,
+    TemplateId,
+    TemplateParameters,
     fidelity_hint_for,
 )
 
@@ -118,4 +138,20 @@ __all__ = [
     "RoomProgram",
     # Final hand-off
     "DesignContext",
+    # Template matcher (Slice 2B.1)
+    "TemplateId",
+    "TemplateParameters",
+    "MatchResult",
+    "MatchFailed",
+    "SuggestedAction",
+    "TemplateDescriptor",
+    "BHKFamily",
+    "FormFactor",
+    "CATALOG",
+    "descriptor_for",
+    "dispatch_template",
+    "dispatch_match",
+    # TemplateMatcher stage (Slice 2B.1.B)
+    "run_template_matcher",
+    "TemplateMatcherMetadata",
 ]

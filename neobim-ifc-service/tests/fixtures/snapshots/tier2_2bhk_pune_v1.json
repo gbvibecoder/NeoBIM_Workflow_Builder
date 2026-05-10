@@ -1,0 +1,3995 @@
+{
+  "project": {
+    "id": "project-1",
+    "name": "2BHK Pune Duplex Project",
+    "model_version": "1.0.0",
+    "site": {
+      "id": "site-1",
+      "name": "Pune Plot",
+      "georef": {
+        "epsg_code": 4326,
+        "x_offset": 0.0,
+        "y_offset": 0.0,
+        "z_offset": 0.0
+      },
+      "true_north_deg": 0.0,
+      "terrain_polygon": [],
+      "building": {
+        "id": "building-1",
+        "name": "2BHK Pune Duplex",
+        "occupancy_nbc_group": "A-2",
+        "envelope_polygon": [
+          {
+            "x": 0.0,
+            "y": 1.5
+          },
+          {
+            "x": 7.32,
+            "y": 1.5
+          },
+          {
+            "x": 7.32,
+            "y": 12.24
+          },
+          {
+            "x": 0.0,
+            "y": 12.24
+          }
+        ],
+        "structural_system": {
+          "id": "structural-system-1",
+          "grid": null,
+          "columns": [
+            {
+              "id": "col-A1",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 0.15,
+                "y": 1.65
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-A2",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 0.15,
+                "y": 5.13
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-A3",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 0.15,
+                "y": 8.61
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-A4",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 0.15,
+                "y": 12.09
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-B1",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 3.66,
+                "y": 1.65
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-B2",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 3.66,
+                "y": 5.13
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-B3",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 3.66,
+                "y": 8.61
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-B4",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 3.66,
+                "y": 12.09
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-C1",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 7.17,
+                "y": 1.65
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-C2",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 7.17,
+                "y": 5.13
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-C3",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 7.17,
+                "y": 8.61
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            },
+            {
+              "id": "col-C4",
+              "host_storey_id": "storey-ground",
+              "grid_intersection": null,
+              "location": {
+                "x": 7.17,
+                "y": 12.09
+              },
+              "top_location": null,
+              "profile": {
+                "name": "C-300x300",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.3,
+                  "depth": 0.3
+                }
+              },
+              "material": "M25-RCC",
+              "base_z": -0.5,
+              "top_z": 6.0,
+              "is_load_bearing": true
+            }
+          ],
+          "beams": [
+            {
+              "id": "bm-L1-A1-A2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A1",
+                "col-A2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 1.65,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 0.15,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-A1-B1",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A1",
+                "col-B1"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 1.65,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 1.65,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-A2-A3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A2",
+                "col-A3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 0.15,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-A2-B2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A2",
+                "col-B2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-A3-A4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A3",
+                "col-A4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 0.15,
+                "y": 12.09,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-A3-B3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A3",
+                "col-B3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-A4-B4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A4",
+                "col-B4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 12.09,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 12.09,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-B1-B2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B1",
+                "col-B2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 1.65,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-B1-C1",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B1",
+                "col-C1"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 1.65,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 1.65,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-B2-B3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B2",
+                "col-B3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-B2-C2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B2",
+                "col-C2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-B3-B4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B3",
+                "col-B4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 12.09,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-B3-C3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B3",
+                "col-C3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-B4-C4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B4",
+                "col-C4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 12.09,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 12.09,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-C1-C2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-C1",
+                "col-C2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 7.17,
+                "y": 1.65,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-C2-C3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-C2",
+                "col-C3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 7.17,
+                "y": 5.13,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L1-C3-C4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-C3",
+                "col-C4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 7.17,
+                "y": 8.61,
+                "z": 2.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 12.09,
+                "z": 2.625
+              },
+              "top_z": 2.85
+            },
+            {
+              "id": "bm-L2-A1-A2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A1",
+                "col-A2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 1.65,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 0.15,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-A1-B1",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A1",
+                "col-B1"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 1.65,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 1.65,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-A2-A3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A2",
+                "col-A3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 0.15,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-A2-B2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A2",
+                "col-B2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-A3-A4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A3",
+                "col-A4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 0.15,
+                "y": 12.09,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-A3-B3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A3",
+                "col-B3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-A4-B4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-A4",
+                "col-B4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 0.15,
+                "y": 12.09,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 12.09,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-B1-B2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B1",
+                "col-B2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 1.65,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-B1-C1",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B1",
+                "col-C1"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 1.65,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 1.65,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-B2-B3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B2",
+                "col-B3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-B2-C2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B2",
+                "col-C2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-B3-B4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B3",
+                "col-B4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 3.66,
+                "y": 12.09,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-B3-C3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B3",
+                "col-C3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-B4-C4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-B4",
+                "col-C4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 3.66,
+                "y": 12.09,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 12.09,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-C1-C2",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-C1",
+                "col-C2"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 7.17,
+                "y": 1.65,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-C2-C3",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-C2",
+                "col-C3"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 7.17,
+                "y": 5.13,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            },
+            {
+              "id": "bm-L2-C3-C4",
+              "host_storey_id": "storey-first",
+              "supported_by_column_ids": [
+                "col-C3",
+                "col-C4"
+              ],
+              "has_moment_connection": false,
+              "moment_connection_target_id": null,
+              "profile": {
+                "name": "B-230x450",
+                "profile_type": "rectangle",
+                "dimensions": {
+                  "width": 0.23,
+                  "depth": 0.45
+                }
+              },
+              "material": "M25-RCC",
+              "start_point": {
+                "x": 7.17,
+                "y": 8.61,
+                "z": 5.625
+              },
+              "end_point": {
+                "x": 7.17,
+                "y": 12.09,
+                "z": 5.625
+              },
+              "top_z": 5.85
+            }
+          ],
+          "allows_slanted": false
+        },
+        "mep_systems": [],
+        "storeys": [
+          {
+            "id": "storey-ground",
+            "name": "Ground Floor",
+            "elevation": 0.0,
+            "actual_height": 3.0,
+            "index": 0,
+            "rooms": [
+              {
+                "id": "room-gf-kitchen",
+                "name": "Kitchen",
+                "usage": "kitchen",
+                "footprint_polygon": [
+                  {
+                    "x": 2.5675,
+                    "y": 5.0675
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 5.0675
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 7.9325
+                  },
+                  {
+                    "x": 2.5675,
+                    "y": 7.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-gf-ph-y50-e",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-E",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-ph-y80-e",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-gf-pv-x25-m",
+                    "side": "right"
+                  }
+                ]
+              },
+              {
+                "id": "room-gf-living-dining",
+                "name": "Living + Dining",
+                "usage": "living",
+                "footprint_polygon": [
+                  {
+                    "x": 2.5675,
+                    "y": 8.0675
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 8.0675
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 12.115
+                  },
+                  {
+                    "x": 2.5675,
+                    "y": 12.115
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-gf-ph-y80-e",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-E",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-N",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-pv-x25-n",
+                    "side": "right"
+                  }
+                ]
+              },
+              {
+                "id": "room-gf-pooja",
+                "name": "Pooja Room",
+                "usage": "pooja",
+                "footprint_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 5.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 5.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 7.9325
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 7.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-gf-ph-y50-w",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-pv-x25-m",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-ph-y80-w",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-gf-W",
+                    "side": "left"
+                  }
+                ]
+              },
+              {
+                "id": "room-gf-powder",
+                "name": "Powder Room",
+                "usage": "toilet",
+                "footprint_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 4.9325
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 4.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-gf-S",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-pv-x25-s",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-ph-y50-w",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-gf-W",
+                    "side": "left"
+                  }
+                ]
+              },
+              {
+                "id": "room-gf-stair-foyer",
+                "name": "Stair & Foyer",
+                "usage": "stair",
+                "footprint_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 8.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 8.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 12.115
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 12.115
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-gf-ph-y80-w",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-pv-x25-n",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-N",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-W",
+                    "side": "left"
+                  }
+                ]
+              },
+              {
+                "id": "room-gf-store",
+                "name": "Store",
+                "usage": "storage",
+                "footprint_polygon": [
+                  {
+                    "x": 5.5675,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 4.9325
+                  },
+                  {
+                    "x": 5.5675,
+                    "y": 4.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-gf-S",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-E",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-ph-y50-e",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-gf-pv-x55-s",
+                    "side": "right"
+                  }
+                ]
+              },
+              {
+                "id": "room-gf-utility",
+                "name": "Utility & Wash",
+                "usage": "utility",
+                "footprint_polygon": [
+                  {
+                    "x": 2.5675,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 5.4325,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 5.4325,
+                    "y": 4.9325
+                  },
+                  {
+                    "x": 2.5675,
+                    "y": 4.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-gf-S",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-pv-x55-s",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-gf-ph-y50-e",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-gf-pv-x25-s",
+                    "side": "right"
+                  }
+                ]
+              }
+            ],
+            "walls": [
+              {
+                "id": "wall-gf-E",
+                "name": "External Wall East - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 7.32,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 12.24
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.25,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster-Exterior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-230mm",
+                    "thickness": 0.23,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Interior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": true,
+                "is_load_bearing": true
+              },
+              {
+                "id": "wall-gf-N",
+                "name": "External Wall North - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 7.32,
+                    "y": 12.24
+                  },
+                  {
+                    "x": 0.0,
+                    "y": 12.24
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.25,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster-Exterior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-230mm",
+                    "thickness": 0.23,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Interior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": true,
+                "is_load_bearing": true
+              },
+              {
+                "id": "wall-gf-S",
+                "name": "External Wall South - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 1.5
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.25,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster-Exterior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-230mm",
+                    "thickness": 0.23,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Interior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": true,
+                "is_load_bearing": true
+              },
+              {
+                "id": "wall-gf-W",
+                "name": "External Wall West - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 12.24
+                  },
+                  {
+                    "x": 0.0,
+                    "y": 1.5
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.25,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster-Exterior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-230mm",
+                    "thickness": 0.23,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Interior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": true,
+                "is_load_bearing": true
+              },
+              {
+                "id": "wall-gf-ph-y50-e",
+                "name": "Partition Y5.0 East - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 5.0
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 5.0
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-gf-ph-y50-w",
+                "name": "Partition Y5.0 West - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 5.0
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 5.0
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-gf-ph-y80-e",
+                "name": "Partition Y8.0 East - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 8.0
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 8.0
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-gf-ph-y80-w",
+                "name": "Partition Y8.0 West - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 8.0
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 8.0
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-gf-pv-x25-m",
+                "name": "Partition X2.5 Mid - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 5.0
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 8.0
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-gf-pv-x25-n",
+                "name": "Partition X2.5 North - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 8.0
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 12.24
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-gf-pv-x25-s",
+                "name": "Partition X2.5 South - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 5.0
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-gf-pv-x55-s",
+                "name": "Partition X5.5 South - GF",
+                "host_storey_ids": [
+                  "storey-ground"
+                ],
+                "axis_points": [
+                  {
+                    "x": 5.5,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 5.5,
+                    "y": 5.0
+                  }
+                ],
+                "base_z": 0.0,
+                "top_z": 2.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              }
+            ],
+            "slabs": [
+              {
+                "id": "slab-ground",
+                "host_storey_id": "storey-ground",
+                "footprint_polygon": [
+                  {
+                    "x": 0.0,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 12.24
+                  },
+                  {
+                    "x": 0.0,
+                    "y": 12.24
+                  }
+                ],
+                "top_z": 0.0,
+                "bottom_z": -0.15,
+                "openings_polygons": [],
+                "layers": [
+                  {
+                    "material_name": "Vitrified-Tile-Floor",
+                    "thickness": 0.03,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "M25-RCC",
+                    "thickness": 0.09,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Ceiling",
+                    "thickness": 0.03,
+                    "function": "finish"
+                  }
+                ],
+                "predefined_type": "FLOOR"
+              }
+            ],
+            "stairs": [
+              {
+                "id": "stair-gf-to-ff",
+                "host_storey_id": "storey-ground",
+                "riser_count": 19,
+                "riser_height": 0.15,
+                "tread_depth": 0.25,
+                "flight_count": 2,
+                "landing_count": 1,
+                "plan_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 8.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 8.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 12.115
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 12.115
+                  }
+                ]
+              }
+            ],
+            "openings": [
+              {
+                "id": "opening-gf-d01",
+                "in_wall_id": "wall-gf-ph-y80-w",
+                "distance_along_wall": 1.0,
+                "sill_z": 0.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-gf-d02",
+                "in_wall_id": "wall-gf-pv-x25-n",
+                "distance_along_wall": 0.5,
+                "sill_z": 0.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-gf-d03",
+                "in_wall_id": "wall-gf-ph-y80-e",
+                "distance_along_wall": 1.0,
+                "sill_z": 0.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-gf-d04",
+                "in_wall_id": "wall-gf-ph-y50-e",
+                "distance_along_wall": 0.5,
+                "sill_z": 0.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-gf-d05",
+                "in_wall_id": "wall-gf-pv-x25-s",
+                "distance_along_wall": 1.0,
+                "sill_z": 0.0,
+                "width": 0.7,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-gf-d06",
+                "in_wall_id": "wall-gf-pv-x55-s",
+                "distance_along_wall": 1.0,
+                "sill_z": 0.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-gf-d07",
+                "in_wall_id": "wall-gf-N",
+                "distance_along_wall": 5.82,
+                "sill_z": 0.0,
+                "width": 1.0,
+                "height": 2.1,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-gf-w01",
+                "in_wall_id": "wall-gf-E",
+                "distance_along_wall": 8.020000000000001,
+                "sill_z": 0.9,
+                "width": 1.2,
+                "height": 1.5,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-gf-w02",
+                "in_wall_id": "wall-gf-N",
+                "distance_along_wall": 1.81,
+                "sill_z": 0.9,
+                "width": 1.2,
+                "height": 1.5,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-gf-w03",
+                "in_wall_id": "wall-gf-E",
+                "distance_along_wall": 4.5,
+                "sill_z": 1.2,
+                "width": 1.0,
+                "height": 1.2,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-gf-w04",
+                "in_wall_id": "wall-gf-W",
+                "distance_along_wall": 1.7200000000000002,
+                "sill_z": 1.5,
+                "width": 0.8,
+                "height": 1.5,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-gf-w05",
+                "in_wall_id": "wall-gf-S",
+                "distance_along_wall": 0.7,
+                "sill_z": 1.8,
+                "width": 0.6,
+                "height": 0.6,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-gf-w06",
+                "in_wall_id": "wall-gf-S",
+                "distance_along_wall": 3.6,
+                "sill_z": 1.5,
+                "width": 0.8,
+                "height": 1.0,
+                "predefined_type": "WINDOW"
+              }
+            ]
+          },
+          {
+            "id": "storey-first",
+            "name": "First Floor",
+            "elevation": 3.0,
+            "actual_height": 3.0,
+            "index": 1,
+            "rooms": [
+              {
+                "id": "room-ff-balcony-e",
+                "name": "Master Balcony",
+                "usage": "balcony",
+                "footprint_polygon": [
+                  {
+                    "x": 2.5675,
+                    "y": 10.5675
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 10.5675
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 12.115
+                  },
+                  {
+                    "x": 2.5675,
+                    "y": 12.115
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-ff-ph-y105-e",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-E",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-N",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-pv-x25-n",
+                    "side": "right"
+                  }
+                ]
+              },
+              {
+                "id": "room-ff-balcony-w",
+                "name": "West Balcony",
+                "usage": "balcony",
+                "footprint_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 10.5675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 10.5675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 12.115
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 12.115
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-ff-ph-y105-w",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-pv-x25-n",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-N",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-W",
+                    "side": "left"
+                  }
+                ]
+              },
+              {
+                "id": "room-ff-bedroom-2",
+                "name": "Bedroom 2",
+                "usage": "bedroom",
+                "footprint_polygon": [
+                  {
+                    "x": 2.5675,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 5.9325
+                  },
+                  {
+                    "x": 2.5675,
+                    "y": 5.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-ff-S",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-E",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-ph-y60-e",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-ff-pv-x25-s",
+                    "side": "right"
+                  }
+                ]
+              },
+              {
+                "id": "room-ff-common-bath",
+                "name": "Common Bathroom",
+                "usage": "bath",
+                "footprint_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 1.625
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 3.9325
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 3.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-ff-S",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-pv-x25-s",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-ph-y40-w",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-ff-W",
+                    "side": "left"
+                  }
+                ]
+              },
+              {
+                "id": "room-ff-master-bath",
+                "name": "Master Bathroom",
+                "usage": "bath",
+                "footprint_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 6.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 6.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 7.9325
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 7.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-ff-ph-y60-w",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-pv-x25-m",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-ph-y80-w",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-ff-W",
+                    "side": "left"
+                  }
+                ]
+              },
+              {
+                "id": "room-ff-master-bedroom",
+                "name": "Master Bedroom",
+                "usage": "bedroom",
+                "footprint_polygon": [
+                  {
+                    "x": 2.5675,
+                    "y": 6.0675
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 6.0675
+                  },
+                  {
+                    "x": 7.195,
+                    "y": 10.4325
+                  },
+                  {
+                    "x": 2.5675,
+                    "y": 10.4325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-ff-ph-y60-e",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-E",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-ph-y105-e",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-ff-pv-x25-m",
+                    "side": "right"
+                  }
+                ]
+              },
+              {
+                "id": "room-ff-stair-landing",
+                "name": "Stair Landing",
+                "usage": "stair",
+                "footprint_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 8.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 8.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 10.4325
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 10.4325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-ff-ph-y80-w",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-pv-x25-m",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-ph-y105-w",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-ff-W",
+                    "side": "left"
+                  }
+                ]
+              },
+              {
+                "id": "room-ff-study",
+                "name": "Study",
+                "usage": "study",
+                "footprint_polygon": [
+                  {
+                    "x": 0.125,
+                    "y": 4.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 4.0675
+                  },
+                  {
+                    "x": 2.4325,
+                    "y": 5.9325
+                  },
+                  {
+                    "x": 0.125,
+                    "y": 5.9325
+                  }
+                ],
+                "bounding_edges": [
+                  {
+                    "wall_id": "wall-ff-ph-y40-w",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-pv-x25-s",
+                    "side": "left"
+                  },
+                  {
+                    "wall_id": "wall-ff-ph-y60-w",
+                    "side": "right"
+                  },
+                  {
+                    "wall_id": "wall-ff-W",
+                    "side": "left"
+                  }
+                ]
+              }
+            ],
+            "walls": [
+              {
+                "id": "wall-ff-E",
+                "name": "External Wall East - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 7.32,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 12.24
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.25,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster-Exterior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-230mm",
+                    "thickness": 0.23,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Interior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": true,
+                "is_load_bearing": true
+              },
+              {
+                "id": "wall-ff-N",
+                "name": "External Wall North - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 7.32,
+                    "y": 12.24
+                  },
+                  {
+                    "x": 0.0,
+                    "y": 12.24
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.25,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster-Exterior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-230mm",
+                    "thickness": 0.23,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Interior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": true,
+                "is_load_bearing": true
+              },
+              {
+                "id": "wall-ff-S",
+                "name": "External Wall South - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 1.5
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.25,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster-Exterior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-230mm",
+                    "thickness": 0.23,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Interior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": true,
+                "is_load_bearing": true
+              },
+              {
+                "id": "wall-ff-W",
+                "name": "External Wall West - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 12.24
+                  },
+                  {
+                    "x": 0.0,
+                    "y": 1.5
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.25,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster-Exterior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-230mm",
+                    "thickness": 0.23,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Interior",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": true,
+                "is_load_bearing": true
+              },
+              {
+                "id": "wall-ff-ph-y105-e",
+                "name": "Partition Y10.5 East - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 10.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 10.5
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-ff-ph-y105-w",
+                "name": "Partition Y10.5 West - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 10.5
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 10.5
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-ff-ph-y40-w",
+                "name": "Partition Y4.0 West - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 4.0
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 4.0
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-ff-ph-y60-e",
+                "name": "Partition Y6.0 East - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 6.0
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 6.0
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-ff-ph-y60-w",
+                "name": "Partition Y6.0 West - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 6.0
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 6.0
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-ff-ph-y80-w",
+                "name": "Partition Y8.0 West - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 0.0,
+                    "y": 8.0
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 8.0
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-ff-pv-x25-m",
+                "name": "Partition X2.5 Mid - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 6.0
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 10.5
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-ff-pv-x25-n",
+                "name": "Partition X2.5 North - FF (balcony divider)",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 10.5
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 12.24
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              },
+              {
+                "id": "wall-ff-pv-x25-s",
+                "name": "Partition X2.5 South - FF",
+                "host_storey_ids": [
+                  "storey-first"
+                ],
+                "axis_points": [
+                  {
+                    "x": 2.5,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 2.5,
+                    "y": 6.0
+                  }
+                ],
+                "base_z": 3.0,
+                "top_z": 5.85,
+                "thickness": 0.135,
+                "layers": [
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "Burnt-Clay-Brick-115mm",
+                    "thickness": 0.115,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster",
+                    "thickness": 0.01,
+                    "function": "finish"
+                  }
+                ],
+                "type": "solid",
+                "is_external": false,
+                "is_load_bearing": false
+              }
+            ],
+            "slabs": [
+              {
+                "id": "slab-first",
+                "host_storey_id": "storey-first",
+                "footprint_polygon": [
+                  {
+                    "x": 0.0,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 12.24
+                  },
+                  {
+                    "x": 0.0,
+                    "y": 12.24
+                  }
+                ],
+                "top_z": 3.0,
+                "bottom_z": 2.85,
+                "openings_polygons": [],
+                "layers": [
+                  {
+                    "material_name": "Vitrified-Tile-Floor",
+                    "thickness": 0.03,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "M25-RCC",
+                    "thickness": 0.09,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Ceiling",
+                    "thickness": 0.03,
+                    "function": "finish"
+                  }
+                ],
+                "predefined_type": "FLOOR"
+              },
+              {
+                "id": "slab-roof",
+                "host_storey_id": "storey-first",
+                "footprint_polygon": [
+                  {
+                    "x": 0.0,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 1.5
+                  },
+                  {
+                    "x": 7.32,
+                    "y": 12.24
+                  },
+                  {
+                    "x": 0.0,
+                    "y": 12.24
+                  }
+                ],
+                "top_z": 6.0,
+                "bottom_z": 5.85,
+                "openings_polygons": [],
+                "layers": [
+                  {
+                    "material_name": "APP-Membrane-Waterproofing",
+                    "thickness": 0.03,
+                    "function": "finish"
+                  },
+                  {
+                    "material_name": "M25-RCC",
+                    "thickness": 0.09,
+                    "function": "core"
+                  },
+                  {
+                    "material_name": "Cement-Plaster-Ceiling",
+                    "thickness": 0.03,
+                    "function": "finish"
+                  }
+                ],
+                "predefined_type": "ROOF"
+              }
+            ],
+            "stairs": [],
+            "openings": [
+              {
+                "id": "opening-ff-d01",
+                "in_wall_id": "wall-ff-pv-x25-m",
+                "distance_along_wall": 2.875,
+                "sill_z": 3.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-ff-d02",
+                "in_wall_id": "wall-ff-ph-y80-w",
+                "distance_along_wall": 0.9,
+                "sill_z": 3.0,
+                "width": 0.7,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-ff-d03",
+                "in_wall_id": "wall-ff-pv-x25-s",
+                "distance_along_wall": 0.9,
+                "sill_z": 3.0,
+                "width": 0.7,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-ff-d04",
+                "in_wall_id": "wall-ff-pv-x25-s",
+                "distance_along_wall": 3.125,
+                "sill_z": 3.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-ff-d05",
+                "in_wall_id": "wall-ff-ph-y60-e",
+                "distance_along_wall": 0.5,
+                "sill_z": 3.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-ff-d06",
+                "in_wall_id": "wall-ff-pv-x25-m",
+                "distance_along_wall": 0.5,
+                "sill_z": 3.0,
+                "width": 0.7,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-ff-d07",
+                "in_wall_id": "wall-ff-ph-y105-e",
+                "distance_along_wall": 1.6600000000000001,
+                "sill_z": 3.0,
+                "width": 1.5,
+                "height": 2.1,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-ff-d08",
+                "in_wall_id": "wall-ff-ph-y105-w",
+                "distance_along_wall": 0.875,
+                "sill_z": 3.0,
+                "width": 0.75,
+                "height": 2.0,
+                "predefined_type": "DOOR"
+              },
+              {
+                "id": "opening-ff-w01",
+                "in_wall_id": "wall-ff-E",
+                "distance_along_wall": 1.65,
+                "sill_z": 3.9,
+                "width": 1.2,
+                "height": 1.5,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-ff-w02",
+                "in_wall_id": "wall-ff-S",
+                "distance_along_wall": 4.3100000000000005,
+                "sill_z": 3.9,
+                "width": 1.2,
+                "height": 1.5,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-ff-w03",
+                "in_wall_id": "wall-ff-E",
+                "distance_along_wall": 6.15,
+                "sill_z": 3.9,
+                "width": 1.2,
+                "height": 1.5,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-ff-w04",
+                "in_wall_id": "wall-ff-W",
+                "distance_along_wall": 6.74,
+                "sill_z": 3.9,
+                "width": 1.0,
+                "height": 1.2,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-ff-w05",
+                "in_wall_id": "wall-ff-W",
+                "distance_along_wall": 4.94,
+                "sill_z": 4.8,
+                "width": 0.6,
+                "height": 0.6,
+                "predefined_type": "WINDOW"
+              },
+              {
+                "id": "opening-ff-w06",
+                "in_wall_id": "wall-ff-S",
+                "distance_along_wall": 0.95,
+                "sill_z": 4.8,
+                "width": 0.6,
+                "height": 0.6,
+                "predefined_type": "WINDOW"
+              }
+            ]
+          }
+        ],
+        "foundation": {
+          "id": "foundation-1",
+          "footings": [
+            {
+              "id": "ftg-A1",
+              "supports_column_id": "col-A1",
+              "location": {
+                "x": 0.15,
+                "y": 1.65
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": -0.6,
+                  "y": 0.8999999999999999
+                },
+                {
+                  "x": 0.9,
+                  "y": 0.8999999999999999
+                },
+                {
+                  "x": 0.9,
+                  "y": 2.4
+                },
+                {
+                  "x": -0.6,
+                  "y": 2.4
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-A2",
+              "supports_column_id": "col-A2",
+              "location": {
+                "x": 0.15,
+                "y": 5.13
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": -0.6,
+                  "y": 4.38
+                },
+                {
+                  "x": 0.9,
+                  "y": 4.38
+                },
+                {
+                  "x": 0.9,
+                  "y": 5.88
+                },
+                {
+                  "x": -0.6,
+                  "y": 5.88
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-A3",
+              "supports_column_id": "col-A3",
+              "location": {
+                "x": 0.15,
+                "y": 8.61
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": -0.6,
+                  "y": 7.859999999999999
+                },
+                {
+                  "x": 0.9,
+                  "y": 7.859999999999999
+                },
+                {
+                  "x": 0.9,
+                  "y": 9.36
+                },
+                {
+                  "x": -0.6,
+                  "y": 9.36
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-A4",
+              "supports_column_id": "col-A4",
+              "location": {
+                "x": 0.15,
+                "y": 12.09
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": -0.6,
+                  "y": 11.34
+                },
+                {
+                  "x": 0.9,
+                  "y": 11.34
+                },
+                {
+                  "x": 0.9,
+                  "y": 12.84
+                },
+                {
+                  "x": -0.6,
+                  "y": 12.84
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-B1",
+              "supports_column_id": "col-B1",
+              "location": {
+                "x": 3.66,
+                "y": 1.65
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": 2.91,
+                  "y": 0.8999999999999999
+                },
+                {
+                  "x": 4.41,
+                  "y": 0.8999999999999999
+                },
+                {
+                  "x": 4.41,
+                  "y": 2.4
+                },
+                {
+                  "x": 2.91,
+                  "y": 2.4
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-B2",
+              "supports_column_id": "col-B2",
+              "location": {
+                "x": 3.66,
+                "y": 5.13
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": 2.91,
+                  "y": 4.38
+                },
+                {
+                  "x": 4.41,
+                  "y": 4.38
+                },
+                {
+                  "x": 4.41,
+                  "y": 5.88
+                },
+                {
+                  "x": 2.91,
+                  "y": 5.88
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-B3",
+              "supports_column_id": "col-B3",
+              "location": {
+                "x": 3.66,
+                "y": 8.61
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": 2.91,
+                  "y": 7.859999999999999
+                },
+                {
+                  "x": 4.41,
+                  "y": 7.859999999999999
+                },
+                {
+                  "x": 4.41,
+                  "y": 9.36
+                },
+                {
+                  "x": 2.91,
+                  "y": 9.36
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-B4",
+              "supports_column_id": "col-B4",
+              "location": {
+                "x": 3.66,
+                "y": 12.09
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": 2.91,
+                  "y": 11.34
+                },
+                {
+                  "x": 4.41,
+                  "y": 11.34
+                },
+                {
+                  "x": 4.41,
+                  "y": 12.84
+                },
+                {
+                  "x": 2.91,
+                  "y": 12.84
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-C1",
+              "supports_column_id": "col-C1",
+              "location": {
+                "x": 7.17,
+                "y": 1.65
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": 6.42,
+                  "y": 0.8999999999999999
+                },
+                {
+                  "x": 7.92,
+                  "y": 0.8999999999999999
+                },
+                {
+                  "x": 7.92,
+                  "y": 2.4
+                },
+                {
+                  "x": 6.42,
+                  "y": 2.4
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-C2",
+              "supports_column_id": "col-C2",
+              "location": {
+                "x": 7.17,
+                "y": 5.13
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": 6.42,
+                  "y": 4.38
+                },
+                {
+                  "x": 7.92,
+                  "y": 4.38
+                },
+                {
+                  "x": 7.92,
+                  "y": 5.88
+                },
+                {
+                  "x": 6.42,
+                  "y": 5.88
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-C3",
+              "supports_column_id": "col-C3",
+              "location": {
+                "x": 7.17,
+                "y": 8.61
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": 6.42,
+                  "y": 7.859999999999999
+                },
+                {
+                  "x": 7.92,
+                  "y": 7.859999999999999
+                },
+                {
+                  "x": 7.92,
+                  "y": 9.36
+                },
+                {
+                  "x": 6.42,
+                  "y": 9.36
+                }
+              ],
+              "material": "M25-RCC"
+            },
+            {
+              "id": "ftg-C4",
+              "supports_column_id": "col-C4",
+              "location": {
+                "x": 7.17,
+                "y": 12.09
+              },
+              "top_z": -0.5,
+              "bottom_z": -1.1,
+              "footprint_polygon": [
+                {
+                  "x": 6.42,
+                  "y": 11.34
+                },
+                {
+                  "x": 7.92,
+                  "y": 11.34
+                },
+                {
+                  "x": 7.92,
+                  "y": 12.84
+                },
+                {
+                  "x": 6.42,
+                  "y": 12.84
+                }
+              ],
+              "material": "M25-RCC"
+            }
+          ]
+        },
+        "roof": {
+          "id": "roof-1",
+          "type": "flat"
+        },
+        "doors": [
+          {
+            "id": "door-ff-bedroom2-master",
+            "in_opening_id": "opening-ff-d05",
+            "connects_room_ids": [
+              "room-ff-bedroom-2",
+              "room-ff-master-bedroom"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-ff-cbath-bedroom2",
+            "in_opening_id": "opening-ff-d03",
+            "connects_room_ids": [
+              "room-ff-common-bath",
+              "room-ff-bedroom-2"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-ff-landing-balconyw",
+            "in_opening_id": "opening-ff-d08",
+            "connects_room_ids": [
+              "room-ff-stair-landing",
+              "room-ff-balcony-w"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-ff-landing-master",
+            "in_opening_id": "opening-ff-d01",
+            "connects_room_ids": [
+              "room-ff-stair-landing",
+              "room-ff-master-bedroom"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-ff-landing-mbath",
+            "in_opening_id": "opening-ff-d02",
+            "connects_room_ids": [
+              "room-ff-stair-landing",
+              "room-ff-master-bath"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-ff-master-balcony",
+            "in_opening_id": "opening-ff-d07",
+            "connects_room_ids": [
+              "room-ff-master-bedroom",
+              "room-ff-balcony-e"
+            ],
+            "swing": "sliding",
+            "handedness": "right"
+          },
+          {
+            "id": "door-ff-mbath-master",
+            "in_opening_id": "opening-ff-d06",
+            "connects_room_ids": [
+              "room-ff-master-bath",
+              "room-ff-master-bedroom"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-ff-study-bedroom2",
+            "in_opening_id": "opening-ff-d04",
+            "connects_room_ids": [
+              "room-ff-study",
+              "room-ff-bedroom-2"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-gf-kitchen-living",
+            "in_opening_id": "opening-gf-d03",
+            "connects_room_ids": [
+              "room-gf-kitchen",
+              "room-gf-living-dining"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-gf-kitchen-utility",
+            "in_opening_id": "opening-gf-d04",
+            "connects_room_ids": [
+              "room-gf-kitchen",
+              "room-gf-utility"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-gf-main-entry",
+            "in_opening_id": "opening-gf-d07",
+            "connects_room_ids": [
+              "room-gf-stair-foyer",
+              "Outside"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-gf-powder-utility",
+            "in_opening_id": "opening-gf-d05",
+            "connects_room_ids": [
+              "room-gf-powder",
+              "room-gf-utility"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-gf-sf-living",
+            "in_opening_id": "opening-gf-d02",
+            "connects_room_ids": [
+              "room-gf-stair-foyer",
+              "room-gf-living-dining"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-gf-sf-pooja",
+            "in_opening_id": "opening-gf-d01",
+            "connects_room_ids": [
+              "room-gf-stair-foyer",
+              "room-gf-pooja"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          },
+          {
+            "id": "door-gf-store-utility",
+            "in_opening_id": "opening-gf-d06",
+            "connects_room_ids": [
+              "room-gf-store",
+              "room-gf-utility"
+            ],
+            "swing": "inward",
+            "handedness": "right"
+          }
+        ],
+        "windows": [
+          {
+            "id": "window-ff-bedroom2-east",
+            "in_opening_id": "opening-ff-w01",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-ff-bedroom2-south",
+            "in_opening_id": "opening-ff-w02",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-ff-cbath-south",
+            "in_opening_id": "opening-ff-w06",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-ff-master-east",
+            "in_opening_id": "opening-ff-w03",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-ff-mbath-west",
+            "in_opening_id": "opening-ff-w05",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-ff-study-west",
+            "in_opening_id": "opening-ff-w04",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-gf-kitchen-east",
+            "in_opening_id": "opening-gf-w03",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-gf-living-east",
+            "in_opening_id": "opening-gf-w01",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-gf-living-north",
+            "in_opening_id": "opening-gf-w02",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-gf-powder-south",
+            "in_opening_id": "opening-gf-w05",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-gf-stair-west",
+            "in_opening_id": "opening-gf-w04",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          },
+          {
+            "id": "window-gf-utility-south",
+            "in_opening_id": "opening-gf-w06",
+            "glass_area": null,
+            "frame_material": "Aluminum"
+          }
+        ]
+      }
+    },
+    "metadata": {
+      "rera": {
+        "project_id": null,
+        "seismic_zone": "III",
+        "wind_zone": 2,
+        "nbc_occupancy_group": "A-2"
+      },
+      "permits": [],
+      "cobie_defaults": {},
+      "provenance": {
+        "model_version": "1.0.0",
+        "input_contract_version": "Tier2Template-1.0.0",
+        "ifcopenshell_version": "",
+        "agent_stages_run": "tier2-template-author",
+        "agent_models_used": "",
+        "total_llm_cost_usd": 0.0,
+        "total_wallclock_ms": 0,
+        "prompt_cache_hit_rate": 0.0,
+        "ids_rules_passed": 0,
+        "ids_rules_failed": 0,
+        "target_fidelity": "LOD-300",
+        "fixture_match": "tier2-2bhk-pune-v1",
+        "generated_at": "2026-05-08T00:00:00Z",
+        "build_id": "tier2-2bhk-pune-v1",
+        "source_contract": "BuildingModel"
+      }
+    }
+  }
+}

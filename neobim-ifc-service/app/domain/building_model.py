@@ -154,7 +154,11 @@ class Wall(BaseModel):
     top_z: float
     thickness: float = Field(gt=0)
     layers: list[MaterialLayer] = Field(default_factory=list)
-    type: Literal["solid", "curtain", "partition", "shear"] = "solid"
+    # Slice T2.0.1.2 — added "railing" so balcony parapets, terrace
+    # railings, etc. can be modelled as Wall entities and dispatched to
+    # an IfcRailing builder downstream. Backward-compatible: existing
+    # type="solid"/"curtain"/"partition"/"shear" still validate.
+    type: Literal["solid", "curtain", "partition", "shear", "railing"] = "solid"
     is_external: bool = False
     is_load_bearing: bool = False
 

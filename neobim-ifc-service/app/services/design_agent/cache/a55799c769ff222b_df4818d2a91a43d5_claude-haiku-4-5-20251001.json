@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.94,
+    "reasoning": "Brief explicitly requests a 1BHK single-floor (ground only) house on a 5.0 x 9.0 m plot in Pune. The plot dimensions fall squarely within the template's typical range (5.0–9.0 m), and the form factor matches exactly. Seismic zone III and wind zone 2 align with the baseline Pune context.",
+    "template_id": "build_1bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 5.0,
+      "plot_length_m": 9.0,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 644,
+    "output_tokens": 262,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002636,
+    "latency_ms": 2551.0390421841294,
+    "created_at_iso": "2026-05-10T15:29:54.665235+00:00"
+  }
+}

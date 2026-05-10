@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.93,
+    "reasoning": "Brief explicitly requests a single-storey 1BHK house for elderly parents on a 25x40 ft plot in Pune. The 25x40 ft dimensions convert to 7.62 x 12.19 m, which falls within the typical plot range (5.0 x 9.0 to 9.0 x 14.0 m) for build_1bhk_pune_house. The \"no stairs\" requirement aligns perfectly with the single-floor form factor, and the elderly-friendly priority matches the target market segment.",
+    "template_id": "build_1bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 7.62,
+      "plot_length_m": 12.19,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 663,
+    "output_tokens": 300,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002845,
+    "latency_ms": 2862.163374898955,
+    "created_at_iso": "2026-05-10T15:29:26.198268+00:00"
+  }
+}

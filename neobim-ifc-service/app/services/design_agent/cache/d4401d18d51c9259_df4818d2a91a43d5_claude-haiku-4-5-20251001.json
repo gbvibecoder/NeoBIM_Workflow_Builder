@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.78,
+    "reasoning": "Brief requests a G+5 2BHK apartment tower in Pune with an open ground floor (no stilt parking). The 2BHK tower template is the correct family and form factor. The explicit plot dimensions (8.0 × 16.0 m) fall well within the tower typical range (7.32–10.0 × 15.24–18.0 m), and the G+5 notation directly maps to habitable_floor_count=5. The key deviation is has_stilt_parking=false, which the dispatcher will honor; the template builder supports this non-standard configuration, though it reduces confidence slightly since most Indian tower templates pin stilt parking as standard. Seismic zone III and wind zone 2 match the Pune baseline.",
+    "template_id": "build_2bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 8.0,
+      "plot_length_m": 16.0,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 5,
+      "has_stilt_parking": false,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 651,
+    "output_tokens": 394,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003303,
+    "latency_ms": 4201.050875009969,
+    "created_at_iso": "2026-05-10T15:30:02.049248+00:00"
+  }
+}

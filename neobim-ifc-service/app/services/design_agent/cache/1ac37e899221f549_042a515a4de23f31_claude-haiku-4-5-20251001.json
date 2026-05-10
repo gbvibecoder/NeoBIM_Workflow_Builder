@@ -1,0 +1,79 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "luxury_villa",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "One- or two-family private dwelling (villa)",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 60.0,
+      "plot_length_m": 30.0,
+      "plot_area_sqm": 1800.0,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary luxury",
+      "cultural_overlay": null,
+      "massing_hint": null,
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 2,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Master bedroom",
+      "3 additional bedrooms",
+      "Living areas",
+      "Kitchen",
+      "Bathrooms",
+      "Home theatre",
+      "Helipad"
+    ],
+    "explicit_dimensions": {},
+    "user_priorities": [
+      "Infinity pool",
+      "Helipad access",
+      "Home theatre",
+      "Luxury finish"
+    ],
+    "raw_brief_summary": "A 4BHK luxury villa on a 30×60 m plot (1800 sqm) in Pune with ground and first floor (G+1 = 2 storeys). Brief specifies premium amenities: infinity pool, helipad, and home theatre. Target fidelity is design-development, enabling MEP routing. Seismic and wind zones to be determined by Pune lookup; no explicit setbacks, height, or FSI stated.",
+    "extraction_warnings": [
+      "Seismic zone not explicitly stated; will be enriched from Pune city lookup (typically Zone III).",
+      "Wind zone not explicitly stated; will be enriched from Pune city lookup (typically Zone 2).",
+      "Plot orientation not specified.",
+      "Maximum height and FSI/FAR not specified.",
+      "Setbacks not specified.",
+      "Facade treatment not stated; assumed contemporary.",
+      "Individual room dimensions (bedrooms, kitchen, etc.) not provided in brief.",
+      "Home theatre and helipad location/integration details not specified."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 516,
+    "output_tokens": 846,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7327,
+    "cost_usd_estimated": 0.013905,
+    "latency_ms": 7564.706832868978,
+    "created_at_iso": "2026-05-10T15:24:10.296311+00:00"
+  }
+}
