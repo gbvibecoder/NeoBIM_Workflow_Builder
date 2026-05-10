@@ -154,9 +154,12 @@ describe("openInlineUpgradeCheckout — re-entry guard (E14)", () => {
   it("second concurrent call returns already-in-flight without firing a server request", async () => {
     // First call hangs forever on the create-subscription fetch — simulating
     // a slow server. Second call should short-circuit.
-    let resolveFetch: ((value: Response) => void) | null = null;
+    // Holder pattern: TS's flow analysis narrows a `let | null` to `null`
+    // because closure assignments aren't visible. Reading through a property
+    // sidesteps the narrow, so `holder.resolve` types correctly.
+    const holder: { resolve: ((value: Response) => void) | null } = { resolve: null };
     globalThis.fetch = vi.fn(
-      () => new Promise<Response>((resolve) => { resolveFetch = resolve; }),
+      () => new Promise<Response>((resolve) => { holder.resolve = resolve; }),
     ) as typeof fetch;
 
     const first = openInlineUpgradeCheckout({ targetTier: "PRO", templateId: "wf-08" });
@@ -166,7 +169,7 @@ describe("openInlineUpgradeCheckout — re-entry guard (E14)", () => {
 
     expect(second.kind).toBe("already-in-flight");
     // Resolve the first promise so the test cleans up.
-    resolveFetch?.(mkRes(500, { error: { code: "X", message: "x" } }));
+    holder.resolve?.(mkRes(500, { error: { code: "X", message: "x" } }));
     await first;
   });
 });
