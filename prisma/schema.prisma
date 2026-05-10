@@ -34,6 +34,14 @@ model User {
   // Cleared on plan change (upgrade/downgrade) so user gets new plan's limits.
   legacyLimits           Json?     @map("legacy_limits")
   legacyLimitsSetAt      DateTime? @map("legacy_limits_set_at")
+  // Timestamp of the user's last plan-tier change (upgrade or downgrade).
+  // Used by check-execution-eligibility to scope paid-tier execution counts
+  // so pre-upgrade FREE rows do not pollute post-upgrade quotas. Set to
+  // now() by both webhook handlers (Razorpay + Stripe) on every role-change
+  // event. Null for never-changed users (FREE since signup) — count-helper
+  // treats null as "lifetime" for FREE and falls back to monthStart for
+  // any orphan paid-tier rows without this field set.
+  planChangedAt          DateTime? @map("plan_changed_at")
   // Gamification
   xp                     Int       @default(0)
   level                  Int       @default(1)

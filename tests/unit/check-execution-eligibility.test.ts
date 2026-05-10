@@ -16,7 +16,7 @@
  *   8. getOrCreateScratchWorkflow — find/restore/create idempotency
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 
 const prismaMocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
@@ -384,13 +384,16 @@ describe("grandfathering edge cases (1:1 cutover)", () => {
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe("JWT staleness defense", () => {
+  // Post §T: helper does ONE count query (period-scoped). The previous
+  // pattern of mockResolvedValueOnce().mockResolvedValueOnce() left a
+  // stale value in the mock queue and contaminated downstream tests
+  // (the per-node-type-peek "ifc-parse" test was returning canExecute=false
+  // because the leftover `2` was still in the queue when its mockResolvedValue(0)
+  // was set as the default). Use mockResolvedValue (single) here and reset
+  // explicitly before the next describe to avoid leakage.
   it("JWT says FREE but DB says PRO → uses PRO limits (just-upgraded user)", async () => {
-    // Stale JWT: still says FREE. DB has been updated to PRO by webhook.
     prismaMocks.userFindUnique.mockResolvedValue({ role: "PRO", legacyLimits: null });
-    // Pre-recount: was 2 (FREE filter, lifetime). Recount is monthly.
-    prismaMocks.executionCount
-      .mockResolvedValueOnce(2)  // first call: lifetime (FREE filter from JWT)
-      .mockResolvedValueOnce(2); // recount with month filter (DB role is paid)
+    prismaMocks.executionCount.mockResolvedValue(2);
     const result = await checkExecutionEligibility({ ...baseArgs, userRole: "FREE" });
     expect(result.canExecute).toBe(true);
     if (result.canExecute) {
@@ -401,9 +404,7 @@ describe("JWT staleness defense", () => {
 
   it("JWT says PRO but DB says FREE → uses FREE limits (just-downgraded user)", async () => {
     prismaMocks.userFindUnique.mockResolvedValue({ role: "FREE", legacyLimits: null });
-    prismaMocks.executionCount
-      .mockResolvedValueOnce(50)  // first: monthly (PRO filter from JWT)
-      .mockResolvedValueOnce(2);  // recount with lifetime filter (DB is FREE)
+    prismaMocks.executionCount.mockResolvedValue(2);
     const result = await checkExecutionEligibility({ ...baseArgs, userRole: "PRO" });
     expect(result.canExecute).toBe(false);
     if (!result.canExecute) {
@@ -413,9 +414,15 @@ describe("JWT staleness defense", () => {
 
   it("JWT says FREE but DB says PLATFORM_ADMIN → admin bypass", async () => {
     prismaMocks.userFindUnique.mockResolvedValue({ role: "PLATFORM_ADMIN", legacyLimits: null });
-    prismaMocks.executionCount.mockResolvedValue(999); // count irrelevant for admin
+    prismaMocks.executionCount.mockResolvedValue(999);
     const result = await checkExecutionEligibility({ ...baseArgs, userRole: "FREE" });
     expect(result.canExecute).toBe(true);
+  });
+
+  // Defensive — explicitly reset executionCount mock implementation after
+  // this describe block so any future once-style queue can't leak forward.
+  afterAll(() => {
+    prismaMocks.executionCount.mockReset();
   });
 });
 
@@ -546,6 +553,100 @@ describe("FREE cap reads from SSOT only (GAP #1)", () => {
       .join(" | ");
     expect(allFeatures).not.toMatch(/2 lifetime executions/);
     expect(STRIPE_PLANS.FREE.features).toContain("1 lifetime execution");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 9a. PERIOD-SCOPED count for paid tiers (P0 §T billing-period bug)
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("period-scoped count (P0 §T fix — pre-upgrade rows excluded from post-upgrade quota)", () => {
+  // Helper: capture the createdAt filter passed to prisma.execution.count
+  // so we can assert the period boundary the helper computed.
+  const capturedFilter: { createdAt?: { gte: Date } } = {};
+  beforeEach(() => {
+    delete capturedFilter.createdAt;
+    prismaMocks.executionCount.mockImplementation(async (args: { where?: { createdAt?: { gte: Date } } } = {}) => {
+      if (args.where?.createdAt?.gte) capturedFilter.createdAt = { gte: args.where.createdAt.gte };
+      return 0;
+    });
+  });
+
+  it("Scenario A — fresh paid user, no planChangedAt → period = calendar month", async () => {
+    prismaMocks.userFindUnique.mockResolvedValue({ role: "MINI", legacyLimits: null, planChangedAt: null });
+    await checkExecutionEligibility({ ...baseArgs, userRole: "MINI" });
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    expect(capturedFilter.createdAt?.gte).toBeDefined();
+    if (capturedFilter.createdAt?.gte) {
+      expect(Math.abs(capturedFilter.createdAt.gte.getTime() - monthStart.getTime())).toBeLessThan(1000);
+    }
+  });
+
+  it("Scenario B — FREE→MINI upgrade with prior FREE exec → period = planChangedAt (THE BUG)", async () => {
+    // User upgraded 2 minutes ago. Calendar month started 7 days ago.
+    // The count must use planChangedAt, not monthStart, otherwise the
+    // pre-upgrade FREE row contaminates the MINI quota.
+    const planChangedAt = new Date(Date.now() - 2 * 60 * 1000);
+    prismaMocks.userFindUnique.mockResolvedValue({ role: "MINI", legacyLimits: null, planChangedAt });
+    await checkExecutionEligibility({ ...baseArgs, userRole: "MINI" });
+    expect(capturedFilter.createdAt?.gte).toBeDefined();
+    if (capturedFilter.createdAt?.gte) {
+      // Must equal planChangedAt (which is later than monthStart in this scenario).
+      expect(capturedFilter.createdAt.gte.getTime()).toBe(planChangedAt.getTime());
+    }
+  });
+
+  it("Scenario D — paid user, planChangedAt months ago → period = monthStart (renewal rollover)", async () => {
+    // User upgraded 90 days ago; calendar month rolled over since.
+    // monthStart > planChangedAt, so monthStart wins (period = current month).
+    const planChangedAt = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    prismaMocks.userFindUnique.mockResolvedValue({ role: "MINI", legacyLimits: null, planChangedAt });
+    await checkExecutionEligibility({ ...baseArgs, userRole: "MINI" });
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    expect(capturedFilter.createdAt?.gte).toBeDefined();
+    if (capturedFilter.createdAt?.gte) {
+      expect(Math.abs(capturedFilter.createdAt.gte.getTime() - monthStart.getTime())).toBeLessThan(1000);
+    }
+  });
+
+  it("Scenario F — FREE user → period = epoch (lifetime semantics preserved)", async () => {
+    prismaMocks.userFindUnique.mockResolvedValue({ role: "FREE", legacyLimits: null, planChangedAt: null });
+    await checkExecutionEligibility({ ...baseArgs, userRole: "FREE" });
+    expect(capturedFilter.createdAt?.gte).toBeDefined();
+    if (capturedFilter.createdAt?.gte) {
+      // Epoch — effectively "lifetime"
+      expect(capturedFilter.createdAt.gte.getTime()).toBe(0);
+    }
+  });
+
+  it("Scenario F-2 — FREE user with planChangedAt set (post-downgrade) → still epoch (lifetime)", async () => {
+    // User downgraded from MINI to FREE; planChangedAt is set but role is FREE.
+    // FREE semantic is lifetime regardless — must NOT mistakenly use planChangedAt.
+    const planChangedAt = new Date(Date.now() - 60 * 1000);
+    prismaMocks.userFindUnique.mockResolvedValue({ role: "FREE", legacyLimits: null, planChangedAt });
+    await checkExecutionEligibility({ ...baseArgs, userRole: "FREE" });
+    if (capturedFilter.createdAt?.gte) {
+      expect(capturedFilter.createdAt.gte.getTime()).toBe(0);
+    }
+  });
+
+  it("Scenario H — workflow-lock independent of period count", async () => {
+    // Paid user with 0/3 used, but workflow already executed → blocked
+    // by workflow_already_executed lock, not by cap.
+    const planChangedAt = new Date(Date.now() - 5 * 60 * 1000);
+    prismaMocks.userFindUnique.mockResolvedValue({ role: "MINI", legacyLimits: null, planChangedAt });
+    prismaMocks.workflowFindUnique.mockResolvedValue({ name: "User Workflow A" });
+    prismaMocks.executionFindFirst.mockResolvedValue({ status: "SUCCESS" });
+    const result = await checkExecutionEligibility({
+      ...baseArgs,
+      userRole: "MINI",
+      intent: { kind: "workflow-run", catalogueIds: [], workflowId: "wf-test" },
+    });
+    expect(result.canExecute).toBe(false);
+    if (!result.canExecute) {
+      // Workflow lock fires regardless of cap state.
+      expect(result.blocks.some((b) => b.type === "workflow_already_executed")).toBe(true);
+    }
   });
 });
 

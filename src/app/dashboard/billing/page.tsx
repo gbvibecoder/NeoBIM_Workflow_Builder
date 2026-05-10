@@ -118,9 +118,38 @@ export default function BillingPage() {
           // FREE tier: lifetime executions (not monthly)
           setUsage({ used: completed.length, limit: planLimit, resetDate: "" });
         } else {
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          const monthCompleted = completed.filter(e => new Date(e.startedAt) >= monthStart);
-          setUsage({ used: monthCompleted.length, limit: planLimit < 0 ? 1000 : planLimit, resetDate: nextMonth.toISOString() });
+          // Period-scoped count for paid tiers — fetch the user's
+          // planChangedAt and use max(planChangedAt, monthStart) as the
+          // period boundary. This matches the server's
+          // getCurrentBillingPeriodStart logic so pre-upgrade FREE-tier
+          // executions don't pollute the post-upgrade quota (P0 bug §T).
+          fetch("/api/user/profile")
+            .then(r => r.ok ? r.json() : null)
+            .then(profile => {
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              const planChangedAt = profile?.planChangedAt
+                ? new Date(profile.planChangedAt)
+                : null;
+              const periodStart =
+                planChangedAt && planChangedAt > monthStart
+                  ? planChangedAt
+                  : monthStart;
+              const periodCompleted = completed.filter(
+                (e) => new Date(e.startedAt) >= periodStart,
+              );
+              setUsage({
+                used: periodCompleted.length,
+                limit: planLimit < 0 ? 1000 : planLimit,
+                resetDate: nextMonth.toISOString(),
+              });
+            })
+            .catch(() => {
+              // Profile fetch failed — fall back to monthStart-only filter
+              // (matches pre-fix behavior; server is still authoritative).
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              const monthCompleted = completed.filter(e => new Date(e.startedAt) >= monthStart);
+              setUsage({ used: monthCompleted.length, limit: planLimit < 0 ? 1000 : planLimit, resetDate: nextMonth.toISOString() });
+            });
         }
       })
       .catch(() => {

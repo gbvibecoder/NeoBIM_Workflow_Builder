@@ -253,6 +253,7 @@ async function updateUserSubscription(
         ...(isRoleChange && {
           legacyLimits: Prisma.DbNull,
           legacyLimitsSetAt: null,
+          planChangedAt: new Date(),
         }),
       },
     });
@@ -361,6 +362,7 @@ async function updateUserSubscription(
         ...(isRoleChange && {
           legacyLimits: Prisma.DbNull,
           legacyLimitsSetAt: null,
+          planChangedAt: new Date(),
         }),
       },
     });
@@ -631,6 +633,7 @@ async function cancelUserSubscription_LEGACY(stripeCustomerId: string) {
       ...(isRoleChange && {
         legacyLimits: Prisma.DbNull,
         legacyLimitsSetAt: null,
+        planChangedAt: new Date(),
       }),
     },
   });
