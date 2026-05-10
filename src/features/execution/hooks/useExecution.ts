@@ -815,20 +815,10 @@ async function executeNode(
       throw err;
     }
 
-    // Check rate limit remaining — warn user when running low
-    const rlRemaining = res.headers.get("X-RateLimit-Remaining");
-    const rlLimit = res.headers.get("X-RateLimit-Limit");
-    if (rlRemaining !== null && rlLimit !== null) {
-      const rem = parseInt(rlRemaining, 10);
-      const lim = parseInt(rlLimit, 10);
-      if (!isNaN(rem) && !isNaN(lim) && rem <= 2 && rem > 0) {
-        toast.warning(`${rem} execution${rem === 1 ? "" : "s"} remaining this month (${lim} total)`, {
-          description: "Upgrade your plan for more executions",
-          action: { label: "Upgrade", onClick: () => { window.location.href = "/dashboard/billing"; } },
-          duration: 8000,
-        });
-      }
-    }
+    // No "running low" warning toast — the sidebar usage counter is
+    // enough passive signal, and at-cap shows a hard ExecutionBlockModal
+    // (not a dismissable toast). The previous warning was visually
+    // intrusive, non-blocking, and tonally desperate.
 
     // Surface referral-bonus consumption so the user sees what's happening
     // instead of getting a silent free run. Only the FIRST node of each
