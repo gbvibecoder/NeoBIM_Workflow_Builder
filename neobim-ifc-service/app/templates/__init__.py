@@ -21,6 +21,12 @@ from app.templates.tier2_2bhk_pune import (
 )
 from app.templates.tier2_2bhk_pune_house import build_2bhk_pune_house
 from app.templates.tier2_2bhk_pune_tower import build_2bhk_pune_tower
+from app.templates.tier2_3bhk_pune import (
+    build_3bhk_pune_duplex,
+    build_3bhk_pune_template,
+)
+from app.templates.tier2_3bhk_pune_house import build_3bhk_pune_house
+from app.templates.tier2_3bhk_pune_tower import build_3bhk_pune_tower
 
 __all__ = [
     "build_1bhk_pune_duplex",
@@ -31,4 +37,8 @@ __all__ = [
     "build_2bhk_pune_house",
     "build_2bhk_pune_template",
     "build_2bhk_pune_tower",
+    "build_3bhk_pune_duplex",
+    "build_3bhk_pune_house",
+    "build_3bhk_pune_template",
+    "build_3bhk_pune_tower",
 ]
