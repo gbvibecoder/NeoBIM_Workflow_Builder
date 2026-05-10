@@ -1,9 +1,13 @@
 /**
  * BriefRendersTemplateCard — promo card for the templates page.
  *
- * Renders only when the canary feature flag is on
- * (`useFeatureFlags().briefRendersEnabled`). Non-eligible users see
- * nothing — there's no flash of "Beta" UI followed by a hidden link.
+ * Renders only when both gates pass:
+ *   1. The canary feature flag is on (`useFeatureFlags().briefRendersEnabled`)
+ *   2. The signed-in user is on the Pro tier (or higher / admin)
+ *
+ * Non-eligible users see nothing — there's no flash of "Beta" UI
+ * followed by a hidden link, and no teaser card for FREE users that
+ * would just lead to a 403 on the brief-renders page.
  *
  * Designed to slot into the templates page below the hero stats bar
  * without disturbing the existing layout. Plain CSS + inline styles so
@@ -14,12 +18,27 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import { canAccessTemplate } from "@/features/billing/lib/template-access";
 
 export function BriefRendersTemplateCard() {
   const { briefRendersEnabled } = useFeatureFlags();
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/user/dashboard-stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.userRole) setUserRole(d.userRole);
+      })
+      .catch(() => {});
+  }, []);
+
   if (!briefRendersEnabled) return null;
+  if (userRole === null) return null; // wait for role before deciding
+  if (!canAccessTemplate(userRole, "PRO")) return null;
 
   return (
     <div

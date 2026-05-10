@@ -1930,8 +1930,332 @@ git push origin main
 
 — end of §U —
 
+---
 
+# §V — Templates page tier-gating analysis (NO CODE CHANGES)
 
+> Analysis-only pass. Maps current gating reality, surfaces decision points,
+> previews implementation scope. No edits made beyond appending this section.
+
+## §V.1 — Template inventory (Part A)
+
+The 9 currently-visible templates plus 1 hidden + 1 canary-flag promo:
+
+| ID | Name | Category | Section in UI | Currently locked for FREE? | Hidden? | Logic location |
+|---|---|---|---|:---:|:---:|---|
+| `wf-08` | PDF Brief → IFC + Video Walkthrough | Concept Design | **Featured/Hero** (`FEATURED_ID`) | ✓ LOCKED | — | `templates/page.tsx:45` |
+| `wf-01` | Text Prompt → Floor Plan | Concept Design | Quick start (`QUICK_START_IDS`) | — | — | — |
+| `wf-06` | Floor Plan → Render + Video Walkthrough | Visualization | Quick start | ✓ LOCKED | — | `templates/page.tsx:45` |
+| `wf-09` | IFC Model → BOQ Cost Estimate | Cost Estimation | Core (`CORE_IDS`) | — | — | — |
+| `wf-11` | Building Photo → Renovation Video | Visualization | Core | ✓ LOCKED | — | `templates/page.tsx:45` |
+| `wf-03` | Text Prompt → 3D Building + IFC Export | BIM Export | Core | — | — | — |
+| `wf-05` | Floor Plan → Interactive 3D Model | 3D Modeling | Specialized | ✓ LOCKED | — | `templates/page.tsx:45` |
+| `wf-04` | Parameters → 3D Massing + IFC Export | BIM Export | Specialized | — | — | — |
+| `wf-12` | IFC Upload → Clash Detection | Site Analysis | Hidden | — | ✓ HIDDEN | `templates/page.tsx:48` |
+| `BriefRendersTemplateCard` | Brief → Renders (BETA) | (custom promo) | Below hero | (canary-flag gated) | — | `BriefRendersTemplateCard.tsx:22` |
+
+**Source for template definitions:** `src/features/workflows/constants/prebuilt-workflows.ts` (770 lines, 9 templates). **Zero `tier` / `requiredTier` / `premium` / `gated` fields** — confirmed by `grep -n "tier\|requiredTier\|PRO\|MINI..." prebuilt-workflows.ts` returning only one unrelated copy match ("premium finishes" in wf-11's description).
+
+## §V.2 — Gating mechanism findings (Part B)
+
+### How templates load
+
+`/dashboard/templates/page.tsx:609-619`:
+```ts
+const loadFromTemplate = useWorkflowStore(selectLoadFromTemplate);
+const router = useRouter();
+const filtered = useMemo(() => {
+  let list = PREBUILT_WORKFLOWS.filter(w => !HIDDEN_IDS.has(w.id));
+  if (activeCategory !== "All") list = list.filter(w => w.category === activeCategory);
+  // ... sort ...
+  return list;
+}, [activeCategory, sortBy]);
+```
+
+No role-based filtering. All non-hidden templates appear in the list for every tier. The hide is purely category-based + the global `HIDDEN_IDS` set.
+
+### How the lock state is computed
+
+`/dashboard/templates/page.tsx:45`:
+```ts
+const LOCKED_IDS = new Set(["wf-05", "wf-06", "wf-08", "wf-11"]);
+```
+
+`/dashboard/templates/page.tsx:566` — userRole hydrated from `/api/user/dashboard-stats`:
+```ts
+const [userRole, setUserRole] = useState("FREE");
+// ...
+fetch("/api/user/dashboard-stats").then(r => r.ok ? r.json() : null).then(d => { if (d?.userRole) setUserRole(d.userRole); }).catch(() => {});
+```
+
+`/dashboard/templates/page.tsx:133` (DarkFeaturedTemplate) + `:652` (renderLightCard) — same pattern:
+```ts
+const isLocked = LOCKED_IDS.has(wf.id) && userRole === "FREE";
+```
+
+**This is BINARY gating: FREE vs everyone-else.** No 5-tier ladder. MINI/STARTER/PRO/TEAM all see the same "everything unlocked" view as PRO would. The current product reality does not differentiate paid tiers' template access at all.
+
+### What happens on click
+
+`/dashboard/templates/page.tsx:621-631`:
+```ts
+const handleUse = (wf: WorkflowTemplate) => {
+  if (LOCKED_IDS.has(wf.id) && userRole === "FREE") {
+    setUpgradeModal({ wf });
+    return;
+  }
+  const template = PREBUILT_WORKFLOWS.find(w => w.id === wf.id);
+  if (!template) return;
+  loadFromTemplate(template as WorkflowTemplate);
+  awardXP("template-cloned");
+  router.push("/dashboard/canvas");
+};
+```
+
+Locked → opens `setUpgradeModal({ wf })` (a local in-component modal at line 1186-1240). Unlocked → calls `loadFromTemplate(template)` from Zustand store (no server-side persist) + routes to `/dashboard/canvas`.
+
+### Locked-card visual state
+
+`/dashboard/templates/page.tsx:674-698`:
+```ts
+{isLocked ? (
+  <div className={s.cardLock}><Lock size={9} /> PRO</div>
+) : (
+  <span className={isDarkIllus ? s.cardNumLight : s.cardNum}>{String(idx + 1).padStart(2, "0")}</span>
+)}
+// …
+<span className={isLocked ? s.cardCtaLocked : s.cardCta}>
+  {isLocked ? "Upgrade" : "Use template"} <ArrowRight size={13} />
+</span>
+```
+
+Card stays fully visible. Number badge ("01"/"02"...) is replaced by a `🔒 PRO` badge. CTA text swaps from "Use template" to "Upgrade".
+
+### Upgrade-modal copy (STALE)
+
+`/dashboard/templates/page.tsx:1213-1218`:
+```ts
+{ icon: "🎬", text: "AI video walkthroughs" },
+{ icon: "🧊", text: "Interactive 3D models" },
+{ icon: "🎨", text: "Photorealistic concept renders" },
+{ icon: "⚡", text: "Up to 100 workflow runs/month" },
+```
+
+> **Stale per §L:** PRO is now **45** workflows + executions, not 100. This copy was missed in the SSOT cascade audit (§L found and fixed 18 i18n keys + 4 source-file references but did NOT touch this hardcoded modal). Decision point Q-stale below.
+
+CTA: `Upgrade & Unlock This Workflow` → routes to `/dashboard/billing` (no `?plan=` deep link, no concrete price).
+
+### Server-side guard: NONE
+
+`workflow-store.ts:194-228` — `loadFromTemplate` is a pure Zustand state mutation: it copies template nodes/edges into the in-memory canvas. **No API call**. A user can:
+- Open DevTools, mutate `LOCKED_IDS` in-memory, click "Use template" → loads onto canvas
+- Or hit `/dashboard/canvas?id=template-X` if such routing exists
+- Or directly call `useWorkflowStore.getState().loadFromTemplate(template)` from console
+
+The template can then be **saved** (subject to `maxWorkflows` cap) and **executed** (subject to per-tier `runsPerMonth` cap from §T helper). So the cap-helper IS a backstop at execution time — but the workflow IS cloneable + saveable regardless of tier.
+
+This means **today's gating is purely cosmetic** for paid users (since they all see "unlocked"), and **lightly-bypassable for FREE** (devtools-savvy user can clone a locked template into their canvas; the actual run still hits the FREE 1-execution lifetime cap).
+
+### Brief → Renders card (canary, not tier)
+
+`BriefRendersTemplateCard.tsx:20-22`:
+```ts
+export function BriefRendersTemplateCard() {
+  const { briefRendersEnabled } = useFeatureFlags();
+  if (!briefRendersEnabled) return null;
+  // ...
+}
+```
+
+Feature-flag gated, not tier-gated. Tier gating would be **separate concern**.
+
+## §V.3 — Proposed badge design (Part C)
+
+### Visual spec
+
+| Property | Value |
+|---|---|
+| **Position** | top-right corner of card, replaces the existing number badge ("01", "02"...) when locked |
+| **Background** | `linear-gradient(135deg, #FFF8DC 0%, #FAEBD7 100%)` (cream so dark-gold text reads cleanly) — Light Render Studio palette |
+| **Border** | `1px solid rgba(184, 134, 11, 0.3)` |
+| **Text color** | `#8B6914` (dark gold; passes WCAG AA on cream) |
+| **Text** | tier-specific: `MINI`, `STARTER`, `PRO`, `PRO+` (or `TEAM`) |
+| **Font** | JetBrains Mono, 11px, weight 600, letter-spacing 0.5px |
+| **Icon** | `<Lock size={9} />` (already imported) — keeps existing visual language |
+| **Padding** | `4px 10px` |
+| **Border-radius** | `99px` (pill) |
+
+### Card interaction spec
+
+- Locked card stays fully visible (image, description, tags, meta) — no dim/blur
+- Number badge → tier badge swap
+- "Use template" CTA → `Upgrade to {tier}` CTA in same gold palette (`background: linear-gradient(135deg, #B8860B 0%, #D4AF37 100%)`, `color: #FFF`)
+- Hover state: subtle gold glow `box-shadow: 0 0 24px rgba(184, 134, 11, 0.15)`
+- Click on locked card → opens **canonical `ExecutionBlockModal`** with the `plan_limit` block built by helper's `makeCapBlock(role, limit)` — concrete pricing and SSOT-driven copy. **Replaces the in-component `upgradeModal`.**
+
+### Suggested per-template tier (STRAW PROPOSAL — DO NOT TREAT AS DECISIONS)
+
+| Template | Suggested tier | Rationale (for Rutik to override) |
+|---|---|---|
+| wf-01 Text → Floor Plan | **FREE** | Simple, 3 nodes, ~30 s — onboarding moment. Already FREE today. |
+| wf-03 Text → 3D Building + IFC | **MINI** (currently FREE) | Advanced node, ~30 s, IFC export — feels worth ₹99. Or keep FREE if you want strong free-tier value prop. |
+| wf-04 Parameters → 3D Massing + IFC | **MINI** | Same family as wf-03. |
+| wf-09 IFC → BOQ Cost Estimate | **MINI** (currently FREE) | The KEY product-market-fit feature — gating it would convert many FREE users. But also the value-demo. Coin-flip. |
+| wf-05 Floor Plan → Interactive 3D | **STARTER** (currently locked) | Already locked; STARTER feels right (visualization, but not video). |
+| wf-06 Floor Plan → Render + Video | **STARTER** (currently locked) | Video walkthrough — STARTER's videoPerMonth=2 supports this. |
+| wf-08 PDF Brief → IFC + Video (FEATURED) | **PRO** (currently locked) | The hero/showcase feature. PRO's videoPerMonth=7 + STARTER capacity. |
+| wf-11 Building Photo → Renovation Video | **PRO** (currently locked) | Cinematic Kling video — PRO. |
+| Brief→Renders (BETA) | **PRO** + canary flag | Already canary-gated; add tier as 2nd gate when canary opens. |
+
+## §V.4 — Decision matrix for Rutik (Part D)
+
+### Per-template tier (your call)
+
+| Template | Current state | Straw proposal | Your decision |
+|---|---|---|---|
+| wf-01 Text → Floor Plan | FREE-visible, unlocked | FREE | _____ |
+| wf-03 Text → 3D Building + IFC | FREE-visible, unlocked | MINI | _____ |
+| wf-04 Parameters → 3D Massing | FREE-visible, unlocked | MINI | _____ |
+| wf-05 Floor Plan → Interactive 3D | FREE locked → all paid see | STARTER | _____ |
+| wf-06 Floor Plan → Render + Video | FREE locked → all paid see | STARTER | _____ |
+| wf-08 PDF Brief → IFC + Video (FEATURED) | FREE locked → all paid see | PRO | _____ |
+| wf-09 IFC → BOQ Cost Estimate | FREE-visible, unlocked | MINI or FREE | _____ |
+| wf-11 Building Photo → Renovation Video | FREE locked → all paid see | PRO | _____ |
+| wf-12 IFC Upload → Clash Detection | HIDDEN | (keep hidden / promote to PRO) | _____ |
+
+### Q-list (ambiguity flags)
+
+- **Q1 — Click on locked card:** open ExecutionBlockModal (canonical, with concrete pricing) OR keep the current in-page `upgradeModal` (separate UI, stale copy)? Recommend ExecutionBlockModal — single source of truth.
+- **Q2 — Server-side guard:** add `/api/workflows/from-template` route that validates required tier vs user role before allowing `loadFromTemplate`? **Recommend YES** — currently a devtools-savvy FREE user can clone any template (the cap-check at run-time is the only real gate).
+- **Q3 — Featured/hero template (wf-08):** for users who already meet the required tier, hero stays as-is. For users below the tier — hero is currently `Try it now →` (orange button). Should it become `Upgrade to {tier}` for them, or hide entirely?
+- **Q4 — Gold badge always-visible vs hover-only:** Recommend always-visible — clearer signal, lower discovery friction.
+- **Q5 — Brief→Renders BETA:** keep canary-only OR add tier gate as 2nd condition (`canary AND tier ≥ PRO`)? Recommend `canary AND tier ≥ PRO` for production-safe rollout.
+- **Q6 — "Locked" filter chip:** add a "Show only available" toggle in the filter row so users can browse what they can use (currently all show together)? Nice-to-have, not P1.
+- **Q-stale — Modal copy `"Up to 100 workflow runs/month"`:** STALE per §L. Either fix in this same PR (1-line) or delete the local modal entirely if migrating to ExecutionBlockModal.
+
+## §V.5 — Implementation scope preview (Part E)
+
+If the proposal is approved (decisions in §V.4 settled), files that would be touched:
+
+| File | Change | LOC delta |
+|---|---|---:|
+| `src/types/workflow.ts` | Add `requiredTier?: PlanKey` to `WorkflowTemplate` | +5 |
+| `src/features/workflows/constants/prebuilt-workflows.ts` | Add `requiredTier: "MINI"` etc. to each of 9 templates | +9 |
+| `src/app/dashboard/templates/page.tsx` | Replace `LOCKED_IDS` set with `isLocked = !canAccess(userRole, wf.requiredTier)`. Remove local upgradeModal. Wire to ExecutionBlockModal via setRateLimitHit pattern. Update badge component to render tier-specific text + gold gradient. | net +50 (delete ~80, add ~130) |
+| `src/app/dashboard/templates/page.module.css` | Add `.tplCardLockGold`, `.tplCardCtaGold` rules with cream gradient + dark-gold text | +30 |
+| `src/features/billing/lib/template-access.ts` (new) | `canAccess(userRole, requiredTier): boolean` using `PLAN_RANK` | +25 |
+| `src/app/api/workflows/from-template/route.ts` (new, optional per Q2) | Server-side guard: validate `userRole` rank ≥ `template.requiredTier` rank before returning template payload | +60 |
+| `src/lib/i18n.ts` | New keys: `templates.upgradeBadge.{mini\|starter\|pro\|team}`, `templates.upgradeCta.{mini\|starter\|pro\|team}` — EN + DE | +24 |
+| `src/features/canvas/components/modals/ExecutionBlockModal.tsx` | Verify it handles a "template_locked" variant or reuse "plan_limit" with tier-target — minor adjustment | +10 |
+| `tests/unit/template-access.test.ts` (new) | Per-tier visibility matrix: 5 plans × 9 templates → 45 cases | +120 |
+| `tests/unit/templates-page.test.tsx` (new, optional) | Render snapshot per tier showing correct lock badge state | +80 |
+
+**LOC delta estimate: medium** (~400-500 LOC across 8-10 files, mostly mechanical). No new dependencies. No backend schema changes. The `template-access` helper would be SSOT-driven and reusable across the dashboard quick-start, the canvas template-load path, and any future template UI.
+
+**Implementation effort: ~2-3 hours** for the backend + helper + main page + CSS. Tests +1 hour. Brief→Renders polish +30 min. i18n +30 min. Total ~4-5 focused hours.
+
+**Risk:** medium-low. The `LOCKED_IDS` set is small + all references are in one file, so the refactor is contained. Main risks are (a) accidentally breaking the Brief→Renders BETA gating logic if not careful with the canary-AND-tier check, and (b) ensuring server-side guard doesn't break workflow-cloning for `?fromTemplate=` URL parameters or any existing deep-link flows.
+
+— end of §V (analysis-only, no code edits made) —
+
+# §W — Templates tier-ladder + gold lock badge (IMPLEMENTED)
+
+**Branch:** `feat/templates-tier-ladder-gold-badge`
+**Rollback tag:** `pre-templates-tier-ladder-rollback` (pushed)
+**Date:** 2026-05-10
+**Phase:** SHIP
+
+## §W.1 — What changed
+
+The templates page binary FREE-vs-paid gate (the `LOCKED_IDS` Set surfaced
+in §V) was replaced with a per-template `requiredTier` field + a single
+SSOT helper that both the client UI and the server route consume. A new
+gold "Upgrade to {tier}" badge replaces the dim "PRO" pill, and the local
+upgrade modal was deleted in favour of the canonical
+`ExecutionBlockModal` already shipped on the canvas.
+
+A new server route — `POST /api/workflows/from-template` — is now the
+authoritative tier gate: client checks are UX only.
+
+## §W.2 — Template tier matrix (locked decisions D1–D5)
+
+| Template | Required tier | Notes |
+|---|---|---|
+| wf-01 — Text → Floor Plan | none (FREE) | unchanged |
+| wf-03 — Text → Concept Building | none (FREE) | unchanged |
+| wf-04 — IFC Exporter | none (FREE) | unchanged |
+| wf-05 — Floor Plan → Interactive 3D | **MINI** | promoted: simplest of locked set |
+| wf-06 — Floor Plan → Render + Video | **STARTER** | mid-complexity |
+| wf-08 — PDF Brief → IFC + Video (HERO) | **PRO** | full pipeline, hero placement |
+| wf-09 — IFC → BOQ | none (FREE) | unchanged |
+| wf-11 — Building Photo → Renovation Video | **STARTER** | mid-complexity |
+| wf-12 — IFC Clash Detection | **STARTER** | unhidden — was in `HIDDEN_IDS`, now gated |
+
+## §W.3 — Files changed
+
+| File | Status | Purpose |
+|---|---|---|
+| `src/types/workflow.ts` | modified | adds `requiredTier?: "FREE"\|"MINI"\|"STARTER"\|"PRO"\|"TEAM"` to `WorkflowTemplate` |
+| `src/features/workflows/constants/prebuilt-workflows.ts` | modified | tags wf-05/06/08/11/12 with `requiredTier` |
+| `src/features/billing/lib/template-access.ts` | NEW | `canAccessTemplate()` + `getUpgradeTargetForTemplate()` — SSOT |
+| `src/features/workflows/components/TemplateLockBadge.tsx` | NEW | gold gradient pill, Crown for PRO/TEAM, Lock for MINI/STARTER |
+| `src/app/dashboard/templates/page.tsx` | modified | drops `LOCKED_IDS` + `HIDDEN_IDS` + local upgradeModal; wires `ExecutionBlockModal` + `TemplateLockBadge`; client `handleUse` calls the new server route |
+| `src/app/api/workflows/from-template/route.ts` | NEW | server-side tier gate + `Workflow` row creation |
+| `src/features/brief-renders/components/BriefRendersTemplateCard.tsx` | modified | gates by canary AND `canAccessTemplate(role, "PRO")` |
+| `src/lib/i18n.ts` | modified | EN+DE keys: `templates.locked.{badge.{MINI/STARTER/PRO/TEAM},cta.upgradeTo,tooltip}` |
+| `tests/unit/template-access.test.ts` | NEW | 11 tests — admin bypass, exact match, higher-tier, lower-tier, anonymous, FREE/undefined |
+| `tests/integration/from-template-route.test.ts` | NEW | 11 tests — auth, validation, tier gate (MINI/PRO/admin), workflow cap, name auto-suffix |
+
+## §W.4 — Validation gauntlet
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | ✓ EXIT 0 |
+| `npx vitest run tests/unit/template-access.test.ts` | ✓ 11/11 passed |
+| `npx vitest run tests/integration/from-template-route.test.ts` | ✓ 11/11 passed |
+| `npm test` (full suite) | ✓ 3486/3494 passed; 7 pre-existing failures (brief-renders/banners.test, ifc-viewcube, plan-consistency, ShotCell, BriefRenderShell) — verified unchanged on HEAD without §W diff |
+| `npm run lint` | ✓ 0 new errors in any §W file |
+| `npm run build` | ✓ production build succeeds, `/dashboard/templates` static-rendered |
+| Stale-copy hunt: `grep "100 runs\|Up to 100"` | ✓ no matches |
+| Removed-symbol hunt: `grep "LOCKED_IDS\|HIDDEN_IDS\|upgradeModal"` | ✓ no matches |
+
+## §W.5 — Behavioural delta (UX → server)
+
+**Before:** binary FREE-vs-paid gate driven by hardcoded `LOCKED_IDS`. FREE
+users saw a generic "PRO" badge and a sarcastic upgrade modal containing
+the stale "Up to 100 workflow runs/month" line. No server-side check —
+a determined user could clone any template via the canvas store.
+
+**After:** four-tier ladder driven by `WorkflowTemplate.requiredTier`.
+Locked templates display a gold "Upgrade to Mini/Starter/Pro/Team" badge
+in the top-right corner of the card image; the same label drives the CTA
+text and the dynamic message in `ExecutionBlockModal`. Clicking "Use
+template" hits `POST /api/workflows/from-template` which:
+
+  1. requires a session (401 if not signed in)
+  2. enforces the rate limit (10/min/user)
+  3. validates the templateId against `PREBUILT_WORKFLOWS`
+  4. re-runs `canAccessTemplate()` against the **DB** role (not the JWT)
+  5. enforces `maxWorkflows` for FREE/MINI/STARTER (admin bypass)
+  6. auto-suffixes the workflow name on collision
+  7. creates the `Workflow` row + fires `trackFirstWorkflow`
+
+The route returns 403 with `BILL_001` and an `Upgrade to {tier}` action
+URL on tier-gate failure, which the client surfaces via the canonical
+`ExecutionBlockModal` — same UI as the canvas-side block.
+
+## §W.6 — Outstanding follow-ups (not blocking)
+
+- The dark-theme branch (`theme === "dark"`) of the templates page is
+  preserved verbatim; it now uses the same `canAccessTemplate` helper +
+  shared modal but its visuals weren't reskinned with the gold badge.
+  Light theme is the production default.
+- 7 pre-existing test failures remain (banners/JobStatusBanner stage
+  label fallback, ifc-viewcube right-side panel guard, plan-consistency
+  interpolation, BriefRenderShell routing, ShotCell idempotency).
+  None are related to Phase W; tracked separately.
+
+— end of §W (Phase W shipped) —
 
 
 

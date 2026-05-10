@@ -12,7 +12,19 @@ import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
 import { awardXP } from "@/lib/award-xp";
 import { BriefRendersTemplateCard } from "@/features/brief-renders/components/BriefRendersTemplateCard";
+import { canAccessTemplate, getUpgradeTargetForTemplate } from "@/features/billing/lib/template-access";
+import { TemplateLockBadge } from "@/features/workflows/components/TemplateLockBadge";
+import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
 import s from "./page.module.css";
+
+interface RateLimitInfo {
+  title: string;
+  message: string;
+  action?: string;
+  actionUrl?: string;
+  secondaryAction?: string;
+  secondaryActionUrl?: string;
+}
 
 /* ── Lazy-loaded 3D scenes — three + @react-three/fiber are ~750KB,
        so split them out of the templates initial chunk. ── */
@@ -42,10 +54,10 @@ const SORT_OPTION_KEYS: Record<string, string> = {
 };
 
 const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, advanced: 2 };
-const LOCKED_IDS = new Set(["wf-05", "wf-06", "wf-08", "wf-11"]);
+// Locked templates are now driven by `requiredTier` on each WorkflowTemplate
+// + canAccessTemplate(userRole, requiredTier) — see template-access.ts.
 const QUICK_START_IDS = ["wf-08", "wf-01", "wf-06"];
 const CORE_IDS = ["wf-09", "wf-11", "wf-03"];
-const HIDDEN_IDS = new Set(["wf-12"]);
 const FEATURED_ID = "wf-08";
 
 const CATEGORY_LABEL_KEYS: Record<string, TranslationKey> = {
@@ -130,7 +142,8 @@ function DarkFeaturedTemplate({ wf, index, isMobile, onUse, t, userRole }: {
 }) {
   const catColor = CATEGORY_COLORS[wf.category] ?? "#06B6D4";
   const catRgb = hexToRgb(catColor);
-  const isLocked = LOCKED_IDS.has(wf.id) && userRole === "FREE";
+  const isLocked = !canAccessTemplate(userRole, wf.requiredTier);
+  const upgradeTarget = getUpgradeTargetForTemplate(userRole, wf.requiredTier);
   const reversed = index % 2 === 1;
   const pipelineSteps = wf.name.split("→").map(s => s.trim());
   const cardRef = useRef<HTMLDivElement>(null);
@@ -195,7 +208,7 @@ function DarkFeaturedTemplate({ wf, index, isMobile, onUse, t, userRole }: {
           <motion.div variants={itemVariants}>
             <button className="tpl-featured-cta" style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 28px", borderRadius: 14, cursor: "pointer", background: isLocked ? "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.06))" : `linear-gradient(135deg, rgba(${catRgb}, 0.15), rgba(${catRgb}, 0.06))`, border: isLocked ? "1px solid rgba(245,158,11,0.35)" : `1px solid rgba(${catRgb}, 0.3)`, color: "#fff", fontSize: 14, fontWeight: 700, transition: "all 0.3s ease", boxShadow: isLocked ? "0 0 24px rgba(245,158,11,0.1)" : `0 0 24px rgba(${catRgb}, 0.08)`, position: "relative", overflow: "hidden" }}>
               {isLocked && <Lock size={14} style={{ color: "#F59E0B", position: "relative", zIndex: 1 }} />}
-              <span style={{ position: "relative", zIndex: 1 }}>{isLocked ? "Unlock Template" : "Use This Template"}</span>
+              <span style={{ position: "relative", zIndex: 1 }}>{isLocked && upgradeTarget ? `Upgrade to ${upgradeTarget.label}` : "Use This Template"}</span>
               {isLocked ? <Sparkles size={14} style={{ color: "#F59E0B", position: "relative", zIndex: 1 }} /> : <ArrowRight size={16} className="tpl-cta-arrow" style={{ color: catColor, position: "relative", zIndex: 1, transition: "transform 0.3s ease" }} />}
             </button>
           </motion.div>
@@ -564,7 +577,7 @@ export default function TemplatesPage() {
   const [sortBy, setSortBy] = useState("default");
   const [showSort, setShowSort] = useState(false);
   const [userRole, setUserRole] = useState("FREE");
-  const [upgradeModal, setUpgradeModal] = useState<{ wf: WorkflowTemplate } | null>(null);
+  const [rateLimitHit, setRateLimitHit] = useState<RateLimitInfo | null>(null);
   const [isSticky, setIsSticky] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -610,7 +623,7 @@ export default function TemplatesPage() {
   const router = useRouter();
 
   const filtered = useMemo(() => {
-    let list = PREBUILT_WORKFLOWS.filter(w => !HIDDEN_IDS.has(w.id));
+    let list = [...PREBUILT_WORKFLOWS];
     if (activeCategory !== "All") list = list.filter(w => w.category === activeCategory);
     if (sortBy === "simple") list.sort((a, b) => COMPLEXITY_ORDER[a.complexity] - COMPLEXITY_ORDER[b.complexity]);
     if (sortBy === "advanced") list.sort((a, b) => COMPLEXITY_ORDER[b.complexity] - COMPLEXITY_ORDER[a.complexity]);
@@ -618,16 +631,55 @@ export default function TemplatesPage() {
     return list;
   }, [activeCategory, sortBy]);
 
-  const handleUse = (wf: WorkflowTemplate) => {
-    if (LOCKED_IDS.has(wf.id) && userRole === "FREE") {
-      setUpgradeModal({ wf });
+  const handleUse = async (wf: WorkflowTemplate) => {
+    // Client-side tier gate — surfaces the canonical ExecutionBlockModal
+    // so the experience matches the canvas-side block. The server route
+    // re-checks this; the client check is UX only.
+    if (!canAccessTemplate(userRole, wf.requiredTier)) {
+      const target = getUpgradeTargetForTemplate(userRole, wf.requiredTier);
+      const tierLabel = target?.label ?? "Pro";
+      setRateLimitHit({
+        title: `Template not available on your plan`,
+        message: `"${wf.name}" needs the ${tierLabel} plan. Upgrade to unlock it and the rest of the ${tierLabel} catalogue.`,
+        action: `Upgrade to ${tierLabel}`,
+        actionUrl: "/dashboard/billing",
+      });
       return;
     }
-    const template = PREBUILT_WORKFLOWS.find(w => w.id === wf.id);
-    if (!template) return;
-    loadFromTemplate(template as WorkflowTemplate);
-    awardXP("template-cloned");
-    router.push("/dashboard/canvas");
+
+    // Server creates the Workflow row and re-validates the tier — this
+    // is the authoritative gate. A locked template that slips past the
+    // client check still 403s here.
+    try {
+      const res = await fetch("/api/workflows/from-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: wf.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = data?.error ?? {};
+        setRateLimitHit({
+          title: typeof err.title === "string" ? err.title : "Couldn't open template",
+          message: typeof err.message === "string" ? err.message : "Please try again.",
+          action: typeof err.action === "string" ? err.action : undefined,
+          actionUrl: typeof err.actionUrl === "string" ? err.actionUrl : undefined,
+        });
+        return;
+      }
+      // Optimistic local state — the canvas already accepts the template
+      // load via Zustand and will reconcile against the persisted row when
+      // it mounts with `?id=...`.
+      const template = PREBUILT_WORKFLOWS.find(w => w.id === wf.id);
+      if (template) loadFromTemplate(template as WorkflowTemplate);
+      awardXP("template-cloned");
+      router.push(`/dashboard/canvas?id=${encodeURIComponent(data.workflowId)}`);
+    } catch {
+      setRateLimitHit({
+        title: "Network error",
+        message: "Couldn't reach the server. Please check your connection and try again.",
+      });
+    }
   };
 
   const SORT_OPTIONS = Object.entries(SORT_OPTION_KEYS).map(([value, key]) => ({ value, label: t(key as TranslationKey) }));
@@ -649,7 +701,8 @@ export default function TemplatesPage() {
 
   /* ── Shared render helpers ── */
   function renderLightCard(wf: WorkflowTemplate, idx: number) {
-    const isLocked = LOCKED_IDS.has(wf.id) && userRole === "FREE";
+    const isLocked = !canAccessTemplate(userRole, wf.requiredTier);
+    const upgradeTarget = getUpgradeTargetForTemplate(userRole, wf.requiredTier);
     const IllusComp = ILLUS_MAP[wf.id];
     const isDarkIllus = wf.id === "wf-06" || wf.id === "wf-03";
     const isCostCard = wf.category === "Cost Estimation";
@@ -671,8 +724,8 @@ export default function TemplatesPage() {
             <span className={isDarkIllus ? s.cardCornerDarkDot : isCostCard ? s.cardCornerCostDot : s.cardCornerDot} />
             {wf.category}
           </div>
-          {isLocked ? (
-            <div className={s.cardLock}><Lock size={9} /> PRO</div>
+          {isLocked && upgradeTarget ? (
+            <TemplateLockBadge tier={upgradeTarget.tier} label={upgradeTarget.label} className={s.cardLock} />
           ) : (
             <span className={isDarkIllus ? s.cardNumLight : s.cardNum}>{String(idx + 1).padStart(2, "0")}</span>
           )}
@@ -695,7 +748,7 @@ export default function TemplatesPage() {
               {wf.tags.slice(0, 3).map(tag => <span key={tag} className={s.tag}>{tag}</span>)}
             </div>
             <span className={isLocked ? s.cardCtaLocked : s.cardCta}>
-              {isLocked ? "Upgrade" : "Use template"} <ArrowRight size={13} />
+              {isLocked && upgradeTarget ? `Upgrade to ${upgradeTarget.label}` : "Use template"} <ArrowRight size={13} />
             </span>
           </div>
         </div>
@@ -814,33 +867,8 @@ export default function TemplatesPage() {
           @media (min-width: 769px) and (max-width: 1024px) { .tpl-hero-title { font-size: 34px !important; } }
           @media (max-width: 480px) { .tpl-hero { min-height: 260px !important; padding: 28px 16px 20px !important; } .tpl-hero-title { font-size: 24px !important; } }
         `}</style>
-        {/* Dark upgrade modal */}
-        <AnimatePresence>
-          {upgradeModal && (
-            <>
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setUpgradeModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", zIndex: 9990 }} />
-              <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} style={{ position: "fixed", inset: 0, zIndex: 9991, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", padding: 16 }}>
-                <div style={{ width: "100%", maxWidth: 460, borderRadius: 24, overflow: "hidden", background: "linear-gradient(180deg, #111125 0%, #0A0A18 100%)", border: "1px solid rgba(245,158,11,0.15)", boxShadow: "0 32px 100px rgba(0,0,0,0.7), 0 0 60px rgba(245,158,11,0.05)", pointerEvents: "auto" }}>
-                  <div style={{ height: 3, background: "linear-gradient(90deg, #F59E0B, #EF4444, #8B5CF6, #F59E0B)" }} />
-                  <div style={{ padding: "36px 32px 20px", textAlign: "center", background: "radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.06) 0%, transparent 70%)" }}>
-                    <div style={{ fontSize: 64, lineHeight: 1, marginBottom: 8, animation: "upgrade-float 3s ease-in-out infinite" }}>{"\u{1F98A}"}</div>
-                    <h2 style={{ fontSize: 22, fontWeight: 800, color: "#F0F2F8", letterSpacing: "-0.03em", margin: "0 0 8px", lineHeight: 1.3 }}>Whoa, easy there! {"\u{1F525}"}</h2>
-                    <p style={{ fontSize: 14, color: "#9898B0", lineHeight: 1.6, margin: "0 0 4px" }}><strong style={{ color: "#F59E0B" }}>&ldquo;{upgradeModal.wf.name}&rdquo;</strong> is a premium workflow &mdash; the kind that makes clients go <em style={{ color: "#10B981" }}>&ldquo;wait, you built that?!&rdquo;</em></p>
-                  </div>
-                  <div style={{ padding: "0 32px 24px" }}>
-                    <div style={{ background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.1)", borderRadius: 16, padding: "16px 20px", marginBottom: 20 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#F59E0B", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 12 }}>What you&apos;re missing out on</div>
-                      {[{ icon: "\u{1F3AC}", text: "AI video walkthroughs" }, { icon: "\u{1F9CA}", text: "Interactive 3D models" }, { icon: "\u{1F3A8}", text: "Photorealistic concept renders" }, { icon: "\u26A1", text: "Up to 100 workflow runs/month" }].map((item, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}><span style={{ fontSize: 16 }}>{item.icon}</span><span style={{ fontSize: 13, color: "#C0C0D8" }}>{item.text}</span></div>))}
-                    </div>
-                    <button onClick={() => { setUpgradeModal(null); router.push("/dashboard/billing"); }} style={{ width: "100%", padding: "14px 24px", borderRadius: 14, background: "linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)", color: "#fff", fontSize: 15, fontWeight: 800, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 8px 32px rgba(245,158,11,0.25)", transition: "all 0.2s ease", letterSpacing: "-0.01em" }}><Zap size={18} />Upgrade &amp; Unlock This Workflow<ArrowRight size={16} /></button>
-                    <button onClick={() => setUpgradeModal(null)} style={{ width: "100%", marginTop: 10, padding: "10px", borderRadius: 12, background: "transparent", border: "none", color: "#55556A", fontSize: 12, cursor: "pointer", transition: "color 0.15s" }}>Nah, I&apos;ll stick with free for now {"\u{1F422}"}</button>
-                  </div>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-        <style>{`@keyframes upgrade-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }`}</style>
+        {/* Tier-gate / rate-limit modal \u2014 canonical, shared with WorkflowCanvas */}
+        <ExecutionBlockModal rateLimitHit={rateLimitHit} onDismiss={() => setRateLimitHit(null)} />
       </div>
     );
   }
@@ -849,7 +877,8 @@ export default function TemplatesPage() {
      LIGHT THEME — Render Studio Design System
      ═══════════════════════════════════════════════════════════════════ */
 
-  const featuredIsLocked = featuredWf ? LOCKED_IDS.has(featuredWf.id) && userRole === "FREE" : false;
+  const featuredIsLocked = featuredWf ? !canAccessTemplate(userRole, featuredWf.requiredTier) : false;
+  const featuredUpgradeTarget = featuredWf ? getUpgradeTargetForTemplate(userRole, featuredWf.requiredTier) : null;
   const FeaturedIllus = featuredWf ? ILLUS_MAP[featuredWf.id] : null;
 
   return (
@@ -1085,7 +1114,9 @@ export default function TemplatesPage() {
                       <span>&middot;</span>
                       <span>{featuredWf.estimatedRunTime}</span>
                     </div>
-                    {featuredIsLocked && <div className={s.lockBadge}><Lock size={9} /> PRO</div>}
+                    {featuredIsLocked && featuredUpgradeTarget && (
+                      <TemplateLockBadge tier={featuredUpgradeTarget.tier} label={featuredUpgradeTarget.label} className={s.lockBadge} />
+                    )}
                     <h2 className={s.featuredTitle}>
                       {(() => { const parts = featuredWf.name.split("\u2192").map(x => x.trim()); return parts.length >= 2 ? <>{parts[0]} <em>&rarr; {parts.slice(1).join(" \u2192 ")}</em></> : featuredWf.name; })()}
                     </h2>
@@ -1099,9 +1130,12 @@ export default function TemplatesPage() {
                         <span key={out} className={s.ionodeOutput}><Building2 size={11} /> {out.split("(")[0].trim()}</span>
                       ))}
                     </div>
-                    <button className={featuredIsLocked ? s.useBtnLocked : s.useBtn} aria-label={featuredIsLocked ? "Upgrade to unlock" : "Use this template"}>
+                    <button
+                      className={featuredIsLocked ? s.useBtnLocked : s.useBtn}
+                      aria-label={featuredIsLocked && featuredUpgradeTarget ? `Upgrade to ${featuredUpgradeTarget.label}` : "Use this template"}
+                    >
                       {featuredIsLocked && <Lock size={14} />}
-                      {featuredIsLocked ? "Upgrade to unlock" : "Use this template"}
+                      {featuredIsLocked && featuredUpgradeTarget ? `Upgrade to ${featuredUpgradeTarget.label}` : "Use this template"}
                       <ArrowRight size={16} />
                     </button>
                   </div>
@@ -1182,63 +1216,8 @@ export default function TemplatesPage() {
       </main>
 
       {/* ════════════════════════ LIGHT UPGRADE MODAL ════════════════════════ */}
-      <AnimatePresence>
-        {upgradeModal && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setUpgradeModal(null)}
-              className={s.upgradeOverlay}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className={s.upgradeCenter}
-            >
-              <div className={s.upgradeCard}>
-                <div className={s.upgradeBar} />
-                <div className={s.upgradeIllus}>
-                  <div className={s.upgradeEmoji}>{"\u{1F98A}"}</div>
-                  <h2 className={s.upgradeH2}>Whoa, easy there!</h2>
-                  <p className={s.upgradeSub}>
-                    <span className={s.upgradeSubName}>&ldquo;{upgradeModal.wf.name}&rdquo;</span> is a premium workflow &mdash; the kind that makes clients go{" "}
-                    <span className={s.upgradeSubPunch}>&ldquo;wait, you built that?!&rdquo;</span>
-                  </p>
-                </div>
-                <div className={s.upgradeBody}>
-                  <div className={s.upgradeFeatures}>
-                    <div className={s.upgradeFeatLabel}>What you&apos;re missing out on</div>
-                    {[
-                      { icon: "\u{1F3AC}", text: "AI video walkthroughs" },
-                      { icon: "\u{1F9CA}", text: "Interactive 3D models" },
-                      { icon: "\u{1F3A8}", text: "Photorealistic concept renders" },
-                      { icon: "\u26A1", text: "Up to 100 workflow runs/month" },
-                    ].map((item, i) => (
-                      <div key={i} className={s.upgradeFeatItem}>
-                        <span className={s.upgradeFeatIcon}>{item.icon}</span>
-                        <span className={s.upgradeFeatText}>{item.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    className={s.upgradeMainBtn}
-                    onClick={() => { setUpgradeModal(null); router.push("/dashboard/billing"); }}
-                  >
-                    <Zap size={18} />
-                    Upgrade &amp; Unlock This Workflow
-                    <ArrowRight size={16} />
-                  </button>
-                  <button className={s.upgradeDismiss} onClick={() => setUpgradeModal(null)}>
-                    Nah, I&apos;ll stick with free for now {"\u{1F422}"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {/* Tier-gate / rate-limit modal \u2014 canonical, shared with WorkflowCanvas */}
+      <ExecutionBlockModal rateLimitHit={rateLimitHit} onDismiss={() => setRateLimitHit(null)} />
     </div>
   );
 }
