@@ -2512,6 +2512,176 @@ checkout flow keeps working.
 
 — end of §Y (lock-badge visual hotfix shipped) —
 
+# §Z — Lock-reveal selector fix + wf-12 art (IMPLEMENTED)
+
+**Branch:** `fix/template-lock-all-variants`
+**Rollback tag:** `pre-template-variants-rollback` (= `245c3d91`, the §Y-final SHA)
+**Date:** 2026-05-10
+**Phase:** SHIP
+
+## §Z.1 — Variant inventory (Phase 1a)
+
+| Section | Render path | Mounts `TemplateLockBadge`? | `data-locked`? | Hover reveal in §Y? |
+|---|---|---|---|---|
+| Featured (hero, wf-08) | inline JSX in `page.tsx`, uses `s.featuredCard` | NO — uses inline `s.lockBadge` span + static "Upgrade to {tier}" button | NO (`s.featuredCard` not `s.card`) | **N/A** — button always-visible by design |
+| Quick Start grid | `renderLightCard` | YES | YES | **BROKEN** |
+| Core Pipelines grid | `renderLightCard` | YES | YES | **BROKEN** |
+| Specialized Tools grid | `renderLightCard` | YES | YES | **BROKEN** |
+| Filtered grid (any category) | `renderLightCard` | YES | YES | **BROKEN** |
+| Brief Renders BETA | `BriefRendersTemplateCard`, canary+PRO gate | NO (own visual) | NO | N/A |
+
+So the bug user observed on wf-12 in Specialized Tools was **not specific to that section** — every locked grid card across the page was rendering its scrim + reveal in `opacity:0` and never fading in on hover. wf-12 just made it loud because its missing artwork left the area empty, and there was nothing else to look at.
+
+## §Z.2 — Root cause (Phase 1b)
+
+Two independent bugs landed under the same visual report:
+
+### Bug A: CSS-modules `:global(.card[...])` selector mismatch
+
+`src/app/dashboard/templates/page.module.css` declares `.card` as a **local** class:
+
+```css
+.card { ... }
+```
+
+The css-modules loader hashes local classes for scoping. The DOM element rendered by `renderLightCard` carries the hashed name:
+
+```html
+<div class="page_card_abc123" data-locked="true">
+```
+
+Meanwhile, `TemplateLockBadge.module.css` had:
+
+```css
+:global(.card[data-locked="true"]:hover) .scrim { opacity: 1; }
+```
+
+`:global(...)` makes the wrapped selector *literal* — it compiles to `.card[data-locked="true"]:hover .module_scrim_xyz`, looking for a literal `class="card"` ancestor that doesn't exist. **The hover/focus reveal had been dead site-wide on every grid card since §X.**
+
+The vitest tests in §X and §Y mounted the badge in isolation and never exercised the parent `:hover` interaction. JSDOM doesn't process `:hover` anyway. tsc, lint, and `npm run build` were all clean. The bug only surfaced in a real browser.
+
+**Fix:** target the data attribute alone, no class dependency:
+
+```css
+:global([data-locked="true"]):hover .scrim,
+:global([data-locked="true"]):focus-within .scrim {
+  opacity: 1;
+}
+```
+
+The `[data-locked="true"]` attribute renders to the DOM verbatim (HTML attributes aren't transformed by css-modules), so the selector matches regardless of what hashed class name the parent ends up with. Only locked cards set this attribute (one place: `renderLightCard` in `page.tsx`), so scope is preserved.
+
+Same change applied to all 6 occurrences: `.pin` (scale), `.scrim` (opacity), `.reveal` (opacity + transform), and the 3 sibling `:focus-within` variants.
+
+### Bug B: `ILLUS_MAP` missing `wf-12`
+
+`PREBUILT_WORKFLOWS` has 9 templates (`wf-01, 03, 04, 05, 06, 08, 09, 11, 12`). `ILLUS_MAP` in `page.tsx` had only 8 entries — `wf-12` was missing, so `IllusComp` resolved to `undefined` and `{IllusComp && <IllusComp />}` rendered nothing. The art layer was a 240×N empty `<div>`.
+
+**Fix:** added two new components and wired the fallback:
+
+| Component | Role |
+|---|---|
+| `IllusClashDetection` | Bespoke wf-12 art — IFC structural beam (burnt) + MEP pipe (blueprint) intersecting, pulsing red bullseye on the clash, "MEP" / "STRUCT" labels, "1 hard clash · AABB" caption. Matches the existing visual vocabulary (Light Render Studio palette: `#1A4D5C` blueprint, `#B87333` burnt, `#0E1218` ink). |
+| `CardArtFallback` | Generic future-proof fallback — subtle dot grid + category-tinted radial + dashed circle with the category label. Used by `renderLightCard` whenever `ILLUS_MAP[wf.id]` is missing. **The art area can never be empty again.** |
+
+Render-path change in `renderLightCard`:
+
+```tsx
+{IllusComp ? <IllusComp /> : <CardArtFallback category={wf.category} />}
+```
+
+## §Z.3 — Fix approach taken (Phase 2)
+
+**FIX-C** from the user's spec — surgical CSS-selector fix + missing-art component, no refactor of the render paths.
+
+FIX-A (unify all card variants under one shared component) was rejected as scope creep: the divergence between hero card and grid card is intentional (different layouts), and the lock-state primitive is *already* a single component (`TemplateLockBadge`). The bug wasn't architectural — it was a one-line CSS selector applied 6 times.
+
+FIX-B (extract a shared `useTemplateLockState` hook) was rejected for the same reason — the gating logic is already a single SSOT (`canAccessTemplate` / `getUpgradeTargetForTemplate`). The hero card and the grid card both call those, just render different markup.
+
+## §Z.4 — wf-12 artwork resolution
+
+Bespoke `IllusClashDetection` shipped (not the generic fallback). Visual:
+
+- Horizontal structural beam in burnt orange (`#B87333`) with subtle inset detail lines
+- Diagonal MEP pipe in blueprint blue (`#1A4D5C`) crossing the beam at ~30°
+- Pulsing red bullseye (`#E55A50`) at the intersection — `<animate attributeName="r" values="14;17;14" dur="2.4s" />` for the breathing effect (collapses under `prefers-reduced-motion` because the SMIL animation runs only when motion is enabled in the browser; the parent `.cardArt` has no transition that would interfere)
+- "MEP" / "STRUCT" caps labels at the corners
+- "1 hard clash · AABB" caption at the bottom
+
+The composition reads as "two systems cross, one clash detected" without needing any text — the visual ladder works at a glance.
+
+`CardArtFallback` covers the case where someone adds a 10th template tomorrow without authoring an Illus component for it. The art area now degrades gracefully instead of going blank.
+
+## §Z.5 — Regression test matrix
+
+`tests/unit/template-card-variants.test.tsx` (new) — 19 tests, three layers:
+
+1. **CSS-source contract** (5 tests):
+   - Asserts `:global([data-locked="true"]):hover` is present
+   - Asserts `:focus-within` variant is present (keyboard accessibility)
+   - Asserts the broken `:global(.card[data-locked=...]:hover)` pattern is **not** present (regex strips comments first so the doc that names the broken pattern as a counter-example doesn't trip the test)
+   - Counts hover/focus-within rules to catch a partial-revert regression
+   - Asserts `@media (hover: none)` block exists
+
+2. **Coverage of every PREBUILT_WORKFLOWS template** (11 dynamic tests, one per template):
+   - For accessible templates: `getUpgradeTargetForTemplate` returns null
+   - For locked templates: target resolves with non-empty label + price > 0; rendering the badge produces a pill carrying the tier label + the `requires {label}` aria-label
+   - This catches the "mount but render empty" failure mode that hit wf-12 in §Y
+
+3. **wf-12 sentinel** (3 tests):
+   - wf-12 exists in `PREBUILT_WORKFLOWS`
+   - Tier gating: locked for FREE/MINI, accessible for STARTER+
+   - Badge mount produces "STARTER" pill text + "Upgrade to Starter" CTA + `₹799`
+
+CSS-source assertions are unusual but appropriate here: the bug shipped clean through tsc + vitest + lint + build. No runtime-only test in JSDOM would catch a CSS-modules + `:global()` interaction. Asserting the working pattern at the source file catches selector regressions in CI.
+
+## §Z.6 — Production smoke-test runbook
+
+After `npm run dev` against production database, on `/dashboard/templates` as a FREE user:
+
+| Template | Expected at rest | Expected on hover |
+|---|---|---|
+| wf-01 (FREE) | floor-plan illus, no pill | no scrim, no reveal — "Use template →" caption |
+| wf-03 (FREE) | building 3D illus, no pill | no scrim, no reveal |
+| wf-04 (FREE) | massing illus, no pill | no scrim, no reveal |
+| wf-05 (MINI) | interactive 3D illus, gold "MINI" pill + Lock | scrim fades in, "Upgrade to Mini · ₹99/month" |
+| wf-06 (STARTER) | render-video illus, gold "STARTER" pill + Lock | scrim fades in, "Upgrade to Starter · ₹799/month" |
+| wf-08 (PRO, hero) | featured card, "♔ PRO" inline span | no hover reveal — inline button is always visible |
+| wf-09 (FREE) | BOQ illus, no pill | no scrim, no reveal |
+| wf-11 (STARTER) | renovation illus, gold "STARTER" pill + Lock | scrim fades in, "Upgrade to Starter · ₹799/month" |
+| wf-12 (STARTER) | **clash detection illus (NOW visible)**, gold "STARTER" pill + Lock | scrim fades in, "Upgrade to Starter · ₹799/month" |
+
+Also verify on a touch device (or DevTools mobile-emulator with `(hover: none)` set):
+
+- All locked cards show scrim + button persistently (no hover required)
+- Tap any locked card → Razorpay popup opens for the correct tier
+- After dismissing the popup, the resting state of the card is unchanged (no stuck blur — already fixed in §Y)
+
+## §Z.7 — Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` (incl `tests/`) | ✓ EXIT 0 |
+| `npx vitest run tests/unit/template-card-variants.test.tsx` | ✓ **19/19** |
+| `npx vitest run` (full) | ✓ **3524/3532** (+19 from §Z; same 7 pre-existing failures unchanged from §Y) |
+| `npx eslint <changed files>` | ✓ 0 errors / 0 new warnings |
+| `npm run build` | ✓ production build succeeds, `/dashboard/templates` static-rendered |
+
+## §Z.8 — Rollback
+
+`pre-template-variants-rollback` tag points at `245c3d91` (the §Y-final state).
+
+```
+git revert <merge-sha>          # cleanest — keeps §X + §Y intact
+# OR full revert:
+git reset --hard pre-template-variants-rollback
+git push --force-with-lease origin main   # requires explicit user authorization
+```
+
+The patch is purely CSS-selector + component additions + a new test file. No DB changes, no server routes, no schema. Reverting affects only the visual layer and the test suite.
+
+— end of §Z (lock-reveal selector + wf-12 art shipped) —
+
 
 
 

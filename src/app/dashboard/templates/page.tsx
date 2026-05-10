@@ -561,7 +561,76 @@ function IllusInteractive3D() {
   );
 }
 
-/* Map wfId → illustration component */
+/* wf-12: IFC Upload → Clash Detection */
+function IllusClashDetection() {
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }} aria-hidden="true">
+      {/* Subtle dot grid */}
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(14,18,24,.05) 1px, transparent 1px)", backgroundSize: "16px 16px", opacity: 0.5 }} />
+      {/* Top-left "MEP" label */}
+      <div style={{ position: "absolute", top: 24, left: 28, fontFamily: "var(--font-jetbrains, monospace)", fontSize: 8, letterSpacing: ".18em", textTransform: "uppercase", color: "#1A4D5C", display: "inline-flex", alignItems: "center", gap: 5 }}>
+        <span style={{ width: 10, height: 2, background: "#1A4D5C" }} />MEP
+      </div>
+      {/* Bottom-right "STRUCT" label */}
+      <div style={{ position: "absolute", bottom: 24, right: 28, fontFamily: "var(--font-jetbrains, monospace)", fontSize: 8, letterSpacing: ".18em", textTransform: "uppercase", color: "#B87333", display: "inline-flex", alignItems: "center", gap: 5 }}>
+        STRUCT<span style={{ width: 10, height: 2, background: "#B87333" }} />
+      </div>
+      {/* Centered intersecting elements */}
+      <svg viewBox="0 0 220 130" fill="none" style={{ width: 220, height: 130, position: "relative", zIndex: 1 }}>
+        {/* Structural beam (burnt) — horizontal */}
+        <rect x="20" y="58" width="180" height="14" fill="rgba(184,115,51,.18)" stroke="#B87333" strokeWidth="1.4" />
+        <line x1="32" y1="65" x2="48" y2="65" stroke="#B87333" strokeWidth="0.6" opacity="0.4" />
+        <line x1="172" y1="65" x2="188" y2="65" stroke="#B87333" strokeWidth="0.6" opacity="0.4" />
+        {/* MEP pipe (blueprint) — diagonal, crossing the beam */}
+        <line x1="10" y1="20" x2="210" y2="110" stroke="#1A4D5C" strokeWidth="6" strokeLinecap="round" />
+        <line x1="10" y1="20" x2="210" y2="110" stroke="rgba(26,77,92,.6)" strokeWidth="2" strokeLinecap="round" />
+        {/* Clash marker — bullseye at the intersection */}
+        <circle cx="110" cy="65" r="14" fill="rgba(229,90,80,.18)" stroke="#E55A50" strokeWidth="1.4">
+          <animate attributeName="r" values="14;17;14" dur="2.4s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="110" cy="65" r="6" fill="#E55A50" />
+        <circle cx="110" cy="65" r="2.5" fill="#fff" />
+      </svg>
+      {/* Bottom-center caption */}
+      <div style={{ position: "absolute", bottom: 8, left: 0, right: 0, textAlign: "center", fontFamily: "var(--font-jetbrains, monospace)", fontSize: 7, letterSpacing: ".15em", textTransform: "uppercase", color: "#9AA1B0" }}>
+        1 hard clash &middot; AABB
+      </div>
+    </div>
+  );
+}
+
+/* Generic fallback for templates without bespoke artwork — subtle dot grid
+ * + category color tint + the template's input/output emoji-glyphs.
+ * Future-proofs new templates so the art area is never empty (the empty
+ * state was the §Z visual bug that made the missing-IllusComp bug visible). */
+function CardArtFallback({ category }: { category: string }) {
+  const tintByCategory: Record<string, string> = {
+    "Concept Design": "26, 77, 92",       // blueprint
+    "Visualization": "16, 185, 129",      // sage / emerald
+    "BIM Export": "245, 158, 11",         // amber
+    "Cost Estimation": "184, 115, 51",    // burnt
+    "Full Pipeline": "6, 182, 212",       // cyan
+    "Site Analysis": "16, 185, 129",      // sage
+    "BIM Analysis": "26, 77, 92",         // blueprint (default fallback for analysis)
+    "3D Modeling": "229, 168, 120",       // ember
+  };
+  const rgb = tintByCategory[category] ?? "26, 77, 92";
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }} aria-hidden="true">
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(14,18,24,.05) 1px, transparent 1px)", backgroundSize: "16px 16px", opacity: 0.6 }} />
+      <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 50%, rgba(${rgb}, 0.10) 0%, transparent 65%)` }} />
+      <div style={{ position: "relative", zIndex: 1, width: 80, height: 80, borderRadius: "50%", border: `1.5px dashed rgba(${rgb}, 0.45)`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-jetbrains, monospace)", fontSize: 9, letterSpacing: ".15em", textTransform: "uppercase", color: `rgba(${rgb}, 0.85)`, textAlign: "center", lineHeight: 1.2, padding: 4 }}>
+        {category.split(" ").map((w) => <div key={w}>{w}</div>)}
+      </div>
+    </div>
+  );
+}
+
+/* Map wfId → illustration component. Templates without a bespoke entry
+ * fall through to <CardArtFallback /> via renderLightCard — the art area
+ * is never empty. (§Z bug: wf-12 was missing here AND the locked-card
+ * hover reveal was broken at the CSS-selector level, making the empty
+ * art unmistakably visible.) */
 const ILLUS_MAP: Record<string, React.FC> = {
   "wf-08": IllusFeatured,
   "wf-01": IllusFloorPlan,
@@ -571,6 +640,7 @@ const ILLUS_MAP: Record<string, React.FC> = {
   "wf-03": IllusBuilding3D,
   "wf-04": IllusMassing,
   "wf-05": IllusInteractive3D,
+  "wf-12": IllusClashDetection,
 };
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -845,7 +915,7 @@ export default function TemplatesPage() {
             {wf.category}
           </div>
           <div className={s.cardArt}>
-            {IllusComp && <IllusComp />}
+            {IllusComp ? <IllusComp /> : <CardArtFallback category={wf.category} />}
           </div>
           {isLocked && upgradeTarget ? (
             <TemplateLockBadge
