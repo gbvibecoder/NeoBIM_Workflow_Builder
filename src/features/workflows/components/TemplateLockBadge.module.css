@@ -1,6 +1,19 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   TemplateLockBadge — gold lock-to-checkout affordance
-   See TemplateLockBadge.tsx + page.module.css `.card[data-locked]` block.
+   TemplateLockBadge — gold lock-to-checkout affordance.
+
+   Hover state contract: any ancestor with `data-locked="true"` triggers the
+   pill scale + scrim fade + center reveal on `:hover` / `:focus-within`.
+
+   Why the selectors are `:global([data-locked="true"])` and NOT
+   `:global(.card[...])`: the parent card's `.card` class is declared in
+   page.module.css as a LOCAL class, so the css-modules loader hashes it to
+   `page_card_xyz` in the DOM. The literal `.card` selector inside `:global()`
+   never matches the rendered card. The data-attribute is rendered to the
+   DOM verbatim (attributes aren't hashed), so attribute-only selectors work
+   regardless of which page mounts the badge. Only locked cards set this
+   attribute (see renderLightCard in page.tsx) so it's safely scoped.
+
+   See §Z of PLAN_CAP_AUDIT_AND_FIX_REPORT.md for the full root-cause.
    ─────────────────────────────────────────────────────────────────────── */
 
 /* ── Gold tier pill (always visible, top-right of card image) ────────── */
@@ -45,7 +58,7 @@
   display: inline-block;
 }
 
-:global(.card[data-locked="true"]:hover) .pin {
+:global([data-locked="true"]):hover .pin {
   transform: scale(1.06);
 }
 
@@ -69,8 +82,8 @@
   pointer-events: none;
 }
 
-:global(.card[data-locked="true"]:hover) .scrim,
-:global(.card[data-locked="true"]:focus-within) .scrim {
+:global([data-locked="true"]):hover .scrim,
+:global([data-locked="true"]):focus-within .scrim {
   opacity: 1;
 }
 
@@ -96,8 +109,8 @@
   user-select: none;
 }
 
-:global(.card[data-locked="true"]:hover) .reveal,
-:global(.card[data-locked="true"]:focus-within) .reveal {
+:global([data-locked="true"]):hover .reveal,
+:global([data-locked="true"]):focus-within .reveal {
   opacity: 1;
   transform: translate(-50%, -50%) translateY(0) scale(1);
 }
@@ -216,11 +229,11 @@
   .scrim {
     transition: opacity 200ms ease;
   }
-  :global(.card[data-locked="true"]:hover) .pin {
+  :global([data-locked="true"]):hover .pin {
     transform: none;
   }
-  :global(.card[data-locked="true"]:hover) .reveal,
-  :global(.card[data-locked="true"]:focus-within) .reveal {
+  :global([data-locked="true"]):hover .reveal,
+  :global([data-locked="true"]):focus-within .reveal {
     transform: translate(-50%, -50%);
   }
   .shine {
