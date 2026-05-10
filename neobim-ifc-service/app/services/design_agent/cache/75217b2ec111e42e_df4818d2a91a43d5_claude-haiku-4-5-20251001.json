@@ -1,0 +1,22 @@
+{
+  "response": {
+    "decision": "refuse",
+    "confidence": 0.25,
+    "reasoning": "The brief is too vague to classify confidently. It specifies \"modern apartment in Mumbai\" but provides no BHK count, no form factor detail (tower vs. duplex vs. house), and no plot dimensions. The brief does not explicitly rule out any template family, but without knowing the target unit size or building height, I cannot select among the nine candidates with confidence ≥ 0.6.",
+    "template_id": null,
+    "parameters": null,
+    "refusal_reason": "Brief is missing critical classifiers: no BHK count (1/2/3), no form factor preference (house/duplex/tower), and no plot dimensions. Cannot select a template confidently.",
+    "best_template_attempted": null,
+    "suggested_action": "ask_user_clarification"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 606,
+    "output_tokens": 260,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002588,
+    "latency_ms": 3029.5002500060946,
+    "created_at_iso": "2026-05-10T15:30:19.396863+00:00"
+  }
+}

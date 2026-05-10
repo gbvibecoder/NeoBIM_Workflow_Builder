@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.93,
+    "reasoning": "This brief is an explicit 1BHK duplex (G+1) on a 6.0 x 12.0 m plot in Pune. The description matches the build_1bhk_pune_duplex template exactly: two storeys with internal stair, ground floor living + kitchen, first floor bedroom + bath. The plot dimensions fall within the template's typical range (5.0–9.0 m width, 9.0–14.0 m length).",
+    "template_id": "build_1bhk_pune_duplex",
+    "parameters": {
+      "plot_width_m": 6.0,
+      "plot_length_m": 12.0,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 656,
+    "output_tokens": 284,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002758,
+    "latency_ms": 2762.983415974304,
+    "created_at_iso": "2026-05-10T15:29:41.774074+00:00"
+  }
+}

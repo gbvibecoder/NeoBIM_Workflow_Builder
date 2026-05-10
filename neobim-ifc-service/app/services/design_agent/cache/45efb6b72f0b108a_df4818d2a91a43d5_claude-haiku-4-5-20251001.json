@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.85,
+    "reasoning": "Brief explicitly specifies G+11 (11 habitable floors), 60 flats of 2BHK each in a Pune apartment tower with stilt parking and lift. This maps cleanly to the 2BHK tower template with habitable_floor_count=11. The plot dimensions (8.0 x 16.0 m) fall within the tower's typical range (7.32–10.0 x 15.24–18.0 m). Modern facade and balcony mentions are supported by the template.",
+    "template_id": "build_2bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 8.0,
+      "plot_length_m": 16.0,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 11,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": true
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 649,
+    "output_tokens": 343,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003046,
+    "latency_ms": 3478.8396251387894,
+    "created_at_iso": "2026-05-10T15:29:36.029726+00:00"
+  }
+}

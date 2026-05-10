@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.94,
+    "reasoning": "Brief explicitly requests a 3BHK ground-only house on a 13 x 24 m plot in Pune for a joint family. The plot dimensions (13.0 x 24.0 m) fall squarely within the typical_plot_m range [10.0 x 18.0 .. 13.0 x 24.0] for build_3bhk_pune_house, and the single-floor \"ground only\" requirement matches the house form factor perfectly. The 3BHK family, Pune location, and site context (seismic zone III, wind zone 2) align exactly with the template baseline.",
+    "template_id": "build_3bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 13.0,
+      "plot_length_m": 24.0,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 647,
+    "output_tokens": 320,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002929,
+    "latency_ms": 3172.16245806776,
+    "created_at_iso": "2026-05-10T15:29:57.843773+00:00"
+  }
+}

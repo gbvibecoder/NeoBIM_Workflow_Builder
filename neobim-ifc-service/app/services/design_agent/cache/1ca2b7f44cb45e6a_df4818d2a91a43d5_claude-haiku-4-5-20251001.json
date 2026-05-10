@@ -1,0 +1,22 @@
+{
+  "response": {
+    "decision": "refuse",
+    "confidence": 0.02,
+    "reasoning": "This brief requests a 50-bed hospital with ICU, operation theatres, wards, and consultation rooms. The catalogue covers residential 1BHK / 2BHK / 3BHK housing only and explicitly excludes institutional buildings such as hospitals.",
+    "template_id": null,
+    "parameters": null,
+    "refusal_reason": "Institutional building (hospital). The brief specifies a 50-bed hospital with ICU, operation theatres, wards, and consultation rooms. No medical-use template exists in the catalogue; all nine candidates are residential housing templates (1BHK to 3BHK houses, duplexes, and towers).",
+    "best_template_attempted": null,
+    "suggested_action": "reject"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 639,
+    "output_tokens": 252,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002581,
+    "latency_ms": 2654.1592080611736,
+    "created_at_iso": "2026-05-10T15:30:10.435862+00:00"
+  }
+}

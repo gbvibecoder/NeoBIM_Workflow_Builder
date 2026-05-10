@@ -1,0 +1,22 @@
+{
+  "response": {
+    "decision": "refuse",
+    "confidence": 0.08,
+    "reasoning": "This brief requests a 4BHK luxury villa with an infinity pool and helipad. The template catalogue covers 1BHK, 2BHK, and 3BHK residential only. The brief explicitly exceeds the maximum BHK count (3BHK), and includes luxury features (infinity pool, helipad) that are not in any of the nine candidate templates.",
+    "template_id": null,
+    "parameters": null,
+    "refusal_reason": "Brief requests 4BHK (exceeds supported 1/2/3 BHK range) and luxury amenities (infinity pool, helipad) not present in any candidate template. The catalogue covers standard residential 1–3BHK only.",
+    "best_template_attempted": "build_3bhk_pune_duplex",
+    "suggested_action": "reject"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 654,
+    "output_tokens": 275,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002711,
+    "latency_ms": 2949.6068749576807,
+    "created_at_iso": "2026-05-10T15:30:16.361029+00:00"
+  }
+}
