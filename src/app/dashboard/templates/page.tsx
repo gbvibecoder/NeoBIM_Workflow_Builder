@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
-import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap } from "lucide-react";
+import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap, Crown } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useWorkflowStore, selectLoadFromTemplate } from "@/features/workflows/stores/workflow-store";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,12 @@ import { BriefRendersTemplateCard } from "@/features/brief-renders/components/Br
 import { canAccessTemplate, getUpgradeTargetForTemplate } from "@/features/billing/lib/template-access";
 import { TemplateLockBadge } from "@/features/workflows/components/TemplateLockBadge";
 import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
+import {
+  openInlineUpgradeCheckout,
+  resumePendingMobileVerify,
+} from "@/features/billing/lib/inline-checkout";
+import { track } from "@/lib/track";
+import { toast } from "sonner";
 import s from "./page.module.css";
 
 interface RateLimitInfo {
@@ -555,7 +561,76 @@ function IllusInteractive3D() {
   );
 }
 
-/* Map wfId → illustration component */
+/* wf-12: IFC Upload → Clash Detection */
+function IllusClashDetection() {
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }} aria-hidden="true">
+      {/* Subtle dot grid */}
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(14,18,24,.05) 1px, transparent 1px)", backgroundSize: "16px 16px", opacity: 0.5 }} />
+      {/* Top-left "MEP" label */}
+      <div style={{ position: "absolute", top: 24, left: 28, fontFamily: "var(--font-jetbrains, monospace)", fontSize: 8, letterSpacing: ".18em", textTransform: "uppercase", color: "#1A4D5C", display: "inline-flex", alignItems: "center", gap: 5 }}>
+        <span style={{ width: 10, height: 2, background: "#1A4D5C" }} />MEP
+      </div>
+      {/* Bottom-right "STRUCT" label */}
+      <div style={{ position: "absolute", bottom: 24, right: 28, fontFamily: "var(--font-jetbrains, monospace)", fontSize: 8, letterSpacing: ".18em", textTransform: "uppercase", color: "#B87333", display: "inline-flex", alignItems: "center", gap: 5 }}>
+        STRUCT<span style={{ width: 10, height: 2, background: "#B87333" }} />
+      </div>
+      {/* Centered intersecting elements */}
+      <svg viewBox="0 0 220 130" fill="none" style={{ width: 220, height: 130, position: "relative", zIndex: 1 }}>
+        {/* Structural beam (burnt) — horizontal */}
+        <rect x="20" y="58" width="180" height="14" fill="rgba(184,115,51,.18)" stroke="#B87333" strokeWidth="1.4" />
+        <line x1="32" y1="65" x2="48" y2="65" stroke="#B87333" strokeWidth="0.6" opacity="0.4" />
+        <line x1="172" y1="65" x2="188" y2="65" stroke="#B87333" strokeWidth="0.6" opacity="0.4" />
+        {/* MEP pipe (blueprint) — diagonal, crossing the beam */}
+        <line x1="10" y1="20" x2="210" y2="110" stroke="#1A4D5C" strokeWidth="6" strokeLinecap="round" />
+        <line x1="10" y1="20" x2="210" y2="110" stroke="rgba(26,77,92,.6)" strokeWidth="2" strokeLinecap="round" />
+        {/* Clash marker — bullseye at the intersection */}
+        <circle cx="110" cy="65" r="14" fill="rgba(229,90,80,.18)" stroke="#E55A50" strokeWidth="1.4">
+          <animate attributeName="r" values="14;17;14" dur="2.4s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="110" cy="65" r="6" fill="#E55A50" />
+        <circle cx="110" cy="65" r="2.5" fill="#fff" />
+      </svg>
+      {/* Bottom-center caption */}
+      <div style={{ position: "absolute", bottom: 8, left: 0, right: 0, textAlign: "center", fontFamily: "var(--font-jetbrains, monospace)", fontSize: 7, letterSpacing: ".15em", textTransform: "uppercase", color: "#9AA1B0" }}>
+        1 hard clash &middot; AABB
+      </div>
+    </div>
+  );
+}
+
+/* Generic fallback for templates without bespoke artwork — subtle dot grid
+ * + category color tint + the template's input/output emoji-glyphs.
+ * Future-proofs new templates so the art area is never empty (the empty
+ * state was the §Z visual bug that made the missing-IllusComp bug visible). */
+function CardArtFallback({ category }: { category: string }) {
+  const tintByCategory: Record<string, string> = {
+    "Concept Design": "26, 77, 92",       // blueprint
+    "Visualization": "16, 185, 129",      // sage / emerald
+    "BIM Export": "245, 158, 11",         // amber
+    "Cost Estimation": "184, 115, 51",    // burnt
+    "Full Pipeline": "6, 182, 212",       // cyan
+    "Site Analysis": "16, 185, 129",      // sage
+    "BIM Analysis": "26, 77, 92",         // blueprint (default fallback for analysis)
+    "3D Modeling": "229, 168, 120",       // ember
+  };
+  const rgb = tintByCategory[category] ?? "26, 77, 92";
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }} aria-hidden="true">
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(14,18,24,.05) 1px, transparent 1px)", backgroundSize: "16px 16px", opacity: 0.6 }} />
+      <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 50%, rgba(${rgb}, 0.10) 0%, transparent 65%)` }} />
+      <div style={{ position: "relative", zIndex: 1, width: 80, height: 80, borderRadius: "50%", border: `1.5px dashed rgba(${rgb}, 0.45)`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-jetbrains, monospace)", fontSize: 9, letterSpacing: ".15em", textTransform: "uppercase", color: `rgba(${rgb}, 0.85)`, textAlign: "center", lineHeight: 1.2, padding: 4 }}>
+        {category.split(" ").map((w) => <div key={w}>{w}</div>)}
+      </div>
+    </div>
+  );
+}
+
+/* Map wfId → illustration component. Templates without a bespoke entry
+ * fall through to <CardArtFallback /> via renderLightCard — the art area
+ * is never empty. (§Z bug: wf-12 was missing here AND the locked-card
+ * hover reveal was broken at the CSS-selector level, making the empty
+ * art unmistakably visible.) */
 const ILLUS_MAP: Record<string, React.FC> = {
   "wf-08": IllusFeatured,
   "wf-01": IllusFloorPlan,
@@ -565,6 +640,7 @@ const ILLUS_MAP: Record<string, React.FC> = {
   "wf-03": IllusBuilding3D,
   "wf-04": IllusMassing,
   "wf-05": IllusInteractive3D,
+  "wf-12": IllusClashDetection,
 };
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -596,6 +672,46 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     fetch("/api/user/dashboard-stats").then(r => r.ok ? r.json() : null).then(d => { if (d?.userRole) setUserRole(d.userRole); }).catch(() => {});
+  }, []);
+
+  // E5 — mobile redirect-flow resume. If the URL carries
+  // razorpay_payment_id, the user just returned from a redirected checkout;
+  // call /api/razorpay/verify and refresh the role.
+  useEffect(() => {
+    let cancelled = false;
+    resumePendingMobileVerify().then((r) => {
+      if (cancelled || !r.attempted || !r.result) return;
+      if (r.result.kind === "success") {
+        toast.success("Upgrade complete — your templates are unlocking.");
+        fetch("/api/user/dashboard-stats")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((d) => { if (d?.userRole) setUserRole(d.userRole); })
+          .catch(() => {});
+      } else if (r.result.kind === "verify-failed") {
+        toast.error(r.result.userMessage);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // E8 — cross-tab role sync. Another tab finished an upgrade → broadcast
+  // arrives → we re-fetch our role so the lock state updates here too.
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const ch = new BroadcastChannel("buildflow-auth");
+    const onMessage = (ev: MessageEvent) => {
+      if (ev.data?.type === "role-updated") {
+        fetch("/api/user/dashboard-stats")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((d) => { if (d?.userRole) setUserRole(d.userRole); })
+          .catch(() => {});
+      }
+    };
+    ch.addEventListener("message", onMessage);
+    return () => {
+      ch.removeEventListener("message", onMessage);
+      ch.close();
+    };
   }, []);
 
   useEffect(() => {
@@ -631,20 +747,86 @@ export default function TemplatesPage() {
     return list;
   }, [activeCategory, sortBy]);
 
+  // Funnel telemetry — fire `template_lock_seen` once per locked template
+  // per page mount. The Set survives until full unmount, so re-renders
+  // (filter changes, scroll, etc.) don't re-emit. If the user upgrades and
+  // their role drops some locks, those are simply no-ops on next pass.
+  const seenRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!filtered.length) return;
+    for (const wf of filtered) {
+      if (canAccessTemplate(userRole, wf.requiredTier)) continue;
+      if (seenRef.current.has(wf.id)) continue;
+      seenRef.current.add(wf.id);
+      track("template_lock_seen", {
+        templateId: wf.id,
+        requiredTier: wf.requiredTier,
+        currentTier: userRole,
+      });
+    }
+  }, [filtered, userRole]);
+
   const handleUse = async (wf: WorkflowTemplate) => {
-    // Client-side tier gate — surfaces the canonical ExecutionBlockModal
-    // so the experience matches the canvas-side block. The server route
-    // re-checks this; the client check is UX only.
+    // Locked path → inline Razorpay checkout (no /dashboard/billing redirect).
+    // The client gate is UX only; the server route /api/workflows/from-template
+    // is the authoritative tier check.
     if (!canAccessTemplate(userRole, wf.requiredTier)) {
       const target = getUpgradeTargetForTemplate(userRole, wf.requiredTier);
-      const tierLabel = target?.label ?? "Pro";
-      setRateLimitHit({
-        title: `Template not available on your plan`,
-        message: `"${wf.name}" needs the ${tierLabel} plan. Upgrade to unlock it and the rest of the ${tierLabel} catalogue.`,
-        action: `Upgrade to ${tierLabel}`,
-        actionUrl: "/dashboard/billing",
+      if (!target) return;
+
+      const result = await openInlineUpgradeCheckout({
+        targetTier: target.tier,
+        templateId: wf.id,
+        currentTier: userRole,
       });
-      return;
+
+      switch (result.kind) {
+        case "success": {
+          toast.success(`Welcome to ${target.label}! Unlocking your templates…`);
+          track("upgrade_verified", {
+            fromRole: result.previousRole,
+            toRole: result.role,
+            source: "template_lock_inline",
+            templateId: wf.id,
+          });
+          // The DB has the new role; refresh dashboard-stats so the page's
+          // userRole state reflects it without requiring a hard reload.
+          fetch("/api/user/dashboard-stats")
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (d?.userRole) setUserRole(d.userRole);
+            })
+            .catch(() => {});
+          return;
+        }
+        case "dismissed":
+          toast("No charge made — try again whenever.");
+          return;
+        case "session-expired":
+          // Helper has already redirected to /login.
+          return;
+        case "already-in-flight":
+        case "create-failed":
+        case "script-blocked":
+        case "payment-failed":
+        case "verify-failed":
+        case "verify-timeout":
+          // Surface in the canonical ExecutionBlockModal — same UI as
+          // canvas-side rate-limit blocks. action wired to billing page
+          // as the tier-aware fallback.
+          setRateLimitHit({
+            title:
+              result.kind === "script-blocked"
+                ? "Payment provider blocked"
+                : result.kind === "verify-timeout"
+                  ? "Activation pending"
+                  : "Couldn't complete upgrade",
+            message: result.userMessage,
+            action: "Open billing page",
+            actionUrl: "/dashboard/billing",
+          });
+          return;
+      }
     }
 
     // Server creates the Workflow row and re-validates the tier — this
@@ -712,11 +894,19 @@ export default function TemplatesPage() {
       <div
         key={wf.id}
         className={s.card}
+        data-locked={isLocked ? "true" : undefined}
         role="article"
-        aria-label={wf.name}
+        aria-label={
+          isLocked && upgradeTarget
+            ? `${wf.name} \u2014 premium template, requires ${upgradeTarget.label}. Click to upgrade.`
+            : wf.name
+        }
         tabIndex={0}
         onClick={() => handleUse(wf)}
         onKeyDown={e => { if (e.key === "Enter") handleUse(wf); }}
+        onMouseEnter={() => {
+          if (isLocked) track("template_lock_hovered", { templateId: wf.id });
+        }}
         style={{ animationDelay: `${idx * 0.08}s` }}
       >
         <div className={isDarkIllus ? s.cardIllusDark : s.cardIllus}>
@@ -724,12 +914,18 @@ export default function TemplatesPage() {
             <span className={isDarkIllus ? s.cardCornerDarkDot : isCostCard ? s.cardCornerCostDot : s.cardCornerDot} />
             {wf.category}
           </div>
+          <div className={s.cardArt}>
+            {IllusComp ? <IllusComp /> : <CardArtFallback category={wf.category} />}
+          </div>
           {isLocked && upgradeTarget ? (
-            <TemplateLockBadge tier={upgradeTarget.tier} label={upgradeTarget.label} className={s.cardLock} />
+            <TemplateLockBadge
+              tier={upgradeTarget.tier}
+              label={upgradeTarget.label}
+              price={upgradeTarget.price}
+            />
           ) : (
             <span className={isDarkIllus ? s.cardNumLight : s.cardNum}>{String(idx + 1).padStart(2, "0")}</span>
           )}
-          {IllusComp && <IllusComp />}
         </div>
         <div className={s.cardContent}>
           <div className={s.cardMeta}>
@@ -747,9 +943,13 @@ export default function TemplatesPage() {
             <div className={s.cardTags}>
               {wf.tags.slice(0, 3).map(tag => <span key={tag} className={s.tag}>{tag}</span>)}
             </div>
-            <span className={isLocked ? s.cardCtaLocked : s.cardCta}>
-              {isLocked && upgradeTarget ? `Upgrade to ${upgradeTarget.label}` : "Use template"} <ArrowRight size={13} />
-            </span>
+            {/* Locked cards: tier is announced by the corner pill — no
+             * bottom-right caption (would be redundant + crowd the tags). */}
+            {!isLocked && (
+              <span className={s.cardCta}>
+                Use template <ArrowRight size={13} />
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1115,7 +1315,10 @@ export default function TemplatesPage() {
                       <span>{featuredWf.estimatedRunTime}</span>
                     </div>
                     {featuredIsLocked && featuredUpgradeTarget && (
-                      <TemplateLockBadge tier={featuredUpgradeTarget.tier} label={featuredUpgradeTarget.label} className={s.lockBadge} />
+                      <span className={s.lockBadge}>
+                        <Crown size={11} strokeWidth={2.4} aria-hidden="true" />
+                        <span>{featuredUpgradeTarget.label.toUpperCase()}</span>
+                      </span>
                     )}
                     <h2 className={s.featuredTitle}>
                       {(() => { const parts = featuredWf.name.split("\u2192").map(x => x.trim()); return parts.length >= 2 ? <>{parts[0]} <em>&rarr; {parts.slice(1).join(" \u2192 ")}</em></> : featuredWf.name; })()}

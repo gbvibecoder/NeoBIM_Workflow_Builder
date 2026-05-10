@@ -624,9 +624,32 @@
   box-shadow: 0 22px 44px -22px rgba(14, 18, 24, 0.18);
 }
 
+/* Locked card: warmer gold-tinted shadow on hover so the upgrade affordance
+ * reads as inviting rather than blocking. */
+.card[data-locked="true"]:hover {
+  border-color: rgba(184, 134, 11, 0.35);
+  box-shadow: 0 16px 40px rgba(184, 134, 11, 0.18);
+}
+
 .card:focus-visible {
   outline: 2px solid var(--rs-blueprint);
   outline-offset: 2px;
+}
+
+/* Art wrapper — pure layout role. Earlier iteration applied
+ * `filter: blur(3px) brightness(0.45)` here on `.card[data-locked]:hover`
+ * AND on `:focus-within` to drive the locked-card hover backdrop. The
+ * `:focus-within` branch leaked: any click on a locked card retained
+ * focus on the card (tabIndex={0}), which kept the filter active at rest.
+ * On iOS Safari, taps stick `:hover` *and* `:focus-within` for the same
+ * reason, so the artwork looked permanently broken until the user tapped
+ * elsewhere. The fix is to NOT mutate the artwork at all — the scrim
+ * inside TemplateLockBadge handles the hover backdrop via opacity, which
+ * has no failure mode under stuck focus. */
+.cardArt {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
 }
 
 .cardIllus {

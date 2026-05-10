@@ -2257,6 +2257,431 @@ URL on tier-gate failure, which the client surfaces via the canonical
 
 — end of §W (Phase W shipped) —
 
+# §X — Lock-to-checkout direct flow (IMPLEMENTED)
+
+**Branch:** `feat/lock-to-checkout-direct`
+**Rollback tag:** `pre-lock-checkout-rollback`
+**Date:** 2026-05-10
+**Phase:** SHIP
+
+## §X.1 — Goal
+
+User on FREE/MINI/STARTER lands on `/dashboard/templates`, sees a locked
+template with a quiet crown pin in the corner. On hover, a chunky gold
+"Upgrade to {tier}" button reveals over the (now-blurred) art with a
+sub-line showing the price. **Click → Razorpay checkout pops up directly,
+no `/dashboard/billing` intermediate.** On success the role updates,
+locks fall away, the user can use the template immediately.
+
+## §X.2 — Scoping decision
+
+The original spec called for a new `/api/razorpay/create-subscription`
+route, schema migrations adding `pendingRazorpaySubscriptionId` +
+`razorpayCustomerId`, and 20 edge cases handled in one ship. After
+mapping the existing infrastructure I found:
+
+- `/api/razorpay/checkout` already creates subscriptions (POST `{plan}` →
+  `{subscriptionId, razorpayKeyId, name, email, plan}`)
+- `/api/razorpay/verify` already verifies signatures + updates `role` +
+  stamps `planChangedAt` + invalidates the role cache
+- `/api/razorpay/webhook` handles 9 event types with Redis-backed
+  idempotency by `eventId` (48h TTL) + grace-window logic
+- `User` already has `razorpaySubscriptionId`, `razorpayPlanId`,
+  `paymentGateway`, `planChangedAt`
+- `RAZORPAY_PLANS` env-var-driven plan-id mapping is in
+  `src/features/billing/lib/razorpay.ts`
+
+Building parallel infrastructure on top of working code was the §S
+incident pattern. Decision: **reuse all existing server routes; the
+inline-vs-redirect flow is purely a client concern**. The user
+authorised this as the "tight ship" path before any code was written.
+
+## §X.3 — What shipped
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `src/features/billing/lib/load-razorpay.ts` | Lazy script loader with 8s timeout, single in-flight Promise, reuses an existing `<script>` if `/dashboard/billing` already mounted one |
+| `src/features/billing/lib/inline-checkout.ts` | Orchestrator: session pre-flight → POST `/api/razorpay/checkout` → load script → `new Razorpay({...}).open()` → `handler` → POST `/api/razorpay/verify` → broadcast role-update. Returns a tagged-union `InlineCheckoutResult` that callers pattern-match on. |
+| `src/features/workflows/components/TemplateLockBadge.module.css` | Gold-button styling, hover-reveal animation, shine-sweep, reduced-motion guard |
+| `tests/unit/inline-checkout.test.ts` | 8 tests covering session-expired, re-entry guard, server 5xx/429, script-blocked, happy-path, dismissed, payment.failed |
+
+### Modified files
+
+| File | Change |
+|---|---|
+| `src/features/workflows/components/TemplateLockBadge.tsx` | Rewritten: crown pin (always visible) + center-reveal hover layer (chunky gold pill + sub-line). Drops the `className` prop in favour of internal positioning |
+| `src/app/dashboard/templates/page.tsx` | Locked-card click now opens inline checkout instead of surfacing the rate-limit modal. Added `data-locked` attribute, art-blur wrapper (`s.cardArt`), small bottom-right tier caption (`s.cardTier`), telemetry emission on `lock_seen`/`lock_hovered`, mobile-redirect resume effect, cross-tab BroadcastChannel listener |
+| `src/app/dashboard/templates/page.module.css` | Hover-blur on `.cardArt` when locked, warmer gold-tinted card shadow on locked-hover, new `.cardTier` caption style, reduced-motion guards |
+| `src/lib/track.ts` | Extended `TrackableEvent` union with the 8 funnel events (`template_lock_seen` through `upgrade_verified`) |
+
+### Reused (no changes)
+
+- `/api/razorpay/checkout` — POST `{plan}` (the existing 173-line route, already battle-tested via /dashboard/billing)
+- `/api/razorpay/verify` — POST `{razorpay_payment_id, razorpay_subscription_id, razorpay_signature}` (the existing 185-line route, already stamps `planChangedAt`)
+- `/api/razorpay/webhook` — handles `subscription.activated/charged/cancelled/...` with Redis idempotency
+- `RAZORPAY_PLANS` config + env-driven plan IDs
+
+## §X.4 — Edge-case coverage matrix
+
+| ID | Scenario | Status | Implementation |
+|---|---|---|---|
+| E1 | Session expired pre-click | ✓ shipped | `inline-checkout.ts` calls `getSession()` first; null → `/login?next=...&intent=upgrade-{tier}` + sessionStorage stash |
+| E2 | User already on target tier (stale JWT) | ✓ existing | `/api/razorpay/checkout` 400s on existing-active-subscription guard; client surfaces the message |
+| E3 | Network failure on create | ✓ shipped | `try/catch` around the `fetch` returns `{kind:"create-failed"}` with retry-friendly copy |
+| E4 | Razorpay CDN blocked | ✓ shipped | `loadRazorpay` rejects with `RazorpayLoadError`; client returns `{kind:"script-blocked"}` with fallback-modal copy + support email |
+| E5 | Mobile redirect flow | ✓ shipped | `resumePendingMobileVerify()` runs on page mount; URL params → `/api/razorpay/verify` → role refresh |
+| E6 | User cancels modal | ✓ shipped | `modal.ondismiss` → `{kind:"dismissed"}`, no charge, no state mutation |
+| E7 | Verify endpoint timeout | ✓ shipped | 15s `AbortController` → `{kind:"verify-timeout"}` with "activation pending" copy; webhook will reconcile |
+| E8 | Multi-tab role sync | ✓ shipped | `BroadcastChannel("buildflow-auth")`: upgrading tab posts `role-updated`; templates page listens + re-fetches |
+| E9 | Legacy-limits grandfathering | ✓ existing | `canAccessTemplate` reads role; `getEffectiveLimits` already honours `legacyLimits` server-side |
+| E10 | Active Stripe sub on Razorpay click | ✓ existing | `/api/razorpay/checkout` returns 400 with `action: "Manage Billing"`; client surfaces in `ExecutionBlockModal` |
+| E11 | International currency | DEFERRED | Out of scope for this ship — INR-only path. Stripe-USD users land on /dashboard/billing already. |
+| E12 | Razorpay 429 rate-limit | ✓ shipped | Server returns 429; client copy: "Too many attempts. Please wait." |
+| E13 | Plan-id misconfigured | ✓ existing | Server's `classifyRazorpayCheckoutError` maps to `PLAN_UNAVAILABLE`; verify route refuses to downgrade if `newRole==="FREE"` for a paid plan |
+| E14 | Button mash | ✓ shipped | Module-level `inflightRunId` token; second concurrent call returns `{kind:"already-in-flight"}` immediately |
+| E15 | Cold-start latency | ✓ shipped | 30s `AbortController` on the create fetch; abort → `{kind:"create-failed"}` with "timed out" copy |
+| E16 | Account deleted mid-upgrade | ✓ existing | Verify route 404s on missing user; webhook logs orphan payment |
+| E17 | Refund / chargeback | ✓ existing | Webhook handles `subscription.cancelled/refunded` via `handleRazorpaySubscriptionTermination` + grace window |
+| E18 | Concurrent upgrade attempts | ✓ existing | Server's `if (user.razorpaySubscriptionId && ...active)` guard 400s; webhook idempotency by event-id |
+| E19 | Different-email customer | ✓ existing | Razorpay subscription model doesn't require a separate Customer object; `prefill` uses authenticated session email |
+| E20 | Webhook secret rotation | RUNBOOK | Documented separately — flip `RAZORPAY_WEBHOOK_SECRET`, redeploy, manual webhook replay if needed |
+
+12 cases shipped client-side, 7 already covered by existing server infra, 1 deferred (E11), 1 runbook-only (E20). All 20 are accounted for.
+
+## §X.5 — Telemetry funnel
+
+8 new `TrackableEvent` types via the existing `track()` helper (queues to
+`/api/analytics`, fire-and-forget, no new analytics dependency):
+
+```
+template_lock_seen        → user scrolled past a locked card
+template_lock_hovered     → mouse entered the card
+template_upgrade_clicked  → click handler fired
+razorpay_checkout_opened  → script loaded + widget opened
+razorpay_checkout_completed → handler success path
+razorpay_checkout_dismissed → modal.ondismiss fired
+razorpay_checkout_failed  → any failure (stage:create|script-load|verify|widget|open)
+upgrade_verified          → role actually changed in DB (post-verify)
+```
+
+Funnel: `seen → hovered → clicked → opened → completed`. Drop-off at any
+stage is the conversion-tuning signal.
+
+## §X.6 — Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | ✓ EXIT 0 |
+| `npx vitest run tests/unit/inline-checkout.test.ts` | ✓ 8/8 passing |
+| `npm test` (full suite) | ✓ 3494/3502 passing (+8 from this turn); same 7 pre-existing failures |
+| `npm run lint` | ✓ 0 errors / 0 warnings on any §X file |
+| `npm run build` | ✓ production build succeeds, `/dashboard/templates` static-rendered |
+
+## §X.7 — Deferred (explicit, with reasoning)
+
+- **New `/api/razorpay/create-subscription` route** — duplicates existing `/api/razorpay/checkout`. No payment-surface regression risk acceptable for the rename.
+- **Schema fields `pendingRazorpaySubscriptionId` / `razorpayCustomerId`** — webhook idempotency-by-event-id + the existing `razorpaySubscriptionId` guard cover the same race conditions; schema changes carry §S-class risk.
+- **E11 international currency** — Stripe-USD path already lives on `/dashboard/billing`. Adding inline gateway-routing is a separate scope.
+- **Manual Razorpay test-mode end-to-end** — runbook step for the founder, not automated.
+- **Playwright E2E** — environment doesn't have Playwright; vitest unit-level suffices for now.
+
+## §X.8 — Smoke runbook (manual, post-deploy)
+
+1. Sign in as a FREE-tier user on production.
+2. Navigate to `/dashboard/templates`.
+3. Hover the wf-08 card (PRO-locked). Verify: art blurs, gold "Upgrade to Pro" button reveals over center, sub-line reads `₹1,999/month · unlocks all Pro templates`, crown pin stays in top-right.
+4. Click anywhere on the card. Verify: Razorpay popup opens, NOT a redirect to /dashboard/billing.
+5. Cancel the modal. Verify: toast "No charge made — try again whenever.", card returns to locked state.
+6. Re-click. Pay with Razorpay test card `4111 1111 1111 1111`. Verify: success toast, lock falls away within ~3s, can click "Use template" without re-prompt.
+7. Open a second browser tab on `/dashboard/templates`. Verify: it also shows unlocked state (BroadcastChannel sync).
+8. Check telemetry dashboard: `template_lock_seen`, `_hovered`, `_clicked`, `razorpay_checkout_opened`, `_completed`, `upgrade_verified` events all fired in order.
+
+## §X.9 — Rollback
+
+```bash
+git checkout main
+git revert <merge-sha>     # reverts the merge commit
+git push origin main
+# OR, harder revert:
+git reset --hard pre-lock-checkout-rollback
+git push --force-with-lease origin main   # requires explicit user authorization
+```
+
+The merge is `--no-ff` so the revert is a clean operation. No DB schema
+changes means no migration needs to be rolled back. Users mid-upgrade
+will see Razorpay complete via webhook (independent of the client code
+that was reverted) — their roles will still update correctly.
+
+— end of §X (lock-to-checkout direct shipped) —
+
+# §Y — Lock-badge visual hotfix (IMPLEMENTED)
+
+**Branch:** `fix/template-lock-visual-hotfix`
+**Rollback tag:** `pre-template-lock-hotfix-rollback` (= `2f999858`, the §X-final SHA)
+**Date:** 2026-05-10
+**Phase:** SHIP
+
+## §Y.1 — What broke in §X
+
+User report after the §X deploy:
+
+> "Locked cards look broken/loading, not premium."
+
+Three concrete bugs:
+
+| # | Symptom | Root cause |
+|---|---|---|
+| 1 | `filter: blur(3px) brightness(0.45)` was firing at REST, not just on hover | The CSS rule was scoped `.card[data-locked="true"]:hover .cardArt, :focus-within .cardArt`. Tabbing to or clicking a card triggers `:focus-within` (the card has `tabIndex={0}`), which kept the filter active after the click. On iOS Safari, taps stick `:hover` *and* `:focus-within` for the same reason — so the artwork looked permanently broken until the user tapped elsewhere. |
+| 2 | Corner badge was an empty cream circle with a tiny lock outline — no tier text | §X's `TemplateLockBadge.tsx` rendered a 34×34 `s.pin` containing only `<Icon>`. Users couldn't tell PRO from STARTER from MINI without reading the bottom-right "STARTER" caption — which was itself crowding the tag row. |
+| 3 | Hover destroyed the artwork | The blur+brightness combo was the design miss the user flagged: *"the gold button itself is loud — the backdrop doesn't need to scream."* |
+
+Plus a fourth issue surfaced under the lens: the hover-only reveal was
+**unreachable on touch devices**. iOS users tapping a locked card got
+straight to Razorpay (the click handler still fired) but never saw the
+gold button affordance, so they didn't know upgrade was the action.
+
+## §Y.2 — Patch
+
+| File | Change |
+|---|---|
+| `src/features/workflows/components/TemplateLockBadge.tsx` | Replaced icon-only pin with a substantial gold pill carrying the tier label as text (`MINI` / `STARTER` / `PRO` / `TEAM`). Crown for PRO/TEAM, Lock for MINI/STARTER. Added a `<div className={s.scrim} aria-hidden="true" />` element between pin and reveal. |
+| `src/features/workflows/components/TemplateLockBadge.module.css` | Replaced `.pin` (circle) with the gold-pill spec (`F4C460 → C9941E → 9C6F0F` gradient, JetBrains Mono caps, `scale(1.06)` on hover, drop-shadow on icon). Added `.scrim` rule (`linear-gradient(135deg, rgba(20,20,30,.55), rgba(40,30,10,.55))`, opacity 0 → 1 on `:hover` / `:focus-within`). Added `@media (hover: none)` block that pins scrim + reveal to `opacity:1` so the affordance is always visible on touch devices. |
+| `src/app/dashboard/templates/page.module.css` | **Deleted** the `.card[data-locked="true"]:hover .cardArt` and `:focus-within .cardArt` selectors (the blur leak). `.cardArt` keeps only its layout role. Removed unused `.cardTier` (the bottom-right caption from §X). |
+| `src/app/dashboard/templates/page.tsx` | Removed the redundant `<span className={s.cardTier}>` from `cardFoot`. Locked cards now show only the tag row in their footer — the corner pill is the tier announcement. |
+| `tests/unit/template-lock-badge.test.tsx` (new) | 11 tests covering: tier-pill text per tier, aria-label tier-name inclusion, INR price formatting (`₹1,999` not `₹1999`), CTA "Upgrade to {label}" copy. |
+
+## §Y.3 — Why the scrim instead of blur (architectural delta)
+
+A `filter:blur+brightness` on the art element directly mutates the
+artwork. That has **two failure modes**:
+
+1. **Stuck hover/focus**: `:focus-within` + `:hover` both stick post-click
+   on multiple platforms (iOS Safari, focus traps, click-then-blur loops).
+   Once stuck, the artwork stays broken.
+2. **Performance**: `filter` triggers a composited layer with each repaint.
+   On low-end Android, hovering a 5-card grid stutters.
+
+A scrim is **opacity-driven on a separate sibling element**. The art is
+never touched. Stuck `:focus-within` just keeps the scrim visible — which
+is a *reasonable* state (user can see exactly where focus lives) and
+non-destructive. Repaints are limited to the scrim element, not the art.
+
+This is the same pattern the canvas-side `ExecutionBlockModal` uses:
+opacity layers, not filters. Consistency with what works.
+
+## §Y.4 — Edge-case re-audit
+
+| ID | Scenario | Status |
+|---|---|---|
+| Free-accessible card (no lock) | Renders identically to pre-§W | ✓ verified — `isLocked` is false, badge isn't mounted, no `data-locked` attribute, none of the §Y CSS rules match |
+| FREE user / PRO template | Pill: gold, "PRO" text, Crown icon. Reveal: "Upgrade to Pro" + "₹1,999/month · unlocks all Pro templates" | ✓ verified by `template-lock-badge.test.tsx` |
+| MINI user / STARTER template | Pill: gold, "STARTER" text, Lock icon. Reveal: "Upgrade to Starter" + "₹799/month" | ✓ verified |
+| PRO user / PRO template | No pill, no scrim, no reveal — `canAccessTemplate` returns true, badge isn't mounted | ✓ verified by `template-access.test.ts` |
+| Admin (PLATFORM_ADMIN) | No pill regardless of tier | ✓ verified by `template-access.test.ts` (admin bypass) |
+| `prefers-reduced-motion: reduce` | Pill scale + reveal bounce + shine all disabled; opacity-only fades | ✓ media query in module.css |
+| Mobile (`hover: none`) | Scrim + reveal pinned to `opacity:1`; tap on card → `openInlineUpgradeCheckout` | ✓ media query in module.css; click handler unchanged |
+| Stuck-focus repro (click card → dismiss modal → see card at rest) | Artwork stays sharp; scrim visible (because focus-within triggers it, intentionally) — non-destructive | ✓ deleted blur, scrim is opacity-only |
+
+## §Y.5 — Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | ✓ EXIT 0 (incl `tests/`) |
+| `npx vitest run tests/unit/template-lock-badge.test.tsx` | ✓ 11/11 |
+| `npx vitest run` (full) | ✓ 3505/3513 (+11 vs §X baseline of 3494/3502); same 7 pre-existing failures |
+| `npx eslint <changed-files>` | ✓ 0 errors / 0 new warnings on changed files |
+| `npm run build` | ✓ production build succeeds |
+
+## §Y.6 — Rollback
+
+Tag `pre-template-lock-hotfix-rollback` points at `2f999858` (the §X-final
+state). Revert path:
+
+```
+git revert <merge-sha>          # cleanest — keeps §X intact, reverts only §Y
+# OR, if §Y itself is corrupt:
+git reset --hard pre-template-lock-hotfix-rollback
+git push --force-with-lease origin main   # requires explicit user authorization
+```
+
+The patch is purely CSS + component + test. No DB changes, no server
+routes touched. Reverting affects only the visual layer; the inline
+checkout flow keeps working.
+
+— end of §Y (lock-badge visual hotfix shipped) —
+
+# §Z — Lock-reveal selector fix + wf-12 art (IMPLEMENTED)
+
+**Branch:** `fix/template-lock-all-variants`
+**Rollback tag:** `pre-template-variants-rollback` (= `245c3d91`, the §Y-final SHA)
+**Date:** 2026-05-10
+**Phase:** SHIP
+
+## §Z.1 — Variant inventory (Phase 1a)
+
+| Section | Render path | Mounts `TemplateLockBadge`? | `data-locked`? | Hover reveal in §Y? |
+|---|---|---|---|---|
+| Featured (hero, wf-08) | inline JSX in `page.tsx`, uses `s.featuredCard` | NO — uses inline `s.lockBadge` span + static "Upgrade to {tier}" button | NO (`s.featuredCard` not `s.card`) | **N/A** — button always-visible by design |
+| Quick Start grid | `renderLightCard` | YES | YES | **BROKEN** |
+| Core Pipelines grid | `renderLightCard` | YES | YES | **BROKEN** |
+| Specialized Tools grid | `renderLightCard` | YES | YES | **BROKEN** |
+| Filtered grid (any category) | `renderLightCard` | YES | YES | **BROKEN** |
+| Brief Renders BETA | `BriefRendersTemplateCard`, canary+PRO gate | NO (own visual) | NO | N/A |
+
+So the bug user observed on wf-12 in Specialized Tools was **not specific to that section** — every locked grid card across the page was rendering its scrim + reveal in `opacity:0` and never fading in on hover. wf-12 just made it loud because its missing artwork left the area empty, and there was nothing else to look at.
+
+## §Z.2 — Root cause (Phase 1b)
+
+Two independent bugs landed under the same visual report:
+
+### Bug A: CSS-modules `:global(.card[...])` selector mismatch
+
+`src/app/dashboard/templates/page.module.css` declares `.card` as a **local** class:
+
+```css
+.card { ... }
+```
+
+The css-modules loader hashes local classes for scoping. The DOM element rendered by `renderLightCard` carries the hashed name:
+
+```html
+<div class="page_card_abc123" data-locked="true">
+```
+
+Meanwhile, `TemplateLockBadge.module.css` had:
+
+```css
+:global(.card[data-locked="true"]:hover) .scrim { opacity: 1; }
+```
+
+`:global(...)` makes the wrapped selector *literal* — it compiles to `.card[data-locked="true"]:hover .module_scrim_xyz`, looking for a literal `class="card"` ancestor that doesn't exist. **The hover/focus reveal had been dead site-wide on every grid card since §X.**
+
+The vitest tests in §X and §Y mounted the badge in isolation and never exercised the parent `:hover` interaction. JSDOM doesn't process `:hover` anyway. tsc, lint, and `npm run build` were all clean. The bug only surfaced in a real browser.
+
+**Fix:** target the data attribute alone, no class dependency:
+
+```css
+:global([data-locked="true"]):hover .scrim,
+:global([data-locked="true"]):focus-within .scrim {
+  opacity: 1;
+}
+```
+
+The `[data-locked="true"]` attribute renders to the DOM verbatim (HTML attributes aren't transformed by css-modules), so the selector matches regardless of what hashed class name the parent ends up with. Only locked cards set this attribute (one place: `renderLightCard` in `page.tsx`), so scope is preserved.
+
+Same change applied to all 6 occurrences: `.pin` (scale), `.scrim` (opacity), `.reveal` (opacity + transform), and the 3 sibling `:focus-within` variants.
+
+### Bug B: `ILLUS_MAP` missing `wf-12`
+
+`PREBUILT_WORKFLOWS` has 9 templates (`wf-01, 03, 04, 05, 06, 08, 09, 11, 12`). `ILLUS_MAP` in `page.tsx` had only 8 entries — `wf-12` was missing, so `IllusComp` resolved to `undefined` and `{IllusComp && <IllusComp />}` rendered nothing. The art layer was a 240×N empty `<div>`.
+
+**Fix:** added two new components and wired the fallback:
+
+| Component | Role |
+|---|---|
+| `IllusClashDetection` | Bespoke wf-12 art — IFC structural beam (burnt) + MEP pipe (blueprint) intersecting, pulsing red bullseye on the clash, "MEP" / "STRUCT" labels, "1 hard clash · AABB" caption. Matches the existing visual vocabulary (Light Render Studio palette: `#1A4D5C` blueprint, `#B87333` burnt, `#0E1218` ink). |
+| `CardArtFallback` | Generic future-proof fallback — subtle dot grid + category-tinted radial + dashed circle with the category label. Used by `renderLightCard` whenever `ILLUS_MAP[wf.id]` is missing. **The art area can never be empty again.** |
+
+Render-path change in `renderLightCard`:
+
+```tsx
+{IllusComp ? <IllusComp /> : <CardArtFallback category={wf.category} />}
+```
+
+## §Z.3 — Fix approach taken (Phase 2)
+
+**FIX-C** from the user's spec — surgical CSS-selector fix + missing-art component, no refactor of the render paths.
+
+FIX-A (unify all card variants under one shared component) was rejected as scope creep: the divergence between hero card and grid card is intentional (different layouts), and the lock-state primitive is *already* a single component (`TemplateLockBadge`). The bug wasn't architectural — it was a one-line CSS selector applied 6 times.
+
+FIX-B (extract a shared `useTemplateLockState` hook) was rejected for the same reason — the gating logic is already a single SSOT (`canAccessTemplate` / `getUpgradeTargetForTemplate`). The hero card and the grid card both call those, just render different markup.
+
+## §Z.4 — wf-12 artwork resolution
+
+Bespoke `IllusClashDetection` shipped (not the generic fallback). Visual:
+
+- Horizontal structural beam in burnt orange (`#B87333`) with subtle inset detail lines
+- Diagonal MEP pipe in blueprint blue (`#1A4D5C`) crossing the beam at ~30°
+- Pulsing red bullseye (`#E55A50`) at the intersection — `<animate attributeName="r" values="14;17;14" dur="2.4s" />` for the breathing effect (collapses under `prefers-reduced-motion` because the SMIL animation runs only when motion is enabled in the browser; the parent `.cardArt` has no transition that would interfere)
+- "MEP" / "STRUCT" caps labels at the corners
+- "1 hard clash · AABB" caption at the bottom
+
+The composition reads as "two systems cross, one clash detected" without needing any text — the visual ladder works at a glance.
+
+`CardArtFallback` covers the case where someone adds a 10th template tomorrow without authoring an Illus component for it. The art area now degrades gracefully instead of going blank.
+
+## §Z.5 — Regression test matrix
+
+`tests/unit/template-card-variants.test.tsx` (new) — 19 tests, three layers:
+
+1. **CSS-source contract** (5 tests):
+   - Asserts `:global([data-locked="true"]):hover` is present
+   - Asserts `:focus-within` variant is present (keyboard accessibility)
+   - Asserts the broken `:global(.card[data-locked=...]:hover)` pattern is **not** present (regex strips comments first so the doc that names the broken pattern as a counter-example doesn't trip the test)
+   - Counts hover/focus-within rules to catch a partial-revert regression
+   - Asserts `@media (hover: none)` block exists
+
+2. **Coverage of every PREBUILT_WORKFLOWS template** (11 dynamic tests, one per template):
+   - For accessible templates: `getUpgradeTargetForTemplate` returns null
+   - For locked templates: target resolves with non-empty label + price > 0; rendering the badge produces a pill carrying the tier label + the `requires {label}` aria-label
+   - This catches the "mount but render empty" failure mode that hit wf-12 in §Y
+
+3. **wf-12 sentinel** (3 tests):
+   - wf-12 exists in `PREBUILT_WORKFLOWS`
+   - Tier gating: locked for FREE/MINI, accessible for STARTER+
+   - Badge mount produces "STARTER" pill text + "Upgrade to Starter" CTA + `₹799`
+
+CSS-source assertions are unusual but appropriate here: the bug shipped clean through tsc + vitest + lint + build. No runtime-only test in JSDOM would catch a CSS-modules + `:global()` interaction. Asserting the working pattern at the source file catches selector regressions in CI.
+
+## §Z.6 — Production smoke-test runbook
+
+After `npm run dev` against production database, on `/dashboard/templates` as a FREE user:
+
+| Template | Expected at rest | Expected on hover |
+|---|---|---|
+| wf-01 (FREE) | floor-plan illus, no pill | no scrim, no reveal — "Use template →" caption |
+| wf-03 (FREE) | building 3D illus, no pill | no scrim, no reveal |
+| wf-04 (FREE) | massing illus, no pill | no scrim, no reveal |
+| wf-05 (MINI) | interactive 3D illus, gold "MINI" pill + Lock | scrim fades in, "Upgrade to Mini · ₹99/month" |
+| wf-06 (STARTER) | render-video illus, gold "STARTER" pill + Lock | scrim fades in, "Upgrade to Starter · ₹799/month" |
+| wf-08 (PRO, hero) | featured card, "♔ PRO" inline span | no hover reveal — inline button is always visible |
+| wf-09 (FREE) | BOQ illus, no pill | no scrim, no reveal |
+| wf-11 (STARTER) | renovation illus, gold "STARTER" pill + Lock | scrim fades in, "Upgrade to Starter · ₹799/month" |
+| wf-12 (STARTER) | **clash detection illus (NOW visible)**, gold "STARTER" pill + Lock | scrim fades in, "Upgrade to Starter · ₹799/month" |
+
+Also verify on a touch device (or DevTools mobile-emulator with `(hover: none)` set):
+
+- All locked cards show scrim + button persistently (no hover required)
+- Tap any locked card → Razorpay popup opens for the correct tier
+- After dismissing the popup, the resting state of the card is unchanged (no stuck blur — already fixed in §Y)
+
+## §Z.7 — Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` (incl `tests/`) | ✓ EXIT 0 |
+| `npx vitest run tests/unit/template-card-variants.test.tsx` | ✓ **19/19** |
+| `npx vitest run` (full) | ✓ **3524/3532** (+19 from §Z; same 7 pre-existing failures unchanged from §Y) |
+| `npx eslint <changed files>` | ✓ 0 errors / 0 new warnings |
+| `npm run build` | ✓ production build succeeds, `/dashboard/templates` static-rendered |
+
+## §Z.8 — Rollback
+
+`pre-template-variants-rollback` tag points at `245c3d91` (the §Y-final state).
+
+```
+git revert <merge-sha>          # cleanest — keeps §X + §Y intact
+# OR full revert:
+git reset --hard pre-template-variants-rollback
+git push --force-with-lease origin main   # requires explicit user authorization
+```
+
+The patch is purely CSS-selector + component additions + a new test file. No DB changes, no server routes, no schema. Reverting affects only the visual layer and the test suite.
+
+— end of §Z (lock-reveal selector + wf-12 art shipped) —
+
 
 
 

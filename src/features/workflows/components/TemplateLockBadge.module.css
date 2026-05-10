@@ -1,0 +1,243 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   TemplateLockBadge — gold lock-to-checkout affordance.
+
+   Hover state contract: any ancestor with `data-locked="true"` triggers the
+   pill scale + scrim fade + center reveal on `:hover` / `:focus-within`.
+
+   Why the selectors are `:global([data-locked="true"])` and NOT
+   `:global(.card[...])`: the parent card's `.card` class is declared in
+   page.module.css as a LOCAL class, so the css-modules loader hashes it to
+   `page_card_xyz` in the DOM. The literal `.card` selector inside `:global()`
+   never matches the rendered card. The data-attribute is rendered to the
+   DOM verbatim (attributes aren't hashed), so attribute-only selectors work
+   regardless of which page mounts the badge. Only locked cards set this
+   attribute (see renderLightCard in page.tsx) so it's safely scoped.
+
+   See §Z of PLAN_CAP_AUDIT_AND_FIX_REPORT.md for the full root-cause.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* ── Gold tier pill (always visible, top-right of card image) ────────── */
+.pin {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px 6px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+
+  background: linear-gradient(135deg, #F4C460 0%, #C9941E 50%, #9C6F0F 100%);
+  border: 1px solid rgba(139, 105, 20, 0.55);
+  color: #1F1300;
+  box-shadow:
+    0 3px 8px rgba(139, 105, 20, 0.32),
+    inset 0 1px 0 rgba(255, 248, 220, 0.55);
+
+  font-family: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  line-height: 1;
+
+  pointer-events: none;
+  user-select: none;
+  transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pinIcon {
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 0 rgba(255, 248, 220, 0.4));
+}
+
+.pinLabel {
+  display: inline-block;
+}
+
+:global([data-locked="true"]):hover .pin {
+  transform: scale(1.06);
+}
+
+/* ── Hover scrim ─────────────────────────────────────────────────────── */
+/* Translucent overlay over the art. The artwork stays VISIBLE underneath
+ * (~45 % darken via the gradient stops) — this replaces the earlier
+ * filter:blur+brightness approach which leaked to the resting state via
+ * `:focus-within` after any click on the card. The scrim is opacity-driven
+ * only, so post-click focus retention has no visual consequence. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: linear-gradient(
+    135deg,
+    rgba(20, 20, 30, 0.55) 0%,
+    rgba(40, 30, 10, 0.55) 100%
+  );
+  opacity: 0;
+  transition: opacity 280ms ease;
+  pointer-events: none;
+}
+
+:global([data-locked="true"]):hover .scrim,
+:global([data-locked="true"]):focus-within .scrim {
+  opacity: 1;
+}
+
+/* ── Center reveal (the gold button + sub-line) ──────────────────────── */
+.reveal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 6;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  opacity: 0;
+  transform: translate(-50%, -50%) translateY(8px) scale(0.94);
+  transition:
+    opacity 320ms ease,
+    transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  pointer-events: none;
+  user-select: none;
+}
+
+:global([data-locked="true"]):hover .reveal,
+:global([data-locked="true"]):focus-within .reveal {
+  opacity: 1;
+  transform: translate(-50%, -50%) translateY(0) scale(1);
+}
+
+/* ── The gold button ─────────────────────────────────────────────────── */
+.cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 16px 34px;
+  border-radius: 999px;
+
+  background: linear-gradient(135deg, #F4C460 0%, #C9941E 35%, #9C6F0F 100%);
+  border: 1.5px solid rgba(139, 105, 20, 0.55);
+  color: #1F1300;
+  box-shadow:
+    0 10px 28px rgba(139, 105, 20, 0.45),
+    0 2px 6px rgba(139, 105, 20, 0.30),
+    inset 0 1px 0 rgba(255, 248, 220, 0.60),
+    inset 0 -2px 4px rgba(139, 105, 20, 0.25);
+
+  font-family: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+
+  overflow: hidden;
+}
+
+.ctaIcon {
+  display: inline-flex;
+  align-items: center;
+  filter: drop-shadow(0 1px 0 rgba(255, 248, 220, 0.4));
+}
+
+.ctaLabel {
+  position: relative;
+  z-index: 1;
+}
+
+.shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -100%;
+  width: 60%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 248, 220, 0) 0%,
+    rgba(255, 248, 220, 0.55) 50%,
+    rgba(255, 248, 220, 0) 100%
+  );
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: shineSweep 2.6s ease-in-out 0.4s infinite;
+}
+
+@keyframes shineSweep {
+  0%   { left: -100%; }
+  50%  { left: 180%; }
+  100% { left: 180%; }
+}
+
+/* ── Sub-line beneath the button ─────────────────────────────────────── */
+.sub {
+  font-family: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.5px;
+  color: rgba(255, 248, 220, 0.92);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.subPrice {
+  color: #F4C460;
+  font-weight: 500;
+}
+
+.subSep {
+  color: rgba(255, 248, 220, 0.92);
+  font-weight: 400;
+}
+
+.subDot {
+  margin: 0 4px;
+  color: rgba(255, 248, 220, 0.55);
+}
+
+/* ── Mobile / no-hover devices ───────────────────────────────────────── */
+/* On touch-only devices `:hover` is unreliable: it can stick after a tap
+ * and is invisible to a user who hasn't tapped yet. Show the scrim +
+ * reveal persistently so the affordance is always discoverable. The
+ * card's onClick handler still fires the inline checkout regardless. */
+@media (hover: none) {
+  .scrim {
+    opacity: 1;
+  }
+  .reveal {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ── Reduced-motion: opacity-only, no scale/bounce/shine ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .pin,
+  .reveal,
+  .scrim {
+    transition: opacity 200ms ease;
+  }
+  :global([data-locked="true"]):hover .pin {
+    transform: none;
+  }
+  :global([data-locked="true"]):hover .reveal,
+  :global([data-locked="true"]):focus-within .reveal {
+    transform: translate(-50%, -50%);
+  }
+  .shine {
+    animation: none;
+    display: none;
+  }
+}
