@@ -373,15 +373,19 @@ export const useWorkflowStore = create<WorkflowState>()(
         }
       } catch (err) {
         console.error("Save failed:", err);
-        // Workflow limit reached
+        // Workflow LIBRARY full (maxWorkflows cap — separate concept from the
+        // EXECUTION cap). This is now soft-info only: the run still proceeds,
+        // gets recorded against the per-user scratch workflow on the server,
+        // and counts toward the execution cap. The hard ExecutionBlockModal
+        // is reserved for actual execution-cap hits.
         if (err instanceof ApiError && err.status === 403) {
-          toast("🐙 You've hit your workflow limit!", {
-            description: "Upgrade your plan for unlimited workflows and more power.",
+          toast.info("Library full — this run won't be saved", {
+            description: "Upgrade to keep your work and add more workflows to your library.",
             action: {
-              label: "Upgrade Plan",
+              label: "Upgrade",
               onClick: () => { window.location.href = "/dashboard/billing"; },
             },
-            duration: 6000,
+            duration: 7000,
           });
         }
         // Duplicate name (user explicitly typed an existing name)

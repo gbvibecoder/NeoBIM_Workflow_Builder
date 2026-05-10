@@ -96,12 +96,13 @@ EXPORT NODES (Cyan):
 - EX-002 BOQ / Spreadsheet Exporter: XLSX/CSV export
 - EX-003 PDF Report Generator: Formatted PDF reports
 
-══ PRICING PLANS ══
-- FREE (₹0): ${FREE_TIER_EXECUTIONS} lifetime executions, ${STRIPE_PLANS.FREE.limits.maxWorkflows} workflows, ${STRIPE_PLANS.FREE.limits.rendersPerMonth} render
-- MINI (₹99/mo): 10 executions/month, 10 workflows, 3 renders
-- STARTER (₹799/mo): 30 executions/month, 30 workflows, 3 video walkthroughs, 3 AI 3D models, 10 renders
-- PRO (₹1999/mo): 100 executions/month, 100 workflows, 7 video walkthroughs, 10 AI 3D models, 30 renders
-- TEAM (₹4999/mo): Unlimited everything, team management
+══ PRICING PLANS (1:1 RULE — saved workflows = monthly executions) ══
+- FREE (₹0): ${FREE_TIER_EXECUTIONS} lifetime execution, ${STRIPE_PLANS.FREE.limits.maxWorkflows} workflow, ${STRIPE_PLANS.FREE.limits.rendersPerMonth} render
+- MINI (₹99/mo): ${STRIPE_PLANS.MINI.limits.runsPerMonth} workflows + executions, ${STRIPE_PLANS.MINI.limits.rendersPerMonth} renders
+- STARTER (₹799/mo): ${STRIPE_PLANS.STARTER.limits.runsPerMonth} workflows + executions, ${STRIPE_PLANS.STARTER.limits.videoPerMonth} video walkthroughs, ${STRIPE_PLANS.STARTER.limits.modelsPerMonth} AI 3D models, ${STRIPE_PLANS.STARTER.limits.rendersPerMonth} renders
+- PRO (₹1999/mo): ${STRIPE_PLANS.PRO.limits.runsPerMonth} workflows + executions, ${STRIPE_PLANS.PRO.limits.videoPerMonth} video walkthroughs, ${STRIPE_PLANS.PRO.limits.modelsPerMonth} AI 3D models, ${STRIPE_PLANS.PRO.limits.rendersPerMonth} renders
+- TEAM (₹4999/mo): ${STRIPE_PLANS.TEAM.limits.runsPerMonth} workflows + executions, ${STRIPE_PLANS.TEAM.limits.teamMembers} team seats, team analytics
+- Each workflow can be EXECUTED ONCE; failed runs can be retried; users hit the cap based on saved-workflow slots
 
 ══ COMMON WORKFLOW PATTERNS ══
 1. IFC → BOQ Pipeline: IN-004 (IFC Upload) → TR-007 (Quantity Extractor) → TR-015 (Market Intelligence) → TR-008 (BOQ Cost Mapper) → EX-002 (Spreadsheet Export)

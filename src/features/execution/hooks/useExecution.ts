@@ -392,7 +392,21 @@ async function executeNode(
 
               if (!uploadRes.ok) {
                 const errBody = await uploadRes.json().catch(() => ({ error: { message: `Server returned ${uploadRes.status}` } }));
-                throw new Error(errBody.error?.message || `Upload failed with status ${uploadRes.status}`);
+                const errMsg = errBody.error?.message || `Upload failed with status ${uploadRes.status}`;
+                const err = new Error(errMsg);
+                // Propagate 429 + plan-cap fields so the outer catch block
+                // (line ~2030) opens ExecutionBlockModal instead of falling
+                // through to mock fallback / generic toast. Closes the
+                // parse-ifc client-side bypass — server-side gate is at
+                // /api/parse-ifc:180.
+                if (uploadRes.status === 429) {
+                  (err as unknown as Record<string, unknown>).status = 429;
+                  (err as unknown as Record<string, unknown>).code = errBody.error?.code;
+                  (err as unknown as Record<string, unknown>).title = errBody.error?.title ?? "Plan limit reached";
+                  (err as unknown as Record<string, unknown>).action = errBody.error?.action;
+                  (err as unknown as Record<string, unknown>).actionUrl = errBody.error?.actionUrl;
+                }
+                throw err;
               }
 
               const uploadData = await uploadRes.json();
@@ -801,19 +815,26 @@ async function executeNode(
       throw err;
     }
 
-    // Check rate limit remaining — warn user when running low
-    const rlRemaining = res.headers.get("X-RateLimit-Remaining");
-    const rlLimit = res.headers.get("X-RateLimit-Limit");
-    if (rlRemaining !== null && rlLimit !== null) {
-      const rem = parseInt(rlRemaining, 10);
-      const lim = parseInt(rlLimit, 10);
-      if (!isNaN(rem) && !isNaN(lim) && rem <= 2 && rem > 0) {
-        toast.warning(`${rem} execution${rem === 1 ? "" : "s"} remaining this month (${lim} total)`, {
-          description: "Upgrade your plan for more executions",
-          action: { label: "Upgrade", onClick: () => { window.location.href = "/dashboard/billing"; } },
-          duration: 8000,
-        });
-      }
+    // No "running low" warning toast — the sidebar usage counter is
+    // enough passive signal, and at-cap shows a hard ExecutionBlockModal
+    // (not a dismissable toast). The previous warning was visually
+    // intrusive, non-blocking, and tonally desperate.
+
+    // Surface referral-bonus consumption so the user sees what's happening
+    // instead of getting a silent free run. Only the FIRST node of each
+    // execution carries this header (server-side dedup), so the toast
+    // fires exactly once per workflow run.
+    const bonusUsed = res.headers.get("X-Referral-Bonus-Used");
+    const bonusRemaining = res.headers.get("X-Referral-Bonus-Remaining");
+    if (bonusUsed === "1") {
+      const remCount = bonusRemaining !== null ? parseInt(bonusRemaining, 10) : null;
+      const remText = remCount !== null && !isNaN(remCount)
+        ? `${remCount} bonus${remCount === 1 ? "" : "es"} remaining`
+        : "Bonus credits applied";
+      toast.info("1 referral bonus used to run this workflow", {
+        description: remText,
+        duration: 6000,
+      });
     }
 
     const { artifact } = await res.json() as { artifact: ExecutionArtifact };
@@ -1215,6 +1236,11 @@ interface RateLimitInfo {
   message: string;
   action?: string;
   actionUrl?: string;
+  /** Optional second CTA — used by workflow_already_executed block to show
+   *  both "Create new workflow" + "Upgrade plan". Same shape as
+   *  ExecutionBlockModal's RateLimitInfo. */
+  secondaryAction?: string;
+  secondaryActionUrl?: string;
 }
 
 interface TopologicalSortResult {
@@ -1485,6 +1511,51 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       }
     }
 
+    // ── Plan-cap pre-flight (intrinsic to runWorkflow, NOT only in canvas
+    //    Run handler). Closes bypass paths like the Command Palette
+    //    "Run Workflow" command and any future caller of runWorkflow.
+    //    Skipped in demo mode (no auth, no plan).
+    if (!isDemoMode) {
+      try {
+        const catalogueIds = (nodes as WorkflowNode[])
+          .map((n) => (n.data as { catalogueId?: string }).catalogueId)
+          .filter((id): id is string => typeof id === "string");
+        const wfIdForCheck = currentWorkflow?.id;
+        const wfIsPersisted = !!(wfIdForCheck && wfIdForCheck.length >= 20 && wfIdForCheck.startsWith("c"));
+        const eligRes = await fetch("/api/check-execution-eligibility", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            catalogueIds,
+            ...(wfIsPersisted ? { workflowId: wfIdForCheck } : {}),
+          }),
+        });
+        if (eligRes.ok) {
+          const elig = (await eligRes.json()) as {
+            canExecute: boolean;
+            blocks?: Array<{ type?: string; title: string; message: string; action?: string; actionUrl?: string; secondaryAction?: string; secondaryActionUrl?: string }>;
+          };
+          if (!elig.canExecute && elig.blocks && elig.blocks.length > 0) {
+            const block = elig.blocks[0];
+            setRateLimitHit({
+              title: block.title,
+              message: block.message,
+              action: block.action,
+              actionUrl: block.actionUrl,
+              secondaryAction: block.secondaryAction,
+              secondaryActionUrl: block.secondaryActionUrl,
+            });
+            return;
+          }
+        }
+        // On non-OK eligibility response, fall through to backend enforcement
+        // (execute-node also runs the same helper). This avoids a hard fail
+        // on a transient network blip while keeping the cap honest.
+      } catch {
+        // Network error — same fall-through. Backend gate is authoritative.
+      }
+    }
+
     const executionId = generateId();
     const execution: Execution = {
       id: executionId,
@@ -1551,15 +1622,65 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       }
     }
 
-    // Persist execution to DB if workflow is saved (skip in demo mode)
-    if (!isDemoMode && workflowId && workflowId.length >= 20 && workflowId.startsWith("c")) {
+    // Persist execution to DB on EVERY run, regardless of whether the
+    // workflow itself saved successfully. When save failed (e.g. FREE user
+    // at maxWorkflows cap), we omit workflowId and the server attaches the
+    // execution to the per-user scratch workflow (`__standalone_tools__`).
+    // This closes the primary billing leak — without an Execution row the
+    // server's `prisma.execution.count()` cap check stays at the previous
+    // value, allowing unlimited runs.
+    //
+    // The /api/executions POST is now ATOMIC (per-user advisory lock + slot-
+    // reservation count). A 429 response means the user is at cap — surface
+    // the block modal and abort cleanly before any node runs.
+    const isWorkflowPersisted = !!(workflowId && workflowId.length >= 20 && workflowId.startsWith("c"));
+    if (!isDemoMode) {
       try {
         const res = await fetch("/api/executions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ workflowId, triggerType: "manual" }),
+          body: JSON.stringify({
+            ...(isWorkflowPersisted ? { workflowId } : {}),
+            triggerType: "manual",
+          }),
         });
+        if (res.status === 429) {
+          // Atomic gate caught a concurrent over-cap attempt (or a stale-pre-
+          // check race). Surface the modal and abort cleanly — no nodes run.
+          try {
+            const errBody = await res.json() as { error?: { title?: string; message?: string; action?: string; actionUrl?: string } };
+            const e = errBody.error;
+            setRateLimitHit({
+              title: e?.title ?? "Plan limit reached",
+              message: e?.message ?? "You're at your plan's execution cap.",
+              action: e?.action,
+              actionUrl: e?.actionUrl,
+            });
+          } catch {
+            setRateLimitHit({
+              title: "Plan limit reached",
+              message: "You're at your plan's execution cap.",
+              action: "View Plans",
+              actionUrl: "/dashboard/billing",
+            });
+          }
+          // Mark the in-memory execution as failed (it never produced any artifacts).
+          completeExecution("failed");
+          return;
+        }
         if (res.ok) {
+          const bonusUsed = res.headers.get("X-Referral-Bonus-Used");
+          const bonusRemaining = res.headers.get("X-Referral-Bonus-Remaining");
+          if (bonusUsed === "1") {
+            const remCount = bonusRemaining !== null ? parseInt(bonusRemaining, 10) : null;
+            const remText = remCount !== null && !isNaN(remCount)
+              ? `${remCount} bonus${remCount === 1 ? "" : "es"} remaining`
+              : "Bonus credits applied";
+            toast.info("1 referral bonus used to run this workflow", {
+              description: remText,
+              duration: 6000,
+            });
+          }
           const { execution: dbEx } = await res.json() as { execution: { id: string } };
           dbExecutionId = dbEx.id;
           // Phase 2.5 — expose the DB id to regenerateNode (runs outside this

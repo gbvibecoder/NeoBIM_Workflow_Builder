@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { trackFirstExecution } from "@/lib/analytics";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import { createExecutionWithCapCheck } from "@/features/billing/lib/check-execution-eligibility";
 import type { ExecutionStatus } from "@prisma/client";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
@@ -82,33 +83,61 @@ export async function POST(req: NextRequest) {
 
     const { workflowId, inputSummary } = await req.json();
 
-    if (!workflowId) {
-      return NextResponse.json(formatErrorResponse({ title: "Missing field", message: "workflowId is required.", code: "VAL_001" }), { status: 400 });
-    }
+    // Atomic cap check + Execution-row creation. The helper:
+    //   • acquires a per-user pg_advisory_xact_lock so concurrent Run clicks
+    //     serialize and only one passes when the user is at cap;
+    //   • falls back to the per-user `__standalone_tools__` scratch workflow
+    //     when workflowId is omitted (closes the save-failure billing leak);
+    //   • atomically consumes a referral bonus if available;
+    //   • uses a slot-reservation count (completed + recent in-flight) so
+    //     two concurrent runs cannot both pass when only one slot is free.
+    const userRole = ((session.user as { role?: string }).role) ?? "FREE";
+    const userEmail = session.user.email;
+    const emailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
 
-    const workflow = await prisma.workflow.findFirst({
-      where: { id: workflowId, ownerId: session.user.id, deletedAt: null },
-      select: { id: true },
+    const result = await createExecutionWithCapCheck({
+      userId: session.user.id,
+      userRole,
+      userEmail,
+      emailVerified,
+      intent: { kind: "workflow-run" },
+      workflowId: workflowId ?? null,
+      initialStatus: "RUNNING",
+      inputSummary,
     });
 
-    if (!workflow) {
-      return NextResponse.json(formatErrorResponse({ title: "Not found", message: "Workflow not found.", code: "NODE_001" }), { status: 404 });
+    if (!result.ok) {
+      const block = result.eligibility.blocks[0];
+      return NextResponse.json(
+        formatErrorResponse({
+          title: block.title,
+          message: block.message,
+          code: "RATE_001",
+          action: block.action,
+          actionUrl: block.actionUrl,
+        }),
+        {
+          status: 429,
+          headers: {
+            "X-Plan-Limit": String(result.eligibility.limit),
+            "X-Plan-Used": String(result.eligibility.used),
+          },
+        },
+      );
     }
-
-    const execution = await prisma.execution.create({
-      data: {
-        workflowId,
-        userId: session.user.id,
-        status: "RUNNING",
-        startedAt: new Date(),
-        ...(inputSummary && { tileResults: { inputSummary } }),
-      },
-    });
 
     // Track execution (+ first execution milestone)
-    await trackFirstExecution(session.user.id, execution.id);
+    await trackFirstExecution(session.user.id, result.execution.id);
 
-    return NextResponse.json({ execution }, { status: 201 });
+    const execution = await prisma.execution.findUnique({ where: { id: result.execution.id } });
+
+    const responseHeaders: Record<string, string> = {};
+    if (result.usedReferralBonus) {
+      responseHeaders["X-Referral-Bonus-Used"] = "1";
+      responseHeaders["X-Referral-Bonus-Remaining"] = String(result.bonusRemaining);
+    }
+
+    return NextResponse.json({ execution }, { status: 201, headers: responseHeaders });
   } catch (error) {
     console.error("[executions/POST]", error);
     return NextResponse.json(formatErrorResponse(UserErrors.INTERNAL_ERROR), { status: 500 });

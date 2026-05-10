@@ -61,6 +61,14 @@ vi.mock(
 
 vi.mock("@/lib/rate-limit", () => ({
   checkEndpointRateLimit: (...args: unknown[]) => rateLimitMock(...args),
+  // Stubs for the centralized eligibility helper (used by the global plan-cap
+  // gate added to /api/brief-renders POST). Defaults: not admin, no bonus,
+  // Redis unconfigured so per-node-type peek is a no-op.
+  isAdminUser: () => false,
+  consumeReferralBonus: async () => false,
+  getReferralBonus: async () => 0,
+  redis: { get: async () => 0 },
+  redisConfigured: false,
 }));
 
 vi.mock("@/lib/qstash", () => ({
@@ -99,6 +107,19 @@ vi.mock("@/lib/db", () => ({
     // FREE so the gate actually fires).
     user: {
       findUnique: prismaUserFindUniqueMock,
+    },
+    // Stubs for the global plan-cap gate added to /api/brief-renders
+    // POST. Default values let the gate pass (count = 0 < FREE limit = 1)
+    // so existing tests continue to exercise the brief-renders-specific
+    // logic. Tests that want to assert the global cap should override.
+    execution: {
+      count: vi.fn().mockResolvedValue(0),
+      create: vi.fn().mockResolvedValue({ id: "exec-stub", workflowId: "wf-scratch", status: "SUCCESS" }),
+    },
+    workflow: {
+      findFirst: vi.fn().mockResolvedValue({ id: "wf-scratch" }),
+      create: vi.fn().mockResolvedValue({ id: "wf-scratch" }),
+      update: vi.fn().mockResolvedValue({ id: "wf-scratch" }),
     },
   },
 }));

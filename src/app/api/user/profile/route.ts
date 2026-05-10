@@ -22,7 +22,7 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true, email: true, image: true, password: true, emailVerified: true, phoneNumber: true, phoneVerified: true, createdAt: true, role: true },
+      select: { name: true, email: true, image: true, password: true, emailVerified: true, phoneNumber: true, phoneVerified: true, createdAt: true, role: true, planChangedAt: true },
     });
 
     const isPlaceholderEmail = user?.email?.endsWith(PLACEHOLDER_EMAIL_DOMAIN) ?? false;
@@ -37,6 +37,10 @@ export async function GET() {
       phoneVerified: !!user?.phoneVerified,
       createdAt: user?.createdAt?.toISOString() ?? null,
       role: user?.role ?? "FREE",
+      // Surfaces the user's last plan-tier-change timestamp so client-side
+      // billing/usage UI can compute the same "current period" boundary
+      // the server uses (max(planChangedAt, monthStart) for paid).
+      planChangedAt: user?.planChangedAt?.toISOString() ?? null,
       hasPlaceholderEmail: isPlaceholderEmail,
     });
     response.headers.set("Cache-Control", "private, max-age=30");

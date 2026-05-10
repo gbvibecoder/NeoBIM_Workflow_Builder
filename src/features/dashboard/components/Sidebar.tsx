@@ -27,10 +27,12 @@ import {
   ScrollText,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
+import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import { PLAN_EXEC_LIMITS, PLAN_RANK } from "@/constants/limits";
+import { getPlanLimits } from "@/features/billing/lib/plan-helpers";
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
@@ -42,7 +44,42 @@ export function Sidebar() {
   const userRole = ((session?.user as { role?: string })?.role) || "FREE";
   const userRank = PLAN_RANK[userRole] ?? 0;
   const isFreeUser = userRole === "FREE";
+  const isAdminBypass = userRole === "PLATFORM_ADMIN" || userRole === "TEAM_ADMIN";
   const { briefRendersEnabled } = useFeatureFlags();
+
+  // §P UX polish: detect at-workflow-cap so the "+ New Workflow" CTA
+  // surfaces the cap proactively instead of letting the user navigate to
+  // canvas, build a workflow, and then hit the save-403 toast. Server is
+  // still authoritative; this is a presentation-layer hint.
+  // SSOT-based: reads STRIPE_PLANS[role].limits.maxWorkflows. Doesn't honor
+  // legacyLimits (they need a DB roundtrip we'd rather avoid on every nav).
+  const [workflowCount, setWorkflowCount] = useState<number | null>(null);
+  const planMaxWorkflows = getPlanLimits(userRole).maxWorkflows;
+  const atWorkflowCap =
+    !isAdminBypass &&
+    planMaxWorkflows > 0 &&
+    workflowCount !== null &&
+    workflowCount >= planMaxWorkflows;
+
+  useEffect(() => {
+    if (!session?.user || isAdminBypass) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/workflows?limit=1", { method: "GET" });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { total?: number };
+        if (typeof data.total === "number" && !cancelled) {
+          setWorkflowCount(data.total);
+        }
+      } catch {
+        // Best-effort hint — backend gate enforces cap on actual save.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user, isAdminBypass]);
 
   // Nav items — premiumTier marks features that require a minimum plan
   const PRIMARY_NAV: Array<{
@@ -301,34 +338,76 @@ export function Sidebar() {
 
         {/* ── New Workflow ────────────────────────────────────────── */}
         <div style={{ padding: isEffectivelyCollapsed ? "14px 8px" : "14px 14px", flexShrink: 0, position: "relative", zIndex: 1 }}>
-          <motion.div whileHover={{ scale: 1.015, y: -1 }} whileTap={{ scale: 0.975 }}>
-            <Link
-              href="/dashboard/canvas?new=1"
-              onMouseEnter={() => setNewBtnHover(true)}
-              onMouseLeave={() => setNewBtnHover(false)}
-              className="sb-new-btn"
-              style={{
-                display: "flex", alignItems: "center",
-                justifyContent: "center", gap: 8,
-                padding: isEffectivelyCollapsed ? "10px" : "10px 16px",
-                borderRadius: 10,
-                textDecoration: "none",
-                fontFamily: "var(--font-jetbrains), monospace",
-                fontSize: 12.5, fontWeight: 600, letterSpacing: "0.3px",
-                color: "#00F5FF",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <Plus
-                size={15} strokeWidth={2.5}
-                style={{
-                  flexShrink: 0,
-                  transition: "transform 250ms cubic-bezier(0.34,1.56,0.64,1)",
-                  transform: newBtnHover ? "rotate(90deg)" : "rotate(0deg)",
+          <motion.div whileHover={atWorkflowCap ? undefined : { scale: 1.015, y: -1 }} whileTap={atWorkflowCap ? undefined : { scale: 0.975 }}>
+            {atWorkflowCap ? (
+              // §P UX polish: at workflow cap → disabled CTA + plan-limit
+              // toast on click. Server-side `/api/workflows POST` returns a
+              // 403 anyway; this just surfaces the gate before the user
+              // builds a workflow they can't save.
+              <button
+                type="button"
+                onClick={() => {
+                  toast(`Library full — ${planMaxWorkflows} of ${planMaxWorkflows} workflow slots used`, {
+                    description: "Upgrade your plan for more workflow slots.",
+                    action: {
+                      label: "Upgrade",
+                      onClick: () => { window.location.href = "/dashboard/billing"; },
+                    },
+                    duration: 7000,
+                  });
                 }}
-              />
-              {effectiveShowLabels && <span>{t("nav.newWorkflow")}</span>}
-            </Link>
+                onMouseEnter={() => setNewBtnHover(true)}
+                onMouseLeave={() => setNewBtnHover(false)}
+                title={`You've used all ${planMaxWorkflows} workflow slots. Upgrade for more.`}
+                className="sb-new-btn"
+                aria-disabled
+                style={{
+                  display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 8,
+                  padding: isEffectivelyCollapsed ? "10px" : "10px 16px",
+                  borderRadius: 10,
+                  background: "transparent",
+                  border: "1px dashed rgba(255,255,255,0.18)",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                  fontSize: 12.5, fontWeight: 600, letterSpacing: "0.3px",
+                  color: "rgba(255,255,255,0.42)",
+                  whiteSpace: "nowrap",
+                  cursor: "not-allowed",
+                  width: "100%",
+                }}
+              >
+                <Plus size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                {effectiveShowLabels && <span>{t("nav.newWorkflow")}</span>}
+              </button>
+            ) : (
+              <Link
+                href="/dashboard/canvas?new=1"
+                onMouseEnter={() => setNewBtnHover(true)}
+                onMouseLeave={() => setNewBtnHover(false)}
+                className="sb-new-btn"
+                style={{
+                  display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 8,
+                  padding: isEffectivelyCollapsed ? "10px" : "10px 16px",
+                  borderRadius: 10,
+                  textDecoration: "none",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                  fontSize: 12.5, fontWeight: 600, letterSpacing: "0.3px",
+                  color: "#00F5FF",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Plus
+                  size={15} strokeWidth={2.5}
+                  style={{
+                    flexShrink: 0,
+                    transition: "transform 250ms cubic-bezier(0.34,1.56,0.64,1)",
+                    transform: newBtnHover ? "rotate(90deg)" : "rotate(0deg)",
+                  }}
+                />
+                {effectiveShowLabels && <span>{t("nav.newWorkflow")}</span>}
+              </Link>
+            )}
           </motion.div>
         </div>
 

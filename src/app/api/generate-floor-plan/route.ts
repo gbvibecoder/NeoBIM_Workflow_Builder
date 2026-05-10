@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
-import { FREE_TIER_EXECUTIONS } from "@/features/billing/lib/plan-data";
+import { checkExecutionEligibility, getOrCreateScratchWorkflow } from "@/features/billing/lib/check-execution-eligibility";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import { generateFloorPlan } from "@/features/ai/services/openai";
 import { logger } from "@/lib/logger";
@@ -177,42 +177,16 @@ function checkPromptFeasibility(parsed: import("@/features/floor-plan/lib/struct
   return { feasible: true };
 }
 
-/** Record a standalone tool use as an Execution so it shows in dashboard + admin.
- *  Uses a per-user workflow named "__standalone_tools__" (hidden from My Workflows
- *  by name filter). Must have deletedAt = null so billing/executions APIs include it. */
+/** Record a standalone tool use as an Execution so it shows in dashboard +
+ *  admin and counts toward the user's plan cap. Routes against the shared
+ *  per-user scratch workflow (`__standalone_tools__`) maintained by the
+ *  billing helper. */
 async function recordToolExecution(userId: string, toolName: string) {
   try {
-    // Find a non-deleted tracking workflow
-    let wf = await prisma.workflow.findFirst({
-      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: null },
-      select: { id: true },
-    });
-    if (!wf) {
-      // Fix legacy: un-delete any soft-deleted one from earlier code
-      const legacy = await prisma.workflow.findFirst({
-        where: { ownerId: userId, name: "__standalone_tools__" },
-        select: { id: true },
-      });
-      if (legacy) {
-        wf = await prisma.workflow.update({
-          where: { id: legacy.id },
-          data: { deletedAt: null },
-          select: { id: true },
-        });
-      } else {
-        wf = await prisma.workflow.create({
-          data: {
-            ownerId: userId,
-            name: "__standalone_tools__",
-            description: "Auto-created for standalone tool usage tracking",
-          },
-          select: { id: true },
-        });
-      }
-    }
+    const workflowId = await getOrCreateScratchWorkflow(userId);
     await prisma.execution.create({
       data: {
-        workflowId: wf.id,
+        workflowId,
         userId,
         status: "SUCCESS",
         startedAt: new Date(),
@@ -254,30 +228,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── FREE tier: lifetime executions (limit - 1 unverified + 1 after verification) ──
-    if (!isAdmin && userRole === "FREE") {
-      const lifetimeCompleted = await prisma.execution.count({
-        where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
+    // ── Plan-cap gate (centralized helper — same source of truth as
+    //    /api/execute-node and /api/parse-ifc). Consumes a referral bonus
+    //    on cap-hit if one is available.
+    if (!isAdmin) {
+      const eligibility = await checkExecutionEligibility({
+        userId,
+        userRole,
+        userEmail,
+        emailVerified: !!(session.user as { emailVerified?: boolean }).emailVerified,
+        intent: { kind: "floor-plan" },
+        options: { consumeBonusOnCap: true },
       });
-
-      // Hard cap: FREE_TIER_EXECUTIONS lifetime executions
-      if (lifetimeCompleted >= FREE_TIER_EXECUTIONS) {
+      if (!eligibility.canExecute) {
+        const block = eligibility.blocks[0];
         return NextResponse.json(
-          { error: "PLAN_LIMIT", title: "Free executions used", message: `You've used all ${FREE_TIER_EXECUTIONS} free executions. Upgrade to keep building amazing floor plans!`, action: "View Plans", actionUrl: "/dashboard/billing" },
-          { status: 429 }
+          {
+            error: "PLAN_LIMIT",
+            title: block.title,
+            message: block.message,
+            action: block.action,
+            actionUrl: block.actionUrl,
+          },
+          {
+            status: 429,
+            headers: {
+              "X-Plan-Limit": String(eligibility.limit),
+              "X-Plan-Used": String(eligibility.used),
+              "X-Plan-Remaining": String(eligibility.remaining),
+            },
+          },
         );
       }
-
-      // Verification gate: after (limit - 1), must verify email for the last one
-      let isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
-      if (!isEmailVerified) {
-        const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { emailVerified: true } });
-        isEmailVerified = !!dbUser?.emailVerified;
-      }
-      if (!isEmailVerified && lifetimeCompleted >= FREE_TIER_EXECUTIONS - 1) {
-        return NextResponse.json(
-          { error: "EMAIL_VERIFY", title: "Verify your email", message: `You've used ${FREE_TIER_EXECUTIONS - 1} of your ${FREE_TIER_EXECUTIONS} free executions. Verify your email to unlock your final free floor plan!`, action: "Verify Email", actionUrl: "/dashboard/settings" },
-          { status: 403 }
+      if (eligibility.usedReferralBonus) {
+        console.log(
+          `[referral] floor-plan user=${userId} bonus consumed, remaining=${eligibility.bonusRemaining}`,
         );
       }
     }

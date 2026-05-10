@@ -39,6 +39,14 @@ interface CanvasToolbarProps {
    * when execution actually begins.
    */
   isStartingRun?: boolean;
+  /**
+   * True when the loaded workflow has already been executed once
+   * (Execution row in {SUCCESS, PARTIAL, RUNNING, PENDING}). Per the
+   * 1:1 spec, each saved workflow can be run exactly once. The Run
+   * button surfaces the lock as a disabled visual state with tooltip;
+   * the server-side gate is still authoritative.
+   */
+  workflowLocked?: boolean;
   isDirty: boolean;
   isSaving: boolean;
   isNodeLibraryOpen: boolean;
@@ -128,6 +136,7 @@ export function CanvasToolbar({
   creationMode,
   isExecuting,
   isStartingRun = false,
+  workflowLocked = false,
   isDirty,
   isSaving,
   isNodeLibraryOpen,
@@ -222,7 +231,9 @@ export function CanvasToolbar({
   // `isStartingRun` folds into this so every styling branch already tied to
   // isWorkflowReady (disabled state, borders, cursor, hover) flips immediately
   // on click — no need to thread a second flag through every style prop.
-  const isWorkflowReady = nodes.length > 0 && !isExecuting && !isStartingRun;
+  // `workflowLocked` (1:1 spec — workflow already executed once) also forces
+  // the disabled state so the user sees the lock proactively, not after click.
+  const isWorkflowReady = nodes.length > 0 && !isExecuting && !isStartingRun && !workflowLocked;
 
   // Save button state
   const canSave = isDirty || isUntitled;
@@ -620,7 +631,11 @@ export function CanvasToolbar({
             <div style={{ display: "flex", position: "relative" }} ref={runMenuRef}>
               <button
                 onClick={onRun}
-                title={`${t('canvas.runWorkflow')} (⌘↵)`}
+                title={
+                  workflowLocked
+                    ? "This workflow has already been executed — open a new workflow to run again"
+                    : `${t('canvas.runWorkflow')} (⌘↵)`
+                }
                 disabled={!isWorkflowReady}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,

@@ -419,12 +419,59 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   // users click it multiple times thinking nothing happened.
   const [isStartingRun, setIsStartingRun] = useState(false);
 
+  // §P UX polish: proactively detect "workflow already executed" lock so the
+  // Run button + inline banner can surface the state on canvas load (instead
+  // of the user discovering it via modal-on-click). The server gate is still
+  // authoritative — this is a presentation-layer hint.
+  const [workflowLocked, setWorkflowLocked] = useState(false);
+
   const addLogEntry = useCallback((entry: LogEntry) => {
     setLogEntries(prev => [...prev.slice(-199), entry]);
     setShowLog(true);
   }, []);
 
   const { runWorkflow, isExecuting, rateLimitHit, setRateLimitHit, clearRateLimitError } = useExecution({ onLog: addLogEntry });
+
+  // §P UX polish: fetch eligibility on canvas mount + after every execution
+  // ends so the workflow-lock banner reflects current state. Skipped in demo
+  // mode and for unsaved workflows.
+  React.useEffect(() => {
+    const wfId = currentWorkflow?.id;
+    if (!wfId || isDemoMode || isExecuting) {
+      // Don't reset to false while a run is in flight — the post-run effect
+      // below will pick up the new locked state once isExecuting flips.
+      return;
+    }
+    const isPersisted = wfId.length >= 20 && wfId.startsWith("c");
+    if (!isPersisted) {
+      setWorkflowLocked(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/check-execution-eligibility", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workflowId: wfId, catalogueIds: [] }),
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          canExecute: boolean;
+          blocks?: Array<{ type?: string }>;
+        };
+        const locked =
+          !data.canExecute &&
+          !!data.blocks?.some((b) => b.type === "workflow_already_executed");
+        if (!cancelled) setWorkflowLocked(locked);
+      } catch {
+        // Silent — backend gate is authoritative.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentWorkflow?.id, isDemoMode, isExecuting]);
 
   // Show showcase when execution finishes + post-execution scene
   React.useEffect(() => {
@@ -716,12 +763,17 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
       const wfId = currentWorkflow?.id;
       const isPersisted = wfId && wfId.length >= 20 && wfId.startsWith("c");
 
-      const eligibilityCheck: Promise<{ canExecute: boolean; blocks?: Array<{ title: string; message: string; action?: string; actionUrl?: string }> } | null> = isDemoMode
+      const eligibilityCheck: Promise<{ canExecute: boolean; blocks?: Array<{ type?: string; title: string; message: string; action?: string; actionUrl?: string }> } | null> = isDemoMode
         ? Promise.resolve(null)
         : fetch("/api/check-execution-eligibility", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ catalogueIds }),
+            // Send workflowId when persisted so the helper can also enforce
+            // the "no double execution" lock (workflow_already_executed block).
+            body: JSON.stringify({
+              catalogueIds,
+              ...(isPersisted ? { workflowId: wfId } : {}),
+            }),
           })
             .then((res) => (res.ok ? res.json() : null))
             .catch(() => null); // pre-check failure falls through to backend enforcement
@@ -736,12 +788,17 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
 
       // Eligibility block takes priority — if blocked, abort before runWorkflow.
       if (eligibility && !eligibility.canExecute && eligibility.blocks && eligibility.blocks.length > 0) {
-        const block = eligibility.blocks[0];
+        const block = eligibility.blocks[0] as {
+          title: string; message: string; action?: string; actionUrl?: string;
+          secondaryAction?: string; secondaryActionUrl?: string;
+        };
         setRateLimitHit({
           title: block.title,
           message: block.message,
           action: block.action,
           actionUrl: block.actionUrl,
+          secondaryAction: block.secondaryAction,
+          secondaryActionUrl: block.secondaryActionUrl,
         });
         return;
       }
@@ -825,12 +882,81 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
         onTouchEndCapture={onTouchEndCapture}
         onTouchMoveCapture={onTouchMoveCapture}
       >
+        {/* §P UX polish: inline banner when workflow is locked (already
+         *  executed). Backend gate hard-blocks regardless; the banner is a
+         *  proactive UX hint so the user doesn't click Run only to be modal-
+         *  blocked. */}
+        {workflowLocked && !isExecuting && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: "absolute",
+              top: 64,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "10px 18px",
+              borderRadius: 12,
+              background: "rgba(16,185,129,0.06)",
+              border: "1px solid rgba(16,185,129,0.18)",
+              backdropFilter: "blur(8px)",
+              fontSize: 13,
+              color: "#0F2E2A",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+            }}
+          >
+            <span style={{ fontSize: 15 }}>🔒</span>
+            <span style={{ fontWeight: 600 }}>This workflow&apos;s run is complete.</span>
+            <button
+              type="button"
+              onClick={() => {
+                const execId = useExecutionStore.getState().currentDbExecutionId;
+                if (execId) router.push(`/dashboard/results/${execId}`);
+                else router.push("/dashboard/history");
+              }}
+              style={{
+                padding: "5px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(16,185,129,0.35)",
+                background: "rgba(255,255,255,0.65)",
+                color: "#0F2E2A",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              View results
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              style={{
+                padding: "5px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(0,0,0,0.06)",
+                background: "transparent",
+                color: "#0F2E2A",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Open new workflow
+            </button>
+          </div>
+        )}
+
         {/* Toolbar always renders — the showcase overlay no longer mounts here. */}
         <CanvasToolbar
             workflowName={workflowName}
             creationMode={creationMode}
             isExecuting={isExecuting}
             isStartingRun={isStartingRun}
+            workflowLocked={workflowLocked}
             isDirty={isDirty}
             isSaving={isSaving}
             isNodeLibraryOpen={isNodeLibraryOpen}

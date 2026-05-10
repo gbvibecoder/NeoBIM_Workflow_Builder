@@ -37,6 +37,11 @@ export interface WorkflowTemplate {
   estimatedRunTime?: string;
   requiredInputs: string[];
   expectedOutputs: string[];
+  /** Plan tier required to use this template. Optional — undefined or
+   *  "FREE" means accessible to every signed-in user. Compared against the
+   *  user's role via canAccessTemplate() — see
+   *  src/features/billing/lib/template-access.ts. */
+  requiredTier?: "FREE" | "MINI" | "STARTER" | "PRO" | "TEAM";
 }
 
 export interface CommunityPublication {

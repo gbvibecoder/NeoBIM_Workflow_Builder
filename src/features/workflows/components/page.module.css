@@ -655,9 +655,22 @@
 }
 .workflowCardStatus[data-status="success"] { color: #4A6B4D; }
 .workflowCardStatus[data-status="failed"] { color: #dc3545; }
+.workflowCardStatus[data-status="cancelled"] { color: #dc3545; }
 .workflowCardStatus[data-status="running"] { color: #1A4D5C; }
+.workflowCardStatus[data-status="pending"] { color: #1A4D5C; }
 .workflowCardStatus[data-status="partial"] { color: #C26A3B; }
+.workflowCardStatus[data-status="available"] { color: #6B7280; }
 .statusDot { width: 5px; height: 5px; border-radius: 99px; background: currentColor; }
+/* Subtle pulse on in-flight states (RUNNING, PENDING) so the user notices
+ * the workflow is in motion without the card hijacking attention. */
+.workflowCardStatus[data-status="running"] .statusDot,
+.workflowCardStatus[data-status="pending"] .statusDot {
+  animation: workflowCardStatusPulse 1.6s ease-in-out infinite;
+}
+@keyframes workflowCardStatusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.85); }
+}
 
 /* Selection checkbox */
 .workflowCardCheckbox {

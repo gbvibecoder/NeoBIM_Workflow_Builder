@@ -3,7 +3,7 @@
  * Minimal, dark-themed, AEC-branded.
  */
 import { CONTACT_EMAIL } from "@/constants/contact";
-import { FREE_TIER_EXECUTIONS } from "@/features/billing/lib/plan-data";
+import { FREE_TIER_EXECUTIONS, STRIPE_PLANS } from "@/features/billing/lib/plan-data";
 
 const BASE_URL = process.env.NEXTAUTH_URL
   || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
@@ -172,10 +172,10 @@ export function subscriptionCanceledEmail(name: string | null, plan: string): st
     <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin:20px 0;">
       <div style="font-size:12px;font-weight:700;color:#9898B0;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">What You Still Get</div>
       <ul style="margin:0;padding:0 0 0 18px;color:#7C7C96;font-size:13px;line-height:2;">
-        <li>${FREE_TIER_EXECUTIONS} free executions</li>
-        <li>3 workflows</li>
+        <li>${FREE_TIER_EXECUTIONS} free execution${FREE_TIER_EXECUTIONS === 1 ? "" : "s"}</li>
+        <li>${STRIPE_PLANS.FREE.limits.maxWorkflows} workflow${STRIPE_PLANS.FREE.limits.maxWorkflows === 1 ? "" : "s"}</li>
         <li>Community templates</li>
-        <li>1 concept render</li>
+        <li>${STRIPE_PLANS.FREE.limits.rendersPerMonth} concept render${STRIPE_PLANS.FREE.limits.rendersPerMonth === 1 ? "" : "s"}</li>
       </ul>
     </div>
     <p style="font-size:13px;color:#7C7C96;line-height:1.6;">
