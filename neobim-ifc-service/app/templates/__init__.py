@@ -9,6 +9,12 @@ across a range of plot sizes.
 
 from __future__ import annotations
 
+from app.templates.tier2_1bhk_pune import (
+    build_1bhk_pune_duplex,
+    build_1bhk_pune_template,
+)
+from app.templates.tier2_1bhk_pune_house import build_1bhk_pune_house
+from app.templates.tier2_1bhk_pune_tower import build_1bhk_pune_tower
 from app.templates.tier2_2bhk_pune import (
     build_2bhk_pune_duplex,
     build_2bhk_pune_template,
@@ -17,6 +23,10 @@ from app.templates.tier2_2bhk_pune_house import build_2bhk_pune_house
 from app.templates.tier2_2bhk_pune_tower import build_2bhk_pune_tower
 
 __all__ = [
+    "build_1bhk_pune_duplex",
+    "build_1bhk_pune_house",
+    "build_1bhk_pune_template",
+    "build_1bhk_pune_tower",
     "build_2bhk_pune_duplex",
     "build_2bhk_pune_house",
     "build_2bhk_pune_template",
