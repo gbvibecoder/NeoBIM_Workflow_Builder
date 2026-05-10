@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly states \"plot opens onto an east-side access road and the main entry must be on the east\" (site_orientation=E, user_priorities=east_facing_entry). East-facing entry = 90° clockwise rotation from the north-default template.",
+    "mirror_axis": "none",
+    "rotation": "90",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3889,
+    "output_tokens": 142,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004599,
+    "latency_ms": 1733.7839999236166,
+    "created_at_iso": "2026-05-10T18:11:53.297252+00:00"
+  }
+}

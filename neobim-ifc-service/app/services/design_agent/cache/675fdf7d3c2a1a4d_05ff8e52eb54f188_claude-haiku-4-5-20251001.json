@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "refuse",
+    "reasoning": "The brief explicitly requests vastu-compliant placement with kitchen in south-east, pooja room in north-east, and master bedroom in south-west. Vastu interpretation requires plot-orientation-aware rule application not supported in v1 — the adapter only supports uniform mirror + rotate transforms, which cannot guarantee room-specific corner assignments.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": "Vastu interpretation (kitchen in SE, pooja in NE, master in SW) requires mapping cardinal directions to template rooms based on plot orientation. v1 adapter applies only whole-building transforms and cannot reposition individual rooms to their vastu-prescribed corners. Vastu compliance deferred to v2 pipeline.",
+    "suggested_action": "ship_as_is"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3914,
+    "output_tokens": 263,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005229,
+    "latency_ms": 2873.1948339845985,
+    "created_at_iso": "2026-05-10T18:12:10.714369+00:00"
+  }
+}

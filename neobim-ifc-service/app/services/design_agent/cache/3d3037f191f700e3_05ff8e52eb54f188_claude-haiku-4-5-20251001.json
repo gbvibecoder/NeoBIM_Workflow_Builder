@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly requests \"default orientation and standard catalogue layout\" with no chirality or rotation requirements. Template default is north-facing entry; user wants exactly that. No transform needed.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3891,
+    "output_tokens": 120,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004491,
+    "latency_ms": 1634.0319160372019,
+    "created_at_iso": "2026-05-10T18:12:07.838051+00:00"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "refuse",
+    "reasoning": "The brief explicitly requests \"balcony only on the east side — no balcony on the west wall,\" which is an asymmetric per-side feature request. While the site_orientation is north-facing (template default), the balcony asymmetry constraint cannot be satisfied by mirror/rotate transforms alone, as these apply symmetrically to the whole building.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": "Asymmetric per-side features (balcony on one side only) are deferred to v2; v1 transforms (mirror + rotate) apply uniformly to the entire building and cannot selectively remove features from one facade. Ship the matcher's default north-facing layout and note that selective balcony placement requires per-side feature control not available in v1.",
+    "suggested_action": "ship_as_is"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3891,
+    "output_tokens": 281,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005296,
+    "latency_ms": 2927.8518750797957,
+    "created_at_iso": "2026-05-10T18:12:16.233725+00:00"
+  }
+}

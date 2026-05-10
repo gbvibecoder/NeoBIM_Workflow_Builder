@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly requests east-facing entry (site_orientation=E) AND mirror layout (kitchen on opposite side from default). This is a combined transform: mirror_axis=X (E-W flip for kitchen relocation) applied first, then rotation=90 to reorient entry from north to east.",
+    "mirror_axis": "X",
+    "rotation": "90",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3895,
+    "output_tokens": 148,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004635,
+    "latency_ms": 2039.9577079806477,
+    "created_at_iso": "2026-05-10T18:11:59.441337+00:00"
+  }
+}

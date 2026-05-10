@@ -48,6 +48,9 @@ from app.services.design_agent.stages.program_architect import (
     ProgramArchitectMetadata,
     run_program_architect,
 )
+from app.services.design_agent.stages.adaptation_planner import (
+    run_adaptation_planner,
+)
 from app.services.design_agent.stages.template_matcher import (
     TemplateMatcherMetadata,
     run_template_matcher,
@@ -64,6 +67,9 @@ from app.services.design_agent.template_dispatcher import (
     dispatch_template,
 )
 from app.services.design_agent.types import (
+    AdaptationFailed,
+    AdaptationPlan,
+    AdaptationPlannerMetadata,
     BriefAnalysis,
     BriefForm,
     BriefStyleWeights,
@@ -86,6 +92,8 @@ from app.services.design_agent.types import (
     SuggestedAction,
     TemplateId,
     TemplateParameters,
+    TransformAxis,
+    TransformRotation,
     fidelity_hint_for,
 )
 
@@ -154,4 +162,11 @@ __all__ = [
     # TemplateMatcher stage (Slice 2B.1.B)
     "run_template_matcher",
     "TemplateMatcherMetadata",
+    # Adaptation planner (Slice 2B.2)
+    "AdaptationPlan",
+    "AdaptationFailed",
+    "AdaptationPlannerMetadata",
+    "TransformAxis",
+    "TransformRotation",
+    "run_adaptation_planner",
 ]

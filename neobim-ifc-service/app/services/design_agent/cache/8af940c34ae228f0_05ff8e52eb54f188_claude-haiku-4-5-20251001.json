@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief requests east-facing entry (90° clockwise from north default) AND explicit north-to-south mirror flip to position kitchen at the south end. Combined transform: mirror_Y first (N-S flip), then rotate 90° to achieve the desired east-facing entry with the kitchen relocated to the back (south).",
+    "mirror_axis": "Y",
+    "rotation": "90",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3889,
+    "output_tokens": 153,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004654,
+    "latency_ms": 2531.6334581002593,
+    "created_at_iso": "2026-05-10T18:12:01.976471+00:00"
+  }
+}

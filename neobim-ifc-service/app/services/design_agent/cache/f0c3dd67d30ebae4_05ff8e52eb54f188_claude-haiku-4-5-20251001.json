@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly requests \"north-facing\" layout on a \"north-facing Pune plot\"; the matched template defaults to north-facing entry, so no transformation is needed. This is a NO-OP adaptation.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3876,
+    "output_tokens": 128,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004516,
+    "latency_ms": 2474.8070419300348,
+    "created_at_iso": "2026-05-10T18:12:04.459764+00:00"
+  }
+}
