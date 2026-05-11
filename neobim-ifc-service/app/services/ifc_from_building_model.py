@@ -616,6 +616,104 @@ def build_ifc_from_building_model(bm: BuildingModel) -> ifcopenshell.file:
         model, body_context, bm=bm, ifc_storeys=ifc_storeys,
     )
 
+    # ── Slice P2.A — stair handrails ────────────────────────────────
+    # One IfcRailing (PredefinedType=HANDRAIL, 0.9 m, MS-Steel) along
+    # every IfcStairFlight emitted above. NBC India 2016 Part 4
+    # mandates a handrail on residential stairs; without one the stair
+    # reads as "AI generated" in the viewer. IFC-layer only — no
+    # BuildingModel change.
+    from app.services.handrail_builder import emit_stair_handrail
+    ms_steel_for_handrails = next(
+        (m for m in model.by_type("IfcMaterial") if m.Name == "MS-Steel"),
+        None,
+    )
+    for storey_node in sorted(bld.storeys, key=lambda s: s.index):
+        ifc_storey = ifc_storeys[storey_node.id]
+        for st_node in sorted(storey_node.stairs, key=lambda s: s.id):
+            emit_stair_handrail(
+                model, body_context,
+                stair=st_node,
+                placement=placements[st_node.id],
+                ifc_storey=ifc_storey,
+                ms_steel_material=ms_steel_for_handrails,
+            )
+
+    # ── Slice P2.D — stilt parking lines ────────────────────────────
+    # 4 IfcAnnotation rectangles (2.5 m × 5.0 m bays) on every storey
+    # marked usage="parking" (tower stilt floors). House/duplex have
+    # no parking storey — emitter is a no-op there.
+    from app.services.parking_line_painter import emit_parking_lines
+    for storey_node in sorted(bld.storeys, key=lambda s: s.index):
+        emit_parking_lines(
+            model, body_context,
+            storey=storey_node,
+            ifc_storey=ifc_storeys[storey_node.id],
+        )
+
+    # ── Slice P2.C — door swing arc annotations ─────────────────────
+    # One IfcAnnotation (90° arc) per swinging IfcDoor. Sliding (lift)
+    # doors and PredefinedType=GATE doors get no arc. Viewer rendering
+    # is inconsistent (BlenderBIM full; IfcViewer/FreeCAD partial); the
+    # IFC is semantically correct regardless.
+    from app.services.door_swing_annotator import emit_door_swing_arc
+    for d_node in sorted(bld.doors, key=lambda d: d.id):
+        door_entity = door_entities.get(d_node.id)
+        parent_opening = openings_by_id.get(d_node.in_opening_id)
+        parent_opening_entity = opening_entities.get(d_node.in_opening_id)
+        if door_entity is None or parent_opening is None or parent_opening_entity is None:
+            continue
+        host_wall_id = parent_opening.in_wall_id
+        host_storey_id = next(
+            (st.id for st in bld.storeys
+             if any(w.id == host_wall_id for w in st.walls)),
+            None,
+        )
+        ifc_storey_for_arc = (
+            ifc_storeys[host_storey_id] if host_storey_id else None
+        )
+        emit_door_swing_arc(
+            model, body_context,
+            door=d_node,
+            door_entity=door_entity,
+            opening=parent_opening,
+            parent_opening_entity=parent_opening_entity,
+            ifc_storey=ifc_storey_for_arc,
+        )
+
+    # ── Slice P2.B — window mullions ────────────────────────────────
+    # One IfcMember(MULLION) per IfcWindow at the horizontal midpoint.
+    # 50 mm × 100 mm Aluminum cross-section. Closes the "single flat
+    # pane" visual gap that reads as "AI generated".
+    from app.services.window_mullion_builder import emit_window_mullion
+    aluminum_mat = api.run(
+        "material.add_material",
+        model,
+        name="Aluminum-Mullion",
+        category="metal",
+    )
+    for w_node in sorted(bld.windows, key=lambda w: w.id):
+        parent_opening = openings_by_id.get(w_node.in_opening_id)
+        parent_opening_entity = opening_entities.get(w_node.in_opening_id)
+        if parent_opening is None or parent_opening_entity is None:
+            continue
+        host_wall_id = parent_opening.in_wall_id
+        host_storey_id = next(
+            (st.id for st in bld.storeys
+             if any(w.id == host_wall_id for w in st.walls)),
+            None,
+        )
+        ifc_storey_for_mullion = (
+            ifc_storeys[host_storey_id] if host_storey_id else None
+        )
+        emit_window_mullion(
+            model, body_context,
+            window=w_node,
+            opening=parent_opening,
+            parent_opening_entity=parent_opening_entity,
+            ifc_storey=ifc_storey_for_mullion,
+            aluminum_material=aluminum_mat,
+        )
+
     # ── Provenance Pset on IfcProject ─────────────────────────────
     initial_provenance = bm.project.metadata.provenance
     stamp_provenance(model, initial_provenance, project)

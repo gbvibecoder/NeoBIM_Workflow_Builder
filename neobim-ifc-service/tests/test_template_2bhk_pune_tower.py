@@ -212,16 +212,16 @@ def test_railing_renders_at_correct_height() -> None:
     bm = build_2bhk_pune_tower(habitable_floor_count=5)
     model = build_ifc_from_building_model(bm)
 
-    railings = model.by_type("IfcRailing")
-    # 5 habitable floors × 3 railings = 15 IfcRailing entities.
-    assert len(railings) == 15, (
-        f"expected 15 IfcRailing entities (3 per habitable × 5), "
-        f"got {len(railings)}"
+    # Slice P2.A adds HANDRAILs alongside stair flights; this test
+    # remains scoped to GUARDRAILs (balcony parapets at 1.1m).
+    guardrails = [r for r in model.by_type("IfcRailing")
+                  if r.PredefinedType == "GUARDRAIL"]
+    # 5 habitable floors × 3 railings = 15 IfcRailing GUARDRAILs.
+    assert len(guardrails) == 15, (
+        f"expected 15 IfcRailing GUARDRAILs (3 per habitable × 5), "
+        f"got {len(guardrails)}"
     )
-    for r in railings:
-        assert r.PredefinedType == "GUARDRAIL", (
-            f"{r.Name}: PredefinedType={r.PredefinedType} (expected GUARDRAIL)"
-        )
+    for r in guardrails:
         depth = None
         for rep in r.Representation.Representations:
             for item in rep.Items:
