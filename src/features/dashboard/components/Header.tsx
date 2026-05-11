@@ -9,6 +9,12 @@ interface HeaderProps {
    * immersive landing where the page surface is dark.
    */
   theme?: "dark" | "light";
+  /**
+   * Extra right offset (px) for the floating avatar. Canvas page passes a
+   * larger value so the avatar clears the 44px-wide Node Library tab handle.
+   * Default 16 keeps current behavior on all other dashboard pages.
+   */
+  rightOffset?: number;
 }
 
 /**
@@ -26,7 +32,7 @@ interface HeaderProps {
  *
  * Pages render edge-to-edge. The 56px-tall black strip is gone.
  */
-export function Header({ theme = "light" }: HeaderProps) {
+export function Header({ theme = "light", rightOffset = 16 }: HeaderProps) {
   const isDark = theme === "dark";
 
   return (
@@ -58,7 +64,7 @@ export function Header({ theme = "light" }: HeaderProps) {
         style={{
           position: "fixed",
           top: 12,
-          right: 16,
+          right: rightOffset,
           zIndex: 40,
           pointerEvents: "auto",
         }}
