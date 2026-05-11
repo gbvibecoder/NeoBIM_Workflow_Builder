@@ -51,6 +51,10 @@ from app.services.design_agent.stages.program_architect import (
 from app.services.design_agent.stages.adaptation_planner import (
     run_adaptation_planner,
 )
+from app.services.design_agent.stages.extension_planner import (
+    run_extension_planner,
+)
+from app.services.design_agent.transforms_extensions import apply_extensions
 from app.services.design_agent.stages.template_matcher import (
     TemplateMatcherMetadata,
     run_template_matcher,
@@ -78,6 +82,12 @@ from app.services.design_agent.types import (
     DesignContext,
     DesignContextValidationError,
     DesignRequest,
+    ExtensionAttachment,
+    ExtensionFailed,
+    ExtensionPlan,
+    ExtensionPlannerMetadata,
+    ExtensionRequest,
+    ExtensionType,
     ExtractionWarning,
     ExtractionWarningCode,
     FidelityHint,
@@ -169,4 +179,13 @@ __all__ = [
     "TransformAxis",
     "TransformRotation",
     "run_adaptation_planner",
+    # Extension planner + orchestrator (Slice 2B.3)
+    "ExtensionType",
+    "ExtensionAttachment",
+    "ExtensionRequest",
+    "ExtensionPlan",
+    "ExtensionFailed",
+    "ExtensionPlannerMetadata",
+    "run_extension_planner",
+    "apply_extensions",
 ]

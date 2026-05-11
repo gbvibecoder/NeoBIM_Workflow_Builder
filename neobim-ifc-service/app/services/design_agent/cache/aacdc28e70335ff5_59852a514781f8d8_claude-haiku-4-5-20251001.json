@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly states \"Standard Indian residential setup\" and \"all the essentials a typical Indian middle-class family home would have\" — per inference rules, this triggers inclusion of all five Slice 2B.3 extensions: compound wall (universal in Indian residential practice), entry gate (with wall), car porch (standard parking), servant quarter (joint-family context with domestic help), and mumty (terrace access for habitable roof usage).",
+    "include_compound_wall": true,
+    "include_entry_gate": true,
+    "include_car_porch": true,
+    "include_servant_quarter": true,
+    "include_mumty": true,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 675,
+    "output_tokens": 247,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002357,
+    "latency_ms": 3030.4388750810176,
+    "created_at_iso": "2026-05-11T03:29:52.346447+00:00"
+  }
+}

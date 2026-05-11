@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly names \"compound wall around the plot\" and \"main entry gate at the front\". Both are directly mentioned; no other extensions requested. Compound wall + entry gate are the only inclusions for this standard duplex.",
+    "include_compound_wall": true,
+    "include_entry_gate": true,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 675,
+    "output_tokens": 199,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002117,
+    "latency_ms": 2575.119416927919,
+    "created_at_iso": "2026-05-11T03:29:39.136233+00:00"
+  }
+}

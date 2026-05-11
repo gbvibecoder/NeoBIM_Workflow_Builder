@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly requests \"mumty on the roof for direct stair access to the terrace\" to solve current access problem. No other extensions mentioned; user says \"default everything else\".",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": true,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 677,
+    "output_tokens": 191,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002079,
+    "latency_ms": 2131.6735001746565,
+    "created_at_iso": "2026-05-11T03:29:36.555295+00:00"
+  }
+}

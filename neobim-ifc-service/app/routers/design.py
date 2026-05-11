@@ -53,15 +53,20 @@ from app.services.design_agent import (
     AdaptationPlan,
     DesignContext,
     DesignContextValidationError,
+    ExtensionFailed,
+    ExtensionPlan,
+    ExtensionType,
     LLMClient,
     MatchFailed,
     MatchResult,
+    apply_extensions,
     classify_brief,
     dispatch_match,
     extract_pdf_text,
     parse_design_request,
     run_adaptation_planner,
     run_brief_analyst,
+    run_extension_planner,
     run_program_architect,
     run_template_matcher,
     vision_extract_pdf,
@@ -741,16 +746,29 @@ def _ifc_to_bytes(model) -> bytes:
             pass
 
 
-def _ifc_filename_for(
-    build_id: str, plan: AdaptationPlan | None
-) -> str:
-    """Deterministic R2 filename: ``design-generate-{id}-{plan}.ifc``.
+_EXTENSION_ABBREV: dict[ExtensionType, str] = {
+    ExtensionType.COMPOUND_WALL: "cw",
+    ExtensionType.ENTRY_GATE: "eg",
+    ExtensionType.CAR_PORCH: "cp",
+    ExtensionType.SERVANT_QUARTER: "sq",
+    ExtensionType.MUMTY: "mu",
+}
 
-    ``plan`` is rendered as ``mirror_<axis>_rot_<deg>`` for non-no-op
-    plans, ``noop`` for the no-op case, ``shipped_as_is`` when the
-    planner refused. The filename is stable per (build_id, plan) so
-    repeated calls overwrite the same R2 object instead of leaking
-    storage on retries.
+
+def _ifc_filename_for(
+    build_id: str,
+    plan: AdaptationPlan | None,
+    extension_plan: ExtensionPlan | None = None,
+) -> str:
+    """Deterministic R2 filename: ``design-generate-{id}-{ext}-{plan}.ifc``.
+
+    ``plan`` (adapter) is rendered as ``mirror_<axis>_rot_<deg>`` for
+    non-no-op plans, ``noop`` for the no-op case, ``shipped_as_is``
+    when the planner refused. The optional ``extension_plan`` (2B.3
+    NEW) adds an ``ext_<abbrevs>`` prefix listing applied extensions
+    in canonical order so distinct extension combinations land at
+    distinct R2 keys. The filename is stable per (build_id, ext_plan,
+    adapter_plan) so repeated calls overwrite the same R2 object.
     """
     if plan is None:
         plan_part = "shipped_as_is"
@@ -759,6 +777,17 @@ def _ifc_filename_for(
     else:
         mir = plan.mirror_axis.value if plan.mirror_axis else "none"
         plan_part = f"mirror_{mir.lower()}_rot_{plan.rotation.value}"
+
+    if extension_plan is not None and not extension_plan.is_noop:
+        # Deterministic ordering: by ExtensionType iteration order,
+        # which matches the canonical orchestrator order
+        # (compound→gate→porch→servant→mumty).
+        abbrevs = [
+            _EXTENSION_ABBREV[t]
+            for t in ExtensionType
+            if any(r.extension_type == t for r in extension_plan.extensions)
+        ]
+        return f"design-generate-{build_id}-ext_{'_'.join(abbrevs)}-{plan_part}.ifc"
     return f"design-generate-{build_id}-{plan_part}.ifc"
 
 
@@ -976,6 +1005,67 @@ async def design_generate(
     else:
         plan_for_apply = planner_decoded
 
+    # ── STAGE 6.5: EXTENSION PLANNER (Slice 2B.3) ────────────────────
+    # Decides which of 5 extensions the user wants (compound_wall,
+    # entry_gate, car_porch, servant_quarter, mumty). Refusal handling
+    # mirrors the adapter planner above.
+    #
+    # Note: ``adaptation`` argument intentionally NOT passed. The
+    # planner reasons in template-space (north=front always) per
+    # decisions doc §1.2; including the adapter context in the user
+    # message would only fragment the cache key without changing the
+    # decision. The same cache works for any adapter plan upstream.
+    try:
+        ext_planner_decoded, ext_planner_meta = run_extension_planner(
+            analysis=analysis,
+            match=match_decoded,
+            llm_client=llm_client,
+        )
+    except (
+        LLMUnavailableError, CircuitBreakerTripped, LLMRateLimited,
+        LLMResponseValidationError, LLMAPIError,
+    ) as exc:
+        wrapped = _wrap_llm_error_as_http(rid, "extension_planner", exc)
+        assert wrapped is not None
+        raise wrapped from exc
+
+    extension_plan_for_apply: Optional[ExtensionPlan] = None
+    extension_failed_payload: Optional[dict[str, Any]] = None
+
+    if isinstance(ext_planner_decoded, ExtensionFailed):
+        if ext_planner_decoded.suggested_action == "ask_user_clarification":
+            elapsed_ms = round((time.monotonic() - stage_start) * 1000, 1)
+            log.info(
+                "design_generate_ext_planner_clarify",
+                request_id=rid, build_id=request.build_id,
+                reason=ext_planner_decoded.reason, elapsed_ms=elapsed_ms,
+            )
+            raise HTTPException(
+                status_code=422,
+                detail=_error_payload(
+                    rid, "DESIGN_EXTENSION_CLARIFY",
+                    ext_planner_decoded.reason,
+                    extra={
+                        "suggested_action": ext_planner_decoded.suggested_action,
+                        "elapsed_ms": elapsed_ms,
+                    },
+                ),
+            )
+        # ship_as_is — log refusal, skip extension application, continue.
+        extension_failed_payload = {
+            "reason": ext_planner_decoded.reason,
+            "suggested_action": ext_planner_decoded.suggested_action,
+            "failed_extensions": [
+                t.value for t in ext_planner_decoded.failed_extensions
+            ],
+        }
+        aggregated_warnings.append(
+            f"ExtensionPlanner: {ext_planner_decoded.reason} "
+            f"(action={ext_planner_decoded.suggested_action})"
+        )
+    else:
+        extension_plan_for_apply = ext_planner_decoded
+
     # ── STAGE 7: DISPATCH TO BUILDER ─────────────────────────────────
     try:
         bm_default = dispatch_match(match_decoded, build_id=request.build_id)
@@ -1003,12 +1093,42 @@ async def design_generate(
             ),
         ) from exc
 
+    # ── STAGE 7.5: APPLY EXTENSIONS (Slice 2B.3) ─────────────────────
+    # Per decisions doc §1.2 — extensions run BEFORE adapter so the
+    # adapter naturally transforms extension geometry (porch, gate
+    # piers, servant quarter, mumty) alongside the rest of the
+    # building. apply_extensions returns the original bm unchanged
+    # when plan.is_noop, OR partial bm with extension_failed envelope
+    # when some extensions failed (ship_as_is / skip_failed_extensions).
+    bm_with_extensions: BuildingModel = bm_default
+    extension_plan_for_response: Optional[ExtensionPlan] = extension_plan_for_apply
+    if extension_plan_for_apply is not None and not extension_plan_for_apply.is_noop:
+        bm_with_extensions, ext_apply_failed = apply_extensions(
+            bm_default, extension_plan_for_apply
+        )
+        if ext_apply_failed is not None:
+            # Partial / total per-extension failure — record into the
+            # response envelope. The orchestrator already reverted to
+            # input bm on total failure; partial failure keeps the
+            # successfully-applied extensions on bm_with_extensions.
+            extension_failed_payload = {
+                "reason": ext_apply_failed.reason,
+                "suggested_action": ext_apply_failed.suggested_action,
+                "failed_extensions": [
+                    t.value for t in ext_apply_failed.failed_extensions
+                ],
+            }
+            aggregated_warnings.append(
+                f"ApplyExtensions: {ext_apply_failed.reason} "
+                f"(action={ext_apply_failed.suggested_action})"
+            )
+
     # ── STAGE 8: APPLY ADAPTATIONS ───────────────────────────────────
-    bm_final: BuildingModel = bm_default
+    bm_final: BuildingModel = bm_with_extensions
     plan_for_response: Optional[AdaptationPlan] = plan_for_apply
     if plan_for_apply is not None and not plan_for_apply.is_noop:
         try:
-            bm_final = apply_adaptations(bm_default, plan_for_apply)
+            bm_final = apply_adaptations(bm_with_extensions, plan_for_apply)
         except AdaptationApplyError as exc:
             # Transform produced an invalid BuildingModel — fall back
             # to default and surface as a structured warning in the
@@ -1029,10 +1149,10 @@ async def design_generate(
             }
             aggregated_warnings.append(
                 f"AdaptationApply: {exc.plan_repr} failed re-validation; "
-                f"shipped matcher's default layout instead. "
+                f"shipped layout with extensions but no adaptation. "
                 f"Underlying error: {exc.original_error}"
             )
-            bm_final = bm_default
+            bm_final = bm_with_extensions
             plan_for_response = None
 
     # ── STAGE 9: BUILD IFC ───────────────────────────────────────────
@@ -1083,7 +1203,11 @@ async def design_generate(
         }
 
     # ── STAGE 11: R2 UPLOAD (with base64 fallback) ───────────────────
-    filename = _ifc_filename_for(request.build_id, plan_for_response)
+    filename = _ifc_filename_for(
+        request.build_id,
+        plan_for_response,
+        extension_plan_for_response,
+    )
     ifc_url = upload_ifc_to_r2(ifc_bytes, filename)
     if ifc_url is None:
         log.warning(
@@ -1099,7 +1223,10 @@ async def design_generate(
     elapsed_ms = round((time.monotonic() - stage_start) * 1000, 1)
     status = (
         "generated_with_fallback"
-        if adaptation_failed_payload is not None
+        if (
+            adaptation_failed_payload is not None
+            or extension_failed_payload is not None
+        )
         else "generated"
     )
     log.info(
@@ -1115,7 +1242,14 @@ async def design_generate(
         plan_rotation=(
             plan_for_response.rotation.value if plan_for_response else None
         ),
+        extensions=(
+            [r.extension_type.value for r in extension_plan_for_response.extensions]
+            if extension_plan_for_response is not None
+            and not extension_plan_for_response.is_noop
+            else []
+        ),
         adaptation_failed=adaptation_failed_payload is not None,
+        extension_failed=extension_failed_payload is not None,
         ids_passed=ids_envelope["passed"] if ids_envelope else None,
         elapsed_ms=elapsed_ms,
         ifc_size_bytes=len(ifc_bytes),
@@ -1128,6 +1262,13 @@ async def design_generate(
         "ifc_url_kind": ifc_url_kind,
         "ifc_size_bytes": len(ifc_bytes),
         "match_result": match_decoded.model_dump(mode="json"),
+        "extension_plan": (
+            extension_plan_for_response.model_dump(mode="json")
+            if extension_plan_for_response is not None
+            and not extension_plan_for_response.is_noop
+            else None
+        ),
+        "extension_failed": extension_failed_payload,
         "adaptation_plan": (
             plan_for_response.model_dump(mode="json")
             if plan_for_response is not None and not plan_for_response.is_noop
@@ -1156,10 +1297,18 @@ async def design_generate(
                 "cost_usd_estimated": planner_meta.llm_cost_usd,
                 "refused": planner_meta.refused,
             },
+            "extension_planner": {
+                "model": ext_planner_meta.llm_model_used,
+                "elapsed_ms": ext_planner_meta.elapsed_ms,
+                "cache_hit": ext_planner_meta.cache_hit,
+                "cost_usd_estimated": ext_planner_meta.llm_cost_usd,
+                "refused": ext_planner_meta.refused,
+            },
             "total_cost_usd_estimated": (
                 analyst_meta.cost_usd_estimated
                 + matcher_meta.cost_usd_estimated
                 + planner_meta.llm_cost_usd
+                + ext_planner_meta.llm_cost_usd
             ),
         },
         "warnings": aggregated_warnings,

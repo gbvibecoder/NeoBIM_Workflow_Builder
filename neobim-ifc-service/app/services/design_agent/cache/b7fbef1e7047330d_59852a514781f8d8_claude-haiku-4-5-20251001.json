@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly requests \"servant quarter (bedroom + bath) at the back of the plot for live-in domestic help\" and states \"no other add-ons required\". Only servant_quarter is set True; all other extensions are False per explicit requirement.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": true,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 681,
+    "output_tokens": 205,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002153,
+    "latency_ms": 2236.22762481682,
+    "created_at_iso": "2026-05-11T03:29:34.418130+00:00"
+  }
+}

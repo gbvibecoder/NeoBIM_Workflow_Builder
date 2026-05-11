@@ -14,12 +14,15 @@ IDS-passing IFC entity:
 Every node class is `frozen=True`. Cross-references between nodes are
 string ids resolved by the root validator.
 
-The 12 Phase-1 invariants run as a single `@model_validator(mode="after")`
-on `BuildingModel`. On any failure they raise `BuildingModelValidationError`
-carrying `rule_id`, `node_id`, `expected`, `actual`, and a remediation
-`hint` — never a generic `ValueError`. This is the spec'd shape downstream
+The 13 invariants (12 Phase-1 + PLOT_POLYGON_VALID added in Slice 2B.3)
+run as a single `@model_validator(mode="after")` on `BuildingModel`.
+On any failure they raise `BuildingModelValidationError` carrying
+`rule_id`, `node_id`, `expected`, `actual`, and a remediation `hint`
+— never a generic `ValueError`. This is the spec'd shape downstream
 tooling (lift warnings, builder error handlers) will consume in later
-slices.
+slices. PLOT_POLYGON_VALID is back-compat-soft: it skips when
+`Site.plot_polygon` is empty so every pre-2B.3 fixture and template
+continues to validate untouched.
 
 This module is deliberately import-light: pydantic + shapely. **No** ifc
 imports, **no** project-services imports, **no** LLM / DB / R2. Anyone
@@ -32,14 +35,14 @@ from collections import defaultdict
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 
 
 # ─── Errors ──────────────────────────────────────────────────────────
 
 
 class BuildingModelValidationError(ValueError):
-    """Raised when one of the 12 Phase-1 invariants fails on construction.
+    """Raised when one of the 13 BuildingModel invariants fails on construction.
 
     Carries the structured fields the lift service (Slice 2) and IFC builders
     (Slices 4–5) consume to surface specific, actionable error messages —
@@ -238,6 +241,12 @@ class Door(BaseModel):
     connects_room_ids: list[str] = Field(min_length=1, max_length=2)
     swing: Literal["inward", "outward", "sliding", "folding", "revolving"]
     handedness: Literal["left", "right"]
+    # Slice 2B.3 — IfcDoor PredefinedType. Default "DOOR" preserves the
+    # 2B.2 baseline byte-for-byte; "GATE" supports the entry-gate
+    # extension (boundary-wall gate, 3m wide, MS-Steel) and
+    # "GARAGE_DOOR" is reserved for a future garage extension. The IFC
+    # builder maps this directly to IfcDoorTypeEnum.
+    predefined_type: Literal["DOOR", "GATE", "GARAGE_DOOR"] = "DOOR"
 
 
 class Window(BaseModel):
@@ -386,6 +395,18 @@ class Site(BaseModel):
     georef: GeoReference = Field(default_factory=GeoReference)
     true_north_deg: float = 0.0
     terrain_polygon: list[Vec2] = Field(default_factory=list)
+    # Slice 2B.3 — Legal plot boundary (CCW, distinct from
+    # Building.envelope_polygon which is the building footprint after
+    # setback subtraction). Empty default preserves the 2B.2 baseline:
+    # PLOT_POLYGON_VALID skips the invariant when the list is empty,
+    # which is what every pre-2B.3 template emits. Backfilled by
+    # house/duplex Tier-2 templates as part of Slice 2B.3 Phase A.1;
+    # tower templates remain empty because their combined_envelope
+    # already extends past plot_width_m due to the lift/stair core
+    # (deferred to a tower-plot-semantics slice). When populated, all
+    # building.envelope_polygon vertices must lie inside this polygon
+    # (enforced by PLOT_POLYGON_VALID).
+    plot_polygon: list[Vec2] = Field(default_factory=list)
     building: Building
 
 
@@ -534,7 +555,9 @@ class _ValidationContext:
     """
 
     def __init__(self, bm: "BuildingModel") -> None:
-        building = bm.project.site.building
+        site = bm.project.site
+        building = site.building
+        self.site = site
         self.building = building
         self.storeys: list[Storey] = list(building.storeys)
         self.storeys_by_id: dict[str, Storey] = {}
@@ -599,7 +622,7 @@ class _ValidationContext:
         target[node_id] = node
 
 
-# ─── Root: BuildingModel + 12 invariants ──────────────────────────────
+# ─── Root: BuildingModel + 13 invariants ──────────────────────────────
 
 
 class BuildingModel(BaseModel):
@@ -655,6 +678,7 @@ class BuildingModel(BaseModel):
         self._i_mep_terminates(ctx)
         self._i_stair_rise_matches(ctx)
         self._i_footprint_valid(ctx)
+        self._i_plot_polygon_valid(ctx)
         return self
 
     # ---- Invariant 1 ---------------------------------------------------
@@ -1333,6 +1357,117 @@ class BuildingModel(BaseModel):
                     hint=(
                         f"{label} is clockwise / collinear / zero-area. Reverse the "
                         "vertex order to make it CCW."
+                    ),
+                )
+
+    # ---- Invariant 13 (Slice 2B.3) ------------------------------------
+    @staticmethod
+    def _i_plot_polygon_valid(ctx: _ValidationContext) -> None:
+        """Site.plot_polygon must be a simple CCW polygon containing the
+        building envelope. An empty plot_polygon SKIPS this invariant
+        (back-compat: every pre-2B.3 template emits an empty polygon).
+
+        Two sub-rules when populated:
+          1. >= 3 distinct vertices (within 1mm), shapely-valid, CCW
+             — same machinery as FOOTPRINT_VALID for the polygon itself.
+          2. Every vertex of building.envelope_polygon is inside the
+             plot polygon (boundary inclusive, 1mm tolerance — a vertex
+             sitting exactly on the plot boundary is allowed because
+             compound walls and zero-side-setback houses intentionally
+             rest on the boundary).
+
+        Together these guarantee:
+          * Adapter transforms (mirror / rotate) preserve plot validity:
+            CCW survives ``_xform_polygon``'s winding-reversal under
+            mirror, and containment is invariant under rigid motions.
+          * Slice 2B.3 extensions (compound wall on perimeter, car porch
+            in front setback, servant quarter in rear setback) have a
+            real, well-defined target region given by
+            ``plot_polygon \\ envelope_polygon``.
+        """
+        site = ctx.site
+        plot = list(site.plot_polygon)
+        if not plot:
+            return  # back-compat: empty plot disables the invariant
+
+        # Sub-rule 1 — polygon validity (mirrors FOOTPRINT_VALID logic).
+        distinct = _count_distinct_vertices(plot, 0.001)
+        if distinct < 3:
+            raise BuildingModelValidationError(
+                rule_id="PLOT_POLYGON_VALID",
+                node_id=site.id,
+                expected="Site.plot_polygon: >= 3 distinct vertices (within 1mm)",
+                actual=f"{distinct} distinct out of {len(plot)} input points",
+                hint=(
+                    "Site.plot_polygon collapses to <3 unique points; cannot "
+                    "enclose area. Either populate a real plot rectangle "
+                    "(e.g. CCW [(0,0),(W,0),(W,L),(0,L)]) or leave empty."
+                ),
+            )
+        try:
+            shp_plot = Polygon([(v.x, v.y) for v in plot])
+        except Exception as exc:  # pragma: no cover
+            raise BuildingModelValidationError(
+                rule_id="PLOT_POLYGON_VALID",
+                node_id=site.id,
+                expected="Site.plot_polygon: shapely-constructable polygon",
+                actual=f"{type(exc).__name__}: {exc}",
+                hint="Plot polygon points cannot be assembled by shapely.",
+            ) from exc
+        if not shp_plot.is_valid:
+            raise BuildingModelValidationError(
+                rule_id="PLOT_POLYGON_VALID",
+                node_id=site.id,
+                expected="Site.plot_polygon: simple non-self-intersecting polygon",
+                actual="shapely is_valid=False",
+                hint=(
+                    "Plot polygon self-intersects or has degenerate edges. "
+                    "Plot boundaries are simple polygons in the legal sense; "
+                    "reorder vertices or remove duplicates."
+                ),
+            )
+        sa = _signed_area(plot)
+        if sa <= 0:
+            raise BuildingModelValidationError(
+                rule_id="PLOT_POLYGON_VALID",
+                node_id=site.id,
+                expected="Site.plot_polygon: counterclockwise winding (signed area > 0)",
+                actual=f"signed area = {sa:.6f}",
+                hint=(
+                    "Plot polygon is clockwise / collinear / zero-area. "
+                    "Reverse the vertex order to make it CCW so the adapter's "
+                    "winding-aware mirror transform behaves consistently with "
+                    "FOOTPRINT_VALID."
+                ),
+            )
+
+        # Sub-rule 2 — every envelope vertex inside (or on) the plot.
+        envelope = list(ctx.building.envelope_polygon)
+        if not envelope:
+            return  # envelope unpopulated; nothing to contain
+        # 1mm buffer absorbs floating drift and treats boundary-coincident
+        # vertices (zero-side-setback templates) as "inside".
+        plot_buffered = shp_plot.buffer(0.001)
+        for v in envelope:
+            if not plot_buffered.contains(Point(v.x, v.y)):
+                raise BuildingModelValidationError(
+                    rule_id="PLOT_POLYGON_VALID",
+                    node_id=ctx.building.id,
+                    expected=(
+                        "every Building.envelope_polygon vertex inside "
+                        "Site.plot_polygon (1mm tolerance)"
+                    ),
+                    actual=(
+                        f"envelope vertex ({v.x:.3f}, {v.y:.3f}) lies outside "
+                        "plot polygon"
+                    ),
+                    hint=(
+                        "Building footprint exceeds the plot boundary. Either "
+                        "shrink the building (raise setbacks) or enlarge the plot "
+                        "polygon. Tower templates whose lift/stair core "
+                        "overhangs plot_width_m intentionally leave plot_polygon "
+                        "empty (skips this invariant) — see Site.plot_polygon "
+                        "field docstring."
                     ),
                 )
 

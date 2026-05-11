@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "refuse",
+    "reasoning": "The brief explicitly requests a basement (~80 sqm sub-grade floor with access stair) and a home theater. Basement is a v2 deferred extension — Slice 2B.3 v1 does not support underground volumes or lower-level utility floors. The brief's primary priority is the basement, which cannot be delivered in v1.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": "Basement (sub-grade floor with storage and home theater) is deferred to v2. Slice 2B.3 v1 does not yet support underground construction or multi-level geometry at the foundation scale.",
+    "suggested_action": "ship_as_is"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 671,
+    "output_tokens": 317,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002703,
+    "latency_ms": 3430.5860409513116,
+    "created_at_iso": "2026-05-11T03:30:09.548716+00:00"
+  }
+}

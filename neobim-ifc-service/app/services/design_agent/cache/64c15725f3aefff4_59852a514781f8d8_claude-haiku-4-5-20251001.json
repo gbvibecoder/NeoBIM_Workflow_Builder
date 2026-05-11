@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief specifies \"2BHK G+5 tower\" (tower template confirmed) with \"habitable terrace\" on top floor for \"gardens and gatherings\". Mumty (stair-access enclosure) is required to enable terrace access and usage. No compound wall, gate, car porch, or servant quarter requested; tower context makes first four extensions incompatible or inapplicable per v1 scope.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": true,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 681,
+    "output_tokens": 245,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002353,
+    "latency_ms": 2850.1662919297814,
+    "created_at_iso": "2026-05-11T03:30:03.000992+00:00"
+  }
+}

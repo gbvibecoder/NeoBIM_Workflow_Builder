@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly mentions \"compound wall\", \"entry gate\", and \"covered car porch at the front\". All three extensions are directly named and the user priorities confirm the intent. Servant quarter and mumty not mentioned, so those remain False.",
+    "include_compound_wall": true,
+    "include_entry_gate": true,
+    "include_car_porch": true,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 684,
+    "output_tokens": 202,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002141,
+    "latency_ms": 2450.6340420339257,
+    "created_at_iso": "2026-05-11T03:29:41.593926+00:00"
+  }
+}

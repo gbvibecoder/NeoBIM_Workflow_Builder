@@ -669,6 +669,14 @@ def _xform_site(site: Site, plan: AdaptationPlan) -> Site:
     lives in project XY and represents site topography that should
     follow the building rotation in the simple non-georeferenced
     development case.
+
+    ``plot_polygon`` (Slice 2B.3) is also transformed (winding-aware).
+    Empty polygon — the back-compat default for templates that pre-
+    date 2B.3 and for tower templates whose envelope intentionally
+    exceeds plot_width_m — passes through unchanged. The legal-plot
+    boundary follows the building rotation in project space the same
+    way the building itself does, so the relative position of plot to
+    envelope is preserved.
     """
     cx, cy = _plot_center_xy(site.building.envelope_polygon)
     new_terrain = (
@@ -676,9 +684,15 @@ def _xform_site(site: Site, plan: AdaptationPlan) -> Site:
         if site.terrain_polygon
         else list(site.terrain_polygon)
     )
+    new_plot = (
+        _xform_polygon(site.plot_polygon, plan, cx, cy)
+        if site.plot_polygon
+        else list(site.plot_polygon)
+    )
     return site.model_copy(
         update={
             "terrain_polygon": new_terrain,
+            "plot_polygon": new_plot,
             "building": _xform_building(site.building, plan, cx, cy),
         }
     )

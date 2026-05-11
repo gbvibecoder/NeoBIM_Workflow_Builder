@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly requests \"main entry gate at the front for vehicle access.\" Entry gate is the primary user priority. A gate requires a boundary wall to attach to, so compound_wall is inferred True per the catalog rules. No other extensions (car_porch, servant_quarter, mumty) are mentioned or implied.",
+    "include_compound_wall": true,
+    "include_entry_gate": true,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 672,
+    "output_tokens": 219,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002214,
+    "latency_ms": 4693.348374916241,
+    "created_at_iso": "2026-05-11T03:29:29.524544+00:00"
+  }
+}

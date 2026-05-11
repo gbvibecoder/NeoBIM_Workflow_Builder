@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly requests \"covered car porch at the front\" and states \"no compound wall, no gate\". Only car_porch is included; all other extensions are explicitly excluded or absent.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": true,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 682,
+    "output_tokens": 192,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002089,
+    "latency_ms": 2643.9902908168733,
+    "created_at_iso": "2026-05-11T03:29:32.176762+00:00"
+  }
+}
