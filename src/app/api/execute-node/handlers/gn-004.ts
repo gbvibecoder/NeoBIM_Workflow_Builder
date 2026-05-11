@@ -147,7 +147,22 @@ export const handleGN004: NodeHandler = async (ctx) => {
     }
   } catch { /* SVG export is best-effort — downstream may still use the project */ }
 
-  const totalAreaSqft = projectRooms.reduce((s, r) => s + r.area_sqm * SQM_TO_SQFT, 0);
+  // Slice P3.1 — totalArea is canonical in **m²** to match every
+  // downstream consumer (`ex-001.ts:208`, `gn-001.ts:58`, `gn-009.ts:59`,
+  // `tr-005.ts:27`, `shared.ts:81` which displays "${d.totalArea} m²")
+  // and the implicit unit convention shared with `gn-003.ts:73` (default
+  // `totalArea: 5000` is m²) and `gn-012.ts:200` (`totalArea_sqm`).
+  //
+  // Pre-P3.1 this field was emitted in sqft (×10.7639), which silently
+  // inflated every downstream `footprint_m2` by ~10.76× and pushed every
+  // residential brief outside the 1/2/3 BHK template range (40–250 m²),
+  // forcing the design-agent matcher to refuse and the legacy
+  // /export-ifc path to ship a thin generic IFC.
+  //
+  // The user-facing `roomList[].area` stays in sqft (it carries an
+  // explicit `unit: "sqft"` marker), so this fix is invisible in the UI
+  // floor-plan table and only corrects the machine-readable area field.
+  const totalAreaSqm = projectRooms.reduce((s, r) => s + r.area_sqm, 0);
   const roomListOut = projectRooms.map((r) => ({
     name: r.name,
     area: Math.round(r.area_sqm * SQM_TO_SQFT * 10) / 10,
@@ -218,7 +233,7 @@ export const handleGN004: NodeHandler = async (ctx) => {
       svg: svgString,
       label: "Floor Plan (AI Generated)",
       roomList: roomListOut,
-      totalArea: Math.round(totalAreaSqft * 10) / 10,
+      totalArea: Math.round(totalAreaSqm * 100) / 100,
       floors: project.floors.length,
       perFloorRooms,
       // FloorPlanProject for editor-aware downstream nodes (GN-012, EX-*)

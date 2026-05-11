@@ -43,36 +43,91 @@ export const handleTR001: NodeHandler = async (ctx) => {
   logger.debug("[TR-001] rawText from inputData:", typeof rawText, "length:", typeof rawText === "string" ? rawText.length : 0);
   logger.debug("[TR-001] pdfBase64 present:", !!pdfBase64, "type:", typeof pdfBase64, "length:", typeof pdfBase64 === "string" ? pdfBase64.length : 0);
 
-  // If we have actual PDF data (base64), extract text from it
+  // ── Slice P3.1.B — Multi-layer PDF text extraction ──────────────────
+  // The previous implementation called `pdf-parse` directly inside a
+  // try/catch. When `pdf-parse` threw (it does, frequently — modern
+  // PDFs with PostScript token sequences > 128 chars crash its
+  // tokenizer with `UnknownErrorException: Command token too long`),
+  // the catch silently fell through to `rawText`, which for an upload
+  // is just the filename (~20 chars). The empty-content gate below
+  // used `< 20`, so a 20-char filename ("floor_plan_brief.pdf") slipped
+  // through and got passed to GPT-4o-mini, which hallucinated default
+  // plot dimensions (164×164 ft = 50m × 50m), room counts, and a
+  // project name ("Urban Residential Development"). Every downstream
+  // node operated on fabricated data.
+  //
+  // The replacement extractor (`src/lib/pdf-text-extractor.ts`)
+  // chains three layers:
+  //   Layer 1 — unpdf  (PDF.js-based, modern, ~95% success)
+  //   Layer 2 — pdf-parse  (different engine; rescues some PDFs unpdf misses)
+  //   Layer 3 — Claude vision-document (handles scanned & complex PDFs natively)
+  // The result carries per-layer error captures so the failure mode is
+  // visible in logs and so the gate below can fail loud instead of
+  // letting hallucinations cascade.
   if (pdfBase64 && typeof pdfBase64 === "string") {
-    try {
-      // Import from lib/ directly to avoid pdf-parse v1 test-runner bug
-      // (index.js tries to open ./test/data/05-versions-space.pdf when !module.parent)
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (buf: Buffer) => Promise<{ text: string; numpages: number; info: Record<string, unknown> }>;
-      pdfBuffer = Buffer.from(pdfBase64, "base64");
-      logger.debug("[TR-001] PDF buffer size:", pdfBuffer.length, "bytes");
-      const pdfData = await pdfParse(pdfBuffer);
-      logger.debug("[TR-001] pdf-parse result — pages:", pdfData.numpages, "text length:", pdfData.text?.length ?? 0);
-      logger.debug("[TR-001] Extracted text (first 300):", pdfData.text?.slice(0, 300));
-      extractedText = pdfData.text || "";
-    } catch (parseErr) {
-      console.error("[TR-001] PDF parsing failed:", parseErr);
-      // Fall through to use rawText if available
+    pdfBuffer = Buffer.from(pdfBase64, "base64");
+    logger.debug("[TR-001] PDF buffer size:", pdfBuffer.length, "bytes");
+    const { extractTextFromPdf, summariseExtractResult } = await import(
+      "@/lib/pdf-text-extractor"
+    );
+    const extracted = await extractTextFromPdf(pdfBuffer, {
+      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+      enableVisionFallback: true,
+    });
+    logger.info(
+      "[TR-001] pdf-extract " + summariseExtractResult(extracted),
+    );
+    if (extracted.text) {
+      extractedText = extracted.text;
+    } else {
+      // All layers failed. Do NOT fall back to the filename / GPT.
+      console.error(
+        "[TR-001] All PDF extractors failed — surfacing clear error to UI",
+        extracted.errors,
+      );
+      const errSummary = [
+        extracted.errors.unpdf && `unpdf: ${extracted.errors.unpdf}`,
+        extracted.errors.pdfParse && `pdf-parse: ${extracted.errors.pdfParse}`,
+        extracted.errors.vision && `vision: ${extracted.errors.vision}`,
+      ]
+        .filter(Boolean)
+        .join(" | ");
+      return NextResponse.json(
+        formatErrorResponse({
+          title: "Could not read PDF",
+          message:
+            `The PDF could not be parsed by any of our text extractors. ` +
+            `Try one of: (a) re-export the PDF as text-based from your tool ` +
+            `(File → Export → PDF with selectable text), (b) paste the brief ` +
+            `as plain text into a Text Prompt node, or (c) make sure the file ` +
+            `is not password-protected.\n\nUnderlying parser errors: ${errSummary}`,
+          code: "PDF_EXTRACTION_FAILED",
+        }),
+        { status: 422 },
+      );
     }
   }
 
   logger.debug("[TR-001] Final extractedText length:", extractedText.trim().length, "chars");
 
-  if (!extractedText || extractedText.trim().length < 20) {
-    console.error("[TR-001] Text too short or empty — returning 400. Text:", JSON.stringify(extractedText.slice(0, 100)));
+  // Tightened threshold from 20 → 100 chars. The filename
+  // "floor_plan_brief.pdf" is exactly 20 chars and used to slip
+  // through the prior `< 20` gate; even a minimal real brief is
+  // ≥ 100 chars. This is the *second* defense; the first is the
+  // extractor's own `MIN_USEFUL_TEXT_CHARS=50` per-layer threshold.
+  if (!extractedText || extractedText.trim().length < 100) {
+    console.error("[TR-001] Text too short or empty — returning 422. Text:", JSON.stringify(extractedText.slice(0, 200)));
     return NextResponse.json(
       formatErrorResponse({
-        title: "No document content",
-        message: "Could not extract text from the document. The PDF may be scanned (image-only) or too short. Try pasting the brief text into a Text Prompt node instead.",
-        code: "EMPTY_DOCUMENT",
+        title: "Brief content too short",
+        message:
+          "Extracted text from the document is too short to parse a brief " +
+          `(${extractedText.trim().length} chars). The PDF may be scanned, ` +
+          "image-only, or password-protected. Try pasting the brief text " +
+          "into a Text Prompt node instead.",
+        code: "BRIEF_TOO_SHORT",
       }),
-      { status: 400 }
+      { status: 422 }
     );
   }
 
@@ -137,12 +192,52 @@ export const handleTR001: NodeHandler = async (ctx) => {
     /* GPT's floorPlan (if any) passes through verbatim. The converter's
        defensive template fallback handles empty rooms[] downstream. */
   }
+  // Slice P3.1.B — Defense-in-depth: sanity-check the final plot dims.
+  // GPT-4o-mini has been observed to hallucinate plot dimensions of
+  // 164.04 × 164.04 ft (exactly 50 m × 50 m in feet) when given empty
+  // or near-empty text. That's outside any realistic residential plot
+  // (typical Indian 1/2/3 BHK plots are 20–80 ft per side). When such
+  // values land in the floorPlan, the design-agent matcher correctly
+  // refuses, fallback fires, and the user sees a thin generic IFC.
+  // Here we override hallucinated plot dims by re-extracting from the
+  // original text via the deterministic regex parser as a final source
+  // of truth — its regex is highly specific and won't hallucinate.
   if (parsed.floorPlan) {
+    const MAX_RESIDENTIAL_PLOT_FT = 100;
+    const looksHallucinated =
+      parsed.floorPlan.plotWidthFt > MAX_RESIDENTIAL_PLOT_FT ||
+      parsed.floorPlan.plotDepthFt > MAX_RESIDENTIAL_PLOT_FT ||
+      Math.abs(parsed.floorPlan.plotWidthFt - parsed.floorPlan.plotDepthFt) < 0.1; // suspicious perfect square
+    if (looksHallucinated) {
+      logger.warn(
+        "[TR-001] floorPlan plot dims look hallucinated " +
+          `(width=${parsed.floorPlan.plotWidthFt}, depth=${parsed.floorPlan.plotDepthFt}); ` +
+          "re-extracting from raw text",
+      );
+      const retry = extractFloorPlanFromText(extractedText);
+      if (retry.schema) {
+        parsed.floorPlan = {
+          ...parsed.floorPlan,
+          plotWidthFt: retry.schema.plotWidthFt,
+          plotDepthFt: retry.schema.plotDepthFt,
+        };
+        logger.info(
+          "[TR-001] plot dims overridden by deterministic re-extraction: " +
+            `${retry.schema.plotWidthFt} × ${retry.schema.plotDepthFt} ft`,
+        );
+      } else {
+        logger.warn(
+          "[TR-001] deterministic re-extraction also failed — leaving " +
+            "hallucinated values; downstream matcher will refuse (expected)",
+        );
+      }
+    }
     logger.debug("[TR-001] final floorPlan attached: floors=" +
       parsed.floorPlan.floors.length +
       ", rooms=" +
       parsed.floorPlan.floors.reduce((n, f) => n + (f.rooms?.length ?? 0), 0) +
-      ", category=" + (parsed.floorPlan.buildingCategory ?? "unset"));
+      ", category=" + (parsed.floorPlan.buildingCategory ?? "unset") +
+      ", plot=" + parsed.floorPlan.plotWidthFt + "×" + parsed.floorPlan.plotDepthFt + " ft");
   } else {
     logger.debug("[TR-001] no floorPlan attached — EX-001 will use massing path");
   }
