@@ -42,6 +42,8 @@ import type { ContextMenuState } from "@/features/canvas/components/ContextMenu"
 import { PromptInput } from "@/features/ai/components/PromptInput";
 import { CanvasEmptyState } from "@/features/canvas/components/CanvasEmptyState";
 import { FullscreenArtifactViewer } from "@/features/canvas/components/FullscreenArtifactViewer";
+import { ThemeToggle } from "@/features/canvas/components/chrome/ThemeToggle";
+import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 
 // ContextMenu is right-click only — load lazily
 const ContextMenu = dynamic(
@@ -163,6 +165,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   const hydrateRegenerationCounts = useExecutionStore(selectHydrateRegenerationCounts);
 
   const { t: tLocale } = useLocale();
+
+  // ─── Canvas theme (Z.CANVAS.1A) ──────────────────────────────────
+  const canvasTheme = useCanvasTheme((s) => s.theme);
 
   // ─── Loading state: prevent empty-canvas flash while workflow loads from DB ──
   const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(!!urlWorkflowId);
@@ -858,7 +863,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   })();
 
   return (
-    <div className="relative flex h-full w-full">
+    <div className={`relative flex h-full w-full canvas-theme-${canvasTheme}`} data-canvas-theme={canvasTheme}>
       {/* Onboarding tour (fixed overlay, renders once) */}
       <OnboardingTour />
 
@@ -1011,6 +1016,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
           )}
         </AnimatePresence>
 
+        {/* Theme toggle — bottom-left corner of canvas (Z.CANVAS.1A) */}
+        <ThemeToggle />
+
         {/* React Flow canvas — bg handled by .bf-canvas-surface on the
             outer wrapper. This div is transparent so the bg shows through. */}
         <div
@@ -1057,13 +1065,13 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
                 position="bottom-left"
                 nodeStrokeWidth={0}
                 nodeColor={miniMapNodeColor}
-                maskColor="rgba(7,8,9,0.7)"
-                className="canvas-minimap"
+                maskColor={canvasTheme === "light" ? "rgba(15,20,25,0.04)" : "rgba(7,8,9,0.7)"}
+                className={`canvas-minimap canvas-theme-${canvasTheme}`}
                 style={{
                   width: 120,
                   height: 80,
-                  backgroundColor: "rgba(10,12,14,0.85)",
-                  border: "1px solid rgba(184,115,51,0.1)",
+                  backgroundColor: canvasTheme === "light" ? "rgba(255,255,255,0.92)" : "rgba(10,12,14,0.85)",
+                  border: canvasTheme === "light" ? "1px solid rgba(15,20,25,0.10)" : "1px solid rgba(184,115,51,0.1)",
                   borderRadius: 8,
                   marginBottom: 16,
                   marginLeft: 16,

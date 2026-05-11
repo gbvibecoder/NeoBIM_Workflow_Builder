@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "../styles/mobile-responsive.css";
 @import "../features/dashboard/components/render-studio-tokens.css";
+@import "../styles/canvas-theme.css";
 
 @layer base {
   :root {
@@ -2041,9 +2042,9 @@
    gotcha that caused hours of debugging.
    ═══════════════════════════════════════════════════════════════════ */
 .bf-canvas-surface {
-  background-color: #0E0E10 !important;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.22) 1.3px, transparent 1.3px) !important;
-  background-size: 22px 22px !important;
+  background-color: var(--canvas-bg, #0E0E10) !important;
+  background-image: var(--canvas-grid-image, radial-gradient(circle, rgba(255, 255, 255, 0.22) 1.3px, transparent 1.3px)) !important;
+  background-size: var(--canvas-grid-size, 22px 22px) !important;
 }
 .bf-canvas-surface .react-flow,
 .bf-canvas-surface .react-flow__pane,

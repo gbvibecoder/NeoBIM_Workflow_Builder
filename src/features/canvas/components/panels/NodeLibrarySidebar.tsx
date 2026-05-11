@@ -7,6 +7,7 @@ import { NODE_CATALOGUE, CATEGORY_CONFIG, LIVE_NODES } from "@/features/workflow
 import type { NodeCatalogueItem, NodeCategory } from "@/types/nodes";
 import { useUIStore } from "@/shared/stores/ui-store";
 import { useLocale } from "@/hooks/useLocale";
+import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ interface NodeLibrarySidebarProps {
 
 export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarProps) {
   const { t } = useLocale();
+  const canvasTheme = useCanvasTheme((s) => s.theme);
   const isNodeLibraryOpen = useUIStore(s => s.isNodeLibraryOpen);
   const toggleNodeLibrary = useUIStore(s => s.toggleNodeLibrary);
   const [search, setSearch] = useState("");
@@ -76,7 +78,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
   const showContent = alwaysOpen || isNodeLibraryOpen;
 
   return (
-    <div style={{ padding: "0 8px", position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: alwaysOpen ? "100%" : "auto" }}>
+    <div className={`canvas-theme-${canvasTheme}`} style={{ padding: "0 8px", position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: alwaysOpen ? "100%" : "auto" }}>
 
       {/* ── Header (hidden in alwaysOpen / right-panel mode) ──────────── */}
       {!alwaysOpen && (
@@ -89,8 +91,8 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
             gap: 8,
             padding: "8px 10px",
             borderRadius: 10,
-            background: isNodeLibraryOpen ? "rgba(0,245,255,0.06)" : "transparent",
-            border: `1px solid ${isNodeLibraryOpen ? "rgba(0,245,255,0.14)" : "transparent"}`,
+            background: isNodeLibraryOpen ? "var(--canvas-lib-active-bg)" : "transparent",
+            border: `1px solid ${isNodeLibraryOpen ? "var(--canvas-lib-active-border)" : "transparent"}`,
             cursor: "pointer",
             transition: "all 180ms ease",
           }}
@@ -98,7 +100,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
           <Package
             size={15}
             style={{
-              color: isNodeLibraryOpen ? "#00F5FF" : "rgba(255,255,255,0.35)",
+              color: isNodeLibraryOpen ? "var(--canvas-lib-active-text)" : "var(--canvas-lib-icon-muted)",
               flexShrink: 0,
               transition: "color 180ms ease",
             }}
@@ -109,7 +111,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
               textAlign: "left",
               fontSize: 12.5,
               fontWeight: 550,
-              color: isNodeLibraryOpen ? "#E2E8F0" : "rgba(255,255,255,0.45)",
+              color: isNodeLibraryOpen ? "var(--canvas-lib-text-primary)" : "var(--canvas-lib-text-secondary)",
               fontFamily: "var(--font-dm-sans), sans-serif",
               letterSpacing: "0.2px",
               whiteSpace: "nowrap",
@@ -122,12 +124,12 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
               fontSize: 9,
               fontWeight: 700,
               letterSpacing: "0.5px",
-              color: "rgba(0,245,255,0.5)",
+              color: "var(--canvas-lib-count-text)",
               fontFamily: "var(--font-jetbrains), monospace",
               padding: "1px 5px",
               borderRadius: 4,
-              background: "rgba(0,245,255,0.06)",
-              border: "1px solid rgba(0,245,255,0.12)",
+              background: "var(--canvas-lib-count-bg)",
+              border: "1px solid var(--canvas-lib-count-border)",
               flexShrink: 0,
             }}
           >
@@ -136,7 +138,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
           <ChevronRight
             size={13}
             style={{
-              color: "rgba(255,255,255,0.3)",
+              color: "var(--canvas-lib-icon-chevron)",
               transform: isNodeLibraryOpen ? "rotate(90deg)" : "rotate(0deg)",
               transition: "transform 200ms ease",
               flexShrink: 0,
@@ -158,7 +160,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
                 left: 9,
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--canvas-lib-icon-muted)",
                 pointerEvents: "none",
               }}
             />
@@ -169,18 +171,18 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
               style={{
                 width: "100%",
                 padding: "7px 28px 7px 27px",
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--canvas-lib-search-bg)",
+                border: "1px solid var(--canvas-lib-search-border)",
                 borderRadius: 8,
-                color: "#E2E8F0",
+                color: "var(--canvas-lib-search-text)",
                 fontSize: 11.5,
                 outline: "none",
                 boxSizing: "border-box",
                 fontFamily: "var(--font-dm-sans), sans-serif",
                 transition: "border-color 150ms ease",
               }}
-              onFocus={(e) => { e.target.style.borderColor = "rgba(0,245,255,0.25)"; }}
-              onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+              onFocus={(e) => { e.target.style.borderColor = "var(--canvas-lib-search-focus)"; }}
+              onBlur={(e) => { e.target.style.borderColor = "var(--canvas-lib-search-border)"; }}
             />
             {search && (
               <button
@@ -193,7 +195,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  color: "rgba(255,255,255,0.35)",
+                  color: "var(--canvas-lib-icon-muted)",
                   padding: 2,
                   display: "flex",
                   alignItems: "center",
@@ -220,11 +222,11 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
                   border: "1px solid",
                   fontFamily: "var(--font-jetbrains), monospace",
                   background:
-                    activeFilter === tab.value ? "rgba(0,245,255,0.12)" : "rgba(255,255,255,0.03)",
+                    activeFilter === tab.value ? "var(--canvas-lib-filter-active-bg)" : "var(--canvas-lib-filter-idle-bg)",
                   borderColor:
-                    activeFilter === tab.value ? "rgba(0,245,255,0.3)" : "rgba(255,255,255,0.08)",
+                    activeFilter === tab.value ? "var(--canvas-lib-filter-active-border)" : "var(--canvas-lib-filter-idle-border)",
                   color:
-                    activeFilter === tab.value ? "#00F5FF" : "rgba(255,255,255,0.4)",
+                    activeFilter === tab.value ? "var(--canvas-lib-filter-active-text)" : "var(--canvas-lib-filter-idle-text)",
                   transition: "all 150ms ease",
                 }}
               >
@@ -236,7 +238,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
           {/* Node count */}
           <div style={{
             fontSize: 9.5,
-            color: "rgba(255,255,255,0.2)",
+            color: "var(--canvas-lib-text-dim)",
             fontFamily: "var(--font-jetbrains), monospace",
             marginBottom: 4,
             paddingLeft: 2,
@@ -261,7 +263,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
               <div style={{
                 padding: "20px 8px",
                 textAlign: "center",
-                color: "rgba(255,255,255,0.2)",
+                color: "var(--canvas-lib-text-dim)",
                 fontSize: 11,
                 fontFamily: "var(--font-dm-sans), sans-serif",
               }}>
@@ -283,9 +285,9 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
             marginTop: 6,
             padding: "5px 8px",
             fontSize: 9.5,
-            color: "rgba(255,255,255,0.15)",
+            color: "var(--canvas-lib-text-hint)",
             fontFamily: "var(--font-jetbrains), monospace",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
+            borderTop: "1px solid var(--canvas-lib-hint-border)",
             textAlign: "center",
             letterSpacing: "0.3px",
           }}>
@@ -356,7 +358,7 @@ function NodeItem({ node, onDragStart }: NodeItemProps) {
           style={{
             fontSize: 11.5,
             fontWeight: 600,
-            color: hovered ? "#E8EDF8" : "#B0BCD4",
+            color: hovered ? "var(--canvas-lib-node-name-hover)" : "var(--canvas-lib-node-name)",
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical" as const,
@@ -371,7 +373,7 @@ function NodeItem({ node, onDragStart }: NodeItemProps) {
         <div
           style={{
             fontSize: 10,
-            color: "rgba(255,255,255,0.25)",
+            color: "var(--canvas-lib-text-meta)",
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical" as const,
@@ -393,9 +395,9 @@ function NodeItem({ node, onDragStart }: NodeItemProps) {
             fontWeight: 700,
             padding: "1px 4px",
             borderRadius: 4,
-            background: "rgba(0,245,255,0.1)",
-            color: "#00F5FF",
-            border: "1px solid rgba(0,245,255,0.2)",
+            background: "var(--canvas-lib-badge-bg)",
+            color: "var(--canvas-lib-badge-text)",
+            border: "1px solid var(--canvas-lib-badge-border)",
             letterSpacing: "0.5px",
             flexShrink: 0,
             fontFamily: "var(--font-jetbrains), monospace",
@@ -407,7 +409,7 @@ function NodeItem({ node, onDragStart }: NodeItemProps) {
 
       {/* Drag handle hint */}
       {hovered && (
-        <GripVertical size={11} style={{ color: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
+        <GripVertical size={11} style={{ color: "var(--canvas-lib-grip)", flexShrink: 0 }} />
       )}
     </div>
   );

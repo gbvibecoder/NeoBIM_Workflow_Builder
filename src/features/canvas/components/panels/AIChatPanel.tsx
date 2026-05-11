@@ -20,6 +20,7 @@ import { processWorkflowChat } from "@/features/ai/services/ai-chat-service";
 import type { ChatAction } from "@/features/ai/services/ai-chat-service";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
+import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ function keywordFallback(
         sourceHandle: lastNode.data.outputs[0]?.id ?? "output",
         target: newNode.id, targetHandle: newNode.data.inputs[0]?.id ?? "input",
         type: "animatedEdge",
-        data: { sourceColor: COLORS[lastNode.data.category as NodeCategory] ?? "#00F5FF", targetColor: COLORS[found.category as NodeCategory] ?? "#00F5FF" },
+        data: { sourceColor: COLORS[lastNode.data.category as NodeCategory] ?? "#B87333", targetColor: COLORS[found.category as NodeCategory] ?? "#B87333" },
       });
     }
     return t('aiChat.addedToWorkflow').replace('{0}', found.name);
@@ -153,8 +154,8 @@ function applyActions(
           target: newNode.id, targetHandle: newNode.data.inputs[0]?.id ?? "input",
           type: "animatedEdge",
           data: {
-            sourceColor: COLORS[connectFrom.data.category as NodeCategory] ?? "#00F5FF",
-            targetColor: COLORS[catalogueNode.category as NodeCategory] ?? "#00F5FF",
+            sourceColor: COLORS[connectFrom.data.category as NodeCategory] ?? "#B87333",
+            targetColor: COLORS[catalogueNode.category as NodeCategory] ?? "#B87333",
           },
         });
       }
@@ -205,7 +206,7 @@ function renderMessage(text: string) {
     <React.Fragment key={i}>
       {line.split(/(\*\*[^*]+\*\*)/).map((part, j) =>
         part.startsWith("**") && part.endsWith("**")
-          ? <strong key={j} style={{ color: "#F0F0F5" }}>{part.slice(2, -2)}</strong>
+          ? <strong key={j} style={{ color: "var(--canvas-text-1)" }}>{part.slice(2, -2)}</strong>
           : part
       )}
       {i < text.split("\n").length - 1 && <br />}
@@ -225,6 +226,7 @@ interface AIChatPanelProps {
 
 export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle }: AIChatPanelProps) {
   const { t } = useLocale();
+  const canvasTheme = useCanvasTheme((s) => s.theme);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [minimized, setMinimized] = useState(false);
@@ -333,7 +335,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
   }, [handleSend]);
 
   return (
-    <>
+    <div className={`canvas-theme-${canvasTheme}`} style={{ display: "contents" }}>
       {/* Floating pill when closed */}
       <AnimatePresence>
         {!isOpen && (
@@ -345,17 +347,17 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             style={{
               position: "absolute", right: 96, bottom: 24,
               zIndex: 25, padding: "10px 16px",
-              background: "rgba(7,8,9,0.92)", border: "1px solid rgba(0,245,255,0.2)",
+              background: "var(--canvas-ai-panel-bg)", border: "1px solid var(--canvas-ai-panel-border)",
               borderRadius: 4,
-              cursor: "pointer", color: "#00F5FF",
+              cursor: "pointer", color: "var(--canvas-ai-text)",
               display: "flex", alignItems: "center", gap: 8,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(0,245,255,0.08)",
+              boxShadow: "var(--canvas-ai-panel-glow)",
               backdropFilter: "blur(20px)",
               WebkitBackdropFilter: "blur(20px)",
               transition: "all 0.2s ease",
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.4)"; e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,0,0,0.5), 0 0 25px rgba(0,245,255,0.12)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.2)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(0,245,255,0.08)"; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--canvas-ai-border-hover)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--canvas-ai-panel-border)"; }}
           >
             <Sparkles size={14} />
             <span style={{ fontSize: 12, fontWeight: 600 }}>{t('aiChat.title')}</span>
@@ -379,13 +381,13 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               width: 380,
               height: minimized ? "auto" : 500,
               zIndex: 55,
-              background: "rgba(7,8,9,0.95)",
+              background: "var(--canvas-panel-bg)",
               backdropFilter: "blur(12px) saturate(1.1)",
               WebkitBackdropFilter: "blur(12px) saturate(1.1)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: "1px solid var(--canvas-panel-border)",
               borderRadius: 4,
               display: "flex", flexDirection: "column",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.04) inset",
+              boxShadow: "var(--canvas-panel-shadow)",
               overflow: "hidden",
               transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
             }}
@@ -395,24 +397,24 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               onMouseDown={onDragHeaderDown}
               style={{
                 height: 44, padding: "0 14px",
-                borderBottom: minimized ? "none" : "1px solid rgba(255,255,255,0.06)",
+                borderBottom: minimized ? "none" : "1px solid var(--canvas-panel-border)",
                 display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
                 cursor: "grab", userSelect: "none",
               }}
             >
-              <Sparkles size={13} style={{ color: "#00F5FF" }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5", flex: 1 }}>
+              <Sparkles size={13} style={{ color: "var(--canvas-ai-text)" }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--canvas-text-1)", flex: 1 }}>
                 {t('aiChat.aiAssistant')}
               </span>
               <button
                 onClick={() => setAiMode(m => m === "gpt" ? "keyword" : "gpt")}
                 title={aiMode === "gpt" ? t('aiChat.usingGpt') : t('aiChat.usingKeyword')}
                 style={{
-                  background: aiMode === "gpt" ? "rgba(0,245,255,0.15)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${aiMode === "gpt" ? "rgba(0,245,255,0.3)" : "rgba(255,255,255,0.06)"}`,
+                  background: aiMode === "gpt" ? "var(--canvas-accent-bg-hover)" : "var(--canvas-hover-bg)",
+                  border: `1px solid ${aiMode === "gpt" ? "var(--canvas-accent-border-strong)" : "var(--canvas-panel-border)"}`,
                   borderRadius: 5, padding: "2px 6px", cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 3,
-                  color: aiMode === "gpt" ? "#00F5FF" : "#5C5C78",
+                  color: aiMode === "gpt" ? "var(--canvas-accent)" : "var(--canvas-log-muted)",
                   fontSize: 10, fontWeight: 600,
                 }}
                 onMouseDown={e => e.stopPropagation()}
@@ -422,29 +424,29 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               </button>
               <button onClick={onClear} title={t('aiChat.clearChat')} style={{
                 background: "none", border: "none", cursor: "pointer",
-                color: "#3A3A50", padding: 4, borderRadius: 4,
+                color: "var(--canvas-log-badge-text)", padding: 4, borderRadius: 4,
               }} onMouseDown={e => e.stopPropagation()}
-                onMouseEnter={e => { e.currentTarget.style.color = "#5C5C78"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = "var(--canvas-log-muted)"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "var(--canvas-log-badge-text)"; }}
               >
                 <Trash2 size={11} />
               </button>
               <button onClick={() => setMinimized(m => !m)} style={{
                 background: "none", border: "none", cursor: "pointer",
-                color: "#3A3A50", padding: 4, borderRadius: 4,
+                color: "var(--canvas-log-badge-text)", padding: 4, borderRadius: 4,
                 fontSize: 14, lineHeight: 1,
               }} onMouseDown={e => e.stopPropagation()}
-                onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = "var(--canvas-text-2)"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "var(--canvas-log-badge-text)"; }}
               >
                 {minimized ? "+" : "−"}
               </button>
               <button onClick={onToggle} style={{
                 background: "none", border: "none", cursor: "pointer",
-                color: "#3A3A50", padding: 4, borderRadius: 4,
+                color: "var(--canvas-log-badge-text)", padding: 4, borderRadius: 4,
               }} onMouseDown={e => e.stopPropagation()}
-                onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = "var(--canvas-text-2)"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "var(--canvas-log-badge-text)"; }}
               >
                 <X size={12} />
               </button>
@@ -458,10 +460,10 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                   {messages.length === 0 && (
                     <div style={{
                       textAlign: "center", padding: "28px 14px",
-                      color: "#3A3A50", fontSize: 11,
+                      color: "var(--canvas-log-badge-text)", fontSize: 11,
                     }}>
                       <MessageSquare size={24} style={{ margin: "0 auto 8px", opacity: 0.3 }} />
-                      <div style={{ fontWeight: 600, color: "#5C5C78", marginBottom: 6 }}>
+                      <div style={{ fontWeight: 600, color: "var(--canvas-log-muted)", marginBottom: 6 }}>
                         {aiMode === "gpt" ? t('aiChat.gptPowered') : t('aiChat.workflowAssistant')}
                       </div>
                       <div style={{ lineHeight: 1.5 }}>
@@ -492,14 +494,14 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                         maxWidth: "85%", padding: "10px 14px",
                         borderRadius: 4,
                         ...(msg.role === "user"
-                          ? { borderBottomRightRadius: 2, background: "rgba(0,245,255,0.12)", border: "1px solid rgba(0,245,255,0.1)" }
-                          : { borderBottomLeftRadius: 2, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.04)" }
+                          ? { borderBottomRightRadius: 2, background: "var(--canvas-accent-bg)", border: "1px solid var(--canvas-accent-border)" }
+                          : { borderBottomLeftRadius: 2, background: "var(--canvas-hover-bg)", border: "1px solid var(--canvas-panel-border)" }
                         ),
-                        fontSize: 12, color: msg.role === "user" ? "#F0F0F5" : "#9898B0", lineHeight: 1.6,
+                        fontSize: 12, color: msg.role === "user" ? "var(--canvas-text-1)" : "var(--canvas-text-2)", lineHeight: 1.6,
                       }}>
                         {renderMessage(msg.content)}
                       </div>
-                      <span style={{ fontSize: 9, color: "#3A3A50" }}>
+                      <span style={{ fontSize: 9, color: "var(--canvas-log-badge-text)" }}>
                         {msg.timestamp.toTimeString().slice(0, 5)}
                       </span>
                     </div>
@@ -508,13 +510,13 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                   {isTyping && (
                     <div style={{
                       display: "flex", gap: 4, padding: "8px 11px",
-                      background: "rgba(255,255,255,0.03)", borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,0.04)",
+                      background: "var(--canvas-hover-bg)", borderRadius: 10,
+                      border: "1px solid var(--canvas-panel-border)",
                       width: "fit-content",
                     }}>
                       {[0, 1, 2].map(i => (
                         <div key={i} style={{
-                          width: 4, height: 4, borderRadius: "50%", background: "#5C5C78",
+                          width: 4, height: 4, borderRadius: "50%", background: "var(--canvas-log-muted)",
                           animation: `dotPulse 1s ease-in-out ${i * 0.2}s infinite`,
                         }} />
                       ))}
@@ -525,7 +527,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
 
                 {/* Input */}
                 <div style={{
-                  padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
+                  padding: "10px 12px", borderTop: "1px solid var(--canvas-panel-border)", flexShrink: 0,
                   display: "flex", gap: 8, alignItems: "flex-end",
                 }}>
                   <textarea
@@ -540,8 +542,8 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                     rows={2}
                     style={{
                       flex: 1, resize: "none", padding: "10px 14px",
-                      borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)",
-                      background: "rgba(255,255,255,0.03)", color: "#F0F0F5",
+                      borderRadius: 4, border: "1px solid var(--canvas-ai-input-border)",
+                      background: "var(--canvas-ai-input-bg)", color: "var(--canvas-text-1)",
                       fontSize: 13, fontFamily: "inherit", outline: "none",
                       lineHeight: 1.5, maxHeight: 80, overflowY: "auto",
                       transition: "all 150ms ease",
@@ -552,8 +554,8 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                     disabled={!input.trim() || isTyping}
                     style={{
                       width: 32, height: 32, borderRadius: 8, border: "none",
-                      background: input.trim() && !isTyping ? "#00F5FF" : "rgba(255,255,255,0.06)",
-                      color: input.trim() && !isTyping ? "#fff" : "#3A3A50",
+                      background: input.trim() && !isTyping ? "var(--canvas-ai-send-active)" : "var(--canvas-hover-bg)",
+                      color: input.trim() && !isTyping ? "var(--canvas-surface-1)" : "var(--canvas-log-badge-text)",
                       cursor: input.trim() && !isTyping ? "pointer" : "default",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       flexShrink: 0, transition: "all 0.15s",
@@ -574,7 +576,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
           50% { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </>
+    </div>
   );
 }
 
