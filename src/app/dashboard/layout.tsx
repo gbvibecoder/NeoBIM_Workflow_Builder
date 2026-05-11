@@ -36,6 +36,10 @@ export default function DashboardLayout({
     pathname === "/dashboard/floor-plan" ||
     pathname === "/dashboard/brief-renders" ||
     pathname.startsWith("/dashboard/results/");
+  // Canvas page has a 44px-wide Node Library tab pinned to the right edge;
+  // push the floating avatar left so it isn't clipped behind the tab.
+  const isCanvasPage = pathname === "/dashboard/canvas";
+
   // BetaBanner: hidden on light surfaces (cream pages stay clean) and on
   // immersive landing.
   const hideBetaBanner = isImmersive || isLightSurface;
@@ -59,7 +63,7 @@ export default function DashboardLayout({
       {/* Floating chrome overlay — sits OUTSIDE the flex column so it
           reserves zero vertical space. Just an avatar circle in the
           top-right corner. */}
-      <Header theme={isLightSurface ? "light" : "dark"} />
+      <Header theme={isLightSurface ? "light" : "dark"} rightOffset={isCanvasPage ? 64 : 16} />
       <CommandPaletteLoader />
       <SessionGuard />
       <OnboardingModal />
