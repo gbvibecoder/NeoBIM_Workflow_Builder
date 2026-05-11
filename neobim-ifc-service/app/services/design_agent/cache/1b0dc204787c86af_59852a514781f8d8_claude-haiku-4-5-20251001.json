@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "refuse",
+    "reasoning": "Brief explicitly requests a swimming pool (\"private swimming pool in the rear yard\", \"lap-pool style\"). Swimming pools are v2 extensions not yet supported in Slice 2B.3 v1. Refusal is cleaner than accepting a brief that cannot be fulfilled as requested.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": "Swimming pool is deferred to v2 / MISC extensions. Slice 2B.3 v1 does not yet support pool geometry or hydraulic integration.",
+    "suggested_action": "ship_as_is"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 677,
+    "output_tokens": 290,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002574,
+    "latency_ms": 3100.032625021413,
+    "created_at_iso": "2026-05-11T03:30:06.110672+00:00"
+  }
+}

@@ -41,6 +41,7 @@ from app.domain.building_model import (
     Slab,
     Storey,
     StructuralSystem,
+    Vec2,
 )
 from app.templates._1bhk_pune_floor_unit import (
     build_1bhk_pune_gf_floor_unit,
@@ -171,11 +172,19 @@ def build_1bhk_pune_house(
         doors=all_doors,
         windows=all_windows,
     )
+    # Slice 2B.3 — legal plot polygon (CCW rectangle anchored at origin).
+    plot_polygon = [
+        Vec2(x=0.0, y=0.0),
+        Vec2(x=plot_width_m, y=0.0),
+        Vec2(x=plot_width_m, y=plot_length_m),
+        Vec2(x=0.0, y=plot_length_m),
+    ]
     site = Site(
         id="site-1",
         name="Pune Plot",
         true_north_deg=0.0,
         terrain_polygon=[],
+        plot_polygon=plot_polygon,
         building=building,
     )
 

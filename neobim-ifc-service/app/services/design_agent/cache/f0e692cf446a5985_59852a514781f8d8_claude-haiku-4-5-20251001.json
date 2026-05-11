@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly requests \"perimeter compound wall around the plot boundary for security\" and explicitly rejects gate, porch, and other extensions. Only compound_wall is True; all others False.",
+    "include_compound_wall": true,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 689,
+    "output_tokens": 192,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 4473,
+    "cost_usd_estimated": 0.00724,
+    "latency_ms": 2611.6414580028504,
+    "created_at_iso": "2026-05-11T03:29:24.825228+00:00"
+  }
+}

@@ -1059,6 +1059,153 @@ class AdaptationPlannerMetadata(BaseModel):
     refused: bool
 
 
+# ─── EXTENSION PLANNER (Slice 2B.3) ──────────────────────────────────
+#
+# Extensions are the five composable add-ons that augment a Tier-2
+# template with optional features common in Indian residential briefs:
+# compound wall, entry gate, car porch, servant quarter, and mumty.
+# The pipeline position is between dispatcher and adapter:
+#
+#     matcher → dispatcher → BuildingModel
+#                                ▼
+#                         apply_extensions  ← 2B.3 NEW
+#                                ▼
+#                         apply_adaptations  (2B.2 adapter)
+#                                ▼
+#                         IFC export
+#
+# Per decisions doc §1.2 — extensions run BEFORE the adapter so the
+# planner LLM reasons in template-space (always north-front) and the
+# adapter transforms extension geometry alongside the rest of the
+# building for free. AI's role here is narrow: classify WHICH
+# extensions the brief asks for. Geometry stays pure-math
+# deterministic in app/services/design_agent/extensions/.
+
+
+class ExtensionType(str, Enum):
+    """The five extensions supported in Slice 2B.3 v1.
+
+    Subclassing ``str`` makes the values JSON-serialisable verbatim so
+    committed cache files store ``"extension_type": "compound_wall"``
+    rather than ``"ExtensionType.COMPOUND_WALL"``.
+    """
+
+    COMPOUND_WALL = "compound_wall"
+    ENTRY_GATE = "entry_gate"
+    CAR_PORCH = "car_porch"
+    SERVANT_QUARTER = "servant_quarter"
+    MUMTY = "mumty"
+
+
+class ExtensionAttachment(str, Enum):
+    """Side of plot where an extension attaches.
+
+    v1 ignores this field — each extension's geometry is hardcoded
+    (compound wall = perimeter, entry gate / car porch = front,
+    servant quarter = rear, mumty = rear-center of roof). The field
+    exists for forward-compatibility with v2 where the planner may
+    place a car porch on the east instead of the front.
+    """
+
+    FRONT = "front"  # North by default
+    REAR = "rear"    # South
+    EAST = "east"
+    WEST = "west"
+    PERIMETER = "perimeter"  # Compound wall only
+
+
+class ExtensionRequest(BaseModel):
+    """Single extension to be applied.
+
+    ``length_m`` / ``width_m`` / ``height_m`` are Optional overrides;
+    None means "use the extension's default" (e.g. 6.0×3.0×2.7m for
+    car porch). Mapping to extension-specific kwargs is handled by
+    the orchestrator (``transforms_extensions.apply_extensions``).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    extension_type: ExtensionType
+    attachment: ExtensionAttachment = ExtensionAttachment.FRONT
+    length_m: Optional[float] = Field(default=None, gt=0)
+    width_m: Optional[float] = Field(default=None, gt=0)
+    height_m: Optional[float] = Field(default=None, gt=0)
+
+
+class ExtensionPlan(BaseModel):
+    """Ordered list of extensions to apply.
+
+    Ordering inside ``extensions`` is informational — the orchestrator
+    re-orders into canonical order (compound_wall → entry_gate →
+    car_porch → servant_quarter → mumty). Duplicates by
+    ``extension_type`` are deduped first-occurrence-wins.
+
+    A plan with ``extensions=[]`` is the no-op plan; the orchestrator
+    short-circuits and returns the input BuildingModel unchanged.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    extensions: list[ExtensionRequest] = Field(default_factory=list)
+    reasoning: str = Field(..., min_length=10)
+
+    @property
+    def is_noop(self) -> bool:
+        return len(self.extensions) == 0
+
+
+class ExtensionFailed(BaseModel):
+    """Orchestrator refusal envelope.
+
+    Three suggested actions mirror the adapter's refusal contract:
+
+      * ``ship_as_is`` — all requested extensions failed. The
+        orchestrator returned the input BuildingModel unchanged; the
+        route handler proceeds to the adapter and IFC export.
+      * ``ask_user_clarification`` — reserved for the planner stage;
+        the orchestrator never emits this (it's a planner-side decision).
+      * ``skip_failed_extensions`` — partial success: some extensions
+        applied, others failed. ``failed_extensions`` lists which ones.
+
+    ``reason`` carries the joined per-extension failure messages so
+    callers can surface specific (rule_id-bearing) errors to the user.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    reason: str = Field(..., min_length=1)
+    suggested_action: Literal[
+        "ship_as_is",
+        "ask_user_clarification",
+        "skip_failed_extensions",
+    ] = "ship_as_is"
+    failed_extensions: list[ExtensionType] = Field(default_factory=list)
+
+
+class ExtensionPlannerMetadata(BaseModel):
+    """Per-call accounting record for the extension planner stage.
+
+    Mirrors :class:`AdaptationPlannerMetadata` (Slice 2B.2) so the route
+    handler can sum cost / latency across stages without a custom
+    aggregator. Pydantic-not-dataclass for serialisation symmetry with
+    the rest of the design-agent payload.
+
+    ``refused`` is True when the planner's output is an
+    :class:`ExtensionFailed` (the brief is unclear, v2-only, or fails
+    NBC / plot constraints).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    llm_model_used: str
+    llm_input_tokens: int = Field(ge=0)
+    llm_output_tokens: int = Field(ge=0)
+    llm_cost_usd: float = Field(ge=0.0)
+    elapsed_ms: float = Field(ge=0.0)
+    cache_hit: bool
+    refused: bool
+
+
 # ─── Internal helpers ────────────────────────────────────────────────
 
 
@@ -1131,6 +1278,13 @@ __all__ = [
     "AdaptationPlan",
     "AdaptationFailed",
     "AdaptationPlannerMetadata",
+    # Extension planner (Slice 2B.3)
+    "ExtensionType",
+    "ExtensionAttachment",
+    "ExtensionRequest",
+    "ExtensionPlan",
+    "ExtensionFailed",
+    "ExtensionPlannerMetadata",
     # Literal aliases (re-exported for downstream typing)
     "SiteOrientation",
     "SeismicZone",

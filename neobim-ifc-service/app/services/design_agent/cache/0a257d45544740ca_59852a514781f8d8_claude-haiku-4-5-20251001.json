@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief mentions \"parking\" → car_porch=True. \"Security\" + family context → compound_wall=True and entry_gate=True. No servant, mumty, or v2 extensions mentioned.",
+    "include_compound_wall": true,
+    "include_entry_gate": true,
+    "include_car_porch": true,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 655,
+    "output_tokens": 198,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002092,
+    "latency_ms": 2242.5999171100557,
+    "created_at_iso": "2026-05-11T03:29:54.598275+00:00"
+  }
+}

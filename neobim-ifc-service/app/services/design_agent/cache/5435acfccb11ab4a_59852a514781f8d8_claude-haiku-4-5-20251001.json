@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief emphasizes \"modern minimalist clean lines, no ornamentation\" with no extension mentions. No compound wall, gate, porch, servant quarter, or mumty requested. Minimal brief = minimal extensions (no-op plan).",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 671,
+    "output_tokens": 203,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002133,
+    "latency_ms": 2445.0518330559134,
+    "created_at_iso": "2026-05-11T03:30:15.903133+00:00"
+  }
+}

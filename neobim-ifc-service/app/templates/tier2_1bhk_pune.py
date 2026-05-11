@@ -44,6 +44,7 @@ from app.domain.building_model import (
     Slab,
     Storey,
     StructuralSystem,
+    Vec2,
 )
 from app.templates._1bhk_pune_floor_unit import (
     build_1bhk_pune_ff_floor_unit,
@@ -218,11 +219,22 @@ def build_1bhk_pune_duplex(
         doors=all_doors,
         windows=all_windows,
     )
+    # Slice 2B.3 — legal plot polygon (CCW rectangle anchored at origin).
+    # PLOT_POLYGON_VALID enforces envelope-inside-plot containment; with
+    # side_setback=0 the envelope sits exactly on the east/west plot
+    # boundary, which the invariant's 1mm tolerance treats as inside.
+    plot_polygon = [
+        Vec2(x=0.0, y=0.0),
+        Vec2(x=plot_width_m, y=0.0),
+        Vec2(x=plot_width_m, y=plot_length_m),
+        Vec2(x=0.0, y=plot_length_m),
+    ]
     site = Site(
         id="site-1",
         name="Pune Plot",
         true_north_deg=0.0,
         terrain_polygon=[],
+        plot_polygon=plot_polygon,
         building=building,
     )
 

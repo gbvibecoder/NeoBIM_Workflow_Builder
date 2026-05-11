@@ -94,7 +94,18 @@ def _patch_analyst_and_matcher(monkeypatch: pytest.MonkeyPatch, fixture) -> None
     The route imports these symbols directly; monkeypatching the
     handler module is the canonical way to substitute them without
     poking at the runner internals.
+
+    Slice 2B.3.C addition — also stubs the extension_planner stage to
+    a noop ExtensionPlan, because the 2B.2 fixtures used by these
+    tests have BriefAnalysis content that hasn't been minted through
+    the Slice 2B.3 extension planner. These tests are scoped to
+    adapter behaviour, so a noop ext plan keeps the test focus right.
     """
+    from app.services.design_agent.types import (
+        ExtensionPlan,
+        ExtensionPlannerMetadata,
+    )
+
     monkeypatch.setattr(
         "app.routers.design.run_brief_analyst",
         lambda **kw: (fixture.analysis, _analyst_metadata_stub()),
@@ -102,6 +113,24 @@ def _patch_analyst_and_matcher(monkeypatch: pytest.MonkeyPatch, fixture) -> None
     monkeypatch.setattr(
         "app.routers.design.run_template_matcher",
         lambda **kw: (fixture.match_result, _matcher_metadata_stub()),
+    )
+    monkeypatch.setattr(
+        "app.routers.design.run_extension_planner",
+        lambda **kw: (
+            ExtensionPlan(
+                extensions=[],
+                reasoning="2B.2 adapter test — extensions intentionally noop",
+            ),
+            ExtensionPlannerMetadata(
+                llm_model_used="claude-haiku-4-5-20251001",
+                llm_input_tokens=0,
+                llm_output_tokens=0,
+                llm_cost_usd=0.0,
+                elapsed_ms=0.0,
+                cache_hit=True,
+                refused=False,
+            ),
+        ),
     )
 
 

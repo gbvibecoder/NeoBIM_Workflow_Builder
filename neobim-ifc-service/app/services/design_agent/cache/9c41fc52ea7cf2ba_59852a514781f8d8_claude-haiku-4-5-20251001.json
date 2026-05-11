@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly names compound wall, entry gate, and mumty for terrace access. Explicitly excludes car porch and servant quarter. All five extensions are individually addressed in the brief.",
+    "include_compound_wall": true,
+    "include_entry_gate": true,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": true,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 694,
+    "output_tokens": 191,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002096,
+    "latency_ms": 3250.449249986559,
+    "created_at_iso": "2026-05-11T03:29:49.308690+00:00"
+  }
+}

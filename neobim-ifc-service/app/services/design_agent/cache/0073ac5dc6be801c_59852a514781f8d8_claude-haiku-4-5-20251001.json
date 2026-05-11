@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly states \"no compound wall, no gate, no extras. Just the building itself.\" and prioritizes \"open_plot\" with apartment-style setup. All five extensions are explicitly or implicitly excluded by the user's request for minimal build with no boundary or security features.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 674,
+    "output_tokens": 210,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002171,
+    "latency_ms": 2341.6481248568743,
+    "created_at_iso": "2026-05-11T03:30:18.253524+00:00"
+  }
+}

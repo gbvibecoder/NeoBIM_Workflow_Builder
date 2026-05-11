@@ -14,6 +14,24 @@
       },
       "true_north_deg": 0.0,
       "terrain_polygon": [],
+      "plot_polygon": [
+        {
+          "x": 0.0,
+          "y": 0.0
+        },
+        {
+          "x": 7.32,
+          "y": 0.0
+        },
+        {
+          "x": 7.32,
+          "y": 15.24
+        },
+        {
+          "x": 0.0,
+          "y": 15.24
+        }
+      ],
       "building": {
         "id": "building-1",
         "name": "2BHK Pune Duplex",
@@ -3745,7 +3763,8 @@
               "room-ff-master-bedroom"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-ff-cbath-bedroom2",
@@ -3755,7 +3774,8 @@
               "room-ff-bedroom-2"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-ff-landing-balconyw",
@@ -3765,7 +3785,8 @@
               "room-ff-balcony-w"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-ff-landing-master",
@@ -3775,7 +3796,8 @@
               "room-ff-master-bedroom"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-ff-landing-mbath",
@@ -3785,7 +3807,8 @@
               "room-ff-master-bath"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-ff-master-balcony",
@@ -3795,7 +3818,8 @@
               "room-ff-balcony-e"
             ],
             "swing": "sliding",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-ff-mbath-master",
@@ -3805,7 +3829,8 @@
               "room-ff-master-bedroom"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-ff-study-bedroom2",
@@ -3815,7 +3840,8 @@
               "room-ff-bedroom-2"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-gf-kitchen-living",
@@ -3825,7 +3851,8 @@
               "room-gf-living-dining"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-gf-kitchen-utility",
@@ -3835,7 +3862,8 @@
               "room-gf-utility"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-gf-main-entry",
@@ -3845,7 +3873,8 @@
               "Outside"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-gf-powder-utility",
@@ -3855,7 +3884,8 @@
               "room-gf-utility"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-gf-sf-living",
@@ -3865,7 +3895,8 @@
               "room-gf-living-dining"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-gf-sf-pooja",
@@ -3875,7 +3906,8 @@
               "room-gf-pooja"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           },
           {
             "id": "door-gf-store-utility",
@@ -3885,7 +3917,8 @@
               "room-gf-utility"
             ],
             "swing": "inward",
-            "handedness": "right"
+            "handedness": "right",
+            "predefined_type": "DOOR"
           }
         ],
         "windows": [

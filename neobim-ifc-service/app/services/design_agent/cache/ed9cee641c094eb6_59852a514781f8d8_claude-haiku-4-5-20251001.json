@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief mentions \"joint family\" and \"full-time domestic help,\" which triggers servant_quarter inference per the partial-inference rules. No explicit mentions of compound wall, entry gate, car porch, or mumty; no keywords like \"standard Indian setup\" or \"complete house\" that would auto-infer all five. Modern, single-floor layout suggests minimalist approach to optional extensions.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": true,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 670,
+    "output_tokens": 234,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002287,
+    "latency_ms": 2658.2181248813868,
+    "created_at_iso": "2026-05-11T03:29:57.261957+00:00"
+  }
+}

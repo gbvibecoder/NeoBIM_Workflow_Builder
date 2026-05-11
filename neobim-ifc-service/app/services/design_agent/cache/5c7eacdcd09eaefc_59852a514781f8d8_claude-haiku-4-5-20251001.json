@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly names all five extensions: \"compound wall,\" \"main entry gate,\" \"covered car porch at the front,\" \"servant quarter (bedroom + bath) at the back,\" and \"mumty on the roof for terrace access.\" User priorities confirm: compound_wall, entry_gate, car_porch, servant_room, mumty. All five are set True.",
+    "include_compound_wall": true,
+    "include_entry_gate": true,
+    "include_car_porch": true,
+    "include_servant_quarter": true,
+    "include_mumty": true,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 717,
+    "output_tokens": 232,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002324,
+    "latency_ms": 2196.104041999206,
+    "created_at_iso": "2026-05-11T03:29:46.050057+00:00"
+  }
+}

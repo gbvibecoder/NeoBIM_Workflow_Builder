@@ -544,6 +544,10 @@ def build_2bhk_pune_tower(
         doors=sorted(all_doors, key=lambda d: d.id),
         windows=sorted(all_windows, key=lambda w: w.id),
     )
+    # Slice 2B.3 — plot_polygon intentionally left empty (see
+    # tier2_1bhk_pune_tower.py for the full rationale: tower's
+    # combined_envelope exceeds plot_width_m due to the lift/stair core,
+    # so tower-plot semantics need a follow-up slice).
     site = Site(
         id="site-1",
         name="Pune Tower Plot",

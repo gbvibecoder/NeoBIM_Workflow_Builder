@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly requests \"servant room at the back\" and \"mumty on the roof for terrace access\"; user also explicitly states \"No compound wall — apartment-style open plot\", ruling out compound_wall, entry_gate, and car_porch.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": true,
+    "include_mumty": true,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 687,
+    "output_tokens": 206,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002164,
+    "latency_ms": 2245.079749962315,
+    "created_at_iso": "2026-05-11T03:29:43.847542+00:00"
+  }
+}

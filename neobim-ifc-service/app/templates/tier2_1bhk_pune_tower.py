@@ -456,6 +456,15 @@ def build_1bhk_pune_tower(
         doors=sorted(all_doors, key=lambda d: d.id),
         windows=sorted(all_windows, key=lambda w: w.id),
     )
+    # Slice 2B.3 — plot_polygon intentionally left empty.
+    # The tower's combined_envelope spans flat_x_min .. core_x_max where
+    # core_x_max = plot_width_m + _CORE_WIDTH_M, exceeding plot_width_m.
+    # Defining a plot_polygon = [(0,0),(plot_width_m, 0),...] would
+    # violate PLOT_POLYGON_VALID's containment sub-rule. Tower-plot
+    # semantics (the actual legal plot exceeds the flat unit's
+    # plot_width_m) are deferred to a future slice; until then, the
+    # invariant skips on empty plot_polygon and the 2B.3 extension
+    # planner refuses non-mumty extensions for tower templates.
     site = Site(
         id="site-1",
         name="Pune Tower Plot",

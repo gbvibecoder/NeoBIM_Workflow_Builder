@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly mentions \"main gate at the entrance\" (entry_gate=True) and \"property fenced\" (compound_wall=True). The gate requires a wall for attachment, and the fencing request directly signals compound_wall. Garden is noted but doesn't trigger car porch (gardens typically imply open front yard, not covered parking). Servant quarter and mumty are not mentioned.",
+    "include_compound_wall": true,
+    "include_entry_gate": true,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 674,
+    "output_tokens": 235,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002296,
+    "latency_ms": 2868.861832888797,
+    "created_at_iso": "2026-05-11T03:30:00.139560+00:00"
+  }
+}
