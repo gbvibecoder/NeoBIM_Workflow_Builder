@@ -276,6 +276,20 @@ def _populate_door(
     })
 
 
+def _door_material_kind(
+    door: Door, ifc_door: ifcopenshell.entity_instance
+) -> str:
+    """Slice P2.E — pick the door material kind by Door.predefined_type +
+    final IfcDoor.OperationType (which already reflects the T2.0.4.B
+    lift-door SLIDING override applied at the IFC layer)."""
+    if door.predefined_type == "GATE":
+        return "gate"
+    op = ifc_door.OperationType or ""
+    if "SLIDING" in op.upper():
+        return "sliding-lift"
+    return "swing"
+
+
 # ─── Window ────────────────────────────────────────────────────────
 
 
@@ -414,6 +428,11 @@ def populate_psets_from_building_model(
         model, mat_cache, "Vitrified-Tile-Floor", "finish"
     )
     gypsum = _get_or_create_material(model, mat_cache, "Gypsum-Board", "finish")
+    # Slice P2.E — door-specific material set.
+    teak = _get_or_create_material(model, mat_cache, "Teak-Door", "wood")
+    glass = _get_or_create_material(
+        model, mat_cache, "Glass-Tempered", "glass"
+    )
 
     # Collect all walls for railing/wall dispatch.
     for storey in bld.storeys:
@@ -495,6 +514,29 @@ def populate_psets_from_building_model(
         host_wall = walls_by_id.get(op.in_wall_id)
         is_exterior = bool(host_wall.is_external) if host_wall else False
         _populate_door(model, ifc_d, door, is_exterior, op.width, op.height)
+        # Slice P2.E — instance-level door material differentiation.
+        kind = _door_material_kind(door, ifc_d)
+        if kind == "gate":
+            _assign_material(model, ifc_d, ms_steel)
+        elif kind == "sliding-lift":
+            # Lift cabin doors: MS-Steel frame + Glass panel.
+            # IfcMaterialList carries both so the model.by_type query
+            # surfaces them as instance-level materials. ifcopenshell's
+            # `material.assign_material` for `type="IfcMaterialList"`
+            # accepts a single material= argument that IS the list
+            # entity; we build it manually so both members are present.
+            mat_list = model.create_entity(
+                "IfcMaterialList", Materials=[ms_steel, glass]
+            )
+            api.run(
+                "material.assign_material",
+                model,
+                products=[ifc_d],
+                type="IfcMaterialList",
+                material=mat_list,
+            )
+        else:
+            _assign_material(model, ifc_d, teak)
 
     for window in bld.windows:
         ifc_w = window_entities.get(window.id)
