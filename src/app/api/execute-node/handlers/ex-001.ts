@@ -157,6 +157,13 @@ export const handleEX001: NodeHandler = async (ctx) => {
   let resolvedProjectName = "BuildFlow Export";
   let resolvedGeometry: import("@/types/geometry").MassingGeometry;
 
+  // Hoisted for Path-A (design-agent) brief synthesis. The Path-B/C
+  // block below assigns these; Path A (real upstream geometry) leaves
+  // them empty and the synthesizer falls back to structured params.
+  let outerTextContent = "";
+  let outerRawData: Record<string, unknown> = {};
+  let outerProgramme: Array<{ space?: string; area_m2?: number }> | undefined;
+
   if (upstreamGeometry?.storeys && upstreamGeometry?.footprint) {
     // ── Path A: Real geometry from GN-001 OR converted floor-plan brief ──
     const upstreamRaw = (inputData?._raw ?? {}) as Record<string, unknown>;
@@ -171,6 +178,9 @@ export const handleEX001: NodeHandler = async (ctx) => {
     // or any node that passes numeric fields directly.
     const rawData = (inputData?._raw ?? {}) as Record<string, unknown>;
     const textContent = String(inputData?.content ?? inputData?.prompt ?? "");
+    // Mirror to outer scope so Path-A (design-agent) brief synthesis can read them.
+    outerRawData = rawData;
+    outerTextContent = textContent;
 
     // Helper: extract a number from text using regex patterns (same as GN-001)
     const extractFromText = (patterns: RegExp[], fallback: number): number => {
@@ -198,6 +208,7 @@ export const handleEX001: NodeHandler = async (ctx) => {
     const rawTotalArea = Number(rawData?.totalArea ?? rawData?.total_area ?? 0);
     // For ParsedBrief from TR-001: sum programme areas if available
     const programme = rawData?.programme as Array<{ space?: string; area_m2?: number }> | undefined;
+    outerProgramme = programme;
     const programmeTotal = programme?.reduce((sum, p) => sum + (p.area_m2 ?? 0), 0) ?? 0;
     const effectiveTotalArea = rawTotalArea > 0 ? rawTotalArea : (programmeTotal > 0 ? programmeTotal : 0);
 
@@ -278,12 +289,176 @@ export const handleEX001: NodeHandler = async (ctx) => {
     label: string; discipline: string; _ifcContent?: string;
   }> = [];
 
+  // ── Design-agent observability fields (populated by Path A when on) ──
+  // Always present in metadata so downstream UI / dashboards have a
+  // stable schema regardless of which path ran.
+  let designAgentUsed = false;
+  let designAgentTemplate: string | null = null;
+  let designAgentCostUsd: number | null = null;
+  let designAgentLatencyMs: number | null = null;
+  let designAgentIdsViolations: number | null = null;
+  let designAgentRefusalReason: string | null = null;
+  let designAgentBriefSource: "upstream-text" | "synthesized" | "fallback" | null = null;
+
+  // ────────────────────────────────────────────────────────────────────
+  // Path A — Design-agent pipeline (feature-flagged).
+  //
+  // When `USE_DESIGN_AGENT_PIPELINE=true`, route IFC generation through
+  // `POST /api/v1/design/generate`. This is the RICH pipeline: brief →
+  // template-matcher → adaptation → BuildingModel → IFC via the
+  // parametric path (carries every P1.5 / P1.6 / 2B.2 / 2B.3 / P2
+  // enrichment).
+  //
+  // On any failure mode (matcher-refusal / timeout / network), Path A
+  // falls THROUGH to the existing legacy /export-ifc + TS fallback
+  // chain. The user always gets a result — the flag is a graceful
+  // upgrade path, not a foot-gun.
+  // ────────────────────────────────────────────────────────────────────
+  const USE_DESIGN_AGENT = process.env.USE_DESIGN_AGENT_PIPELINE === "true";
+
+  if (USE_DESIGN_AGENT) {
+    const { generateIFCViaDesignAgent, isDesignAgentRefusal, adaptDesignAgentToServiceResponse } =
+      await import("@/features/ifc/services/ifc-service-client");
+    const { synthesizeBrief } = await import(
+      "@/features/ifc/services/brief-synthesizer"
+    );
+
+    // Plot dimensions — derive from MassingGeometry.boundingBox when the
+    // upstream parser didn't extract them explicitly. This was the
+    // primary cause of design-agent matcher refusals on PDF briefs that
+    // don't say "30x60 ft plot" in plain text.
+    let plotWidthM: number | undefined;
+    let plotDepthM: number | undefined;
+    const bbox = (resolvedGeometry as {
+      boundingBox?: {
+        xMin?: number; xMax?: number; yMin?: number; yMax?: number;
+        minX?: number; maxX?: number; minY?: number; maxY?: number;
+      };
+    }).boundingBox;
+    if (bbox) {
+      const xMin = Number(bbox.xMin ?? bbox.minX ?? 0);
+      const xMax = Number(bbox.xMax ?? bbox.maxX ?? 0);
+      const yMin = Number(bbox.yMin ?? bbox.minY ?? 0);
+      const yMax = Number(bbox.yMax ?? bbox.maxY ?? 0);
+      const w = Math.abs(xMax - xMin);
+      const d = Math.abs(yMax - yMin);
+      if (w > 0.1 && d > 0.1) {
+        plotWidthM = w;
+        plotDepthM = d;
+      }
+    }
+
+    // BHK heuristic — when not stated by upstream, infer from
+    // per-floor footprint (typical Indian residential): <70 m² → 1BHK,
+    // 70-110 → 2BHK, 110-200 → 3BHK. Footprints outside [40, 250] don't
+    // get a guess (matcher will refuse anyway and that's correct).
+    const explicitBhk = Number(
+      (inputData as Record<string, unknown> | undefined)?.bhk_count ??
+        (inputData as Record<string, unknown> | undefined)?.bhkCount ??
+        outerRawData?.bhk_count ?? 0,
+    );
+    const footprintM2 = Number(
+      (resolvedGeometry as { footprintArea?: number }).footprintArea ?? 0,
+    );
+    let inferredBhk: number | undefined =
+      explicitBhk > 0 ? explicitBhk : undefined;
+    if (!inferredBhk && footprintM2 >= 40 && footprintM2 <= 250) {
+      inferredBhk =
+        footprintM2 < 70 ? 1 : footprintM2 < 110 ? 2 : 3;
+    }
+
+    // Region default — templates ship for Pune only at the moment, so
+    // explicitly defaulting reduces matcher refusal rate without
+    // misleading the user (the matcher applies city heuristics for
+    // seismic/wind zone enrichment; "Pune" is safe-default India zone III).
+    const explicitRegion = String(
+      outerRawData?.region ?? outerRawData?.location ?? "",
+    ).trim();
+    const region = explicitRegion.length > 0 ? explicitRegion : "Pune";
+
+    const { briefText, source: briefSource } = synthesizeBrief({
+      textContent: outerTextContent,
+      buildingType: resolvedBuildingType,
+      floors: Number.isFinite(Number(resolvedGeometry.floors))
+        ? Number(resolvedGeometry.floors)
+        : undefined,
+      bhkCount: inferredBhk,
+      footprintM2: footprintM2 || undefined,
+      plotWidthM,
+      plotDepthM,
+      gfaM2: Number(resolvedGeometry.gfa ?? 0) || undefined,
+      heightM: Number(resolvedGeometry.totalHeight ?? 0) || undefined,
+      region,
+      programme: outerProgramme,
+    });
+    designAgentBriefSource = briefSource;
+
+    logger.info("[EX-001/Path-A] design-agent brief assembled", {
+      briefSource,
+      briefLength: briefText.length,
+      briefPreview: briefText.slice(0, 200),
+    });
+
+    const designResult = await generateIFCViaDesignAgent(briefText, {
+      buildId: executionId ?? `local-${Date.now()}`,
+      targetFidelity: "design-development",
+    });
+
+    if (designResult && !isDesignAgentRefusal(designResult)) {
+      designAgentUsed = true;
+      ifcServiceUsed = true;
+      designAgentTemplate = designResult.match_result?.template_id ?? null;
+      designAgentCostUsd =
+        designResult.metadata?.total_cost_usd_estimated ?? null;
+      designAgentLatencyMs = designResult.elapsed_ms ?? null;
+      designAgentIdsViolations =
+        designResult.ids_validation?.violations_count ?? null;
+
+      const serviceResult = adaptDesignAgentToServiceResponse(
+        designResult,
+        filePrefix,
+      );
+      files = serviceResult.files.map((f) => ({
+        name: f.file_name,
+        type: "IFC 4",
+        size: f.size,
+        downloadUrl: f.download_url,
+        label: `${f.discipline.charAt(0).toUpperCase() + f.discipline.slice(1)} IFC`,
+        discipline: f.discipline,
+        _ifcContent: undefined as unknown as string,
+      }));
+
+      logger.info("[EX-001/Path-A] design-agent SUCCESS", {
+        template: designAgentTemplate,
+        costUsd: designAgentCostUsd,
+        latencyMs: designAgentLatencyMs,
+        idsViolations: designAgentIdsViolations,
+        ifcSizeKb: Math.round(designResult.ifc_size_bytes / 1024),
+        warningsCount: designResult.warnings?.length ?? 0,
+      });
+    } else if (designResult && isDesignAgentRefusal(designResult)) {
+      designAgentRefusalReason = designResult.reason;
+      logger.warn("[EX-001/Path-A] design-agent REFUSAL — falling through to legacy", {
+        kind: designResult.refusalKind,
+        reason: designResult.reason,
+        httpStatus: designResult.httpStatus,
+      });
+    } else {
+      logger.warn("[EX-001/Path-A] design-agent returned null (network/timeout/5xx) — falling through to legacy");
+    }
+  }
+
   const { isServiceReady, generateIFCViaService } = await import(
     "@/features/ifc/services/ifc-service-client"
   );
-  const readiness = await isServiceReady();
+  // When design-agent already produced files, skip the legacy /export-ifc
+  // call entirely. Synthesize a "ready" readiness so the metadata block
+  // below stays consistent.
+  const readiness = designAgentUsed
+    ? { ready: true, reason: "ok" as const, latencyMs: 0, checkedAt: Date.now() }
+    : await isServiceReady();
 
-  if (readiness.ready) {
+  if (!designAgentUsed && readiness.ready) {
     try {
       const serviceResult = await generateIFCViaService(
         resolvedGeometry,
@@ -456,10 +631,24 @@ export const handleEX001: NodeHandler = async (ctx) => {
       ifcServiceUsed,
       // Phase 1 Track A observability fields — feed the Rich/Lean badge
       // and any future admin dashboard.
-      ifcServicePath: ifcServiceUsed ? "python" : "ts-fallback",
+      ifcServicePath: designAgentUsed
+        ? "design-agent"
+        : ifcServiceUsed
+          ? "python"
+          : "ts-fallback",
       ifcServiceProbeMs: readiness.latencyMs,
       ifcServiceSkipped: !readiness.ready,
       ifcServiceSkipReason: readiness.ready ? undefined : readiness.reason,
+      // Path-A design-agent observability — populated only when
+      // USE_DESIGN_AGENT_PIPELINE was on for this call. Stable schema
+      // even when null so dashboards can left-join cleanly.
+      designAgentUsed,
+      designAgentTemplate,
+      designAgentCostUsd,
+      designAgentLatencyMs,
+      designAgentIdsViolations,
+      designAgentRefusalReason,
+      designAgentBriefSource,
       // Phase 1 Track B — rich-mode plumbing. `richMode` is the resolved
       // literal, `richModeSource` tells operators where it came from
       // (override / env / default), `richFlags` is the four-flag bundle
