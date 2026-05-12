@@ -14,7 +14,7 @@ import { MiniWorkflowDiagram } from "@/features/workflows/components/MiniWorkflo
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useLocale } from '@/hooks/useLocale';
 import type { TranslationKey } from '@/lib/i18n';
-import { trackLead, trackViewContent } from '@/lib/meta-pixel';
+import { trackLead, trackViewContent, META_EVENT_VALUE, META_CURRENCY } from '@/lib/meta-pixel';
 import { LanguageSwitcher } from '@/shared/components/ui/LanguageSwitcher';
 import { PipelineSection } from '@/features/landing/components/PipelineSection';
 import { NewsletterSignup } from '@/features/landing/components/NewsletterSignup';
@@ -26,6 +26,50 @@ import { LandingFooter } from '@/features/landing/components/LandingFooter';
 // import { ExitIntentModal } from '@/features/marketing/components/ExitIntentModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Fire a Lead conversion with full Meta-grade payload: same `eventID` on the
+ * browser pixel and the server CAPI fire (dedup), value+currency from the
+ * canonical constants (so browser and server agree), and `keepalive: true`
+ * so the fetch survives the post-click navigation that most of these CTAs
+ * trigger. `extra` lets a caller attach form-derived `email`/`firstName` so
+ * Meta's identity matching has more to work with.
+ */
+function fireLead(
+  contentName: string,
+  extra?: {
+    contentCategory?: string;
+    email?: string;
+    firstName?: string;
+  },
+): void {
+  const eventId = `lead_${crypto.randomUUID()}`;
+
+  const pixelParams: Record<string, string | number> = {
+    content_name: contentName,
+    value: META_EVENT_VALUE.LEAD_INR,
+    currency: META_CURRENCY,
+  };
+  if (extra?.contentCategory) pixelParams.content_category = extra.contentCategory;
+  trackLead(pixelParams, { eventID: eventId });
+
+  const capiBody: Record<string, string | number> = {
+    eventId,
+    contentName,
+    value: META_EVENT_VALUE.LEAD_INR,
+    currency: META_CURRENCY,
+  };
+  if (typeof window !== "undefined") capiBody.eventSourceUrl = window.location.href;
+  if (extra?.email) capiBody.email = extra.email;
+  if (extra?.firstName) capiBody.firstName = extra.firstName;
+
+  fetch("/api/track/lead", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(capiBody),
+    keepalive: true,
+  }).catch(() => {});
+}
 
 function hexToRgb(hex: string): string {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -974,7 +1018,11 @@ export default function LandingPage() {
     // Basic email validation
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requestForm.email)) return;
 
-    trackLead({ content_name: "workflow_request", content_category: requestForm.discipline });
+    fireLead("workflow_request", {
+      contentCategory: requestForm.discipline,
+      email: requestForm.email.trim().toLowerCase(),
+      firstName: requestForm.name.trim().split(" ")[0],
+    });
 
     // Persist to backend (fire-and-forget — works even if API doesn't exist yet)
     fetch("/api/workflow-requests", {
@@ -1094,7 +1142,7 @@ export default function LandingPage() {
               textDecoration: "none", whiteSpace: "nowrap",
               boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
             }}
-              onClick={() => trackLead({ content_name: "nav_cta_sign_up" })}
+              onClick={() => fireLead("nav_cta_sign_up")}
             >
               {t('landing.signUpFree')}
             </Link>
@@ -1186,7 +1234,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/register"
-                onClick={() => { setMobileMenuOpen(false); trackLead({ content_name: "mobile_menu_sign_up" }); }}
+                onClick={() => { setMobileMenuOpen(false); fireLead("mobile_menu_sign_up"); }}
                 style={{
                   display: "block", padding: "12px 16px", borderRadius: 10,
                   fontSize: 14, fontWeight: 700, color: "white", textAlign: "center",
@@ -1550,7 +1598,7 @@ export default function LandingPage() {
                 boxShadow: "0 0 40px rgba(0,245,255,0.2), 0 0 80px rgba(79,138,255,0.15)",
                 transition: "all 0.3s ease",
               }}
-                onClick={() => trackLead({ content_name: "hero_cta_get_started" })}
+                onClick={() => fireLead("hero_cta_get_started")}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.boxShadow = "0 0 50px rgba(0,245,255,0.35), 0 0 100px rgba(79,138,255,0.2)";
                   (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
@@ -1911,7 +1959,7 @@ export default function LandingPage() {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 {/* Book a Demo — primary action here since demo videos already play above. */}
-                <Link href="/book-demo" onClick={() => trackLead({ content_name: "showcase_cta_book_demo" })} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 10, background: "linear-gradient(135deg, rgba(79,138,255,0.14), rgba(99,102,241,0.1))", border: "1px solid rgba(79,138,255,0.35)", color: "#A5B4FC", fontSize: 13, fontWeight: 700, textDecoration: "none", transition: "all 0.2s", whiteSpace: "nowrap", boxShadow: "0 0 18px rgba(79,138,255,0.1)" }}
+                <Link href="/book-demo" onClick={() => fireLead("showcase_cta_book_demo")} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 10, background: "linear-gradient(135deg, rgba(79,138,255,0.14), rgba(99,102,241,0.1))", border: "1px solid rgba(79,138,255,0.35)", color: "#A5B4FC", fontSize: 13, fontWeight: 700, textDecoration: "none", transition: "all 0.2s", whiteSpace: "nowrap", boxShadow: "0 0 18px rgba(79,138,255,0.1)" }}
                   onMouseEnter={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(79,138,255,0.22), rgba(99,102,241,0.16))"; el.style.borderColor = "rgba(79,138,255,0.55)"; el.style.color = "#C7D2FE"; el.style.boxShadow = "0 0 28px rgba(79,138,255,0.22)"; }}
                   onMouseLeave={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(79,138,255,0.14), rgba(99,102,241,0.1))"; el.style.borderColor = "rgba(79,138,255,0.35)"; el.style.color = "#A5B4FC"; el.style.boxShadow = "0 0 18px rgba(79,138,255,0.1)"; }}
                 >

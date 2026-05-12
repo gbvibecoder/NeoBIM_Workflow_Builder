@@ -5,6 +5,28 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef, useState } from "react";
 import { useLocale } from "@/hooks";
 import { trackContact } from "@/lib/meta-pixel";
+
+/**
+ * Browser + server twin for the `Contact` event. Same `eventID` on both sides
+ * so Meta dedups. Server CAPI fire reads `_fbp`/`_fbc` from cookies and
+ * forwards IP/UA — see `/api/track/contact/route.ts`.
+ */
+function fireContact(args: { contentName: string; email?: string; firstName?: string }): void {
+  const eventId = `contact_${crypto.randomUUID()}`;
+  trackContact({ content_name: args.contentName }, { eventID: eventId });
+
+  const capiBody: Record<string, string> = { eventId, contentName: args.contentName };
+  if (typeof window !== "undefined") capiBody.eventSourceUrl = window.location.href;
+  if (args.email) capiBody.email = args.email;
+  if (args.firstName) capiBody.firstName = args.firstName;
+
+  fetch("/api/track/contact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(capiBody),
+    keepalive: true,
+  }).catch(() => {});
+}
 import {
   Mail,
   MessageSquare,
@@ -68,7 +90,11 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
-    trackContact({ content_name: formState.subject || "contact_form" });
+    fireContact({
+      contentName: formState.subject || "contact_form",
+      email: formState.email.trim().toLowerCase(),
+      firstName: formState.name.trim().split(" ")[0],
+    });
 
     try {
       const res = await fetch("/api/contact", {

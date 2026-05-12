@@ -69,6 +69,17 @@ const optionalSchema = z.object({
   NEXT_PUBLIC_GOOGLE_ADS_ID: z.string().optional(),
   NEXT_PUBLIC_CLARITY_PROJECT_ID: z.string().optional(),
   META_CAPI_ACCESS_TOKEN: z.string().optional(),
+  /** Meta tracking environment gates — see src/lib/tracking-env.ts.
+   *  Leave both unset for normal operation. Set to the literal "true" only
+   *  for explicit staging smoke tests; otherwise localhost / Vercel preview
+   *  fires would pollute the production Meta dataset. */
+  NEXT_PUBLIC_META_TRACKING_FORCE: z.enum(["true", "false"]).optional(),
+  META_TRACKING_FORCE: z.enum(["true", "false"]).optional(),
+  /** Vercel auto-populates these on every deploy; gate logic reads them. */
+  VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
+  NEXT_PUBLIC_VERCEL_ENV: z
+    .enum(["production", "preview", "development"])
+    .optional(),
   FAL_KEY: z.string().optional(),
   MESHY_API_KEY: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().optional(),

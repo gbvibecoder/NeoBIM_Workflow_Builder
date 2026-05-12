@@ -27,7 +27,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, email, password, source, referralCode, phoneNumber: rawPhone, signupEventId } = await req.json();
+    const {
+      name,
+      email,
+      password,
+      source,
+      referralCode,
+      phoneNumber: rawPhone,
+      signupEventId,
+      fbp,
+      fbc,
+    } = await req.json();
 
     // Validate required fields
     if (!email || !email.trim()) {
@@ -128,6 +138,9 @@ export async function POST(req: NextRequest) {
 
     // Server-side conversion: Meta CAPI (fire-and-forget, bypasses ad blockers)
     // Use event_id from client so Meta dedups browser pixel + server event.
+    // fbp/fbc come from the browser body (read from _fbp/_fbc cookies by the
+    // register page) — Meta needs them in the server payload to match identity
+    // against the browser pixel fire.
     trackServerSignup({
       email: normalizedEmail,
       phone: normalizedPhone,
@@ -135,6 +148,8 @@ export async function POST(req: NextRequest) {
       ip,
       userAgent: req.headers.get("user-agent") || undefined,
       eventId: typeof signupEventId === "string" ? signupEventId : undefined,
+      fbp: typeof fbp === "string" ? fbp : undefined,
+      fbc: typeof fbc === "string" ? fbc : undefined,
     }).catch(err => console.warn("[meta-capi]", err));
 
     // Claim referral if a code was provided (awaited — ensures bonuses are granted)

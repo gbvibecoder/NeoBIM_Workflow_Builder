@@ -7,6 +7,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
 import { trackLogin } from "@/lib/analytics";
+import { trackServerSignup } from "@/lib/server-conversions";
 import { normalizePhone } from "@/lib/form-validation";
 
 // Throttle DB role lookups: refresh at most once per 15 seconds per user.
@@ -133,6 +134,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       } catch {
         // Cookie setting can fail outside a request context — fail silent
         // so sign-in is never blocked.
+      }
+
+      // Meta CAPI fire for OAuth signups (Google, etc.). Credentials signups
+      // are tracked from `/api/auth/register/route.ts` with the client-pixel
+      // event_id and fbp/fbc — full dedup. Here we don't have access to the
+      // client-side eventID (no shared cookie was set before account creation),
+      // so we use a deterministic per-user ID. Browser pixel for Google OAuth
+      // currently fires its own randomly-generated eventID — full browser↔server
+      // dedup requires Pattern (b) from the audit (defer browser fire to
+      // /onboard where session.user.id is known). Filed as follow-up.
+      if (user.email) {
+        try {
+          const cookieStore = await cookies();
+          await trackServerSignup({
+            email: user.email,
+            firstName: user.name?.split(" ")[0],
+            eventId: `signup_oauth_${user.id}`,
+            fbp: cookieStore.get("_fbp")?.value,
+            fbc: cookieStore.get("_fbc")?.value,
+          });
+        } catch (err) {
+          // Never block account creation if CAPI fails. Worst case: this
+          // OAuth signup is only counted on the browser pixel.
+          console.warn("[meta-capi] oauth signup fire failed:", err);
+        }
       }
     },
   },
