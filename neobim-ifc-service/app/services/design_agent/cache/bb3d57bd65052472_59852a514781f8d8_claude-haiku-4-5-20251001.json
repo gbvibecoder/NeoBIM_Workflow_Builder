@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "The brief specifies a single-storey 2BHK residential villa with no mentions of compound wall, entry gate, car porch, servant quarter, or mumty. The program explicitly lists living room, two bedrooms, shared bathroom, kitchen, pooja room, utility, and staircase provision—all core elements of the matched template. No extension features are requested or implied by \"single storey,\" \"compact design,\" or \"constrained plot.\" This is a baseline villa with no add-ons.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 913,
+    "output_tokens": 261,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002665,
+    "latency_ms": 3011.769332922995,
+    "created_at_iso": "2026-05-11T17:35:02.764957+00:00"
+  }
+}

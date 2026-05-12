@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Tower brief (G+23) explicitly requests stilt-level parking and multi-unit residential configuration. Mumty (terrace/roof access enclosure) is the only v1-supported extension for towers; other four extensions are plot-scale or incompatible with apartment tower unit-level design. Brief does not mention terrace usage, habitable roof, or roof garden, so mumty is not implied. All five extensions set False (no-op plan for tower).",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 936,
+    "output_tokens": 253,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002648,
+    "latency_ms": 3393.7710002064705,
+    "created_at_iso": "2026-05-11T17:37:18.295874+00:00"
+  }
+}

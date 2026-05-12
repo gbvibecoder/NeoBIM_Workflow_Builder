@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.88,
+    "reasoning": "Brief explicitly specifies a 3BHK apartment tower (G+23 = 23 habitable floors) on a Pune plot with stilt parking. The tower-family template `build_3bhk_pune_tower` is the direct match: 3 bedrooms per unit, multi-storey form factor with configurable habitable floors, stilt parking supported. Plot dimensions convert exactly from feet: 60 ft × 100 ft = 60.96 m × 30.48 m (well within the 10.0 × 18.0 to 13.0 × 24.0 m typical range for 3BHK towers, and larger plots are acceptable for mid-rise). Seismic zone III and wind zone 3 are provided by the brief analysis.",
+    "template_id": "build_3bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 30.48,
+      "plot_length_m": 60.96,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 23,
+      "has_stilt_parking": true,
+      "stilt_height_m": 2.7,
+      "seismic_zone": "III",
+      "wind_zone": 3,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 775,
+    "output_tokens": 394,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003427,
+    "latency_ms": 4904.61020800285,
+    "created_at_iso": "2026-05-11T17:37:12.860752+00:00"
+  }
+}

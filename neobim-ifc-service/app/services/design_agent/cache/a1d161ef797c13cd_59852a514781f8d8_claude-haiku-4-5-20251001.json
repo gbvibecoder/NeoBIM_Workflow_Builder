@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief specifies a single-storey 3BHK house in Pune with no mention of extensions (compound wall, gate, car porch, servant quarter, or mumty). No explicit or inferred extension requests; emit a no-op plan with all five booleans False.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 802,
+    "output_tokens": 214,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 4473,
+    "cost_usd_estimated": 0.007463,
+    "latency_ms": 3550.1953749917448,
+    "created_at_iso": "2026-05-11T08:46:53.600948+00:00"
+  }
+}

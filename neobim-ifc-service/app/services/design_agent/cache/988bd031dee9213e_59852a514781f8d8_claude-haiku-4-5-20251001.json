@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "The brief describes a standard single-storey 3BHK residential house in Pune with no mention of compound wall, entry gate, car porch, servant quarter, or mumty. The program focuses on interior rooms and layout; no exterior or boundary extensions are requested. This is a NO-OP extensions plan.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 994,
+    "output_tokens": 220,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002541,
+    "latency_ms": 3418.724082875997,
+    "created_at_iso": "2026-05-11T11:40:06.276177+00:00"
+  }
+}

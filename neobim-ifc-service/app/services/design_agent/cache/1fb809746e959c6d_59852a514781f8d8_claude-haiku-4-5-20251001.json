@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief specifies a G+5 apartment tower with stilt parking (user priority explicitly stated). Tower templates in v1 support only mumty (roof-access enclosure) as a valid extension. No mention of compound wall, entry gate, car porch (stilt is built-in), servant quarter, or mumty. Stilt parking is already part of the tower template; no extension required. All five booleans set to False (no-op plan).",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 919,
+    "output_tokens": 253,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002631,
+    "latency_ms": 3266.3982920348644,
+    "created_at_iso": "2026-05-11T17:36:40.063441+00:00"
+  }
+}

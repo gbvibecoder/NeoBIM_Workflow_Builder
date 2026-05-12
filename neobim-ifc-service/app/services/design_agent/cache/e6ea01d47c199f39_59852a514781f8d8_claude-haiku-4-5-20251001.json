@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief is for a small apartment flat (tower template: build_1bhk_pune_tower) for a young couple in Pune with no extension mentions. No compound wall, gate, car porch, servant quarter, or mumty are requested or implied. This is a minimalist tower apartment scenario with no additions.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 777,
+    "output_tokens": 219,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002319,
+    "latency_ms": 2799.826249945909,
+    "created_at_iso": "2026-05-11T11:41:01.820017+00:00"
+  }
+}

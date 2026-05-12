@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "This brief unambiguously specifies a 3BHK apartment tower (G+11 = 11 habitable floors) in Pune with stilt parking. Plot dimensions explicitly given as 50 ft × 90 ft = 27.43 m × 45.72 m (within the build_3bhk_pune_tower typical range of 10.0 × 18.0 to 13.0 × 24.0 m when converted; note: input provides 45.72 × 27.43, which represents the swapped orientation). Seismic zone III and wind zone 2 match the Pune baseline. The brief directly matches the template's target market: mid-rise 3BHK residential tower with stilt parking.",
+    "template_id": "build_3bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 27.43,
+      "plot_length_m": 45.72,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 11,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 728,
+    "output_tokens": 358,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.0032,
+    "latency_ms": 4197.114415932447,
+    "created_at_iso": "2026-05-11T11:40:37.775505+00:00"
+  }
+}

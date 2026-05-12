@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "Brief specifies explicit 2BHK + G+1 duplex form factor on a 30×50 ft Pune plot. The room inventory (living-dining, kitchen, 2 bedrooms with baths) and two-storey configuration match the build_2bhk_pune_duplex template exactly. Plot dimensions convert cleanly: 30 ft × 50 ft = 9.144 m × 15.24 m, well within the template's typical range (6.0–10.0 m × 12.0–18.0 m).",
+    "template_id": "build_2bhk_pune_duplex",
+    "parameters": {
+      "plot_width_m": 9.144,
+      "plot_length_m": 15.24,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 699,
+    "output_tokens": 306,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002911,
+    "latency_ms": 3866.3996250834316,
+    "created_at_iso": "2026-05-11T11:39:40.123811+00:00"
+  }
+}

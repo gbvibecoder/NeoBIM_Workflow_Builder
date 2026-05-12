@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief does not specify site orientation; no vastu, room swaps, or asymmetric constraints mentioned. Template default north-facing entry with no chirality adjustment required.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4091,
+    "output_tokens": 119,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004686,
+    "latency_ms": 1739.0657078940421,
+    "created_at_iso": "2026-05-11T17:34:59.748637+00:00"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief does not specify a site orientation or any directional preference; the matched template defaults to north-facing entry. No mirror or rotation is required.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4003,
+    "output_tokens": 114,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004573,
+    "latency_ms": 1913.1912919692695,
+    "created_at_iso": "2026-05-11T08:46:50.043999+00:00"
+  }
+}

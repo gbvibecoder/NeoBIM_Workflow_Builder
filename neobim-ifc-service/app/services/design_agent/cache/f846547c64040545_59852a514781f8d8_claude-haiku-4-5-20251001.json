@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief specifies a basic 3BHK duplex with no mentions of compound wall, entry gate, car porch, servant quarter, or mumty. The explicit room list names \"parking (ground floor)\" as a fixed floor-plan element, not a car porch extension. No extension keywords or inference triggers are present; the brief is functionally minimal regarding add-ons beyond core architecture.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 914,
+    "output_tokens": 236,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 4473,
+    "cost_usd_estimated": 0.007685,
+    "latency_ms": 3080.6817079428583,
+    "created_at_iso": "2026-05-11T08:01:53.439747+00:00"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "Brief explicitly specifies 3BHK apartment tower (G+5, 6 floors total: 1 stilt + 5 habitable) in Pune on a 40×80 ft plot. Converted dimensions cleanly to 12.192 × 24.384 m. Each floor contains one 3BHK unit with master bedroom ensuite, two additional bedrooms, balcony, lift core, and fire stair—all core features of the build_3bhk_pune_tower template. Seismic zone III and wind zone 2 match the Pune baseline.",
+    "template_id": "build_3bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 12.192,
+      "plot_length_m": 24.384,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 5,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": true
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 790,
+    "output_tokens": 356,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003252,
+    "latency_ms": 3285.825249971822,
+    "created_at_iso": "2026-05-11T17:36:34.947655+00:00"
+  }
+}

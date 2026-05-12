@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Tower brief (G+5 apartment tower, stilt + 5 habitable floors) with explicit lift core and stilt parking already in the template. No Slice 2B.3 extensions mentioned or inferred: compound_wall, entry_gate, car_porch, and servant_quarter are plot-scale or not applicable to towers; mumty not requested. Emit no-op plan (all five booleans False).",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 898,
+    "output_tokens": 248,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002585,
+    "latency_ms": 3377.3020831868052,
+    "created_at_iso": "2026-05-11T11:40:24.973505+00:00"
+  }
+}

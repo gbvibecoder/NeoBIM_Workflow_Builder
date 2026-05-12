@@ -1,0 +1,68 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "apartment_tower",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential apartment tower",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 45.72,
+      "plot_length_m": 27.43,
+      "plot_area_sqm": 1254.38,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "Modern residential tower",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 12,
+    "floors_below_ground": 0,
+    "explicit_room_list": [],
+    "explicit_dimensions": {
+      "plot_dimensions": "50 ft × 90 ft"
+    },
+    "user_priorities": [
+      "Lift core with fire stair provision",
+      "Stilt parking"
+    ],
+    "raw_brief_summary": "A 12-storey (G+11) residential apartment tower in Pune, Maharashtra, comprising 12 units of 3BHK each (one per habitable floor) on a 50 ft × 90 ft plot with stilt-level parking. The brief explicitly states seismic zone III and wind zone 2; structural design includes lift core and fire stair.",
+    "extraction_warnings": [
+      "Stilt parking basement details not specified (depth, area, structural layout assumed TBD).",
+      "Individual unit carpet/built-up areas not stated; downstream stages will infer from 3BHK typology.",
+      "Setbacks, max height, FSI/FAR, and site orientation not specified.",
+      "Facade treatment not specified; modern tower assumed from context.",
+      "Foundation type not stated; will require soil investigation."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 546,
+    "output_tokens": 764,
+    "cache_read_tokens": 7294,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005095,
+    "latency_ms": 7117.460750043392,
+    "created_at_iso": "2026-05-11T17:36:47.852551+00:00"
+  }
+}

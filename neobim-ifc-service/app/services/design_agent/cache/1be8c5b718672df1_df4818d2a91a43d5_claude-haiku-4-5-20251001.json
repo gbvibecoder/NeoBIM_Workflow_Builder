@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "Brief explicitly requests a G+5 (6-storey) residential apartment tower with stilt parking on a Pune plot. Each floor contains one 2BHK unit with living-dining, kitchen, two bedrooms, two bathrooms, and balcony. This matches the build_2bhk_pune_tower template precisely: multi-storey 2BHK flats with stilt parking, RCC frame, lift + stair core. Plot dimensions (10.97 × 21.34 m) fall comfortably within the tower candidate's typical range.",
+    "template_id": "build_2bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 10.97,
+      "plot_length_m": 21.34,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 5,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": true
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 778,
+    "output_tokens": 348,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.0032,
+    "latency_ms": 3572.0492920372635,
+    "created_at_iso": "2026-05-11T17:36:17.646267+00:00"
+  }
+}

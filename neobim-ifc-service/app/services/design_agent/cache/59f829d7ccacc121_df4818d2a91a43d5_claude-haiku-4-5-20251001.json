@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "Brief explicitly requests a G+11 (12-storey) 3BHK apartment tower in Pune with stilt parking and lift + fire stair. The \"12 storey\" phrasing maps to 11 habitable floors (above the stilt level). Plot dimensions 50 ft × 90 ft convert to 15.24 × 27.43 m, which fits the 3BHK tower's typical range. Seismic zone III and wind zone 2 are provided and match the baseline.",
+    "template_id": "build_3bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 15.24,
+      "plot_length_m": 27.43,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 11,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 718,
+    "output_tokens": 341,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003105,
+    "latency_ms": 3887.547458987683,
+    "created_at_iso": "2026-05-11T17:36:51.748135+00:00"
+  }
+}

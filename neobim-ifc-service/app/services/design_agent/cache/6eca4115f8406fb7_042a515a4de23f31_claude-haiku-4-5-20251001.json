@@ -1,0 +1,72 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "duplex",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Two-family residential duplex",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 9.144,
+      "plot_length_m": 15.24,
+      "plot_area_sqm": 139.35,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 2,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Living-dining",
+      "Kitchen",
+      "Parking",
+      "Master bedroom with attached bath",
+      "Second bedroom",
+      "Common bath"
+    ],
+    "explicit_dimensions": {
+      "plot": "30 ft × 50 ft"
+    },
+    "user_priorities": [],
+    "raw_brief_summary": "2BHK duplex residential in Pune on a 30 ft × 50 ft plot with G+1 (2 storeys). Ground floor comprises living-dining, kitchen, and parking. First floor has master bedroom with attached bath, second bedroom, and common bath.",
+    "extraction_warnings": [
+      "Seismic zone not stated; leave null for post-LLM lookup against Pune location.",
+      "Wind zone not stated; leave null for post-LLM lookup against Pune location.",
+      "No maximum height, FSI/FAR, setbacks, or site orientation specified.",
+      "No architectural style, facade treatment, or cultural (e.g., Vastu) preference stated; defaulted to contemporary residential.",
+      "No explicit material preferences, structural system constraints, or foundation hints provided."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 539,
+    "output_tokens": 767,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7317,
+    "cost_usd_estimated": 0.01352,
+    "latency_ms": 7054.046042030677,
+    "created_at_iso": "2026-05-11T11:39:36.252562+00:00"
+  }
+}

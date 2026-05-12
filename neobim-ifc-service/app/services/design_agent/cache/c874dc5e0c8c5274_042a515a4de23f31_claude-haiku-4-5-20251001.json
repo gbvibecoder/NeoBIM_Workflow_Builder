@@ -1,0 +1,86 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "3BHK apartment tower",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential apartment building",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 12.19,
+      "plot_length_m": 24.38,
+      "plot_area_sqm": 297.26,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential tower",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 6,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Living-Dining",
+      "Kitchen",
+      "Master Bedroom",
+      "Master Bath",
+      "Bedroom 2",
+      "Bedroom 3",
+      "Common Bath",
+      "Balcony",
+      "Stilt Parking",
+      "Lift Core"
+    ],
+    "explicit_dimensions": {
+      "plot": "40 ft × 80 ft",
+      "plot_length_m": "24.38 m",
+      "plot_width_m": "12.19 m"
+    },
+    "user_priorities": [
+      "3BHK per floor",
+      "stilt parking integration",
+      "lift core provision"
+    ],
+    "raw_brief_summary": "A 6-storey (stilt + 5 habitable) residential apartment tower in Pune on a 40 ft × 80 ft plot (297.26 sqm). Stilt level accommodates parking and lift core; each of the 5 habitable floors contains one 3BHK unit with living-dining, kitchen, master bedroom with bath, two additional bedrooms, common bathroom, and balcony.",
+    "extraction_warnings": [
+      "Seismic zone not explicitly stated; post-lookup against Pune city data will populate.",
+      "Wind zone not explicitly stated; post-lookup against Pune city data will populate.",
+      "FSI/FAR not specified in brief.",
+      "Maximum height constraint not specified.",
+      "Setback requirements not stated.",
+      "Carpet vs. built-up area distinction not provided; room dimensions not quantified.",
+      "Site orientation not specified.",
+      "Facade treatment not specified.",
+      "Foundation type not stated."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 561,
+    "output_tokens": 852,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7294,
+    "cost_usd_estimated": 0.013938,
+    "latency_ms": 8541.382958879694,
+    "created_at_iso": "2026-05-11T11:40:15.045906+00:00"
+  }
+}

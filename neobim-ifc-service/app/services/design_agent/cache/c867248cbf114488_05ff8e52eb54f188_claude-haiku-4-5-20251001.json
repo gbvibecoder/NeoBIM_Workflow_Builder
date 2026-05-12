@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly specifies north-facing plot orientation and north-facing entry, which matches the template default. No mirror or rotation transformation is needed; the matched template's default layout already satisfies the user's orientation requirement.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4063,
+    "output_tokens": 128,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004703,
+    "latency_ms": 2035.889791091904,
+    "created_at_iso": "2026-05-11T08:01:50.353122+00:00"
+  }
+}

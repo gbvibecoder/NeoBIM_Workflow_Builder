@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Site orientation is unspecified in the brief; no rotation or mirror requested. Template default (north-facing entry) applies directly. User priorities focus on floor count, 3BHK layout, and core services — all orientation-agnostic. NO-OP adapt is appropriate for orientation-silent residential briefs.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4061,
+    "output_tokens": 151,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004816,
+    "latency_ms": 2548.101792111993,
+    "created_at_iso": "2026-05-11T11:40:21.594382+00:00"
+  }
+}

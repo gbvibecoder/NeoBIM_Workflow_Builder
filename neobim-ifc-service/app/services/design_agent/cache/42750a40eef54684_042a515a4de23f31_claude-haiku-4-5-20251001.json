@@ -1,0 +1,80 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "single_storey_duplex_or_villa",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "One- or two-family private dwelling, single-storey villa",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 16.764,
+      "plot_length_m": 9.144,
+      "plot_area_sqm": 153.26,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "living room",
+      "bedroom 1",
+      "bedroom 2",
+      "shared bathroom",
+      "kitchen",
+      "pooja room",
+      "utility room",
+      "staircase"
+    ],
+    "explicit_dimensions": {
+      "plot_width": "55 feet",
+      "plot_depth": "30 feet"
+    },
+    "user_priorities": [
+      "single storey",
+      "2-bedroom layout",
+      "compact design on constrained plot"
+    ],
+    "raw_brief_summary": "Single-storey, 2BHK residential villa in Pune on a 30 ft (depth) × 55 ft (width) plot. The program comprises living room, two bedrooms sharing one bathroom, kitchen, pooja room, utility, and staircase provision. A compact neighbourhood dwelling on approximately 153 sqm (1,650 sqft) plot area.",
+    "extraction_warnings": [
+      "Seismic and wind zones for Pune not specified in brief; will be filled by post-LLM lookup.",
+      "No setbacks, FSI/FAR, or site orientation stated.",
+      "No architectural style detail provided; inferred as contemporary residential.",
+      "Plot dimensions converted from feet to metres (55 ft ≈ 16.764 m, 30 ft ≈ 9.144 m) for consistency; original imperial units retained in explicit_dimensions.",
+      "No maximum height constraint stated.",
+      "Staircase listed but single-storey brief suggests either future expansion provision or internal level split — retained in room list as stated."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 533,
+    "output_tokens": 851,
+    "cache_read_tokens": 7284,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005516,
+    "latency_ms": 8732.233959017321,
+    "created_at_iso": "2026-05-11T17:34:54.514118+00:00"
+  }
+}

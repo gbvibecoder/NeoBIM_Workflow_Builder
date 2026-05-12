@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief explicitly specifies \"duplex residential building\" with \"ground floor\" and \"first floor\" layout, \"master bedroom with attached bath,\" \"pooja room,\" and \"terrace access.\" No extensions are mentioned: no compound wall, entry gate, car porch, servant quarter, or mumty are named. The brief focuses on internal room arrangement and functional requirements within the template, not on boundary or accessory structures.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 880,
+    "output_tokens": 240,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002527,
+    "latency_ms": 3026.827041991055,
+    "created_at_iso": "2026-05-11T17:35:49.278324+00:00"
+  }
+}

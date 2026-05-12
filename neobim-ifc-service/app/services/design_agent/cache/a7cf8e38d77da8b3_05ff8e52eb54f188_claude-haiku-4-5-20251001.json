@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Site orientation is unspecified in the brief. The matched template defaults to north-facing entry, which is appropriate for a standard Pune tower on a 40×80 ft plot without explicit directional constraints. No transform needed.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4081,
+    "output_tokens": 132,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004741,
+    "latency_ms": 1844.625832978636,
+    "created_at_iso": "2026-05-11T17:36:36.794643+00:00"
+  }
+}

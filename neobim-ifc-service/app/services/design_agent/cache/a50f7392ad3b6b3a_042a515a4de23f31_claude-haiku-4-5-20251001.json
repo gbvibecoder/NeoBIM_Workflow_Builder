@@ -1,0 +1,72 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "1BHK single-family house",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "One-family private dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 6.096,
+      "plot_length_m": 12.192,
+      "plot_area_sqm": 74.32,
+      "site_orientation": "N",
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Living room",
+      "Bedroom with attached bath",
+      "Kitchen",
+      "Utility area"
+    ],
+    "explicit_dimensions": {
+      "plot": "20 ft × 40 ft"
+    },
+    "user_priorities": [
+      "North-facing orientation"
+    ],
+    "raw_brief_summary": "Single-storey 1BHK residential house in Pune on a 20 ft × 40 ft north-facing plot. Programme comprises living room, one bedroom with attached bathroom, kitchen, and small utility area. Design-development fidelity requested.",
+    "extraction_warnings": [
+      "Seismic zone to be enriched from Pune city lookup (Zone III expected).",
+      "Wind zone to be enriched from Pune city lookup (Zone 2 expected).",
+      "No maximum height, FSI/FAR, or setback requirements specified.",
+      "No architectural style details beyond orientation; defaulted to 'contemporary residential'.",
+      "No facade treatment specified."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 525,
+    "output_tokens": 714,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7284,
+    "cost_usd_estimated": 0.0132,
+    "latency_ms": 6889.451458118856,
+    "created_at_iso": "2026-05-11T11:38:59.479686+00:00"
+  }
+}

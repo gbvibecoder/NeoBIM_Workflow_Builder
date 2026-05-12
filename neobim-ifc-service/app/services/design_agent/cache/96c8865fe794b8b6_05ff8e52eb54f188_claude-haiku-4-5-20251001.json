@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief explicitly specifies \"north-facing plot\" and \"north-facing orientation\" as user priority. The matched template defaults to north-facing entry (positive Y edge), so no transform is required—this is a no-op adaptation where the template already matches the user's intent.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3993,
+    "output_tokens": 142,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004703,
+    "latency_ms": 2330.312166828662,
+    "created_at_iso": "2026-05-11T11:39:05.428100+00:00"
+  }
+}

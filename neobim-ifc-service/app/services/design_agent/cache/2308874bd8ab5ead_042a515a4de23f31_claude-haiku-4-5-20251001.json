@@ -1,0 +1,74 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "apartment_tower",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential apartment tower",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 45.72,
+      "plot_length_m": 27.43,
+      "plot_area_sqm": 1254.56,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary_residential_tower",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "rcc_frame",
+      "foundation_hint": "raft",
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 12,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Bedroom 1",
+      "Bedroom 2",
+      "Bedroom 3",
+      "Hall/Living Room",
+      "Kitchen"
+    ],
+    "explicit_dimensions": {
+      "plot": "50 ft x 90 ft"
+    },
+    "user_priorities": [
+      "multi-floor residential tower",
+      "efficient lift core",
+      "fire stair provision",
+      "stilt parking"
+    ],
+    "raw_brief_summary": "A 12-storey (G+11) residential apartment tower in Pune, Maharashtra on a 50 ft × 90 ft plot, with stilt-level parking, one 3BHK unit per floor, centralised lift core and fire stair. Located in seismic zone III and wind zone 2.",
+    "extraction_warnings": [
+      "Brief does not specify carpet/built-up/super-built-up area for the units; room-level dimensions not stated.",
+      "Exact setback requirements, FSI/FAR, and facade treatment not specified.",
+      "Foundation type inferred as raft based on high-rise apartment tower typology; not explicitly stated."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 544,
+    "output_tokens": 749,
+    "cache_read_tokens": 7294,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005018,
+    "latency_ms": 7492.637207964435,
+    "created_at_iso": "2026-05-11T11:40:33.575280+00:00"
+  }
+}

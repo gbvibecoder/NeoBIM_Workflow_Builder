@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "The brief explicitly requests a 1BHK single-storey residential bungalow (house form factor) on a north-facing Pune plot. The footprint dimensions of 24 ft × 40 ft convert to 7.32 m × 12.19 m, which aligns perfectly with the build_1bhk_pune_house typical plot range of 5.0 × 9.0 m to 9.0 × 14.0 m. The program (living room, bedroom with attached bath, kitchen, utility, roof access) matches the template's single-storey 1BHK layout exactly.",
+    "template_id": "build_1bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 12.19,
+      "plot_length_m": 7.32,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 733,
+    "output_tokens": 317,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 6816,
+    "cost_usd_estimated": 0.010838,
+    "latency_ms": 3473.9393331110477,
+    "created_at_iso": "2026-05-11T17:34:40.026425+00:00"
+  }
+}

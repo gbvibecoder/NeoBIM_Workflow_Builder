@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "The brief specifies a 3BHK single-storey residential house with no mention of compound wall, entry gate, car porch, servant quarter, or mumty extensions. This is a straightforward program-focused design request without any extension add-ons explicitly named or implied.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 890,
+    "output_tokens": 213,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002402,
+    "latency_ms": 2540.7647502142936,
+    "created_at_iso": "2026-05-11T17:35:33.751137+00:00"
+  }
+}

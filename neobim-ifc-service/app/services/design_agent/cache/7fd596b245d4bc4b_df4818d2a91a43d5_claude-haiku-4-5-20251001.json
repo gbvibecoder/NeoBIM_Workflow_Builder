@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "Brief explicitly specifies 1BHK single-storey house on a 20×40 ft north-facing Pune plot. The programme (living room, 1 bedroom with attached bath, kitchen, utility) matches the build_1bhk_pune_house template exactly. Plot dimensions convert to 6.10 × 12.19 m, well within the typical range (5.0 × 9.0 to 9.0 × 14.0 m) for this template.",
+    "template_id": "build_1bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 6.096,
+      "plot_length_m": 12.192,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 690,
+    "output_tokens": 287,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 6816,
+    "cost_usd_estimated": 0.010645,
+    "latency_ms": 3596.0364169441164,
+    "created_at_iso": "2026-05-11T11:39:03.081592+00:00"
+  }
+}

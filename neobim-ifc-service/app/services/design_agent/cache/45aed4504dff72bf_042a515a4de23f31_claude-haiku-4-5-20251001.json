@@ -1,0 +1,65 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "single-storey house",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "One- or two-family private dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": null,
+      "plot_length_m": null,
+      "plot_area_sqm": null,
+      "site_orientation": null,
+      "location_city": null,
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [],
+    "explicit_dimensions": {
+      "footprint": "465 m²",
+      "total_GFA": "~465 m²"
+    },
+    "user_priorities": [],
+    "raw_brief_summary": "Single-storey residential house with a footprint and gross floor area of approximately 465 m², classified as a one- or two-family private dwelling (NBC A-2). No location, room breakdown, or aesthetic intent was specified; downstream stages will develop the program.",
+    "extraction_warnings": [
+      "Location not specified; seismic and wind zones cannot be determined.",
+      "No explicit room list or individual room dimensions provided.",
+      "No architectural style, cultural overlay, or aesthetic intent stated; defaulted to contemporary residential.",
+      "No structural system preference stated; defaulted to auto selection."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 515,
+    "output_tokens": 669,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7284,
+    "cost_usd_estimated": 0.012965,
+    "latency_ms": 8604.934165952727,
+    "created_at_iso": "2026-05-11T08:21:44.043008+00:00"
+  }
+}

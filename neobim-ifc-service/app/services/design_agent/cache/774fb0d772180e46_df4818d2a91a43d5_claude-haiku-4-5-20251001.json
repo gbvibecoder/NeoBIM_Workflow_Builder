@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "The brief explicitly requests a 2BHK duplex (G+1) on a 30 ft × 50 ft plot in Pune with defined ground and first-floor layouts. The plot dimensions convert to 9.144 m × 15.24 m, which fall squarely within the typical range for the 2BHK duplex template (6.0–10.0 m × 12.0–18.0 m). Seismic zone III and wind zone 3 align with the input context.",
+    "template_id": "build_2bhk_pune_duplex",
+    "parameters": {
+      "plot_width_m": 9.144,
+      "plot_length_m": 15.24,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 3,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 763,
+    "output_tokens": 295,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.00292,
+    "latency_ms": 3073.1285829097033,
+    "created_at_iso": "2026-05-11T17:35:13.339016+00:00"
+  }
+}

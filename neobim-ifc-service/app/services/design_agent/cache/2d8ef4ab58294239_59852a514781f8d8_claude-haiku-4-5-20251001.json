@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "The brief describes a single-storey 3BHK bungalow on a standard Pune residential plot with explicit room list but makes no mention of any Slice 2B.3 extensions (compound wall, entry gate, car porch, servant quarter, or mumty). The brief is focused on internal room specification and floor layout, not perimeter features or roof access. No extension triggers are present.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 859,
+    "output_tokens": 240,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 4473,
+    "cost_usd_estimated": 0.00765,
+    "latency_ms": 3039.227250032127,
+    "created_at_iso": "2026-05-11T12:22:03.944744+00:00"
+  }
+}

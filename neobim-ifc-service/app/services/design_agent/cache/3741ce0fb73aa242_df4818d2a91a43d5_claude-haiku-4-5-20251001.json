@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "The brief explicitly specifies a 3BHK apartment tower with G+5 configuration (stilt + 5 habitable floors) on a 40 ft × 80 ft Pune plot. All key parameters align: 3BHK per floor, stilt parking, lift core, contemporary tower form, and seismic zone III. Plot dimensions (12.19 × 24.38 m) fall squarely within the candidate's typical range (10.0 × 18.0 to 13.0 × 24.0 m).",
+    "template_id": "build_3bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 12.19,
+      "plot_length_m": 24.38,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 5,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": true
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 795,
+    "output_tokens": 350,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003227,
+    "latency_ms": 3993.8165829516947,
+    "created_at_iso": "2026-05-11T11:40:19.044653+00:00"
+  }
+}

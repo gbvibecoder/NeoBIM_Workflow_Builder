@@ -1,0 +1,374 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "r-living-01",
+        "name": "Living Room",
+        "usage": "living",
+        "target_area_sqm": 15.6,
+        "nbc_min_area_sqm": 9.5,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.0,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "public",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-dining-01",
+          "r-lobby-01"
+        ],
+        "adjacency_forbidden": [
+          "r-bath-master-01",
+          "r-bath-common-01"
+        ],
+        "notes": "Vastu: N or E placement preferred. Explicit brief dimension 12×14 ft ≈ 15.6 sqm."
+      },
+      {
+        "id": "r-dining-01",
+        "name": "Dining Room",
+        "usage": "dining",
+        "target_area_sqm": 9.3,
+        "nbc_min_area_sqm": 5.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.0,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "semi_private",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-kitchen-01",
+          "r-living-01"
+        ],
+        "adjacency_forbidden": [
+          "r-bath-master-01",
+          "r-bath-common-01"
+        ],
+        "notes": "Explicit brief dimension 10×10 ft ≈ 9.3 sqm."
+      },
+      {
+        "id": "r-kitchen-01",
+        "name": "Kitchen",
+        "usage": "kitchen",
+        "target_area_sqm": 7.43,
+        "nbc_min_area_sqm": 5.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "semi_private",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-dining-01",
+          "r-utility-01"
+        ],
+        "adjacency_forbidden": [
+          "r-bath-master-01",
+          "r-bath-common-01",
+          "r-powder-01",
+          "r-pooja-01"
+        ],
+        "notes": "Vastu: SE corner placement (Agni direction). Explicit brief dimension 10×8 ft ≈ 7.43 sqm."
+      },
+      {
+        "id": "r-powder-01",
+        "name": "Powder Room",
+        "usage": "powder_room",
+        "target_area_sqm": 2.0,
+        "nbc_min_area_sqm": 1.1,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": false,
+        "natural_ventilation_required": true,
+        "privacy_level": "semi_private",
+        "floor_index": 0,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "r-kitchen-01",
+          "r-dining-01",
+          "r-pooja-01"
+        ],
+        "notes": "Vastu: NW or W placement preferred for toilet/wash. Half-bath assumed; no bath/tub."
+      },
+      {
+        "id": "r-pooja-01",
+        "name": "Pooja Room",
+        "usage": "pooja_room",
+        "target_area_sqm": 2.0,
+        "nbc_min_area_sqm": 1.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.0,
+        "natural_light_required": true,
+        "natural_ventilation_required": false,
+        "privacy_level": "private",
+        "floor_index": 0,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "r-bath-master-01",
+          "r-bath-common-01",
+          "r-powder-01",
+          "r-kitchen-01"
+        ],
+        "notes": "Vastu: NE corner placement (Eshanya direction). Inferred from Vastu brief; no explicit dimensions given."
+      },
+      {
+        "id": "r-lobby-01",
+        "name": "Entrance Lobby",
+        "usage": "lobby",
+        "target_area_sqm": 3.5,
+        "nbc_min_area_sqm": 2.5,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": false,
+        "natural_ventilation_required": false,
+        "privacy_level": "public",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-living-01",
+          "r-stair-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Vastu: Entrance on N or NE face of building (north-facing plot). Acts as transition from exterior to living."
+      },
+      {
+        "id": "r-utility-01",
+        "name": "Utility / Service Area",
+        "usage": "utility",
+        "target_area_sqm": 2.5,
+        "nbc_min_area_sqm": 1.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": false,
+        "natural_ventilation_required": true,
+        "privacy_level": "private",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-kitchen-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Inferred from 2BHK template; accommodates washing machine, service sink. Adjacent to kitchen for plumbing efficiency."
+      },
+      {
+        "id": "r-stair-01",
+        "name": "Staircase & Landing",
+        "usage": "stairs_landing",
+        "target_area_sqm": 5.5,
+        "nbc_min_area_sqm": 1.2,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": false,
+        "natural_ventilation_required": false,
+        "privacy_level": "semi_private",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-lobby-01",
+          "r-corridor-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Vastu: Staircase in SW or S zone. Covers both floors (ground run + first floor landing). Sized for 1.0 m clear residential stair width."
+      },
+      {
+        "id": "r-balcony-gf-01",
+        "name": "Ground Floor Balcony / Sit-out",
+        "usage": "balcony",
+        "target_area_sqm": 3.5,
+        "nbc_min_area_sqm": 1.4,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "semi_private",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-living-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Front sit-out / entrance balcony on north-facing facade. Vastu: E or N face."
+      },
+      {
+        "id": "r-master-bed-01",
+        "name": "Master Bedroom",
+        "usage": "master_bedroom",
+        "target_area_sqm": 13.35,
+        "nbc_min_area_sqm": 9.5,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.0,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "private",
+        "floor_index": 1,
+        "adjacency_required": [
+          "r-bath-master-01"
+        ],
+        "adjacency_forbidden": [
+          "r-bath-common-01"
+        ],
+        "notes": "Vastu: SW placement on upper floor. Explicit brief dimension 12×12 ft ≈ 13.35 sqm."
+      },
+      {
+        "id": "r-bath-master-01",
+        "name": "Master Bathroom (En-suite)",
+        "usage": "bathroom",
+        "target_area_sqm": 3.5,
+        "nbc_min_area_sqm": 1.8,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": false,
+        "natural_ventilation_required": true,
+        "privacy_level": "private",
+        "floor_index": 1,
+        "adjacency_required": [
+          "r-master-bed-01"
+        ],
+        "adjacency_forbidden": [
+          "r-kitchen-01",
+          "r-pooja-01"
+        ],
+        "notes": "Vastu: NW or W zone. Inferred as attached en-suite per brief note ('master bedroom with attached bathroom')."
+      },
+      {
+        "id": "r-bed2-01",
+        "name": "Second Bedroom",
+        "usage": "bedroom",
+        "target_area_sqm": 11.15,
+        "nbc_min_area_sqm": 7.5,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.0,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "private",
+        "floor_index": 1,
+        "adjacency_required": [
+          "r-bath-common-01"
+        ],
+        "adjacency_forbidden": [
+          "r-bath-master-01"
+        ],
+        "notes": "Explicit brief dimension 10×12 ft ≈ 11.15 sqm."
+      },
+      {
+        "id": "r-bath-common-01",
+        "name": "Common Bathroom",
+        "usage": "bathroom",
+        "target_area_sqm": 3.0,
+        "nbc_min_area_sqm": 1.8,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": false,
+        "natural_ventilation_required": true,
+        "privacy_level": "semi_private",
+        "floor_index": 1,
+        "adjacency_required": [
+          "r-bed2-01"
+        ],
+        "adjacency_forbidden": [
+          "r-kitchen-01",
+          "r-pooja-01"
+        ],
+        "notes": "Vastu: NW or W placement on first floor. Shared between second bedroom and corridor access."
+      },
+      {
+        "id": "r-corridor-01",
+        "name": "First Floor Corridor",
+        "usage": "corridor",
+        "target_area_sqm": 4.0,
+        "nbc_min_area_sqm": 1.5,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": false,
+        "natural_ventilation_required": false,
+        "privacy_level": "semi_private",
+        "floor_index": 1,
+        "adjacency_required": [
+          "r-stair-01",
+          "r-master-bed-01",
+          "r-bed2-01",
+          "r-bath-common-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Distributes circulation on first floor to both bedrooms. Min clear width 1.2 m per NBC residential."
+      },
+      {
+        "id": "r-balcony-ff-01",
+        "name": "First Floor Balcony",
+        "usage": "balcony",
+        "target_area_sqm": 4.5,
+        "nbc_min_area_sqm": 1.4,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "semi_private",
+        "floor_index": 1,
+        "adjacency_required": [
+          "r-master-bed-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Vastu: E or N face preferred. Opens from master bedroom or corridor. Explicit brief mentions balcony on first floor."
+      }
+    ],
+    "rooms_per_floor": {
+      "0": [
+        "r-living-01",
+        "r-dining-01",
+        "r-kitchen-01",
+        "r-powder-01",
+        "r-pooja-01",
+        "r-lobby-01",
+        "r-utility-01",
+        "r-stair-01",
+        "r-balcony-gf-01"
+      ],
+      "1": [
+        "r-master-bed-01",
+        "r-bath-master-01",
+        "r-bed2-01",
+        "r-bath-common-01",
+        "r-corridor-01",
+        "r-balcony-ff-01"
+      ]
+    },
+    "circulation": {
+      "corridor_min_width_m": 1.2,
+      "stair_count": 1,
+      "lift_count": 0,
+      "egress_paths_required": 1
+    },
+    "constraints": {
+      "total_carpet_area_sqm_min": 95.28,
+      "total_carpet_area_sqm_max": 142.92,
+      "rera_carpet_built_super_ratio": [
+        1.0,
+        1.15,
+        1.3
+      ],
+      "setbacks_m": {},
+      "max_floors": 2
+    },
+    "summary": "G+1 (ground + first floor) 2BHK duplex on a 24×50 ft north-facing plot in Pune, designed to NBC India 2016 Group A-4 standards with a Vastu overlay. Ground floor carries the public and service zones — entrance lobby, living, dining, kitchen (SE), pooja room (NE), powder room, utility, stair, and a front sit-out balcony; the first floor holds the private suite — master bedroom with en-suite bath (SW), second bedroom, common bathroom, connecting corridor, and a north/east-facing balcony. Total program is 15 rooms across 2 floors, targeting ≈95 sqm carpet area in RCC frame construction with isolated pad footings.",
+    "extraction_warnings": [
+      "Vastu placement applied: kitchen SE, master_bedroom SW, pooja_room NE, bathrooms NW/W, staircase SW/S, entrance lobby N/NE.",
+      "Master bathroom (en-suite) inferred from brief note 'master bedroom with attached bathroom'; it was not separately enumerated in the explicit room list.",
+      "Pooja room inferred from Vastu context in the brief; no explicit dimensions or area provided — sized at 2.0 sqm (NBC min 1.0 sqm).",
+      "Utility/service area inferred per 2BHK template norm; not listed in the explicit room list.",
+      "Entrance lobby inferred for ground floor arrival sequence; not listed in the explicit room list.",
+      "Ground floor balcony/sit-out added to serve north-facing entrance; only 'balcony' on first floor was explicitly mentioned.",
+      "First floor corridor added to distribute circulation between two bedrooms, stair landing, and common bathroom.",
+      "Powder room assumed to be a half-bath (WC + wash basin, no shower/tub) as type was not specified in the brief.",
+      "Total carpet area ~95 sqm against stated built area of 1200 sqft (~111 sqm); residual ~16 sqm accounts for structural walls, MEP shafts, and external projections under RERA carpet-area definition — within expected 1.15 built-up ratio.",
+      "No setbacks_m provided in site context; setbacks left empty — design team to confirm PMRDA / PMC Development Control Rules for this plot.",
+      "Stair landing area (r-stair-01) covers the ground-floor run; first-floor landing circulation is captured within r-corridor-01."
+    ]
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 21,
+    "output_tokens": 4284,
+    "cache_read_tokens": 6084,
+    "cache_creation_tokens": 1292,
+    "cost_usd_estimated": 0.070993,
+    "latency_ms": 46736.01591703482,
+    "created_at_iso": "2026-05-07T12:15:25.967317+00:00"
+  }
+}
