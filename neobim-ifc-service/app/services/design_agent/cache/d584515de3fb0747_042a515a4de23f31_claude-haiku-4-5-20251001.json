@@ -1,0 +1,76 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "apartment",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential tower",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 60.96,
+      "plot_length_m": 30.48,
+      "plot_area_sqm": 1858.06,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 3,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": "pile",
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 24,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "3BHK unit (per floor)",
+      "Lift core (x2)",
+      "Fire stair",
+      "Stilt parking"
+    ],
+    "explicit_dimensions": {
+      "plot": "60 ft × 100 ft (60.96 m × 30.48 m)",
+      "floors": "G+23 (24 floors above ground)"
+    },
+    "user_priorities": [
+      "Multi-unit residential apartment tower",
+      "Efficient circulation via two lift cores and fire stair",
+      "Stilt parking provision"
+    ],
+    "raw_brief_summary": "A 24-storey (G+23) residential apartment tower in Pune on a 60 ft × 100 ft plot (≈1,858 sqm), with each habitable floor housing one 3BHK unit. The building includes two lift cores, a fire stair, and stilt-level parking; design-development fidelity is required, triggering MEP routing analysis.",
+    "extraction_warnings": [
+      "Plot dimensions converted from feet to metres (60 ft = 18.29 m width, 100 ft = 30.48 m length); brief used imperial units.",
+      "Maximum building height not specified; downstream seismic detailing (IS 1893:2016 Zone III, NBC A-4) will govern.",
+      "FSI/FAR not stated; Pune local zoning regulations will determine permissibility.",
+      "Carpet area, built-up area, and super-built-up area for each 3BHK unit not specified.",
+      "No explicit mention of vastu, cultural overlay, facade material, or setback distances.",
+      "Stilt parking configuration (open or enclosed, number of spaces) not detailed in brief."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 535,
+    "output_tokens": 918,
+    "cache_read_tokens": 7294,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005854,
+    "latency_ms": 8987.260665977374,
+    "created_at_iso": "2026-05-11T17:37:07.946662+00:00"
+  }
+}

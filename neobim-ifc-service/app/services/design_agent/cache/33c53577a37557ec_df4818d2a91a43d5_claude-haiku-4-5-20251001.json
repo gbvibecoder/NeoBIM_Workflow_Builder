@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.92,
+    "reasoning": "Brief explicitly specifies a 3BHK single-storey house on a north-facing Pune plot (60 ft width × 36 ft depth = 18.288 × 10.973 m). The program includes three bedrooms, pooja room, utility, and storage — matching the build_3bhk_pune_house template exactly. Plot dimensions (18.288 m × 10.973 m) fall within the template's typical range (10.0–13.0 m × 18.0–24.0 m). Seismic zone III and wind zone 2 are the Pune baseline defaults.",
+    "template_id": "build_3bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 18.288,
+      "plot_length_m": 10.973,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 761,
+    "output_tokens": 317,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003028,
+    "latency_ms": 3275.2752918750048,
+    "created_at_iso": "2026-05-11T17:35:29.208540+00:00"
+  }
+}

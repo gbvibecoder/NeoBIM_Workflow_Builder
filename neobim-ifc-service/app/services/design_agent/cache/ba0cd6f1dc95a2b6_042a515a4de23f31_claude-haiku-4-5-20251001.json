@@ -1,0 +1,73 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "single_storey_house",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "One-family private dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 27.43,
+      "plot_length_m": 18.29,
+      "plot_area_sqm": 501.8,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary_indian_residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Drawing room",
+      "Living-dining",
+      "Kitchen with utility",
+      "Bedroom 1",
+      "Bedroom 2",
+      "Bedroom 3",
+      "Attached bathroom (Master)",
+      "Common bathroom",
+      "Pooja room",
+      "Store"
+    ],
+    "explicit_dimensions": {
+      "plot": "36 ft × 60 ft"
+    },
+    "user_priorities": [
+      "Three-bedroom residential",
+      "Single-storey design"
+    ],
+    "raw_brief_summary": "A single-storey 3BHK residential house in Pune on a 36 ft × 60 ft (≈18.3 m × 27.4 m) plot. The program includes a drawing room, living-dining space, kitchen with utility, three bedrooms (at least one with attached bath), common bathroom, pooja room, and store room. Design-development fidelity with MEP routing required.\",\n  \"extraction_warnings\">[\n  \"Seismic zone (III) and wind zone (3) for Pune populated by post-extraction lookup; not stated in brief.\",\n  \"Building dimensions (width, depth, coverage, FAR/FSI) not specified; to be determined in design development.\",\n  \"Architectural style inferred as contemporary Indian residential; not explicitly stated in brief.\",\n  \"Facade treatment not specified in brief.\"\n]",
+    "extraction_warnings": []
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 534,
+    "output_tokens": 823,
+    "cache_read_tokens": 7284,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005377,
+    "latency_ms": 8394.412457942963,
+    "created_at_iso": "2026-05-11T11:39:54.063830+00:00"
+  }
+}

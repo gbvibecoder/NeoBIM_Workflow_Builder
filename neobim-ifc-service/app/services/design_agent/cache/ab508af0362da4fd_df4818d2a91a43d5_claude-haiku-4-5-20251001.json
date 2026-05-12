@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.93,
+    "reasoning": "Brief explicitly requests a single-storey 3BHK independent house in Pune on a 36×60 ft plot (18.29 × 27.43 m). The program matches the build_3bhk_pune_house template exactly: three bedrooms, pooja room, single-storey ground-only construction, and the plot dimensions fall well within the template's typical range (10.0–13.0 m width, 18.0–24.0 m length). Seismic zone III and wind zone 2 are confirmed via Pune lookup.",
+    "template_id": "build_3bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 18.29,
+      "plot_length_m": 27.43,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 865,
+    "output_tokens": 303,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003062,
+    "latency_ms": 6805.4700419306755,
+    "created_at_iso": "2026-05-11T11:40:00.873508+00:00"
+  }
+}

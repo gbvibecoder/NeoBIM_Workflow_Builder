@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.88,
+    "reasoning": "Brief explicitly requests single-storey 2BHK residential villa in Pune with living room, two bedrooms, shared bathroom, kitchen, pooja room, utility, and staircase provision. Plot dimensions convert cleanly from feet: 30 ft (depth) × 55 ft (width) = 9.144 m × 16.764 m. The build_2bhk_pune_house template matches perfectly: it is single-storey, 2BHK, independent house form factor, includes pooja room, and the converted plot dimensions (9.144 × 16.764 m) fall squarely within the template's typical range (6.0–10.0 m × 12.0–18.0 m).",
+    "template_id": "build_2bhk_pune_house",
+    "parameters": {
+      "plot_width_m": 16.764,
+      "plot_length_m": 9.144,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": null,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 761,
+    "output_tokens": 343,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.003158,
+    "latency_ms": 3473.3868341427296,
+    "created_at_iso": "2026-05-11T17:34:57.993983+00:00"
+  }
+}

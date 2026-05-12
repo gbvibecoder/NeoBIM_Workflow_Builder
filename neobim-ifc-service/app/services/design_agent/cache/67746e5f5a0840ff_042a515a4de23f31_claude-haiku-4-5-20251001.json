@@ -1,0 +1,72 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "1BHK bungalow",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Single-family private dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 18.29,
+      "plot_length_m": 12.19,
+      "plot_area_sqm": 222.88,
+      "site_orientation": "N",
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Living room",
+      "Bedroom",
+      "Attached bathroom",
+      "Kitchen",
+      "Utility area",
+      "Roof access stair"
+    ],
+    "explicit_dimensions": {
+      "plot_depth": "24 feet",
+      "plot_width": "40 feet"
+    },
+    "user_priorities": [
+      "North-facing orientation"
+    ],
+    "raw_brief_summary": "A 1BHK single-storey residential bungalow in Pune on a 24 ft × 40 ft (222.88 sqm) north-facing plot. Program comprises living room, one bedroom with attached bath, kitchen, utility area, and roof access stair; no dimensions given for individual rooms. Location placed in seismic Zone III per IS 1893 lookup.",
+    "extraction_warnings": [
+      "No individual room dimensions provided beyond plot boundary.",
+      "Wind zone inferred from post-lookup; submitted as null per honesty rule."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 536,
+    "output_tokens": 712,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7284,
+    "cost_usd_estimated": 0.013201,
+    "latency_ms": 7006.915000034496,
+    "created_at_iso": "2026-05-11T17:34:36.543748+00:00"
+  }
+}

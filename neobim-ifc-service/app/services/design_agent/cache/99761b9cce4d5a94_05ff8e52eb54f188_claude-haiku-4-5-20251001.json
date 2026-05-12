@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief specifies no explicit orientation or chirality request — only \"compact efficient layout\" for a young couple in Pune. The matched template defaults to north-facing entry, which is a standard, buildable orientation for residential towers. No mirror or rotation needed.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 3978,
+    "output_tokens": 137,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004663,
+    "latency_ms": 2297.473416198045,
+    "created_at_iso": "2026-05-11T11:40:59.017606+00:00"
+  }
+}

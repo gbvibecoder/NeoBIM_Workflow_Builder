@@ -1,0 +1,80 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "single_storey_3bhk_house",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Single-family residential dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 27.432,
+      "plot_length_m": 18.288,
+      "plot_area_sqm": 501.7,
+      "site_orientation": "N",
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary_residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "drawing_room",
+      "living_dining",
+      "kitchen",
+      "utility",
+      "bedroom_1",
+      "bedroom_2",
+      "bedroom_3",
+      "attached_bath",
+      "common_bath",
+      "pooja_room",
+      "store",
+      "staircase"
+    ],
+    "explicit_dimensions": {
+      "plot_depth": "36 ft",
+      "plot_width": "60 ft",
+      "plot_area": "2160 sqft"
+    },
+    "user_priorities": [
+      "north_facing_orientation",
+      "three_bedrooms",
+      "attached_bathroom"
+    ],
+    "raw_brief_summary": "3BHK single-storey residential house in Pune on a 36 ft (depth) × 60 ft (width) north-facing plot. Program includes drawing room, living-dining, kitchen with utility, three bedrooms (one with attached bath), common bath, pooja room, store, and staircase.",
+    "extraction_warnings": [
+      "Seismic zone not explicitly stated; will be determined via city lookup (Pune typically Zone III). Wind zone not explicitly stated; will be determined via city lookup (Pune typically Zone 2). Building height not specified. FSI/FAR constraint not provided. Setback requirements not specified. Architectural style inferred as contemporary residential; brief contained no explicit aesthetic intent beyond functional program. Massing inferred as rectangular based on orthogonal plot dimensions."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 547,
+    "output_tokens": 820,
+    "cache_read_tokens": 7284,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005375,
+    "latency_ms": 7373.898916179314,
+    "created_at_iso": "2026-05-11T17:35:25.929823+00:00"
+  }
+}

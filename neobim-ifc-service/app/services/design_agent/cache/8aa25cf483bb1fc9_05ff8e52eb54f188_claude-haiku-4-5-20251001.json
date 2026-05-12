@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief does not specify plot orientation or entry direction; site_orientation is unspecified. Template defaults to north-facing entry. No rotation or mirror requested. This is a standard baseline adaptation where the matched template's default orientation is appropriate.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4157,
+    "output_tokens": 132,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004817,
+    "latency_ms": 1976.6841251403093,
+    "created_at_iso": "2026-05-11T11:40:02.855340+00:00"
+  }
+}

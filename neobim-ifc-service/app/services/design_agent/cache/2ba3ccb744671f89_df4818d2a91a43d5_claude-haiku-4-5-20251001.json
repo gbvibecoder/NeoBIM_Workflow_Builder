@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.95,
+    "reasoning": "The brief explicitly specifies a 1BHK apartment tower (G+5) in Pune on a 30×60 ft plot with stilt parking and five habitable floors. This maps directly to the build_1bhk_pune_tower template with habitable_floor_count=5. The converted plot dimensions (9.144 × 18.288 m) fit within the template's typical range, and all structural requirements (lift core, fire stair, stilt parking) are standard in the tower builder.",
+    "template_id": "build_1bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 9.144,
+      "plot_length_m": 18.288,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": 5,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 768,
+    "output_tokens": 336,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.00313,
+    "latency_ms": 3289.630791870877,
+    "created_at_iso": "2026-05-11T17:35:59.733657+00:00"
+  }
+}

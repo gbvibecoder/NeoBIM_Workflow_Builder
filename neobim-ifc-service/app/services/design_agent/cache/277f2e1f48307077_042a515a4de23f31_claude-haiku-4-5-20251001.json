@@ -1,0 +1,62 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "single_storey_house",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Single-family dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": null,
+      "plot_length_m": null,
+      "plot_area_sqm": 2500.0,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 3,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "Contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [],
+    "explicit_dimensions": {
+      "footprint": "2500 m²",
+      "total_gfa": "2500 m²"
+    },
+    "user_priorities": [],
+    "raw_brief_summary": "Single-storey residential house with a 2500 m² footprint and total gross floor area of approximately 2500 m² located in Pune. The brief specifies one level above ground with no basement, target fidelity is design-development phase.",
+    "extraction_warnings": [
+      "No specific room layout or dimensions provided; downstream stages will infer the residential program. No architectural style preference stated; defaulted to contemporary. No setbacks, FSI/FAR, plot dimensions (length/width), or site orientation specified."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 521,
+    "output_tokens": 659,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7284,
+    "cost_usd_estimated": 0.012921,
+    "latency_ms": 7968.278916087002,
+    "created_at_iso": "2026-05-11T08:52:09.077609+00:00"
+  }
+}

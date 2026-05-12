@@ -1,0 +1,80 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "apartment_tower",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential apartment",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 10.97,
+      "plot_length_m": 21.34,
+      "plot_area_sqm": 234.1,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": "pile",
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 6,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Living-dining",
+      "Kitchen",
+      "Master bedroom",
+      "Bedroom",
+      "Bathroom",
+      "Bathroom",
+      "Balcony",
+      "Lift core",
+      "Fire stair",
+      "Stilt parking"
+    ],
+    "explicit_dimensions": {
+      "plot": "36 ft × 70 ft",
+      "plot_metric": "10.97 m × 21.34 m"
+    },
+    "user_priorities": [
+      "Multi-floor apartment tower with stilt parking",
+      "Unified 2BHK unit per floor",
+      "Lift and fire stair core"
+    ],
+    "raw_brief_summary": "Six-storey (G+5) residential apartment tower on a 36 ft × 70 ft Pune plot with stilt parking. Each of the five upper floors (and presumed ground floor) contains one 2BHK unit with living-dining, kitchen, two bedrooms, two bathrooms, and balcony. Lift core and fire staircase serve all floors.",
+    "extraction_warnings": [
+      "Foundation hint inferred as pile due to stilt parking requirement; brief did not explicitly state foundation type.",
+      "Architectural style and facade treatment not specified in brief; set to 'contemporary residential' as default.",
+      "Site orientation, maximum height, FSI/FAR, and setbacks not specified in brief.",
+      "Per-unit floor area (carpet / built-up) not stated; downstream ProgramArchitect will infer 2BHK standard areas."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 552,
+    "output_tokens": 873,
+    "cache_read_tokens": 7294,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005646,
+    "latency_ms": 8662.392291938886,
+    "created_at_iso": "2026-05-11T17:36:14.067130+00:00"
+  }
+}

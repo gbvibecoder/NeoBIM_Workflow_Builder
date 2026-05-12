@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief specifies a multi-storey 3BHK apartment tower in Pune with no explicit site orientation or chirality request. Template default (north-facing entry) is appropriate; no mirror or rotation needed.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4116,
+    "output_tokens": 129,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004761,
+    "latency_ms": 2025.0777089968324,
+    "created_at_iso": "2026-05-11T17:37:14.898466+00:00"
+  }
+}

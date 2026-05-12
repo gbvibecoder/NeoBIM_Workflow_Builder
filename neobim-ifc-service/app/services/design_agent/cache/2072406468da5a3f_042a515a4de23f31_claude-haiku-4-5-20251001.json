@@ -1,0 +1,75 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "bungalow",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Single-family residential dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 10.97,
+      "plot_length_m": 18.29,
+      "plot_area_sqm": null,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary Indian residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Living room",
+      "Dining room",
+      "Kitchen",
+      "Bedroom 1 (with attached bathroom)",
+      "Bedroom 2",
+      "Bedroom 3",
+      "Common bathroom",
+      "Pooja room"
+    ],
+    "explicit_dimensions": {
+      "plot": "36 ft × 60 ft"
+    },
+    "user_priorities": [],
+    "raw_brief_summary": "A single-storey, 3-bedroom residential bungalow on a 36 ft × 60 ft plot in Pune, with living room, dining, kitchen, three bedrooms (one with attached bath), common bathroom, and pooja room. Target fidelity is design-development.",
+    "extraction_warnings": [
+      "Plot area (sqm) not calculated from dimensions — left null for downstream enrichment.",
+      "Individual room dimensions not specified in brief.",
+      "Max building height not stated.",
+      "Site orientation, setbacks, and FSI/FAR not mentioned.",
+      "Architectural style inferred as generic Indian residential; no explicit style guidance provided.",
+      "No explicit user priorities mentioned; list left empty."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 528,
+    "output_tokens": 738,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7284,
+    "cost_usd_estimated": 0.013323,
+    "latency_ms": 8289.667542092502,
+    "created_at_iso": "2026-05-11T12:21:55.356097+00:00"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "The brief specifies a basic single-storey 2BHK bungalow with core rooms (living, 2 bedrooms, kitchen, wash, toilet, staircase) on a 24×50 ft Pune plot. No extensions—compound wall, entry gate, car porch, servant quarter, or mumty—are mentioned or implied. This is a straightforward, minimal residential brief with no add-on features requested.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 891,
+    "output_tokens": 248,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002578,
+    "latency_ms": 2655.432292027399,
+    "created_at_iso": "2026-05-11T11:39:28.760009+00:00"
+  }
+}

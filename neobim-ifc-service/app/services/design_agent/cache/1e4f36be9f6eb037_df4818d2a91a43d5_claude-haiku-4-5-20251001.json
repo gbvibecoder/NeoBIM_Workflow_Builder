@@ -1,0 +1,22 @@
+{
+  "response": {
+    "decision": "refuse",
+    "confidence": 0.15,
+    "reasoning": "Brief specifies a single-storey residential house in Pune (correct city and form factor), but the footprint of 2499 m² is extraordinarily large — roughly 50–100× the typical area of any candidate template (1BHK house ~50 m², 3BHK house ~150 m²). This scale implies either a large multi-dwelling compound, an institutional campus, or a data-entry error. No candidate template covers residential properties of this magnitude.",
+    "template_id": null,
+    "parameters": null,
+    "refusal_reason": "Brief specifies a single-storey house with 2499 m² footprint. This is far outside the scope of the nine residential templates (max 3BHK house ~180–200 m² GFA). The scale suggests either a complex multi-unit compound, a commercial/institutional property misclassified, or a measurement error. Cannot classify confidently.",
+    "best_template_attempted": "build_3bhk_pune_house",
+    "suggested_action": "ask_user_clarification"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 663,
+    "output_tokens": 321,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 6816,
+    "cost_usd_estimated": 0.010788,
+    "latency_ms": 3876.4763330109417,
+    "created_at_iso": "2026-05-11T10:52:59.579714+00:00"
+  }
+}

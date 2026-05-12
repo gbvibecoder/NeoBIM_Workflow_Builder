@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "This is a tower (G+11 apartment); tower-compatible extension in v1 is mumty only. Brief does not mention terrace access, roof garden, habitable terrace, or any roof-usage intent. All five booleans set False (no-op extensions); mumty not implied without explicit roof-access or rooftop-usage language.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 903,
+    "output_tokens": 269,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002695,
+    "latency_ms": 3395.26033308357,
+    "created_at_iso": "2026-05-11T11:40:43.203327+00:00"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "duplex",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Two-family residential duplex",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 9.144,
+      "plot_length_m": 15.24,
+      "plot_area_sqm": 139.35,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 3,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "residential duplex",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 2,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "living-dining",
+      "kitchen",
+      "parking",
+      "half bath",
+      "master bedroom with bath",
+      "second bedroom",
+      "common bath",
+      "balcony"
+    ],
+    "explicit_dimensions": {
+      "plot": "30 ft × 50 ft"
+    },
+    "user_priorities": [],
+    "raw_brief_summary": "A 2BHK duplex residential building on a 30 ft × 50 ft (15.24 m × 9.144 m) plot in Pune, with G+1 structure (2 storeys total). Ground floor contains living-dining, kitchen, parking, and half bath; first floor comprises master bedroom with ensuite bath, second bedroom, common bath, and balcony. Seismic and wind design required per IS 1893 and IS 875 for Pune Zone III, Zone 3 wind.",
+    "extraction_warnings": []
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 544,
+    "output_tokens": 704,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7317,
+    "cost_usd_estimated": 0.01321,
+    "latency_ms": 7357.011875137687,
+    "created_at_iso": "2026-05-11T17:35:10.263638+00:00"
+  }
+}

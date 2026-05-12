@@ -1,0 +1,208 @@
+{
+  "response": {
+    "rooms": [
+      {
+        "id": "r-warehouse-01",
+        "name": "Main Warehouse Floor",
+        "usage": "warehouse_floor",
+        "target_area_sqm": 130.0,
+        "nbc_min_area_sqm": 50.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "semi_private",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-loading-bay-01",
+          "r-loading-bay-02",
+          "r-store-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Primary bulk storage area; clear height 8 m per brief; steel-frame portal structure; approximately 70% of total building footprint."
+      },
+      {
+        "id": "r-loading-bay-01",
+        "name": "Loading Bay 1",
+        "usage": "loading_bay",
+        "target_area_sqm": 18.0,
+        "nbc_min_area_sqm": 12.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": false,
+        "natural_ventilation_required": true,
+        "privacy_level": "public",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-warehouse-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Dock-level loading bay; direct access to warehouse floor and exterior apron; sized for standard truck bay (3.5 m x 5 m clear)."
+      },
+      {
+        "id": "r-loading-bay-02",
+        "name": "Loading Bay 2",
+        "usage": "loading_bay",
+        "target_area_sqm": 18.0,
+        "nbc_min_area_sqm": 12.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": false,
+        "natural_ventilation_required": true,
+        "privacy_level": "public",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-warehouse-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Second dock-level loading bay; paired with Loading Bay 1 on the same operational wall; 2 loading bays explicitly required by brief."
+      },
+      {
+        "id": "r-office-01",
+        "name": "Manager's Office",
+        "usage": "office",
+        "target_area_sqm": 12.0,
+        "nbc_min_area_sqm": 5.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": true,
+        "natural_ventilation_required": true,
+        "privacy_level": "semi_private",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-lobby-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Inferred per Warehouse NBC Group H template; located near entry lobby for visitor management; partitioned with glazed screen."
+      },
+      {
+        "id": "r-lobby-01",
+        "name": "Entry Lobby / Reception",
+        "usage": "lobby",
+        "target_area_sqm": 8.0,
+        "nbc_min_area_sqm": 2.5,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": false,
+        "natural_ventilation_required": false,
+        "privacy_level": "public",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-office-01",
+          "Outside"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Inferred per standard warehouse program; serves as visitor/staff entry point and security post."
+      },
+      {
+        "id": "r-store-01",
+        "name": "Store / Ancillary Storage",
+        "usage": "store",
+        "target_area_sqm": 6.0,
+        "nbc_min_area_sqm": 1.0,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 3.0,
+        "natural_light_required": false,
+        "natural_ventilation_required": false,
+        "privacy_level": "private",
+        "floor_index": 0,
+        "adjacency_required": [
+          "r-warehouse-01"
+        ],
+        "adjacency_forbidden": [],
+        "notes": "Inferred; used for packaging materials, consumables, and warehouse stationery; enclosed within warehouse block."
+      },
+      {
+        "id": "r-bathroom-01",
+        "name": "Toilet / WC (Male)",
+        "usage": "bathroom",
+        "target_area_sqm": 4.0,
+        "nbc_min_area_sqm": 1.8,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": false,
+        "natural_ventilation_required": true,
+        "privacy_level": "private",
+        "floor_index": 0,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "r-warehouse-01",
+          "r-office-01"
+        ],
+        "notes": "Inferred; NBC mandates separate sanitary facilities for warehouse/industrial occupancies; male WC block near office wing."
+      },
+      {
+        "id": "r-bathroom-02",
+        "name": "Toilet / WC (Female)",
+        "usage": "bathroom",
+        "target_area_sqm": 4.0,
+        "nbc_min_area_sqm": 1.8,
+        "aspect_ratio_min": 1.0,
+        "aspect_ratio_max": 2.5,
+        "natural_light_required": false,
+        "natural_ventilation_required": true,
+        "privacy_level": "private",
+        "floor_index": 0,
+        "adjacency_required": [],
+        "adjacency_forbidden": [
+          "r-warehouse-01",
+          "r-office-01"
+        ],
+        "notes": "Inferred; NBC mandates separate male/female sanitary facilities for warehouse/industrial occupancies."
+      }
+    ],
+    "rooms_per_floor": {
+      "0": [
+        "r-warehouse-01",
+        "r-loading-bay-01",
+        "r-loading-bay-02",
+        "r-office-01",
+        "r-lobby-01",
+        "r-store-01",
+        "r-bathroom-01",
+        "r-bathroom-02"
+      ]
+    },
+    "circulation": {
+      "corridor_min_width_m": 1.5,
+      "stair_count": 1,
+      "lift_count": 0,
+      "egress_paths_required": 2
+    },
+    "constraints": {
+      "total_carpet_area_sqm_min": 200.0,
+      "total_carpet_area_sqm_max": 300.0,
+      "rera_carpet_built_super_ratio": [
+        1.0,
+        1.15,
+        1.3
+      ],
+      "setbacks_m": {},
+      "max_floors": 1
+    },
+    "summary": "Single-storey steel-frame warehouse in Aurangabad MIDC, total carpet area approximately 200 sqm (brief states ~186 sqm / 2000 sqft), with 8 m clear storage height and 2 truck loading bays. The program comprises the main warehouse floor (130 sqm), two loading bays, a manager's office, entry lobby, ancillary store, and male/female WC blocks — all on floor index 0. Structure is a portal steel frame designed for Seismic Zone III and Wind Zone 2.",
+    "extraction_warnings": [
+      "Total building area stated as 2000 sqft (~186 sqm); program allocates 200 sqm carpet to respect NBC minimums and accommodate ancillary rooms not enumerated in brief — slight upsize flagged.",
+      "Explicit room list was empty in brief; all rooms except 2 loading bays are inferred from NBC Group H Warehouse template.",
+      "Plot dimensions, FSI/FAR, and setbacks not specified in brief; setbacks_m left empty — LayoutArchitect must obtain from MIDC Aurangabad development regulations.",
+      "Occupancy load persons not stated; NBC Group H low-occupancy assumed; 2 egress paths retained as per non-residential egress rule.",
+      "Foundation system not stated in brief; steel-frame portal with isolated column bases recommended for MIDC industrial plots — structural engineer to confirm from soil report.",
+      "Seismic Zone III and Wind Zone 2 (Aurangabad lookup) applied to structural intent; design loads to be confirmed by structural consultant.",
+      "Manager's office (12 sqm) and entry lobby (8 sqm) inferred from standard warehouse program; not explicitly mentioned in brief.",
+      "Separate male and female WC blocks inferred per NBC Part 4 mandatory sanitary provisions for industrial/warehouse occupancies.",
+      "Ancillary store (6 sqm) inferred for packaging materials storage; not stated in brief."
+    ]
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "input_tokens": 1177,
+    "output_tokens": 2377,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 5891,
+    "cost_usd_estimated": 0.061277,
+    "latency_ms": 35203.19762500003,
+    "created_at_iso": "2026-05-07T12:13:38.783295+00:00"
+  }
+}

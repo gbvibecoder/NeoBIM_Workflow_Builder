@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "The brief explicitly defines a 2BHK duplex with ground and first-floor layouts including living, kitchen, parking, and bedrooms—no extensions (compound wall, entry gate, car porch, servant quarter, or mumty) are mentioned or implied. This is a minimal, specification-focused brief with no request for boundary security, covered parking, domestic help accommodation, or roof-access structures.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 889,
+    "output_tokens": 237,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002521,
+    "latency_ms": 2882.676291046664,
+    "created_at_iso": "2026-05-11T17:35:18.265946+00:00"
+  }
+}

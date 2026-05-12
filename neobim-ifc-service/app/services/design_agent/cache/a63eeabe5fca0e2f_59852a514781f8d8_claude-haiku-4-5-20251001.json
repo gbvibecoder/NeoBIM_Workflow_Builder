@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief is a minimal 1BHK single-storey bungalow with no extension mentions. User priorities focus on north-facing orientation only. No compound wall, gate, car porch, servant quarter, or mumty referenced in the explicit room list or priorities. This is a straightforward, compact residential unit with no add-on features requested.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 875,
+    "output_tokens": 227,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 4473,
+    "cost_usd_estimated": 0.007601,
+    "latency_ms": 2970.7009161356837,
+    "created_at_iso": "2026-05-11T17:34:45.592326+00:00"
+  }
+}

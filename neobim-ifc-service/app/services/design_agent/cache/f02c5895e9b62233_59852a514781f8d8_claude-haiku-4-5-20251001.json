@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "This is a G+11 (12-storey) residential apartment tower with stilt-level parking and lift + fire stair provision. Tower templates in v1 support mumty (roof-access enclosure) as the only extension. The brief makes no mention of mumty, terrace garden, rooftop usage, or habitable terrace, so mumty is not triggered. Other extensions (compound wall, entry gate, car porch, servant quarter) are plot-level or unit-level add-ons not applicable to tower units. This is a no-op extension plan (all five booleans False).",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 838,
+    "output_tokens": 286,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002715,
+    "latency_ms": 3473.882291931659,
+    "created_at_iso": "2026-05-11T17:36:57.380740+00:00"
+  }
+}

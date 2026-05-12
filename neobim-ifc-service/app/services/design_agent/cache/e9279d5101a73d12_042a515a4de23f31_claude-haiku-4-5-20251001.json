@@ -1,0 +1,81 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "duplex",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "Two-family residential duplex",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 9.144,
+      "plot_length_m": 18.288,
+      "plot_area_sqm": 167.32,
+      "site_orientation": "N",
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 2,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "living-dining",
+      "kitchen",
+      "bedroom with attached bath (ground floor)",
+      "parking (ground floor)",
+      "master bedroom with attached bath (first floor)",
+      "bedroom (first floor)",
+      "bedroom (first floor)",
+      "common bathroom (first floor)",
+      "balcony (first floor)"
+    ],
+    "explicit_dimensions": {
+      "plot": "30 ft × 60 ft"
+    },
+    "user_priorities": [
+      "North-facing orientation",
+      "Central staircase",
+      "3 bedrooms with attached master bath"
+    ],
+    "raw_brief_summary": "A two-storey (G+1) residential duplex on a 30×60 ft north-facing plot in Pune, housing 3 bedrooms with a central staircase. Ground floor contains living-dining, kitchen, one bedroom with ensuite and parking; first floor has a master suite, two additional bedrooms, common bath, and balcony.",
+    "extraction_warnings": [
+      "Seismic zone not stated; will be enriched from Pune city lookup (Zone III).",
+      "Wind zone not stated; will be enriched from Pune city lookup (Zone 2).",
+      "Maximum building height not specified.",
+      "Setbacks and FSI/FAR not specified.",
+      "No explicit room dimensions provided (only plot dimensions given).",
+      "Facade treatment not specified.",
+      "Foundation type not specified."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 552,
+    "output_tokens": 844,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7320,
+    "cost_usd_estimated": 0.013922,
+    "latency_ms": 7838.0394170526415,
+    "created_at_iso": "2026-05-11T08:01:44.741749+00:00"
+  }
+}

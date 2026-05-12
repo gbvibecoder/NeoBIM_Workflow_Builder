@@ -1,0 +1,32 @@
+{
+  "response": {
+    "decision": "match",
+    "confidence": 0.72,
+    "reasoning": "Brief specifies a small apartment flat in Pune for a young couple with no explicit room count. The apartment form factor (tower) and urban location are clear; the \"compact efficient layout\" and \"young couple\" profile strongly suggest a 1BHK entry-level or mid-rise tower. Defaulting plot dimensions to the 1BHK tower typical minimum and leaving habitable_floor_count null for the builder's default G+5 configuration.",
+    "template_id": "build_1bhk_pune_tower",
+    "parameters": {
+      "plot_width_m": 7.32,
+      "plot_length_m": 12.2,
+      "floor_height_m": 3.0,
+      "habitable_floor_count": null,
+      "has_stilt_parking": true,
+      "stilt_height_m": null,
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "has_balcony": null
+    },
+    "refusal_reason": null,
+    "best_template_attempted": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 659,
+    "output_tokens": 308,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002881,
+    "latency_ms": 3783.5443750955164,
+    "created_at_iso": "2026-05-11T11:40:56.718074+00:00"
+  }
+}

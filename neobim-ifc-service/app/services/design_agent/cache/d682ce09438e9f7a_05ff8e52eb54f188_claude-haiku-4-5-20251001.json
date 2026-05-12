@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Site orientation is unspecified in the brief; user priorities focus on multi-floor tower efficiency, lift core, fire stair, and stilt parking—no explicit directional request. Template default (north-facing entry) is appropriate as the baseline.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4086,
+    "output_tokens": 136,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004766,
+    "latency_ms": 2027.9884170740843,
+    "created_at_iso": "2026-05-11T11:40:39.805444+00:00"
+  }
+}

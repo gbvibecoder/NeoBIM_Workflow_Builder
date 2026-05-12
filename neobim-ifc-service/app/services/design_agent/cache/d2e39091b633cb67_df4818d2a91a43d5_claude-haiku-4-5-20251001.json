@@ -1,0 +1,22 @@
+{
+  "response": {
+    "decision": "refuse",
+    "confidence": 0.02,
+    "reasoning": "Brief explicitly describes a mixed-use commercial office complex with retail tenancy—a fundamentally commercial/office building use case. The catalogue contains only residential 1BHK, 2BHK, and 3BHK templates (houses, duplexes, and apartment towers). No candidate template supports office, retail, or mixed-use commercial programmes.",
+    "template_id": null,
+    "parameters": null,
+    "refusal_reason": "Brief requests a commercial office building with retail (mixed-use office complex). The template catalogue covers residential 1BHK/2BHK/3BHK only; no office, retail, or commercial variant is supported.",
+    "best_template_attempted": null,
+    "suggested_action": "reject"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 724,
+    "output_tokens": 249,
+    "cache_read_tokens": 6816,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002651,
+    "latency_ms": 3111.9330408982933,
+    "created_at_iso": "2026-05-11T17:37:31.712951+00:00"
+  }
+}

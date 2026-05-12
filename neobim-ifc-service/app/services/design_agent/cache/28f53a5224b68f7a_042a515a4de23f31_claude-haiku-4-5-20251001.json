@@ -1,0 +1,78 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "apartment",
+      "nbc_group": "A-4",
+      "nbc_subdivision": "Multi-family residential apartment tower",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": 12.192,
+      "plot_length_m": 24.384,
+      "plot_area_sqm": 297.42,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": null,
+      "wind_zone": null,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "contemporary residential tower",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 6,
+    "floors_below_ground": 0,
+    "explicit_room_list": [
+      "Living-Dining",
+      "Kitchen",
+      "Master Bedroom",
+      "Master Bathroom",
+      "Bedroom 2",
+      "Bedroom 3",
+      "Common Bathroom",
+      "Balcony",
+      "Lift Core",
+      "Fire Stair"
+    ],
+    "explicit_dimensions": {
+      "plot": "40 ft × 80 ft",
+      "typical_3bhk_unit": "not specified"
+    },
+    "user_priorities": [
+      "stilt parking",
+      "modern lift core",
+      "fire stair compliance",
+      "5 habitable floors"
+    ],
+    "raw_brief_summary": "A 3BHK apartment tower in Pune on a 40 ft × 80 ft plot, configured as G+5 (6 floors total: ground stilt + 5 habitable levels). Each habitable floor contains one 3BHK unit with living-dining, kitchen, master bedroom with ensuite, two additional bedrooms, common bathroom, and balcony; served by lift core and fire staircase. Target fidelity is design-development.",
+    "extraction_warnings": [
+      "Seismic and wind zones for Pune will be populated by deterministic city lookup (not guessed). Individual unit carpet/built-up area not specified; typical 3BHK implies ~900–1200 sqft built-up but not stated in brief. Stilt parking storey treated as non-habitable (floor count: 1 stilt + 5 habitable = 6 above ground). Max building height, FSI/FAR, setbacks, and site orientation not specified."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 561,
+    "output_tokens": 853,
+    "cache_read_tokens": 7294,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.005555,
+    "latency_ms": 7861.779582919553,
+    "created_at_iso": "2026-05-11T17:36:31.655735+00:00"
+  }
+}

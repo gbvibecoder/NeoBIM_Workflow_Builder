@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief describes a standard 2BHK duplex with ground-floor parking but explicitly mentions no extensions (no compound wall, entry gate, car porch, servant quarter, or mumty named). Parking is already part of the floor plan, not a car porch add-on. No extension signals detected; emitting no-op plan.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 835,
+    "output_tokens": 225,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002407,
+    "latency_ms": 2998.7399999517947,
+    "created_at_iso": "2026-05-11T11:39:45.344688+00:00"
+  }
+}

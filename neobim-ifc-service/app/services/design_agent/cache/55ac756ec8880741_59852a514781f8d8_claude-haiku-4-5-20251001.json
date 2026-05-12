@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief specifies a G+5 apartment tower with explicit mention of \"habitable terrace\" use via roof access requirement. Tower towers in v1 Slice 2B.3 support mumty (stair-access enclosure on roof) for terrace access. No compound wall, entry gate, car porch, or servant quarter is applicable to a tower unit. Stilt parking is already in the template; lift and fire stair are core structural elements, not extensions.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 858,
+    "output_tokens": 255,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.00258,
+    "latency_ms": 3378.8227499462664,
+    "created_at_iso": "2026-05-11T17:36:04.946900+00:00"
+  }
+}

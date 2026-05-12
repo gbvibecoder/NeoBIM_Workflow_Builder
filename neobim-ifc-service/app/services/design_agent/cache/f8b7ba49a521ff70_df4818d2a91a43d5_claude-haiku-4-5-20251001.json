@@ -1,0 +1,22 @@
+{
+  "response": {
+    "decision": "refuse",
+    "confidence": 0.15,
+    "reasoning": "The brief specifies a 2500 m² footprint and total GFA of 2500 m², which is incompatible with any single-storey template in the catalogue. The largest candidate (3BHK house, ~130–170 m² built-up on typical plots) would require a plot far smaller than 2500 m², and the 1:1 footprint-to-GFA ratio contradicts standard single-storey construction. The brief lacks explicit BHK count and room configuration, making confident classification impossible.",
+    "template_id": null,
+    "parameters": null,
+    "refusal_reason": "Brief specifies 2500 m² footprint and 2500 m² GFA on a single storey. This is inconsistent with the residential templates, which are designed for plots of 25–170 m² with built-up areas of 80–200 m². The brief is missing explicit BHK count and detailed room layout; clarification is needed to determine if this is a 1BHK, 2BHK, 3BHK, or a non-standard residential type.",
+    "best_template_attempted": null,
+    "suggested_action": "ask_user_clarification"
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 691,
+    "output_tokens": 359,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 6816,
+    "cost_usd_estimated": 0.011006,
+    "latency_ms": 4676.024875137955,
+    "created_at_iso": "2026-05-11T08:52:13.758596+00:00"
+  }
+}

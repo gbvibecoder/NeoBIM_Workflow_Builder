@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "site_orientation is unspecified; the brief focuses on functional requirements (duplex layout, ground floor master with attached bath, pooja room, first floor bedrooms, terrace access) rather than entry direction. The matched template defaults to north-facing, which is a standard orientation for Pune residential plots. No explicit mirror or rotation request is present.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4041,
+    "output_tokens": 157,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004826,
+    "latency_ms": 2166.8891250155866,
+    "created_at_iso": "2026-05-11T17:35:46.249226+00:00"
+  }
+}

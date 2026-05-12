@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "Brief specifies a 2BHK duplex in Pune on a 30×50 ft plot with no explicit site orientation or chirality request; the matched template defaults to north-facing entry, which aligns with the brief's standard residential configuration. No transform is needed.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4068,
+    "output_tokens": 143,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004783,
+    "latency_ms": 2039.8167078383267,
+    "created_at_iso": "2026-05-11T17:35:15.381080+00:00"
+  }
+}

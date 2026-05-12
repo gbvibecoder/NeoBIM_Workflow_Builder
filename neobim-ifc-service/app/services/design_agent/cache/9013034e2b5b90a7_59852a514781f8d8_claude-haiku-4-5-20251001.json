@@ -1,0 +1,23 @@
+{
+  "response": {
+    "decision": "plan",
+    "reasoning": "Brief is for a G+5 apartment tower with stilt parking on a Pune plot. The tower template is pre-matched (build_2bhk_pune_tower). No extensions are explicitly mentioned. Stilt parking is already integrated into the tower template; compound wall, entry gate, car porch, and servant quarter are either plot-level (not unit-level) or incompatible with tower units. Mumty (roof-access enclosure) is possible for terrace usage but not mentioned in the brief. Emit a no-op extension plan.",
+    "include_compound_wall": false,
+    "include_entry_gate": false,
+    "include_car_porch": false,
+    "include_servant_quarter": false,
+    "include_mumty": false,
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 893,
+    "output_tokens": 273,
+    "cache_read_tokens": 4473,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.002705,
+    "latency_ms": 3623.8401669543236,
+    "created_at_iso": "2026-05-11T17:36:23.274175+00:00"
+  }
+}

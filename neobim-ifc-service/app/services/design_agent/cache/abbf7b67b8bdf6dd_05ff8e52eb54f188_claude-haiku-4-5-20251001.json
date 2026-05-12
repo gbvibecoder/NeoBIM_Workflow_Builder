@@ -1,0 +1,20 @@
+{
+  "response": {
+    "decision": "adapt",
+    "reasoning": "The brief does not specify site orientation or any directional preference. The matched template defaults to north-facing entry, which aligns with the absence of an explicit orientation request. No chirality or mirror instruction is stated. This is a legitimate no-op adaptation outcome.",
+    "mirror_axis": "none",
+    "rotation": "0",
+    "refusal_reason": null,
+    "suggested_action": null
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 4039,
+    "output_tokens": 138,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost_usd_estimated": 0.004729,
+    "latency_ms": 2145.8326659630984,
+    "created_at_iso": "2026-05-11T17:36:53.898624+00:00"
+  }
+}

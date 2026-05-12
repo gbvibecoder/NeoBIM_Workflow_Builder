@@ -1,0 +1,65 @@
+{
+  "response": {
+    "building_class": {
+      "primary_type": "residential",
+      "sub_type": "single-storey house",
+      "nbc_group": "A-2",
+      "nbc_subdivision": "One-family dwelling",
+      "occupancy_load_persons": null
+    },
+    "site_context": {
+      "plot_width_m": null,
+      "plot_length_m": null,
+      "plot_area_sqm": null,
+      "site_orientation": null,
+      "location_city": "Pune",
+      "seismic_zone": "III",
+      "wind_zone": 2,
+      "setbacks_m": null,
+      "max_height_m": null,
+      "fsi_or_far": null
+    },
+    "style_intent": {
+      "architectural_style": "Contemporary residential",
+      "cultural_overlay": null,
+      "massing_hint": "rectangular",
+      "facade_treatment": null
+    },
+    "structural_intent": {
+      "system": "auto",
+      "foundation_hint": null,
+      "seismic_design_required": true,
+      "wind_design_required": true
+    },
+    "fidelity_hint": {
+      "rebar_required": false,
+      "mep_routing_required": true,
+      "cobie_required": false
+    },
+    "floors_above_ground": 1,
+    "floors_below_ground": 0,
+    "explicit_room_list": [],
+    "explicit_dimensions": {
+      "footprint": "2499 m²",
+      "total_gfa": "2499 m²"
+    },
+    "user_priorities": [],
+    "raw_brief_summary": "Single-storey residential house in Pune with a footprint and total GFA of approximately 2499 m². Intended for design-development fidelity with MEP routing required.",
+    "extraction_warnings": [
+      "Brief does not specify individual room list or dimensions; footprint equals total GFA, suggesting minimal circulation/wall area — unusual for a residential program and may indicate briefing ambiguity.",
+      "No explicit architectural style, cultural preferences (e.g., Vastu), facade treatment, or massing preference stated; defaults applied.",
+      "No plot dimensions, FSI/FAR, setbacks, or site orientation provided.",
+      "Seismic zone III and wind zone 2 assigned via Pune city lookup; not explicitly stated in brief."
+    ]
+  },
+  "metadata": {
+    "model": "claude-haiku-4-5-20251001",
+    "input_tokens": 521,
+    "output_tokens": 718,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 7284,
+    "cost_usd_estimated": 0.013216,
+    "latency_ms": 7147.88308320567,
+    "created_at_iso": "2026-05-11T10:52:55.700904+00:00"
+  }
+}
