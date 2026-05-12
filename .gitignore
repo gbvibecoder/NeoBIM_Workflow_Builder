@@ -104,3 +104,6 @@ experiments/training-data/
 # the repo root when OCR first runs. Not a source artefact.
 eng.traineddata
 .env*.local
+
+# Local Claude Code artifacts
+temp/

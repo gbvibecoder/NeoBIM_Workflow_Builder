@@ -11,7 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { trackLead } from "@/lib/meta-pixel";
+import { trackLead, META_EVENT_VALUE, META_CURRENCY } from "@/lib/meta-pixel";
 
 // ─── Design tokens (matching landing page) ──────────────────────────────────
 
@@ -277,7 +277,30 @@ export default function BookDemoPage() {
       });
 
       if (res.ok) {
-        trackLead({ content_name: "book_demo", value: 1 });
+        const eventId = `lead_${crypto.randomUUID()}`;
+        trackLead(
+          {
+            content_name: "book_demo",
+            value: META_EVENT_VALUE.LEAD_INR,
+            currency: META_CURRENCY,
+          },
+          { eventID: eventId },
+        );
+        fetch("/api/track/lead", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventId,
+            contentName: "book_demo",
+            value: META_EVENT_VALUE.LEAD_INR,
+            currency: META_CURRENCY,
+            eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
+            email: formData.email?.trim().toLowerCase() || undefined,
+            phone: formData.phone || undefined,
+            firstName: formData.name?.trim().split(" ")[0] || undefined,
+          }),
+          keepalive: true,
+        }).catch(() => {});
         setSubmitted(true);
       } else {
         const data = await res.json().catch(() => null);

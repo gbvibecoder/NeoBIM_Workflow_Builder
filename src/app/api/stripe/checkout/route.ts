@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { stripe } from '@/features/billing/lib/stripe';
 import { prisma } from '@/lib/db';
@@ -164,6 +165,19 @@ export async function POST(req: Request) {
       // Auto-apply coupon if configured, otherwise allow promo code input
       const defaultCoupon = process.env.STRIPE_DEFAULT_COUPON_ID;
 
+      // Stash Meta browser identifiers + IP/UA on the checkout session so the
+      // Stripe webhook (which fires from Stripe's servers without browser
+      // context) can forward them to the Meta CAPI Purchase fire — this is
+      // how browser↔server dedup keeps working through the payment redirect.
+      const cookieStore = await cookies();
+      const fbp = cookieStore.get('_fbp')?.value || '';
+      const fbc = cookieStore.get('_fbc')?.value || '';
+      const clientIp =
+        req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        req.headers.get('x-real-ip') ||
+        '';
+      const clientUa = req.headers.get('user-agent') || '';
+
       const checkoutSession = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
@@ -176,6 +190,10 @@ export async function POST(req: Request) {
         metadata: {
           userId: user.id,
           plan: normalizedPlan,
+          fbp,
+          fbc,
+          clientIp,
+          clientUa,
         },
       });
 
