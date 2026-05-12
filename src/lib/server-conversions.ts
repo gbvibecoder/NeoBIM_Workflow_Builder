@@ -12,6 +12,7 @@
 
 import crypto from "crypto";
 import { getPurchaseEventId } from "@/lib/plan-pricing";
+import { isMetaTrackingAllowedServer } from "@/lib/tracking-env";
 
 const META_PIXEL_ID =
   process.env.META_PIXEL_ID ||
@@ -58,6 +59,17 @@ interface MetaConversionEvent {
 }
 
 export async function sendMetaConversion(event: MetaConversionEvent): Promise<void> {
+  // Gate by environment FIRST — prevents Vercel preview deployments from
+  // polluting the production Meta dataset. VERCEL_ENV is the authoritative
+  // discriminator (NODE_ENV=production on preview builds too).
+  if (!isMetaTrackingAllowedServer()) {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[meta-capi] skipped — non-production environment");
+    }
+    return;
+  }
+
   const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
   if (!accessToken) return; // Silently skip if not configured
 

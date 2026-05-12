@@ -1,6 +1,7 @@
 /** Meta Pixel (Facebook Pixel) helper utilities */
 
 import { pushToDataLayer } from "./gtm";
+import { isMetaTrackingAllowedBrowser } from "./tracking-env";
 
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2072969213494487";
 
@@ -43,48 +44,56 @@ function fbq(
 
 /** Track a lead generation event (form submissions, workflow requests) */
 export function trackLead(params?: FbqParams, options?: FbqOptions) {
+  if (!isMetaTrackingAllowedBrowser()) return;
   fbq("track", "Lead", params, options);
   pushToDataLayer("generate_lead", params);
 }
 
 /** Track a completed registration (requires eventID for server-side dedup) */
 export function trackCompleteRegistration(params?: FbqParams, options?: FbqOptions) {
+  if (!isMetaTrackingAllowedBrowser()) return;
   fbq("track", "CompleteRegistration", params, options);
   pushToDataLayer("sign_up", { ...params, ...(options?.eventID && { event_id: options.eventID }) });
 }
 
 /** Track a contact form submission */
 export function trackContact(params?: FbqParams, options?: FbqOptions) {
+  if (!isMetaTrackingAllowedBrowser()) return;
   fbq("track", "Contact", params, options);
   pushToDataLayer("contact_form", params);
 }
 
 /** Track a content view (e.g., viewing a specific workflow or page) */
 export function trackViewContent(params?: FbqParams, options?: FbqOptions) {
+  if (!isMetaTrackingAllowedBrowser()) return;
   fbq("track", "ViewContent", params, options);
   pushToDataLayer("view_item", params);
 }
 
 /** Track a register page view */
 export function trackRegisterPageView() {
+  if (!isMetaTrackingAllowedBrowser()) return;
   fbq("track", "ViewRegisterPage");
   pushToDataLayer("view_register_page");
 }
 
 /** Track a successful purchase/subscription (requires eventID for server-side dedup) */
 export function trackPurchase(params?: FbqParams, options?: FbqOptions) {
+  if (!isMetaTrackingAllowedBrowser()) return;
   fbq("track", "Purchase", params, options);
   pushToDataLayer("purchase", { ...params, ...(options?.eventID && { event_id: options.eventID }) });
 }
 
 /** Track intent-to-purchase — fires when user clicks a paid-plan CTA. */
 export function trackInitiateCheckout(params?: FbqParams, options?: FbqOptions) {
+  if (!isMetaTrackingAllowedBrowser()) return;
   fbq("track", "InitiateCheckout", params, options);
   pushToDataLayer("begin_checkout", params);
 }
 
 /** Track a returning-user login. Not a Meta standard event — uses trackCustom. */
 export function trackLogin(params?: FbqParams) {
+  if (!isMetaTrackingAllowedBrowser()) return;
   fbq("trackCustom", "Login", params);
   pushToDataLayer("login", params);
 }

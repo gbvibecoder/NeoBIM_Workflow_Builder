@@ -41,20 +41,34 @@ export function TrackingScripts() {
       {/* Meta Pixel (Facebook) — init + PageView fire IMMEDIATELY so the
           verifier and Meta Pixel Helper can detect a real network hit.
           Privacy gating uses Limited Data Use (LDU) instead of consent
-          revoke; cookie-consent.ts clears LDU when the user accepts. */}
+          revoke; cookie-consent.ts clears LDU when the user accepts.
+
+          ENVIRONMENT GATE: the IIFE below returns early on anything but
+          trybuildflow.in (localhost, *.vercel.app previews, staging).
+          This is the primary defense against polluting Meta's dataset
+          with dev/QA traffic. Set NEXT_PUBLIC_META_TRACKING_FORCE=true
+          in a staging smoke-test env to bypass. The <Script> tag itself
+          always renders to avoid SSR/CSR hydration mismatch; the gate
+          is purely runtime inside the script body. */}
       <Script id="meta-pixel" strategy="afterInteractive">
         {`
-          !function(f,b,e,v,n,t,s)
-          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-          n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t,s)}(window, document,'script',
-          'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '${META_PIXEL_ID}');
-          fbq('dataProcessingOptions', ['LDU'], 0, 0);
-          fbq('track', 'PageView');
+          (function(){
+            var force = ${process.env.NEXT_PUBLIC_META_TRACKING_FORCE === "true" ? "true" : "false"};
+            if (!force && (typeof window === 'undefined' || window.location.hostname !== 'trybuildflow.in')) {
+              return;
+            }
+            !function(f,b,e,v,n,t,s)
+            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+            n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t,s)}(window, document,'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+            fbq('init', '${META_PIXEL_ID}');
+            fbq('dataProcessingOptions', ['LDU'], 0, 0);
+            fbq('track', 'PageView');
+          })();
         `}
       </Script>
 
