@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Mail, ArrowRight, Check, Loader2 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { trackLead } from "@/lib/meta-pixel";
+import { trackLead, META_EVENT_VALUE, META_CURRENCY } from "@/lib/meta-pixel";
 
 export function NewsletterSignup() {
   const [email, setEmail] = useState("");
@@ -31,7 +31,29 @@ export function NewsletterSignup() {
       }
 
       setStatus("success");
-      trackLead({ content_name: "newsletter_signup" });
+      const eventId = `lead_${crypto.randomUUID()}`;
+      const trimmedEmail = email.trim().toLowerCase();
+      trackLead(
+        {
+          content_name: "newsletter_signup",
+          value: META_EVENT_VALUE.LEAD_INR,
+          currency: META_CURRENCY,
+        },
+        { eventID: eventId },
+      );
+      fetch("/api/track/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId,
+          contentName: "newsletter_signup",
+          value: META_EVENT_VALUE.LEAD_INR,
+          currency: META_CURRENCY,
+          eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
+          email: trimmedEmail,
+        }),
+        keepalive: true,
+      }).catch(() => {});
       setEmail("");
     } catch (err) {
       setStatus("error");

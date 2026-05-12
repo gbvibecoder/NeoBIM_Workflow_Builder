@@ -273,13 +273,26 @@ async function activateSubscription(subscription: {
     })();
 
     // Server-side conversion: Meta CAPI (fire-and-forget)
+    // fbp/fbc/clientIp/clientUa are stashed in subscription.notes at
+    // checkout creation; Razorpay round-trips them here so we can preserve
+    // browser↔server identity matching across the payment redirect.
+    const notes = (subscription.notes ?? {}) as Record<string, unknown>;
+    const notesStr = (key: string): string | undefined => {
+      const v = notes[key];
+      return typeof v === 'string' && v.length > 0 ? v : undefined;
+    };
     trackServerPurchase({
       userId: user.id,
       email: user.email,
+      phone: user.phoneNumber,
       firstName: user.name?.split(" ")[0],
       plan: newRole,
       currency: "INR",
       value: getPlanValueINR(newRole),
+      fbp: notesStr('fbp'),
+      fbc: notesStr('fbc'),
+      ip: notesStr('clientIp'),
+      userAgent: notesStr('clientUa'),
     }).catch(err => console.warn("[meta-capi]", err));
   }
 }

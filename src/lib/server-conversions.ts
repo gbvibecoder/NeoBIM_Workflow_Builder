@@ -13,9 +13,19 @@
 import crypto from "crypto";
 import { getPurchaseEventId } from "@/lib/plan-pricing";
 
-const META_PIXEL_ID = "2072969213494487";
+const META_PIXEL_ID =
+  process.env.META_PIXEL_ID ||
+  process.env.NEXT_PUBLIC_META_PIXEL_ID ||
+  "2072969213494487";
 const META_API_VERSION = "v21.0";
 const META_CAPI_URL = `https://graph.facebook.com/${META_API_VERSION}/${META_PIXEL_ID}/events`;
+
+/** Duplicated from meta-pixel.ts so this module stays server-safe (no client deps). */
+const META_EVENT_VALUE = {
+  LEAD_INR: 1000,
+  REGISTRATION_INR: 100,
+} as const;
+const META_CURRENCY = "INR" as const;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -101,6 +111,8 @@ export async function trackServerSignup(params: {
   userAgent?: string;
   /** Pass the same event_id from the client pixel so Meta dedups both fires. */
   eventId?: string;
+  fbp?: string;
+  fbc?: string;
 }): Promise<void> {
   const eventId = params.eventId || `signup_${crypto.randomUUID()}`;
 
@@ -113,10 +125,14 @@ export async function trackServerSignup(params: {
       firstName: params.firstName,
       clientIpAddress: params.ip,
       clientUserAgent: params.userAgent,
+      fbp: params.fbp,
+      fbc: params.fbc,
     },
     customData: {
       content_name: "BuildFlow Signup",
       status: "complete",
+      value: META_EVENT_VALUE.REGISTRATION_INR,
+      currency: META_CURRENCY,
     },
     eventSourceUrl: "https://trybuildflow.in/register",
   });
@@ -132,6 +148,8 @@ export async function trackServerPurchase(params: {
   value?: number;
   ip?: string;
   userAgent?: string;
+  fbp?: string;
+  fbc?: string;
 }): Promise<void> {
   const eventId = getPurchaseEventId(params.userId, params.plan);
 
@@ -144,13 +162,81 @@ export async function trackServerPurchase(params: {
       firstName: params.firstName,
       clientIpAddress: params.ip,
       clientUserAgent: params.userAgent,
+      fbp: params.fbp,
+      fbc: params.fbc,
     },
     customData: {
       content_name: `BuildFlow ${params.plan} Plan`,
-      currency: params.currency || "INR",
+      currency: params.currency || META_CURRENCY,
       value: params.value || 0,
     },
     eventSourceUrl: "https://trybuildflow.in/thank-you/subscription",
+  });
+}
+
+export async function trackServerLead(params: {
+  eventId: string;
+  email?: string;
+  phone?: string | null;
+  firstName?: string;
+  ip?: string;
+  userAgent?: string;
+  fbp?: string;
+  fbc?: string;
+  contentName?: string;
+  value?: number;
+  currency?: string;
+  eventSourceUrl?: string;
+}): Promise<void> {
+  await sendMetaConversion({
+    eventName: "Lead",
+    eventId: params.eventId,
+    userData: {
+      email: params.email,
+      phone: params.phone || undefined,
+      firstName: params.firstName,
+      clientIpAddress: params.ip,
+      clientUserAgent: params.userAgent,
+      fbp: params.fbp,
+      fbc: params.fbc,
+    },
+    customData: {
+      content_name: params.contentName || "BuildFlow Lead",
+      value: params.value ?? META_EVENT_VALUE.LEAD_INR,
+      currency: params.currency || META_CURRENCY,
+    },
+    eventSourceUrl: params.eventSourceUrl,
+  });
+}
+
+export async function trackServerContact(params: {
+  eventId: string;
+  email?: string;
+  phone?: string | null;
+  firstName?: string;
+  ip?: string;
+  userAgent?: string;
+  fbp?: string;
+  fbc?: string;
+  contentName?: string;
+  eventSourceUrl?: string;
+}): Promise<void> {
+  await sendMetaConversion({
+    eventName: "Contact",
+    eventId: params.eventId,
+    userData: {
+      email: params.email,
+      phone: params.phone || undefined,
+      firstName: params.firstName,
+      clientIpAddress: params.ip,
+      clientUserAgent: params.userAgent,
+      fbp: params.fbp,
+      fbc: params.fbc,
+    },
+    customData: {
+      content_name: params.contentName || "BuildFlow Contact",
+    },
+    eventSourceUrl: params.eventSourceUrl,
   });
 }
 

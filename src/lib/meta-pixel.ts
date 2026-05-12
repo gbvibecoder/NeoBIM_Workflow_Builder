@@ -2,7 +2,14 @@
 
 import { pushToDataLayer } from "./gtm";
 
-const META_PIXEL_ID = "2072969213494487";
+const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2072969213494487";
+
+/** Standard Meta event values — keep browser and server in sync. INR only. */
+export const META_EVENT_VALUE = {
+  LEAD_INR: 1000,
+  REGISTRATION_INR: 100,
+} as const;
+export const META_CURRENCY = "INR" as const;
 
 type FbqParams = Record<string, string | number | boolean | undefined>;
 type FbqOptions = { eventID?: string };
@@ -90,6 +97,22 @@ export function trackLogin(params?: FbqParams) {
 export function trackAdsConversion(sendTo: string, params?: FbqParams) {
   if (typeof window === "undefined" || !window.gtag) return;
   window.gtag("event", "conversion", { send_to: sendTo, ...params });
+}
+
+/**
+ * Read Meta browser identifiers (`_fbp` + `_fbc`) from `document.cookie`.
+ * `_fbp` is set by the pixel on PageView; `_fbc` is set when a user lands
+ * with a `?fbclid=…` URL parameter from a Meta ad. Forwarding them to the
+ * server CAPI payload is how Meta deduplicates browser↔server event pairs
+ * and resolves identity. Returns `{}` on SSR or when neither cookie exists.
+ */
+export function getMetaBrowserIds(): { fbp?: string; fbc?: string } {
+  if (typeof document === "undefined") return {};
+  const match = (name: string) => {
+    const m = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+    return m ? decodeURIComponent(m[1]) : undefined;
+  };
+  return { fbp: match("_fbp"), fbc: match("_fbc") };
 }
 
 export { META_PIXEL_ID };

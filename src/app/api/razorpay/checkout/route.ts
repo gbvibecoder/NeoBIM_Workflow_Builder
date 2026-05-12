@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { razorpay, resolveRazorpayPlanId } from '@/features/billing/lib/razorpay';
 import { prisma } from '@/lib/db';
@@ -113,6 +114,19 @@ export async function POST(req: Request) {
       );
     }
 
+    // Stash Meta browser identifiers + IP/UA in the subscription `notes` so
+    // the Razorpay webhook (which fires from Razorpay's servers without
+    // browser context) can forward them to the Meta CAPI Purchase fire —
+    // notes round-trip back to us on subscription.activated / .charged.
+    const cookieStore = await cookies();
+    const fbp = cookieStore.get('_fbp')?.value || '';
+    const fbc = cookieStore.get('_fbc')?.value || '';
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip') ||
+      '';
+    const clientUa = req.headers.get('user-agent') || '';
+
     // Create Razorpay subscription
     try {
       const subscription = await razorpay.subscriptions.create({
@@ -124,6 +138,10 @@ export async function POST(req: Request) {
           userId: user.id,
           plan: normalizedPlan,
           email: user.email!,
+          fbp,
+          fbc,
+          clientIp,
+          clientUa,
         },
       });
 

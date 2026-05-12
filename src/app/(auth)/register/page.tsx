@@ -8,7 +8,14 @@ import { Mail, Lock, User, Chrome, Loader2, Eye, EyeOff, Gift } from "lucide-rea
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
-import { trackAdsConversion, trackCompleteRegistration, trackRegisterPageView } from "@/lib/meta-pixel";
+import {
+  getMetaBrowserIds,
+  META_CURRENCY,
+  META_EVENT_VALUE,
+  trackAdsConversion,
+  trackCompleteRegistration,
+  trackRegisterPageView,
+} from "@/lib/meta-pixel";
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
 
@@ -141,7 +148,13 @@ function RegisterForm() {
       // Shared event_id so client pixel + server CAPI dedup as one event in Meta.
       const signupEventId = `signup_${crypto.randomUUID()}`;
 
+      // Forward Meta browser identifiers so the server CAPI fire can dedup
+      // and match identity against the browser session.
+      const { fbp, fbc } = getMetaBrowserIds();
+
       const body: Record<string, string> = { name, password, signupEventId };
+      if (fbp) body.fbp = fbp;
+      if (fbc) body.fbc = fbc;
       if (isEmail) {
         body.email = identifier.trim().toLowerCase();
       } else {
@@ -174,6 +187,8 @@ function RegisterForm() {
       trackCompleteRegistration(
         {
           content_name: isEmail ? "email_signup" : "phone_signup",
+          value: META_EVENT_VALUE.REGISTRATION_INR,
+          currency: META_CURRENCY,
           ...(isEmail && { user_email: identifier.trim().toLowerCase() }),
           user_name: name.trim(),
         },
@@ -223,7 +238,24 @@ function RegisterForm() {
       if (referralCode) {
         localStorage.setItem("pending_referral_code", referralCode);
       }
-      trackCompleteRegistration({ content_name: "google_signup" });
+      // Google OAuth path: generate a browser-side eventID and stash it so a
+      // future enhancement can deterministically pair this fire with the server
+      // CAPI fire (currently keyed off `signup_oauth_${user.id}` in NextAuth's
+      // `events.createUser` — full dedup requires Pattern (b) in the audit).
+      const googleEventId = `signup_google_${crypto.randomUUID()}`;
+      try {
+        sessionStorage.setItem("bf_google_signup_event_id", googleEventId);
+      } catch {
+        // Storage may be unavailable (private mode / SSR); not fatal.
+      }
+      trackCompleteRegistration(
+        {
+          content_name: "google_signup",
+          value: META_EVENT_VALUE.REGISTRATION_INR,
+          currency: META_CURRENCY,
+        },
+        { eventID: googleEventId },
+      );
       // Google Ads conversion + sign_up_complete dataLayer push are DEFERRED
       // to /onboard, which fires only when events.createUser confirms a
       // freshly created user. Firing here would count cancellations at the

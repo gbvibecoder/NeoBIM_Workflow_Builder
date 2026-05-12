@@ -94,6 +94,10 @@ export async function POST(req: NextRequest) {
 
             // Server-side conversion: Meta CAPI (fire-and-forget)
             // Prefer real amount from Stripe session when present, fall back to plan map.
+            // fbp/fbc/clientIp/clientUa are stashed on session.metadata at
+            // checkout creation so this webhook (which fires from Stripe's
+            // servers, no browser cookies) can still attribute the Purchase to
+            // the browser session that initiated it.
             const amountTotalINR = session.amount_total ? session.amount_total / 100 : undefined;
             trackServerPurchase({
               userId: checkoutUser.id,
@@ -103,6 +107,10 @@ export async function POST(req: NextRequest) {
               plan: checkoutUser.role,
               currency: "INR",
               value: amountTotalINR ?? getPlanValueINR(checkoutUser.role),
+              fbp: session.metadata?.fbp || undefined,
+              fbc: session.metadata?.fbc || undefined,
+              ip: session.metadata?.clientIp || undefined,
+              userAgent: session.metadata?.clientUa || undefined,
             }).catch(err => console.warn("[meta-capi]", err));
           }
         }

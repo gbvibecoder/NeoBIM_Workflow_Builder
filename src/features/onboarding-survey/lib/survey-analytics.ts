@@ -3,6 +3,8 @@ import {
   trackInitiateCheckout,
   trackLead,
   trackViewContent,
+  META_CURRENCY,
+  META_EVENT_VALUE,
 } from "@/lib/meta-pixel";
 import type { PricingAction } from "@/features/onboarding-survey/types/survey";
 
@@ -129,10 +131,32 @@ export function trackComplete(total_time_seconds: number, profile: SurveyProfile
 
   // 2. Meta Pixel Lead — qualified lead (profile survey completed).
   //    Pixel params must be primitives; profession + team_size are user-safe strings.
-  const leadParams: Record<string, string> = { content_name: "onboarding_survey_complete" };
+  const eventId = `lead_${crypto.randomUUID()}`;
+  const leadParams: Record<string, string | number> = {
+    content_name: "onboarding_survey_complete",
+    value: META_EVENT_VALUE.LEAD_INR,
+    currency: META_CURRENCY,
+  };
   if (profile.profession) leadParams.profession = profile.profession;
   if (profile.team_size) leadParams.team_size = profile.team_size;
-  trackLead(leadParams);
+  trackLead(leadParams, { eventID: eventId });
+
+  // CAPI twin — server fires the same eventId so Meta dedups browser↔server.
+  // No form context here (this fires from the post-survey path), so no email
+  // is attached; Meta still benefits from fbp/fbc + IP/UA forwarded server-side.
+  const capiBody: Record<string, string | number> = {
+    eventId,
+    contentName: "onboarding_survey_complete",
+    value: META_EVENT_VALUE.LEAD_INR,
+    currency: META_CURRENCY,
+  };
+  if (typeof window !== "undefined") capiBody.eventSourceUrl = window.location.href;
+  fetch("/api/track/lead", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(capiBody),
+    keepalive: true,
+  }).catch(() => {});
 
   // 3. User properties — separate dataLayer event with user_* prefix so
   //    GTM's GA4 "User Properties" field can pick them up.
