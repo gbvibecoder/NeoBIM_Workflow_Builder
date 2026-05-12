@@ -71,9 +71,23 @@ from app.utils.guid import (
 )
 
 
-PROJECT_NAME = "2BHK Pune Duplex Project"
-BUILDING_NAME = "2BHK Pune Duplex"
-SITE_NAME = "Pune Plot"
+# Slice P3.1 — these constants are FALLBACKS only, used when the
+# BuildingModel happens to ship without a name (legacy MassingGeometry
+# lifted briefs with no project context). For every Tier-2 template
+# (1/2/3 BHK × house/duplex/tower) the BuildingModel carries its own
+# project / building / site name and those win. The pre-P3.1 freeze
+# pinned every IFC to "2BHK Pune Duplex Project" regardless of the
+# matched template; that surfaced a misleading project name in every
+# design-agent-generated IFC. Trade-off: this slice intentionally
+# breaks the byte-identity test pins on per-template GUID hashes —
+# project name is part of the deterministic-GUID namespace via
+# `set_project_namespace(...)` (see `app/utils/guid.py`). The byte-
+# identity tests that hash the full IFC bytes need to be regenerated;
+# the SHA-256 cross-path identity test (service vs legacy) still
+# passes because both paths now read the same `bm.project.name`.
+_FALLBACK_PROJECT_NAME = "2BHK Pune Duplex Project"
+_FALLBACK_BUILDING_NAME = "2BHK Pune Duplex"
+_FALLBACK_SITE_NAME = "Pune Plot"
 BUILDING_TYPE = "residential"
 
 
@@ -83,19 +97,35 @@ def build_ifc_from_building_model(bm: BuildingModel) -> ifcopenshell.file:
     Mirrors the spatial-hierarchy / material-cache / type-registry setup
     of `app.services.ifc_builder.build_ifc`, then dispatches each
     BuildingModel node to its parametric builder.
+
+    Slice P3.1 — project / building / site names come from the supplied
+    BuildingModel (`bm.project.name`, `bm.project.site.building.name`,
+    `bm.project.site.name`). Pre-P3.1 these were hardcoded constants;
+    every IFC was labelled "2BHK Pune Duplex Project" regardless of the
+    matched template, which misled downstream tools and reports.
     """
+    project_name = (bm.project.name or _FALLBACK_PROJECT_NAME).strip()
+    building_name = (
+        bm.project.site.building.name or _FALLBACK_BUILDING_NAME
+    ).strip()
+    site_name = (bm.project.site.name or _FALLBACK_SITE_NAME).strip()
+
     # Deterministic GUIDs: same project namespace + same BuildingModel
-    # produces byte-identical IFC.
-    set_project_namespace(PROJECT_NAME, BUILDING_NAME, SITE_NAME)
+    # produces byte-identical IFC. Note: changing the project name
+    # changes the GUID-seeding namespace, so two templates with
+    # different project names produce different GUIDs even if all other
+    # inputs match — this is the intended behaviour (a 1BHK house's
+    # IfcWall should not collide with a 3BHK tower's IfcWall).
+    set_project_namespace(project_name, building_name, site_name)
     reset_new_guid_counter()
 
     model = ifcopenshell.file(schema="IFC4")
 
     # ── Project + units + context ─────────────────────────────────
     project = api.run(
-        "root.create_entity", model, ifc_class="IfcProject", name=PROJECT_NAME
+        "root.create_entity", model, ifc_class="IfcProject", name=project_name
     )
-    project.GlobalId = derive_guid("IfcProject", PROJECT_NAME)
+    project.GlobalId = derive_guid("IfcProject", project_name)
     api.run("unit.assign_unit", model, length={"is_metric": True, "raw": "METRE"})
 
     context = api.run("context.add_context", model, context_type="Model")
@@ -109,14 +139,14 @@ def build_ifc_from_building_model(bm: BuildingModel) -> ifcopenshell.file:
     )
 
     # ── Spatial hierarchy ─────────────────────────────────────────
-    site = api.run("root.create_entity", model, ifc_class="IfcSite", name=SITE_NAME)
-    site.GlobalId = derive_guid("IfcSite", SITE_NAME)
+    site = api.run("root.create_entity", model, ifc_class="IfcSite", name=site_name)
+    site.GlobalId = derive_guid("IfcSite", site_name)
     api.run("aggregate.assign_object", model, relating_object=project, products=[site])
 
     building = api.run(
-        "root.create_entity", model, ifc_class="IfcBuilding", name=BUILDING_NAME
+        "root.create_entity", model, ifc_class="IfcBuilding", name=building_name
     )
-    building.GlobalId = derive_guid("IfcBuilding", BUILDING_NAME)
+    building.GlobalId = derive_guid("IfcBuilding", building_name)
     api.run("aggregate.assign_object", model, relating_object=site, products=[building])
 
     bld = bm.project.site.building

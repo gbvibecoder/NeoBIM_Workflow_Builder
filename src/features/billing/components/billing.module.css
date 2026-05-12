@@ -70,12 +70,12 @@
 .container {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 48px 56px 64px;
+  padding: 32px 56px 64px;
   position: relative;
   z-index: 1;
 }
 @media (max-width: 720px) {
-  .container { padding: 32px 20px 48px; }
+  .container { padding: 24px 20px 48px; }
 }
 
 /* ── Backdrop Floaters ────────────────────────────────────────── */
@@ -115,18 +115,18 @@
 .banner {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 28px 32px;
+  gap: 16px;
+  padding: 16px 28px;
   border-radius: 16px;
   background: var(--rs-paper, #fff);
   border: 1px solid var(--rs-rule, rgba(14,18,24,0.07));
   box-shadow: 0 1px 3px rgba(14, 18, 24, 0.04);
-  margin-bottom: 36px;
+  margin-bottom: 24px;
 }
 .bannerIcon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   background: linear-gradient(135deg, var(--plan-blueprint), var(--plan-plum));
   display: flex;
   align-items: center;
@@ -143,11 +143,11 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--plan-blueprint);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 .bannerTitle {
   font-family: var(--font-display, Georgia, serif);
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--rs-ink, #0E1218);
   margin-bottom: 2px;
@@ -179,26 +179,26 @@
   border-color: rgba(14, 18, 24, 0.22);
 }
 @media (max-width: 720px) {
-  .banner { flex-direction: column; align-items: flex-start; padding: 24px 20px; }
+  .banner { flex-direction: column; align-items: flex-start; padding: 14px 18px; }
 }
 
 /* ── Launch Offer Banner ─────────────────────────────────────── */
 .launchOffer {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 24px 28px;
+  gap: 16px;
+  padding: 14px 24px;
   border-radius: 16px;
   background: linear-gradient(135deg, rgba(184, 118, 45, 0.06), rgba(194, 106, 59, 0.04));
   border: 1.5px solid var(--plan-amber-mid);
-  margin-bottom: 36px;
+  margin-bottom: 24px;
   position: relative;
   overflow: hidden;
 }
 .launchOfferIcon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   background: linear-gradient(135deg, var(--plan-amber), var(--rs-burnt, #C26A3B));
   display: flex;
   align-items: center;
@@ -260,18 +260,18 @@
 
 /* ── Usage Card ──────────────────────────────────────────────── */
 .usageCard {
-  padding: 28px 32px;
+  padding: 16px 28px;
   border-radius: 16px;
   background: var(--rs-paper, #fff);
   border: 1px solid var(--rs-rule, rgba(14,18,24,0.07));
   box-shadow: 0 1px 3px rgba(14, 18, 24, 0.04);
-  margin-bottom: 36px;
+  margin-bottom: 24px;
 }
 .usageCardHead {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 .usageCardTitle {
   font-family: var(--font-display, Georgia, serif);
@@ -298,7 +298,7 @@
 .usageCardSub { font-size: 13px; color: var(--rs-text-mute, #9AA1B0); }
 .usageCardBig {
   font-family: var(--font-display, Georgia, serif);
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--plan-blueprint);
   letter-spacing: -0.01em;
@@ -341,18 +341,18 @@
 .hero {
   position: relative;
   text-align: center;
-  margin-bottom: 48px;
-  padding: 48px 0 32px;
+  margin-bottom: 24px;
+  padding: 24px 0 16px;
   overflow: visible;
 }
 .cityscape {
   position: absolute;
-  top: 60px;
+  top: 24px;
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
   max-width: 1100px;
-  height: 280px;
+  height: 200px;
   pointer-events: none;
   opacity: 0.85;
 }
@@ -364,7 +364,7 @@
 .heroContent {
   position: relative;
   z-index: 2;
-  padding-top: 200px;
+  padding-top: 140px;
 }
 .heroEyebrow {
   display: inline-flex;
@@ -376,7 +376,7 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--rs-text-mute, #9AA1B0);
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 .heroEyebrowDot {
   width: 6px;
@@ -390,7 +390,7 @@
   font-size: 46px;
   font-weight: 500;
   color: var(--rs-ink, #0E1218);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
@@ -402,7 +402,7 @@
   font-size: 15px;
   color: var(--rs-text-mute, #9AA1B0);
   max-width: 600px;
-  margin: 0 auto 24px;
+  margin: 0 auto 16px;
   line-height: 1.6;
 }
 .heroTrustRow {
@@ -432,14 +432,14 @@
   opacity: 0.4;
 }
 @media (max-width: 1100px) {
-  .cityscape { height: 200px; max-width: 90%; }
-  .heroContent { padding-top: 160px; }
+  .cityscape { height: 160px; max-width: 90%; }
+  .heroContent { padding-top: 110px; }
 }
 @media (max-width: 720px) {
   .heroTitle { font-size: 32px; }
   .heroSub { font-size: 14px; }
-  .cityscape { height: 140px; }
-  .heroContent { padding-top: 120px; }
+  .cityscape { height: 110px; }
+  .heroContent { padding-top: 90px; }
   .heroTrustDivider { display: none; }
   .heroTrustRow { gap: 8px; }
 }
@@ -449,7 +449,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 40px;
+  margin-bottom: 24px;
 }
 .scaleDividerLine {
   flex: 1;
