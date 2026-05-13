@@ -301,6 +301,14 @@ const T = {
   groupGrayBg:       { l: "rgba(75, 85, 99, 0.025)",                   d: "rgba(156, 163, 175, 0.04)" },
   groupGrayLabel:    { l: "#4B5563",                                   d: "#D1D5DB" },
 
+  // ── Slim Library ──────────────────────────────────────────────
+  slimStripBg:       { l: "#FFFFFF",                                    d: "rgba(10, 12, 16, 0.92)" },
+  slimStripBorder:   { l: "rgba(15, 20, 25, 0.10)",                     d: "rgba(255, 255, 255, 0.10)" },
+  slimBtnHover:      { l: "rgba(15, 20, 25, 0.04)",                     d: "rgba(255, 255, 255, 0.04)" },
+  slimDividerBg:     { l: "rgba(15, 20, 25, 0.08)",                     d: "rgba(255, 255, 255, 0.06)" },
+  drawerBg:          { l: "#FFFFFF",                                    d: "rgba(10, 12, 16, 0.95)" },
+  drawerHeaderBorder:{ l: "rgba(15, 20, 25, 0.06)",                     d: "rgba(255, 255, 255, 0.06)" },
+
   // ── Minimap ───────────────────────────────────────────────────
   minimapBg:       { l: "rgba(255, 255, 255, 0.92)",                   d: "rgba(10, 12, 14, 0.85)" },
   minimapBorder:   { l: "rgba(15, 20, 25, 0.10)",                      d: "rgba(184, 115, 51, 0.1)" },

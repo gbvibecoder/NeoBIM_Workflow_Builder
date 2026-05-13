@@ -27,7 +27,8 @@ import {
 import dynamic from "next/dynamic";
 import { BaseNode } from "@/features/canvas/components/nodes/BaseNode";
 import { AnimatedEdge } from "@/features/canvas/components/edges/AnimatedEdge";
-import { RightNodePanel } from "@/features/canvas/components/panels/RightNodePanel";
+import { SlimLibraryStrip } from "@/features/canvas/components/panels/SlimLibraryStrip";
+import { SlimLibraryDrawer } from "@/features/canvas/components/panels/SlimLibraryDrawer";
 import { CanvasToolbar } from "@/features/canvas/components/toolbar/CanvasToolbar";
 
 import { ExecutionLog } from "@/features/canvas/components/ExecutionLog";
@@ -974,8 +975,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
         )}
       </AnimatePresence>
 
-      {/* Right-side Node Library panel — canvas only */}
-      <RightNodePanel />
+      {/* Slim library — VS Code activity-rail UX (Z.CANVAS.SLIM-LIBRARY) */}
+      <SlimLibraryStrip />
+      <SlimLibraryDrawer />
 
       {/* Canvas area */}
       <div
@@ -1305,11 +1307,10 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
                 aria-label={tLocale('showcase.viewResults') ?? "View Results"}
                 style={{
                   // True-centered over the visible canvas. Compensate for the
-                  // right node-library width: 300px when open, 44px tab when
-                  // collapsed. Half of that width is added as a left offset.
+                  // Slim library strip is 56px — compensate for centering.
                   position: "absolute",
                   bottom: 28,
-                  left: `calc(50% - ${(isNodeLibraryOpen ? 300 : 44) / 2}px)`,
+                  left: `calc(50% - ${56 / 2}px)`,
                   transform: "translateX(-50%)",
                   zIndex: 12,
                   display: "inline-flex",
