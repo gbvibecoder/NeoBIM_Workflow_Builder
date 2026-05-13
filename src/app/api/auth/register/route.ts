@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
@@ -136,21 +136,36 @@ export async function POST(req: NextRequest) {
     // Fire-and-forget: don't block registration response on analytics
     trackSignup(user.id, source).catch(err => console.warn("[analytics]", err));
 
-    // Server-side conversion: Meta CAPI (fire-and-forget, bypasses ad blockers)
-    // Use event_id from client so Meta dedups browser pixel + server event.
-    // fbp/fbc come from the browser body (read from _fbp/_fbc cookies by the
-    // register page) — Meta needs them in the server payload to match identity
-    // against the browser pixel fire.
-    trackServerSignup({
-      email: normalizedEmail,
-      phone: normalizedPhone,
-      firstName: name?.split(" ")[0],
-      ip,
-      userAgent: req.headers.get("user-agent") || undefined,
-      eventId: typeof signupEventId === "string" ? signupEventId : undefined,
-      fbp: typeof fbp === "string" ? fbp : undefined,
-      fbc: typeof fbc === "string" ? fbc : undefined,
-    }).catch(err => console.warn("[meta-capi]", err));
+    // Server-side conversion: Meta CAPI (bypasses ad blockers). Use event_id
+    // from client so Meta dedups browser pixel + server event. fbp/fbc come
+    // from the browser body (read from _fbp/_fbc cookies by the register
+    // page) — Meta needs them in the server payload to match identity against
+    // the browser pixel fire.
+    //
+    // Wrapped in `after()` so the Graph API POST survives Vercel function
+    // suspension: a plain fire-and-forget can be killed mid-flight once
+    // NextResponse.json returns. Captured locals (normalizedEmail, ip, etc.)
+    // are closed over — no request.headers reads inside the callback.
+    const userAgent = req.headers.get("user-agent") || undefined;
+    const capiEventId = typeof signupEventId === "string" ? signupEventId : undefined;
+    const capiFbp = typeof fbp === "string" ? fbp : undefined;
+    const capiFbc = typeof fbc === "string" ? fbc : undefined;
+    after(async () => {
+      try {
+        await trackServerSignup({
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          firstName: name?.split(" ")[0],
+          ip,
+          userAgent,
+          eventId: capiEventId,
+          fbp: capiFbp,
+          fbc: capiFbc,
+        });
+      } catch (err) {
+        console.warn("[meta-capi]", err);
+      }
+    });
 
     // Claim referral if a code was provided (awaited — ensures bonuses are granted)
     if (referralCode && typeof referralCode === "string") {

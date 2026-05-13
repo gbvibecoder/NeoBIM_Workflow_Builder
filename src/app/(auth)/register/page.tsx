@@ -238,29 +238,14 @@ function RegisterForm() {
       if (referralCode) {
         localStorage.setItem("pending_referral_code", referralCode);
       }
-      // Google OAuth path: generate a browser-side eventID and stash it so a
-      // future enhancement can deterministically pair this fire with the server
-      // CAPI fire (currently keyed off `signup_oauth_${user.id}` in NextAuth's
-      // `events.createUser` — full dedup requires Pattern (b) in the audit).
-      const googleEventId = `signup_google_${crypto.randomUUID()}`;
-      try {
-        sessionStorage.setItem("bf_google_signup_event_id", googleEventId);
-      } catch {
-        // Storage may be unavailable (private mode / SSR); not fatal.
-      }
-      trackCompleteRegistration(
-        {
-          content_name: "google_signup",
-          value: META_EVENT_VALUE.REGISTRATION,
-          currency: META_CURRENCY,
-        },
-        { eventID: googleEventId },
-      );
-      // Google Ads conversion + sign_up_complete dataLayer push are DEFERRED
-      // to /onboard, which fires only when events.createUser confirms a
-      // freshly created user. Firing here would count cancellations at the
-      // Google consent screen and returning-user sign-ins as new signups.
-      // See src/app/onboard/GoogleAdsSignupFire.tsx.
+      // All conversion fires (Meta Pixel, Google Ads, GTM dataLayer) for the
+      // Google OAuth path are DEFERRED to /onboard via OnboardSignupTracking.
+      // Firing here would count consent-screen cancellations and returning-user
+      // sign-ins as new signups — that pattern caused a 332-event browser↔CAPI
+      // gap. This sessionStorage flag is the only thing we set here; it is one
+      // half of the double-gate that OnboardSignupTracking checks (the other
+      // half is the bf_signup_just_created cookie set by Auth.js
+      // events.createUser, which fires only for genuinely new user rows).
       sessionStorage.setItem("pending_google_signup_conversion", "1");
       await signIn("google", { callbackUrl: "/onboard" });
     } catch (err) {
