@@ -4,10 +4,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
 import { trackLogin } from "@/lib/analytics";
 import { trackServerSignup } from "@/lib/server-conversions";
+import { getOauthSignupEventId } from "@/lib/oauth-signup-event-id";
 import { normalizePhone } from "@/lib/form-validation";
 
 // Throttle DB role lookups: refresh at most once per 15 seconds per user.
@@ -138,26 +140,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       // Meta CAPI fire for OAuth signups (Google, etc.). Credentials signups
       // are tracked from `/api/auth/register/route.ts` with the client-pixel
-      // event_id and fbp/fbc — full dedup. Here we don't have access to the
-      // client-side eventID (no shared cookie was set before account creation),
-      // so we use a deterministic per-user ID. Browser pixel for Google OAuth
-      // currently fires its own randomly-generated eventID — full browser↔server
-      // dedup requires Pattern (b) from the audit (defer browser fire to
-      // /onboard where session.user.id is known). Filed as follow-up.
+      // event_id and fbp/fbc. The browser pixel for this OAuth path now fires
+      // from /onboard via OnboardSignupTracking using the same deterministic
+      // event_id helper — both sides must match byte-for-byte or Meta cannot
+      // dedup the pair.
+      //
+      // Wrapped in `after()` so the OAuth callback response is sent without
+      // waiting on Graph API latency, and so the in-flight POST is not killed
+      // by Vercel function suspension. _fbp/_fbc are captured BEFORE entering
+      // after() — cookies() read inside the callback would risk request-scope
+      // confusion across the post-response boundary.
       if (user.email) {
         try {
           const cookieStore = await cookies();
-          await trackServerSignup({
-            email: user.email,
-            firstName: user.name?.split(" ")[0],
-            eventId: `signup_oauth_${user.id}`,
-            fbp: cookieStore.get("_fbp")?.value,
-            fbc: cookieStore.get("_fbc")?.value,
+          const fbp = cookieStore.get("_fbp")?.value;
+          const fbc = cookieStore.get("_fbc")?.value;
+          const email = user.email;
+          const firstName = user.name?.split(" ")[0];
+          const eventId = getOauthSignupEventId(user.id);
+          after(async () => {
+            try {
+              await trackServerSignup({ email, firstName, eventId, fbp, fbc });
+            } catch (err) {
+              // Never block account creation if CAPI fails. Worst case: this
+              // OAuth signup is only counted on the browser pixel.
+              console.warn("[meta-capi] oauth signup fire failed:", err);
+            }
           });
         } catch (err) {
-          // Never block account creation if CAPI fails. Worst case: this
-          // OAuth signup is only counted on the browser pixel.
-          console.warn("[meta-capi] oauth signup fire failed:", err);
+          // after() throws if called outside a request scope. Should never
+          // happen in production (events.createUser runs inside the OAuth
+          // callback handler), but the catch keeps account creation alive.
+          console.warn("[meta-capi] oauth signup fire scheduling failed:", err);
         }
       }
     },

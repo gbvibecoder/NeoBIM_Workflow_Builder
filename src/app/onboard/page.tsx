@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { SurveyShell } from "@/features/onboarding-survey/components/SurveyShell";
 import type { SurveyRecord } from "@/features/onboarding-survey/types/survey";
-import { GoogleAdsSignupFire } from "./GoogleAdsSignupFire";
+import { OnboardSignupTracking } from "./OnboardSignupTracking";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,11 @@ export default async function OnboardPage() {
 
   return (
     <>
-      <GoogleAdsSignupFire />
+      <OnboardSignupTracking
+        userId={session.user.id}
+        userEmail={session.user.email ?? null}
+        userName={session.user.name ?? null}
+      />
       <SurveyShell initial={initial} />
     </>
   );
