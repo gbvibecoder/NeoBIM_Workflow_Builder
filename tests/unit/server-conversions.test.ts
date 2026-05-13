@@ -252,4 +252,93 @@ describe("server-conversions — Meta CAPI", () => {
       sha256Lower("Test@Example.com")
     );
   });
+
+  // ── Fire-time regression guards (Meta diagnostic immunity) ─────────────
+
+  it("REGRESSION: trackServerLead with value: 0 falls back to default (not raw 0)", async () => {
+    // `??` defaulting would let 0 through and re-flag Meta's diagnostic
+    // (Meta requires value > 0). The positiveValueOrFallback guard catches it.
+    const fetchSpy = installFetchSpy();
+    await mod.trackServerLead({
+      eventId: "lead-zero",
+      email: "x@y.com",
+      value: 0,
+      currency: "EUR",
+    });
+    const event = (fetchSpy.calls[0].body.data as Array<Record<string, unknown>>)[0];
+    const customData = event.custom_data as Record<string, unknown>;
+    expect(customData.value).toBe(1);
+    expect(customData.currency).toBe("EUR");
+  });
+
+  it("REGRESSION: trackServerLead with no value still carries value > 0 + currency", async () => {
+    const fetchSpy = installFetchSpy();
+    await mod.trackServerLead({
+      eventId: "lead-bare",
+      email: "x@y.com",
+    });
+    const event = (fetchSpy.calls[0].body.data as Array<Record<string, unknown>>)[0];
+    const customData = event.custom_data as Record<string, unknown>;
+    expect(typeof customData.value).toBe("number");
+    expect(customData.value as number).toBeGreaterThan(0);
+    expect(customData.currency).toBe("EUR");
+  });
+
+  it("REGRESSION: trackServerContact CAPI payload carries value + currency", async () => {
+    // Contact is the next standard event Meta would flag with the same
+    // diagnostic. Previously it sent custom_data with NO value/currency
+    // at all — this pins the fix in place.
+    const fetchSpy = installFetchSpy();
+    await mod.trackServerContact({
+      eventId: "contact-1",
+      email: "x@y.com",
+    });
+    const event = (fetchSpy.calls[0].body.data as Array<Record<string, unknown>>)[0];
+    const customData = event.custom_data as Record<string, unknown>;
+    expect(customData.value).toBe(1);
+    expect(customData.currency).toBe("EUR");
+  });
+
+  it("REGRESSION: trackServerPurchase SKIPS the CAPI fire if value is missing", async () => {
+    // Sending Purchase with value: 0 / undefined would corrupt ROAS and
+    // flag the diagnostic. The guard short-circuits before fetch.
+    const fetchSpy = installFetchSpy();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await mod.trackServerPurchase({
+      userId: "u1",
+      email: "buyer@x.com",
+      plan: "FREE",
+      // value omitted on purpose
+    });
+    expect(fetchSpy.calls.length).toBe(0);
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("REGRESSION: trackServerPurchase SKIPS the CAPI fire if value is 0", async () => {
+    const fetchSpy = installFetchSpy();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await mod.trackServerPurchase({
+      userId: "u1",
+      email: "buyer@x.com",
+      plan: "FREE",
+      value: 0,
+    });
+    expect(fetchSpy.calls.length).toBe(0);
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("trackServerPurchase fires normally when value > 0", async () => {
+    const fetchSpy = installFetchSpy();
+    await mod.trackServerPurchase({
+      userId: "u1",
+      email: "buyer@x.com",
+      plan: "PRO",
+      value: 20,
+      currency: "EUR",
+    });
+    expect(fetchSpy.calls.length).toBe(1);
+    const event = (fetchSpy.calls[0].body.data as Array<Record<string, unknown>>)[0];
+    expect(event.event_name).toBe("Purchase");
+    expect(event.custom_data).toMatchObject({ value: 20, currency: "EUR" });
+  });
 });
