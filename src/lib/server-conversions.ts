@@ -26,8 +26,21 @@ const META_CAPI_URL = `https://graph.facebook.com/${META_API_VERSION}/${META_PIX
 const META_EVENT_VALUE = {
   LEAD: 1,
   REGISTRATION: 1,
+  CONTACT: 1,
 } as const;
 const META_CURRENCY = "EUR" as const;
+
+/**
+ * Returns the caller's value if it's a positive number, otherwise the fallback.
+ * Guards against three failure modes that all flag Meta's diagnostic:
+ *   - `undefined` → fall through (covered by `??`)
+ *   - `null`      → fall through (covered by `??`)
+ *   - `0`         → fall through (NOT covered by `??`, this is the trap)
+ *   - negative    → fall through
+ */
+function positiveValueOrFallback(value: number | undefined | null, fallback: number): number {
+  return typeof value === "number" && value > 0 ? value : fallback;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -164,6 +177,17 @@ export async function trackServerPurchase(params: {
   fbp?: string;
   fbc?: string;
 }): Promise<void> {
+  // Hard guard: Purchase MUST carry a positive value or we don't fire at all.
+  // Meta's "Send valid price and currency information" diagnostic flags any
+  // Purchase with value <= 0 — and sending value: 0 would also corrupt ROAS
+  // modelling. Better to drop the fire and log loudly than misreport revenue.
+  if (typeof params.value !== "number" || params.value <= 0) {
+    console.warn(
+      "[trackServerPurchase] skipping CAPI fire — value missing or non-positive",
+      { plan: params.plan, value: params.value },
+    );
+    return;
+  }
   const eventId = getPurchaseEventId(params.userId, params.plan);
 
   await sendMetaConversion({
@@ -181,7 +205,12 @@ export async function trackServerPurchase(params: {
     customData: {
       content_name: `BuildFlow ${params.plan} Plan`,
       currency: params.currency || META_CURRENCY,
-      value: params.value || 0,
+      // Purchase value is plan-specific; if the caller couldn't compute one
+      // (e.g. FREE plan accidentally routed to this fire path) we'd rather
+      // skip the fire than send `value: 0`, which both flags Meta's
+      // diagnostic AND pollutes ROAS modelling with a fake zero-revenue
+      // purchase. The guard above short-circuits in that case.
+      value: params.value as number,
     },
     eventSourceUrl: "https://trybuildflow.in/thank-you/subscription",
   });
@@ -215,7 +244,10 @@ export async function trackServerLead(params: {
     },
     customData: {
       content_name: params.contentName || "BuildFlow Lead",
-      value: params.value ?? META_EVENT_VALUE.LEAD,
+      // `??` falls through on null/undefined but NOT on 0 — use the explicit
+      // guard so any caller that ever passes `value: 0` still gets the
+      // fallback instead of triggering Meta's diagnostic.
+      value: positiveValueOrFallback(params.value, META_EVENT_VALUE.LEAD),
       currency: params.currency || META_CURRENCY,
     },
     eventSourceUrl: params.eventSourceUrl,
@@ -232,6 +264,8 @@ export async function trackServerContact(params: {
   fbp?: string;
   fbc?: string;
   contentName?: string;
+  value?: number;
+  currency?: string;
   eventSourceUrl?: string;
 }): Promise<void> {
   await sendMetaConversion({
@@ -248,6 +282,11 @@ export async function trackServerContact(params: {
     },
     customData: {
       content_name: params.contentName || "BuildFlow Contact",
+      // Contact is a signal event (same family as Lead/CompleteRegistration).
+      // Meta requires `value > 0` + `currency` on every fire to keep ROAS
+      // modelling honest, so we apply the same default here.
+      value: positiveValueOrFallback(params.value, META_EVENT_VALUE.CONTACT),
+      currency: params.currency || META_CURRENCY,
     },
     eventSourceUrl: params.eventSourceUrl,
   });

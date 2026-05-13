@@ -10,18 +10,38 @@ const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2072969213494487
  * in sync. Currency unified on EUR for ad-platform reporting; per-plan
  * Purchase amounts live in `plan-pricing.ts` (`getPlanValueEUR`).
  *
- * LEAD and REGISTRATION are flat €1 — these aren't revenue, just signals,
- * but Meta requires a numeric `value` + `currency` on every fire (otherwise
- * the "Send valid price and currency information" diagnostic flags 100%).
+ * LEAD / REGISTRATION / CONTACT are flat €1 — these aren't revenue, just
+ * signals, but Meta requires a numeric `value` + `currency` on every fire
+ * (otherwise the "Send valid price and currency information" diagnostic
+ * flags 100% of those events).
  */
 export const META_EVENT_VALUE = {
   LEAD: 1,
   REGISTRATION: 1,
+  CONTACT: 1,
 } as const;
 export const META_CURRENCY = "EUR" as const;
 
 type FbqParams = Record<string, string | number | boolean | undefined>;
 type FbqOptions = { eventID?: string };
+
+/**
+ * Enrich pixel params with default value+currency so a caller that forgets
+ * to pass them cannot reintroduce Meta's "missing value/currency" diagnostic.
+ * Caller-supplied keys win — the spread order is defaults-first.
+ *
+ * `signalKey` is used for events with a fixed flat value (Lead, Registration,
+ * Contact). For revenue events (Purchase, InitiateCheckout) where `value`
+ * varies per plan, pass `null` so only `currency` is defaulted.
+ */
+function withDefaults(
+  params: FbqParams | undefined,
+  signalKey: keyof typeof META_EVENT_VALUE | null
+): FbqParams {
+  const defaults: FbqParams = { currency: META_CURRENCY };
+  if (signalKey) defaults.value = META_EVENT_VALUE[signalKey];
+  return { ...defaults, ...(params ?? {}) };
+}
 
 declare global {
   interface Window {
@@ -53,22 +73,25 @@ function fbq(
 /** Track a lead generation event (form submissions, workflow requests) */
 export function trackLead(params?: FbqParams, options?: FbqOptions) {
   if (!isMetaTrackingAllowedBrowser()) return;
-  fbq("track", "Lead", params, options);
-  pushToDataLayer("generate_lead", params);
+  const enriched = withDefaults(params, "LEAD");
+  fbq("track", "Lead", enriched, options);
+  pushToDataLayer("generate_lead", enriched);
 }
 
 /** Track a completed registration (requires eventID for server-side dedup) */
 export function trackCompleteRegistration(params?: FbqParams, options?: FbqOptions) {
   if (!isMetaTrackingAllowedBrowser()) return;
-  fbq("track", "CompleteRegistration", params, options);
-  pushToDataLayer("sign_up", { ...params, ...(options?.eventID && { event_id: options.eventID }) });
+  const enriched = withDefaults(params, "REGISTRATION");
+  fbq("track", "CompleteRegistration", enriched, options);
+  pushToDataLayer("sign_up", { ...enriched, ...(options?.eventID && { event_id: options.eventID }) });
 }
 
 /** Track a contact form submission */
 export function trackContact(params?: FbqParams, options?: FbqOptions) {
   if (!isMetaTrackingAllowedBrowser()) return;
-  fbq("track", "Contact", params, options);
-  pushToDataLayer("contact_form", params);
+  const enriched = withDefaults(params, "CONTACT");
+  fbq("track", "Contact", enriched, options);
+  pushToDataLayer("contact_form", enriched);
 }
 
 /** Track a content view (e.g., viewing a specific workflow or page) */
@@ -85,18 +108,23 @@ export function trackRegisterPageView() {
   pushToDataLayer("view_register_page");
 }
 
-/** Track a successful purchase/subscription (requires eventID for server-side dedup) */
+/** Track a successful purchase/subscription (requires eventID for server-side dedup).
+ *  Value is variable per plan (see `getPlanValueEUR`) and must come from the
+ *  caller; only currency is defaulted here. */
 export function trackPurchase(params?: FbqParams, options?: FbqOptions) {
   if (!isMetaTrackingAllowedBrowser()) return;
-  fbq("track", "Purchase", params, options);
-  pushToDataLayer("purchase", { ...params, ...(options?.eventID && { event_id: options.eventID }) });
+  const enriched = withDefaults(params, null);
+  fbq("track", "Purchase", enriched, options);
+  pushToDataLayer("purchase", { ...enriched, ...(options?.eventID && { event_id: options.eventID }) });
 }
 
-/** Track intent-to-purchase — fires when user clicks a paid-plan CTA. */
+/** Track intent-to-purchase — fires when user clicks a paid-plan CTA.
+ *  Same value-is-caller's-responsibility rule as `trackPurchase`. */
 export function trackInitiateCheckout(params?: FbqParams, options?: FbqOptions) {
   if (!isMetaTrackingAllowedBrowser()) return;
-  fbq("track", "InitiateCheckout", params, options);
-  pushToDataLayer("begin_checkout", params);
+  const enriched = withDefaults(params, null);
+  fbq("track", "InitiateCheckout", enriched, options);
+  pushToDataLayer("begin_checkout", enriched);
 }
 
 /** Track a returning-user login. Not a Meta standard event — uses trackCustom. */

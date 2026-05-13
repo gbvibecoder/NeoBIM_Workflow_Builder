@@ -83,10 +83,12 @@ describe("meta-pixel — track helpers", () => {
       { content_name: "BuildFlow Signup" },
       { eventID: "evt-123" }
     );
+    // Wrapper auto-enriches with value + currency so Meta's diagnostic
+    // cannot fail even if the caller forgot to pass them.
     expect(stub.fbqCalls[0]).toEqual([
       "track",
       "CompleteRegistration",
-      { content_name: "BuildFlow Signup" },
+      { value: 1, currency: "EUR", content_name: "BuildFlow Signup" },
       { eventID: "evt-123" },
     ]);
     expect(stub.dataLayer.at(-1)).toMatchObject({
@@ -101,7 +103,7 @@ describe("meta-pixel — track helpers", () => {
     expect(stub.fbqCalls[0]).toEqual([
       "track",
       "Contact",
-      { source: "contact-page" },
+      { value: 1, currency: "EUR", source: "contact-page" },
     ]);
     expect(stub.dataLayer.at(-1)).toMatchObject({
       event: "contact_form",
@@ -147,10 +149,12 @@ describe("meta-pixel — track helpers", () => {
 
   it("trackInitiateCheckout → fbq('track','InitiateCheckout') + 'begin_checkout'", () => {
     mod.trackInitiateCheckout({ plan: "PRO" });
+    // Revenue event: only currency is defaulted; value must come from caller
+    // (here this is a partial test fixture, so no value is asserted).
     expect(stub.fbqCalls[0]).toEqual([
       "track",
       "InitiateCheckout",
-      { plan: "PRO" },
+      { currency: "EUR", plan: "PRO" },
     ]);
     expect(stub.dataLayer.at(-1)).toMatchObject({
       event: "begin_checkout",
@@ -413,6 +417,100 @@ describe("meta-pixel — value/currency contract (Meta diagnostic guard)", () =>
     const keys = Object.keys(mod.META_EVENT_VALUE);
     expect(keys).not.toContain("LEAD_INR");
     expect(keys).not.toContain("REGISTRATION_INR");
+  });
+
+  it("META_EVENT_VALUE.CONTACT is a positive number (Contact is the next event Meta would flag)", () => {
+    expect(typeof mod.META_EVENT_VALUE.CONTACT).toBe("number");
+    expect(mod.META_EVENT_VALUE.CONTACT).toBeGreaterThan(0);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// FIRE-TIME REGRESSION GUARDS — these prove the wrapper itself enriches every
+// fire with value+currency. They are the assertions that catch the failure
+// mode the constants-only tests above CAN'T catch: a future caller that
+// passes empty / partial params and would otherwise re-introduce Meta's
+// "Send valid price and currency information" diagnostic.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe("meta-pixel — wrapper enriches every fire (diagnostic immunity)", () => {
+  let stub: PixelStub;
+  let mod: typeof import("@/lib/meta-pixel");
+
+  beforeEach(async () => {
+    clearWindow();
+    stub = installPixelStub();
+    vi.resetModules();
+    mod = await import("@/lib/meta-pixel");
+  });
+
+  afterEach(() => clearWindow());
+
+  it("trackLead() with NO params still fires with value + currency", () => {
+    mod.trackLead();
+    const params = stub.fbqCalls[0]?.[2] as Record<string, unknown>;
+    expect(params).toBeTruthy();
+    expect(params.value).toBe(1);
+    expect(params.currency).toBe("EUR");
+  });
+
+  it("trackLead({}) with empty params still fires with value + currency", () => {
+    mod.trackLead({});
+    const params = stub.fbqCalls[0]?.[2] as Record<string, unknown>;
+    expect(params.value).toBe(1);
+    expect(params.currency).toBe("EUR");
+  });
+
+  it("trackLead({content_name:'x'}) — caller content_name preserved, defaults still applied", () => {
+    mod.trackLead({ content_name: "newsletter" });
+    const params = stub.fbqCalls[0]?.[2] as Record<string, unknown>;
+    expect(params.value).toBe(1);
+    expect(params.currency).toBe("EUR");
+    expect(params.content_name).toBe("newsletter");
+  });
+
+  it("trackLead — caller-supplied value+currency override the defaults (no clobber)", () => {
+    mod.trackLead({ value: 25, currency: "USD" });
+    const params = stub.fbqCalls[0]?.[2] as Record<string, unknown>;
+    expect(params.value).toBe(25);
+    expect(params.currency).toBe("USD");
+  });
+
+  it("trackCompleteRegistration() with NO params still fires with value + currency", () => {
+    mod.trackCompleteRegistration();
+    const params = stub.fbqCalls[0]?.[2] as Record<string, unknown>;
+    expect(params.value).toBe(1);
+    expect(params.currency).toBe("EUR");
+  });
+
+  it("trackContact() with NO params still fires with value + currency", () => {
+    mod.trackContact();
+    const params = stub.fbqCalls[0]?.[2] as Record<string, unknown>;
+    expect(params.value).toBe(1);
+    expect(params.currency).toBe("EUR");
+  });
+
+  it("trackPurchase — revenue event defaults currency to EUR (value is caller's responsibility)", () => {
+    mod.trackPurchase({ value: 20 }, { eventID: "p-1" });
+    const params = stub.fbqCalls[0]?.[2] as Record<string, unknown>;
+    expect(params.value).toBe(20);
+    expect(params.currency).toBe("EUR");
+  });
+
+  it("trackInitiateCheckout — revenue event defaults currency to EUR (value caller-supplied)", () => {
+    mod.trackInitiateCheckout({ value: 8 });
+    const params = stub.fbqCalls[0]?.[2] as Record<string, unknown>;
+    expect(params.value).toBe(8);
+    expect(params.currency).toBe("EUR");
+  });
+
+  it("dataLayer push also carries enriched value+currency (GTM/GA4 consistency)", () => {
+    mod.trackLead();
+    expect(stub.dataLayer.at(-1)).toMatchObject({
+      event: "generate_lead",
+      value: 1,
+      currency: "EUR",
+    });
   });
 });
 
