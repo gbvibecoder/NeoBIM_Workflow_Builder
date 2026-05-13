@@ -181,6 +181,111 @@
   --canvas-lib-count-border:    rgba(0, 245, 255, 0.12);
   --canvas-lib-count-text:      rgba(0, 245, 255, 0.5);
   --canvas-lib-grip:            rgba(255, 255, 255, 0.2);
+
+  /* ── Z.CANVAS.2A: Node tokens ────────────────────────────────── */
+  --canvas-node-bg:               rgba(10, 12, 14, 0.75);
+  --canvas-node-border:           rgba(255, 255, 255, 0.08);
+  --canvas-node-border-hover:     rgba(255, 255, 255, 0.15);
+  --canvas-node-shadow:           0 4px 24px rgba(0,0,0,0.5);
+  --canvas-node-shadow-hover:     0 16px 48px rgba(0,0,0,0.65);
+  --canvas-node-shadow-selected:  0 16px 48px rgba(0,0,0,0.65);
+  --canvas-node-divider:          rgba(255, 255, 255, 0.06);
+  --canvas-node-footer-bg:        rgba(0, 0, 0, 0.2);
+  --canvas-node-stat-bg:          rgba(184, 115, 51, 0.08);
+  --canvas-node-stat-border:      rgba(184, 115, 51, 0.15);
+  --canvas-node-status-idle-bg:     transparent;
+  --canvas-node-status-idle-text:   rgba(255, 255, 255, 0.4);
+  --canvas-node-status-running-bg:  rgba(255, 191, 0, 0.12);
+  --canvas-node-status-running-text:#FFBF00;
+  --canvas-node-status-success-bg:  rgba(16, 185, 129, 0.12);
+  --canvas-node-status-success-text:#10B981;
+  --canvas-node-status-error-bg:    rgba(239, 68, 68, 0.12);
+  --canvas-node-status-error-text:  #EF4444;
+  --canvas-node-progress-track:   rgba(255, 191, 0, 0.10);
+
+  /* ── Z.CANVAS.2B: Power feature tokens ───────────────────────── */
+
+  /* Edge type label chips */
+  --canvas-edge-callout-bg:       rgba(10, 12, 16, 0.95);
+  --canvas-edge-callout-text:     #9898B0;
+  --canvas-edge-callout-border:   rgba(255, 255, 255, 0.10);
+
+  /* Canvas Controls cluster */
+  --canvas-control-bg:            rgba(10, 12, 16, 0.88);
+  --canvas-control-border:        rgba(255, 255, 255, 0.08);
+  --canvas-control-shadow:        0 4px 24px rgba(0,0,0,0.4);
+  --canvas-control-btn-hover:     rgba(255, 255, 255, 0.06);
+  --canvas-control-btn-active-bg: rgba(0, 245, 255, 0.10);
+  --canvas-control-btn-active-text: #00F5FF;
+  --canvas-control-btn-text:      rgba(255, 255, 255, 0.7);
+
+  /* Quick Search palette */
+  --canvas-qs-overlay:            rgba(0, 0, 0, 0.65);
+  --canvas-qs-modal-bg:           rgba(12, 13, 16, 0.98);
+  --canvas-qs-modal-border:       rgba(255, 255, 255, 0.10);
+  --canvas-qs-modal-shadow:       0 16px 48px rgba(0, 0, 0, 0.6);
+  --canvas-qs-input-text:         #F0F0F5;
+  --canvas-qs-input-placeholder:  rgba(255, 255, 255, 0.35);
+  --canvas-qs-row-hover:          rgba(255, 255, 255, 0.06);
+  --canvas-qs-row-active:         rgba(0, 245, 255, 0.10);
+  --canvas-qs-section-label:      rgba(255, 255, 255, 0.5);
+  --canvas-qs-foot-bg:            rgba(7, 8, 9, 0.92);
+  --canvas-qs-foot-border:        rgba(255, 255, 255, 0.06);
+  --canvas-qs-kbd-bg:             rgba(255, 255, 255, 0.04);
+  --canvas-qs-kbd-border:         rgba(255, 255, 255, 0.10);
+  --canvas-qs-kbd-text:           rgba(255, 255, 255, 0.7);
+
+  /* Smart connect ghost preview */
+  --canvas-ghost-edge:            #00F5FF;
+  --canvas-ghost-edge-invalid:    #EF4444;
+  --canvas-ghost-port-valid:      rgba(0, 245, 255, 0.25);
+  --canvas-ghost-port-invalid:    rgba(239, 68, 68, 0.15);
+
+  /* Smart guides (alignment lines) */
+  --canvas-guide-line:            #EC4899;
+  --canvas-guide-label-bg:        #EC4899;
+  --canvas-guide-label-text:      #FFFFFF;
+
+  /* ── Z.CANVAS.SCHEMA: Sticky comment tokens ──────────────────── */
+  --canvas-sticky-bg:             linear-gradient(180deg, rgba(254,243,199,0.95), rgba(253,230,138,0.95));
+  --canvas-sticky-border:         rgba(180, 83, 9, 0.40);
+  --canvas-sticky-text:           rgba(40, 16, 2, 0.95);
+  --canvas-sticky-text-meta:      rgba(80, 35, 10, 0.80);
+  --canvas-sticky-resolved:       rgba(0, 0, 0, 0.30);
+
+  /* Comment thread modal */
+  --canvas-thread-bg:             rgba(12, 13, 16, 0.98);
+  --canvas-thread-border:         rgba(255, 255, 255, 0.10);
+  --canvas-thread-shadow:         0 16px 48px rgba(0, 0, 0, 0.6);
+  --canvas-thread-divider:        rgba(255, 255, 255, 0.06);
+  --canvas-thread-input-bg:       rgba(255, 255, 255, 0.04);
+  --canvas-thread-input-border:   rgba(255, 255, 255, 0.10);
+
+  /* Group frame palette */
+  --canvas-group-purple:          rgba(139, 92, 246, 0.40);
+  --canvas-group-purple-bg:       rgba(139, 92, 246, 0.04);
+  --canvas-group-purple-label:    #B79CFA;
+  --canvas-group-blue:            rgba(96, 165, 250, 0.40);
+  --canvas-group-blue-bg:         rgba(96, 165, 250, 0.04);
+  --canvas-group-blue-label:      #93BBFC;
+  --canvas-group-green:           rgba(74, 222, 128, 0.40);
+  --canvas-group-green-bg:        rgba(74, 222, 128, 0.04);
+  --canvas-group-green-label:     #86EFAC;
+  --canvas-group-orange:          rgba(251, 146, 60, 0.40);
+  --canvas-group-orange-bg:       rgba(251, 146, 60, 0.04);
+  --canvas-group-orange-label:    #FDBA74;
+  --canvas-group-gray:            rgba(156, 163, 175, 0.40);
+  --canvas-group-gray-bg:         rgba(156, 163, 175, 0.04);
+  --canvas-group-gray-label:      #D1D5DB;
+  --canvas-group-label-bg:        rgba(10, 12, 16, 0.95);
+  --canvas-group-label-border:    rgba(255, 255, 255, 0.10);
+  --canvas-group-resize-handle:   rgba(255, 255, 255, 0.20);
+
+  /* ── Z.CANVAS.COLLAB-COMPLETE tokens ─────────────────────────── */
+  --canvas-mention-pop-bg:        rgba(12, 13, 16, 0.98);
+  --canvas-mention-pop-border:    rgba(255, 255, 255, 0.10);
+  --canvas-mention-pop-shadow:    0 8px 24px rgba(0, 0, 0, 0.6);
+  --canvas-group-dragging-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Light Theme V3 (Modern Creative Studio) ──────────────────── */
@@ -362,6 +467,111 @@
   --canvas-lib-count-border:    rgba(37, 99, 235, 0.12);
   --canvas-lib-count-text:      #2563EB;
   --canvas-lib-grip:            #BCC2CE;
+
+  /* ── Z.CANVAS.2A: Node tokens ────────────────────────────────── */
+  --canvas-node-bg:               #FFFFFF;
+  --canvas-node-border:           rgba(15, 20, 25, 0.10);
+  --canvas-node-border-hover:     rgba(15, 20, 25, 0.16);
+  --canvas-node-shadow:           0 2px 4px rgba(15,20,25,0.04), 0 4px 12px rgba(15,20,25,0.06);
+  --canvas-node-shadow-hover:     0 4px 8px rgba(15,20,25,0.04), 0 12px 32px rgba(15,20,25,0.08);
+  --canvas-node-shadow-selected:  0 4px 8px rgba(15,20,25,0.04), 0 12px 32px rgba(15,20,25,0.08), 0 0 0 3px rgba(37, 99, 235, 0.18);
+  --canvas-node-divider:          rgba(15, 20, 25, 0.06);
+  --canvas-node-footer-bg:        #FBFAF7;
+  --canvas-node-stat-bg:          #FBFAF7;
+  --canvas-node-stat-border:      rgba(15, 20, 25, 0.06);
+  --canvas-node-status-idle-bg:     #FBFAF7;
+  --canvas-node-status-idle-text:   #8089A0;
+  --canvas-node-status-running-bg:  rgba(37, 99, 235, 0.10);
+  --canvas-node-status-running-text:#2563EB;
+  --canvas-node-status-success-bg:  rgba(5, 150, 105, 0.10);
+  --canvas-node-status-success-text:#059669;
+  --canvas-node-status-error-bg:    rgba(220, 38, 38, 0.10);
+  --canvas-node-status-error-text:  #DC2626;
+  --canvas-node-progress-track:   rgba(37, 99, 235, 0.10);
+
+  /* ── Z.CANVAS.2B: Power feature tokens ───────────────────────── */
+
+  /* Edge type label chips */
+  --canvas-edge-callout-bg:       rgba(255, 255, 255, 0.96);
+  --canvas-edge-callout-text:     #4A5360;
+  --canvas-edge-callout-border:   rgba(15, 20, 25, 0.10);
+
+  /* Canvas Controls cluster */
+  --canvas-control-bg:            #FFFFFF;
+  --canvas-control-border:        rgba(15, 20, 25, 0.10);
+  --canvas-control-shadow:        0 1px 2px rgba(15,20,25,0.04), 0 1px 4px rgba(15,20,25,0.04);
+  --canvas-control-btn-hover:     #FBFAF7;
+  --canvas-control-btn-active-bg: #DBE5FF;
+  --canvas-control-btn-active-text: #1E40AF;
+  --canvas-control-btn-text:      #4A5360;
+
+  /* Quick Search palette */
+  --canvas-qs-overlay:            rgba(15, 20, 25, 0.35);
+  --canvas-qs-modal-bg:           #FFFFFF;
+  --canvas-qs-modal-border:       rgba(15, 20, 25, 0.10);
+  --canvas-qs-modal-shadow:       0 8px 16px rgba(15,20,25,0.06), 0 24px 64px rgba(15,20,25,0.10);
+  --canvas-qs-input-text:         #0F1419;
+  --canvas-qs-input-placeholder:  #BCC2CE;
+  --canvas-qs-row-hover:          #FBFAF7;
+  --canvas-qs-row-active:         rgba(37, 99, 235, 0.08);
+  --canvas-qs-section-label:      #8089A0;
+  --canvas-qs-foot-bg:            #FBFAF7;
+  --canvas-qs-foot-border:        rgba(15, 20, 25, 0.06);
+  --canvas-qs-kbd-bg:             #FFFFFF;
+  --canvas-qs-kbd-border:         rgba(15, 20, 25, 0.10);
+  --canvas-qs-kbd-text:           #4A5360;
+
+  /* Smart connect ghost preview */
+  --canvas-ghost-edge:            #2563EB;
+  --canvas-ghost-edge-invalid:    #DC2626;
+  --canvas-ghost-port-valid:      rgba(37, 99, 235, 0.20);
+  --canvas-ghost-port-invalid:    rgba(220, 38, 38, 0.15);
+
+  /* Smart guides (alignment lines) */
+  --canvas-guide-line:            #EC4899;
+  --canvas-guide-label-bg:        #EC4899;
+  --canvas-guide-label-text:      #FFFFFF;
+
+  /* ── Z.CANVAS.SCHEMA: Sticky comment tokens ──────────────────── */
+  --canvas-sticky-bg:             linear-gradient(180deg, #FEF3C7, #FDE68A);
+  --canvas-sticky-border:         rgba(180, 83, 9, 0.20);
+  --canvas-sticky-text:           rgba(69, 26, 3, 0.95);
+  --canvas-sticky-text-meta:      rgba(120, 53, 15, 0.85);
+  --canvas-sticky-resolved:       rgba(15, 20, 25, 0.06);
+
+  /* Comment thread modal */
+  --canvas-thread-bg:             #FFFFFF;
+  --canvas-thread-border:         rgba(15, 20, 25, 0.10);
+  --canvas-thread-shadow:         0 8px 32px rgba(15, 20, 25, 0.10);
+  --canvas-thread-divider:        rgba(15, 20, 25, 0.06);
+  --canvas-thread-input-bg:       #FBFAF7;
+  --canvas-thread-input-border:   rgba(15, 20, 25, 0.10);
+
+  /* Group frame palette */
+  --canvas-group-purple:          rgba(124, 58, 237, 0.30);
+  --canvas-group-purple-bg:       rgba(124, 58, 237, 0.025);
+  --canvas-group-purple-label:    #7C3AED;
+  --canvas-group-blue:            rgba(37, 99, 235, 0.30);
+  --canvas-group-blue-bg:         rgba(37, 99, 235, 0.025);
+  --canvas-group-blue-label:      #2563EB;
+  --canvas-group-green:           rgba(21, 128, 61, 0.30);
+  --canvas-group-green-bg:        rgba(21, 128, 61, 0.025);
+  --canvas-group-green-label:     #15803D;
+  --canvas-group-orange:          rgba(234, 88, 12, 0.30);
+  --canvas-group-orange-bg:       rgba(234, 88, 12, 0.025);
+  --canvas-group-orange-label:    #EA580C;
+  --canvas-group-gray:            rgba(75, 85, 99, 0.30);
+  --canvas-group-gray-bg:         rgba(75, 85, 99, 0.025);
+  --canvas-group-gray-label:      #4B5563;
+  --canvas-group-label-bg:        #FFFFFF;
+  --canvas-group-label-border:    rgba(15, 20, 25, 0.10);
+  --canvas-group-resize-handle:   rgba(15, 20, 25, 0.20);
+
+  /* ── Z.CANVAS.COLLAB-COMPLETE tokens ─────────────────────────── */
+  --canvas-mention-pop-bg:        #FFFFFF;
+  --canvas-mention-pop-border:    rgba(15, 20, 25, 0.10);
+  --canvas-mention-pop-shadow:    0 4px 12px rgba(15,20,25,0.08);
+  --canvas-group-dragging-shadow: 0 4px 16px rgba(15, 20, 25, 0.10);
 }
 
 /* ── Atmospheric mesh overlay (light theme only) ──────────────── */
@@ -378,4 +588,39 @@
 /* Hidden in dark theme */
 .canvas-theme-dark .bf-canvas-surface::before {
   display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Z.CANVAS.2B Phase 7 — Mobile responsive rules
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hide minimap + canvas controls on mobile (<768px) */
+@media (max-width: 767px) {
+  .canvas-minimap { display: none !important; }
+  /* Quick search: full-screen on mobile */
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Z.CANVAS.2B Phase 8 — Reduced motion audit
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Disable all canvas CSS animations */
+  @keyframes atelier-flow { from, to { stroke-dashoffset: 0; } }
+  @keyframes atelier-float-1 { from, to { transform: none; } }
+  @keyframes atelier-pulse { from, to { opacity: 1; } }
+  @keyframes accent-pulse { from, to { opacity: 1; } }
+  @keyframes shimmer { from, to { transform: none; } }
+  @keyframes spin-slow { from, to { transform: none; } }
+  @keyframes pulseInputBorder { from, to { border-color: inherit; } }
+
+  /* Edge type chips always visible (no hover dependency) */
+  .edge-type-chip { opacity: 1 !important; transition: none !important; }
+
+  /* Disable all transitions on canvas chrome */
+  .canvas-theme-light *,
+  .canvas-theme-dark * {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
 }

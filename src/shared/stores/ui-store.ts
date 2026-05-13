@@ -3,6 +3,7 @@
 import { create } from "zustand";
 
 type PanelId = "nodeLibrary" | "executionHistory" | "workflowMeta" | "none";
+export type CanvasMode = "select" | "comment" | "group";
 
 interface UIState {
   // Panel visibility
@@ -16,6 +17,8 @@ interface UIState {
 
   // Canvas state
   canvasZoom: number;
+  canvasMode: CanvasMode;
+  setCanvasMode: (mode: CanvasMode) => void;
 
   // Modal states
   isRequestDialogOpen: boolean;
@@ -69,6 +72,8 @@ export const useUIStore = create<UIState>()((set) => ({
 
   selectedNodeIds: [],
   canvasZoom: 1,
+  canvasMode: "select",
+  setCanvasMode: (mode) => set({ canvasMode: mode }),
 
   isRequestDialogOpen: false,
   isNewWorkflowDialogOpen: false,
@@ -133,3 +138,5 @@ export const selectIsDemoMode = (s: UIState) => s.isDemoMode;
 export const selectActivePanel = (s: UIState) => s.activePanel;
 export const selectSelectedNodeIds = (s: UIState) => s.selectedNodeIds;
 export const selectIsNodeLibraryOpen = (s: UIState) => s.isNodeLibraryOpen;
+export const selectCanvasMode = (s: UIState) => s.canvasMode;
+export const selectSetCanvasMode = (s: UIState) => s.setCanvasMode;

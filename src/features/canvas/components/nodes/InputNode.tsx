@@ -12,7 +12,8 @@ import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import type { WorkflowNodeData } from "@/types/nodes";
 import { formatBytes } from "@/lib/utils";
-import { nodeText } from "@/features/canvas/components/nodes/node-text-styles";
+import { nodeText, nodeTextLight } from "@/features/canvas/components/nodes/node-text-styles";
+import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 
 // ─── File store (module-level, not in Zustand — files can't serialize) ───────
 export const inputFileStore = new Map<string, File>();
@@ -28,6 +29,8 @@ function stopAll(e: React.SyntheticEvent) {
 export const TextPromptInput = memo(function TextPromptInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
+  const { theme } = useCanvasTheme();
+  const isLight = theme === "light";
   const value = (data.inputValue as string) ?? "";
 
   const onChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -37,6 +40,7 @@ export const TextPromptInput = memo(function TextPromptInput({ nodeId, data }: {
   }, [nodeId, updateNode]);
 
   const isEmpty = !value.trim();
+  const nt = isLight ? nodeTextLight : nodeText;
 
   return (
     <div className="nodrag nowheel nopan" onMouseDown={stopAll} onClick={stopAll} onKeyDown={stopAll}>
@@ -48,19 +52,22 @@ export const TextPromptInput = memo(function TextPromptInput({ nodeId, data }: {
         style={{
           width: "100%", resize: "none", boxSizing: "border-box",
           marginTop: 8, padding: "12px",
-          background: isEmpty ? "rgba(0,245,255,0.04)" : "rgba(0,0,0,0.3)",
-          borderRadius: 4,
-          border: isEmpty
-            ? "1px solid rgba(0,245,255,0.3)"
-            : "1px solid rgba(255,255,255,0.08)",
-          color: "#F0F0F5", fontSize: 13, lineHeight: 1.5,
+          background: isLight
+            ? (isEmpty ? "rgba(30, 64, 175, 0.03)" : "#FFFFFF")
+            : (isEmpty ? "rgba(0,245,255,0.04)" : "rgba(0,0,0,0.3)"),
+          borderRadius: isLight ? 6 : 4,
+          border: isLight
+            ? (isEmpty ? "1px solid rgba(30, 64, 175, 0.20)" : "1px solid rgba(15, 20, 25, 0.10)")
+            : (isEmpty ? "1px solid rgba(0,245,255,0.3)" : "1px solid rgba(255,255,255,0.08)"),
+          color: isLight ? "#0F1419" : "#F0F0F5",
+          fontSize: 13, lineHeight: 1.5,
           fontFamily: "inherit", outline: "none",
-          animation: isEmpty ? "pulseInputBorder 2s ease-in-out infinite" : "none",
+          animation: !isLight && isEmpty ? "pulseInputBorder 2s ease-in-out infinite" : "none",
           transition: "all 150ms ease",
         }}
       />
       <div style={{
-        ...nodeText.meta,
+        ...nt.meta,
         textAlign: "right", marginTop: 4,
       }}>
         {value.length} / 2000
@@ -83,6 +90,8 @@ interface FileUploadProps {
 export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showPreview }: FileUploadProps) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
+  const { theme } = useCanvasTheme();
+  const isLight = theme === "light";
   const inputRef = useRef<HTMLInputElement>(null);
   const fileName = data.inputValue as string | undefined;
   const hasFile = !!fileName;
@@ -285,6 +294,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
 
   const fileObj = inputFileStore.get(nodeId);
   const isImage = showPreview && fileObj && fileObj.type.startsWith("image/");
+  const nt = isLight ? nodeTextLight : nodeText;
 
   return (
     <div
@@ -301,7 +311,8 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
       {hasFile ? (
         <div style={{
           marginTop: 8, padding: "6px 8px", borderRadius: 6,
-          background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)",
+          background: isLight ? "rgba(5, 150, 105, 0.04)" : "rgba(16,185,129,0.06)",
+          border: isLight ? "1px solid rgba(5, 150, 105, 0.15)" : "1px solid rgba(16,185,129,0.2)",
           display: "flex", flexDirection: "column", gap: 4,
         }}>
           {isImage && fileObj && (
@@ -315,10 +326,10 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{
               width: 6, height: 6, borderRadius: "50%",
-              background: "#10B981", flexShrink: 0,
+              background: isLight ? "#059669" : "#10B981", flexShrink: 0,
             }} />
             <span style={{
-              fontSize: 11, fontWeight: 500, color: "#34D399", flex: 1,
+              fontSize: 11, fontWeight: 500, color: isLight ? "#059669" : "#34D399", flex: 1,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               letterSpacing: "0.01em",
             }}>
@@ -327,7 +338,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
             <button
               onClick={onRemove}
               style={{
-                ...nodeText.helper,
+                ...nt.helper,
                 background: "none",
                 border: "none", cursor: "pointer", padding: "0 4px",
               }}
@@ -336,7 +347,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
             </button>
           </div>
           {(data.fileSize as number | undefined) && (
-            <span style={nodeText.meta}>
+            <span style={nt.meta}>
               {((data.fileSize as number) / 1024).toFixed(1)} KB
             </span>
           )}
@@ -348,24 +359,26 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
           onDragOver={onDragOver}
           style={{
             marginTop: 8, padding: "10px 8px", borderRadius: 6, cursor: "pointer",
-            border: "1px dashed rgba(0,245,255,0.25)",
-            background: "rgba(0,245,255,0.03)",
+            border: isLight ? "1px dashed rgba(30, 64, 175, 0.20)" : "1px dashed rgba(0,245,255,0.25)",
+            background: isLight ? "rgba(30, 64, 175, 0.03)" : "rgba(0,245,255,0.03)",
             textAlign: "center",
             transition: "all 0.15s",
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,245,255,0.5)";
-            (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.07)";
+            const el = e.currentTarget as HTMLElement;
+            el.style.borderColor = isLight ? "rgba(30, 64, 175, 0.40)" : "rgba(0,245,255,0.5)";
+            el.style.background = isLight ? "rgba(30, 64, 175, 0.06)" : "rgba(0,245,255,0.07)";
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,245,255,0.25)";
-            (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.03)";
+            const el = e.currentTarget as HTMLElement;
+            el.style.borderColor = isLight ? "rgba(30, 64, 175, 0.20)" : "rgba(0,245,255,0.25)";
+            el.style.background = isLight ? "rgba(30, 64, 175, 0.03)" : "rgba(0,245,255,0.03)";
           }}
         >
-          <div style={nodeText.helper}>
-            Drop {label} {t('input.dropHereOr')} <span style={nodeText.hintLink}>{t('input.clickToBrowse')}</span>
+          <div style={nt.helper}>
+            Drop {label} {t('input.dropHereOr')} <span style={nt.hintLink}>{t('input.clickToBrowse')}</span>
           </div>
-          <div style={{ ...nodeText.meta, marginTop: 3 }}>
+          <div style={{ ...nt.meta, marginTop: 3 }}>
             {accept} · max {maxMB}MB
           </div>
         </div>
@@ -421,6 +434,8 @@ function NumericParamInput({
 export const ParameterInput = memo(function ParameterInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
+  const { theme } = useCanvasTheme();
+  const isLight = theme === "light";
 
   const STYLE_OPTIONS = useMemo(() => [
     { value: "Modern", label: t('input.styleModern') },
@@ -458,9 +473,10 @@ export const ParameterInput = memo(function ParameterInput({ nodeId, data }: { n
 
   const inputStyle: React.CSSProperties = {
     width: "100%", boxSizing: "border-box",
-    padding: "6px 12px", borderRadius: 4,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(0,0,0,0.35)", color: "#F2F4F8",
+    padding: "6px 12px", borderRadius: isLight ? 6 : 4,
+    border: isLight ? "1px solid rgba(15, 20, 25, 0.10)" : "1px solid rgba(255,255,255,0.12)",
+    background: isLight ? "#FFFFFF" : "rgba(0,0,0,0.35)",
+    color: isLight ? "#0F1419" : "#F2F4F8",
     fontSize: 13, outline: "none", fontFamily: "inherit",
     transition: "all 150ms ease",
   };
@@ -480,7 +496,7 @@ export const ParameterInput = memo(function ParameterInput({ nodeId, data }: { n
     >
       {rows.map(row => (
         <div key={row.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <label style={{ ...nodeText.label, width: 64, flexShrink: 0 }}>
+          <label style={{ ...(isLight ? nodeTextLight.label : nodeText.label), width: 64, flexShrink: 0 }}>
             {row.label}
           </label>
           {row.type === "number" ? (
@@ -511,6 +527,8 @@ export const supplementaryIFCStore = new Map<string, { file: File; parsed?: unkn
 
 function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
+  const { theme } = useCanvasTheme();
+  const isLight = theme === "light";
   const [structural, setStructural] = useState<string | null>(null);
   const [mep, setMep] = useState<string | null>(null);
   const structRef = useRef<HTMLInputElement>(null);
@@ -548,7 +566,10 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
   const structBonus = structural ? 12 : 0;
   const mepBonus = mep ? 10 : 0;
   const totalAccuracy = baseAccuracy + structBonus + mepBonus;
-  const barColor = totalAccuracy >= 85 ? "#10B981" : totalAccuracy >= 75 ? "#FFBF00" : "#00F5FF";
+  const barColor = isLight
+    ? (totalAccuracy >= 85 ? "#059669" : totalAccuracy >= 75 ? "#D97706" : "#2563EB")
+    : (totalAccuracy >= 85 ? "#10B981" : totalAccuracy >= 75 ? "#FFBF00" : "#00F5FF");
+  const nt = isLight ? nodeTextLight : nodeText;
 
   const onDrop = useCallback((e: React.DragEvent, type: "structural" | "mep") => {
     e.preventDefault(); e.stopPropagation();
@@ -568,17 +589,17 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
 
       {/* ── Accuracy Meter ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <span style={nodeText.sectionHdr}>Estimate Accuracy</span>
+        <span style={nt.sectionHdr}>Estimate Accuracy</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: barColor, fontFamily: "monospace" }}>~{totalAccuracy}%</span>
       </div>
-      <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden", marginBottom: 10 }}>
+      <div style={{ height: 4, background: isLight ? "rgba(15,20,25,0.06)" : "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden", marginBottom: 10 }}>
         <div style={{ height: "100%", width: `${totalAccuracy}%`, background: `linear-gradient(90deg, ${barColor}, ${barColor}dd)`, borderRadius: 2, transition: "width 0.6s ease, background 0.6s ease" }} />
       </div>
 
       {/* ── Boost Accuracy Header ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-        <span style={{ ...nodeText.sectionHdr, whiteSpace: "nowrap" }}>Boost Accuracy</span>
-        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+        <span style={{ ...nt.sectionHdr, whiteSpace: "nowrap" }}>Boost Accuracy</span>
+        <div style={{ flex: 1, height: 1, background: isLight ? "rgba(15,20,25,0.06)" : "rgba(255,255,255,0.08)" }} />
       </div>
 
       {/* ── Structural IFC Drop Zone ── */}
@@ -588,40 +609,48 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
         onDragOver={onDragOver}
         style={{
           padding: "8px 10px", marginBottom: 6, borderRadius: 6, cursor: structural ? "default" : "pointer",
-          border: structural ? "1px solid rgba(16,185,129,0.3)" : "1.5px dashed rgba(255,255,255,0.12)",
-          background: structural ? "rgba(16,185,129,0.05)" : "rgba(0,0,0,0.15)",
+          border: structural
+            ? (isLight ? "1px solid rgba(5,150,105,0.20)" : "1px solid rgba(16,185,129,0.3)")
+            : (isLight ? "1.5px dashed rgba(15,20,25,0.10)" : "1.5px dashed rgba(255,255,255,0.12)"),
+          background: structural
+            ? (isLight ? "rgba(5,150,105,0.04)" : "rgba(16,185,129,0.05)")
+            : (isLight ? "#FBFAF7" : "rgba(0,0,0,0.15)"),
           transition: "all 0.2s",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            background: structural ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.04)",
+            background: structural
+              ? (isLight ? "rgba(5,150,105,0.08)" : "rgba(16,185,129,0.12)")
+              : (isLight ? "rgba(15,20,25,0.04)" : "rgba(255,255,255,0.04)"),
           }}>
             <span style={{ fontSize: 13, opacity: structural ? 1 : 0.4 }}>{structural ? "✓" : "⊞"}</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: structural ? "#34D399" : "#D6DAE4", letterSpacing: "0.01em" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: structural ? (isLight ? "#059669" : "#34D399") : (isLight ? "#0F1419" : "#D6DAE4"), letterSpacing: "0.01em" }}>
                 {structural ? structural : "Structural IFC"}
               </span>
               {!structural && (
-                <span style={{ ...nodeText.helper, fontStyle: "italic", opacity: 0.9 }}>optional</span>
+                <span style={{ ...nt.helper, fontStyle: "italic", opacity: 0.9 }}>optional</span>
               )}
             </div>
-            <div style={{ ...nodeText.helper, marginTop: 2 }}>
+            <div style={{ ...nt.helper, marginTop: 2 }}>
               {structural ? "Foundation, rebar, columns, beams" : "Foundations, rebar, columns, beams"}
             </div>
             {!structural && (
-              <div style={{ ...nodeText.helper, marginTop: 3, display: "flex", alignItems: "center", gap: 4, color: "#00F5FF", opacity: 0.85 }}>
+              <div style={{ ...nt.helper, marginTop: 3, display: "flex", alignItems: "center", gap: 4, color: isLight ? "#2563EB" : "#00F5FF", opacity: 0.85 }}>
                 <span style={{ fontSize: 10 }}>↑</span> Click or drag to upload
               </div>
             )}
           </div>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, flexShrink: 0, marginTop: 2,
-            background: structural ? "rgba(16,185,129,0.18)" : "rgba(0,245,255,0.12)",
-            color: structural ? "#34D399" : "#4FE8F5",
+            background: structural
+              ? (isLight ? "rgba(5,150,105,0.10)" : "rgba(16,185,129,0.18)")
+              : (isLight ? "rgba(37,99,235,0.08)" : "rgba(0,245,255,0.12)"),
+            color: structural ? (isLight ? "#059669" : "#34D399") : (isLight ? "#2563EB" : "#4FE8F5"),
             letterSpacing: "0.02em",
           }}>
             {structural ? "✓ +12%" : "+12%"}
@@ -636,40 +665,48 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
         onDragOver={onDragOver}
         style={{
           padding: "8px 10px", marginBottom: 6, borderRadius: 6, cursor: mep ? "default" : "pointer",
-          border: mep ? "1px solid rgba(16,185,129,0.3)" : "1.5px dashed rgba(255,255,255,0.12)",
-          background: mep ? "rgba(16,185,129,0.05)" : "rgba(0,0,0,0.15)",
+          border: mep
+            ? (isLight ? "1px solid rgba(5,150,105,0.20)" : "1px solid rgba(16,185,129,0.3)")
+            : (isLight ? "1.5px dashed rgba(15,20,25,0.10)" : "1.5px dashed rgba(255,255,255,0.12)"),
+          background: mep
+            ? (isLight ? "rgba(5,150,105,0.04)" : "rgba(16,185,129,0.05)")
+            : (isLight ? "#FBFAF7" : "rgba(0,0,0,0.15)"),
           transition: "all 0.2s",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            background: mep ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.04)",
+            background: mep
+              ? (isLight ? "rgba(5,150,105,0.08)" : "rgba(16,185,129,0.12)")
+              : (isLight ? "rgba(15,20,25,0.04)" : "rgba(255,255,255,0.04)"),
           }}>
             <span style={{ fontSize: 13, opacity: mep ? 1 : 0.4 }}>{mep ? "✓" : "⚙"}</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: mep ? "#34D399" : "#D6DAE4", letterSpacing: "0.01em" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: mep ? (isLight ? "#059669" : "#34D399") : (isLight ? "#0F1419" : "#D6DAE4"), letterSpacing: "0.01em" }}>
                 {mep ? mep : "MEP IFC"}
               </span>
               {!mep && (
-                <span style={{ ...nodeText.helper, fontStyle: "italic", opacity: 0.9 }}>optional</span>
+                <span style={{ ...nt.helper, fontStyle: "italic", opacity: 0.9 }}>optional</span>
               )}
             </div>
-            <div style={{ ...nodeText.helper, marginTop: 2 }}>
+            <div style={{ ...nt.helper, marginTop: 2 }}>
               {mep ? "Plumbing, electrical, HVAC, fire" : "Plumbing, electrical, HVAC, fire"}
             </div>
             {!mep && (
-              <div style={{ ...nodeText.helper, marginTop: 3, display: "flex", alignItems: "center", gap: 4, color: "#00F5FF", opacity: 0.85 }}>
+              <div style={{ ...nt.helper, marginTop: 3, display: "flex", alignItems: "center", gap: 4, color: isLight ? "#2563EB" : "#00F5FF", opacity: 0.85 }}>
                 <span style={{ fontSize: 10 }}>↑</span> Click or drag to upload
               </div>
             )}
           </div>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, flexShrink: 0, marginTop: 2,
-            background: mep ? "rgba(16,185,129,0.18)" : "rgba(0,245,255,0.12)",
-            color: mep ? "#34D399" : "#4FE8F5",
+            background: mep
+              ? (isLight ? "rgba(5,150,105,0.10)" : "rgba(16,185,129,0.18)")
+              : (isLight ? "rgba(37,99,235,0.08)" : "rgba(0,245,255,0.12)"),
+            color: mep ? (isLight ? "#059669" : "#34D399") : (isLight ? "#2563EB" : "#4FE8F5"),
             letterSpacing: "0.02em",
           }}>
             {mep ? "✓ +10%" : "+10%"}
@@ -680,28 +717,29 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
       {/* ── QS Corrections (informational only) ── */}
       <div style={{
         padding: "8px 10px", borderRadius: 6,
-        border: "1px solid rgba(255,191,0,0.15)",
-        background: "rgba(255,191,0,0.03)",
+        border: isLight ? "1px solid rgba(217,119,6,0.12)" : "1px solid rgba(255,191,0,0.15)",
+        background: isLight ? "rgba(217,119,6,0.03)" : "rgba(255,191,0,0.03)",
       }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            background: "rgba(255,191,0,0.08)",
+            background: isLight ? "rgba(217,119,6,0.06)" : "rgba(255,191,0,0.08)",
           }}>
             <span style={{ fontSize: 12, opacity: 0.7 }}>✎</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#FFBF00", letterSpacing: "0.01em" }}>QS corrections</span>
-              <span style={{ ...nodeText.helper, fontStyle: "italic", opacity: 0.95 }}>builds over time</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: isLight ? "#D97706" : "#FFBF00", letterSpacing: "0.01em" }}>QS corrections</span>
+              <span style={{ ...nt.helper, fontStyle: "italic", opacity: 0.95 }}>builds over time</span>
             </div>
-            <div style={{ ...nodeText.helper, marginTop: 2 }}>
+            <div style={{ ...nt.helper, marginTop: 2 }}>
               Edit rates in BOQ results to train the system
             </div>
           </div>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, flexShrink: 0, marginTop: 2,
-            background: "rgba(255,191,0,0.14)", color: "#FFD24D",
+            background: isLight ? "rgba(217,119,6,0.08)" : "rgba(255,191,0,0.14)",
+            color: isLight ? "#D97706" : "#FFD24D",
             letterSpacing: "0.02em",
           }}>
             +5% over time
@@ -740,6 +778,8 @@ const labelStyle: React.CSSProperties = {
 
 export const LocationInput = memo(function LocationInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
+  const { theme } = useCanvasTheme();
+  const isLight = theme === "light";
 
   // Parse stored JSON or default
   const stored = useMemo(() => {
@@ -797,6 +837,17 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
     return [];
   }, [countryCode, stored.state, hasStates, hasCitiesDirect, locationData]);
 
+  // Light-themed overrides for module-level styles
+  const lSelectStyle: React.CSSProperties = isLight
+    ? { ...selectStyle, background: "#FFFFFF", color: "#0F1419", border: "1px solid rgba(15, 20, 25, 0.10)", borderRadius: 6 }
+    : selectStyle;
+  const lInputStyle: React.CSSProperties = isLight
+    ? { ...lSelectStyle, cursor: "text" }
+    : inputStyle;
+  const lLabelStyle: React.CSSProperties = isLight
+    ? { ...nodeTextLight.label, marginBottom: 4, display: "block" }
+    : labelStyle;
+
   const onCountryChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const country = e.target.value;
     const entry = LOCATION_COUNTRIES.find(c => c.label === country);
@@ -814,8 +865,8 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
       style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>
       {/* Country */}
       <div>
-        <label style={labelStyle}>Country</label>
-        <select value={stored.country || ""} onChange={onCountryChange} style={selectStyle}>
+        <label style={lLabelStyle}>Country</label>
+        <select value={stored.country || ""} onChange={onCountryChange} style={lSelectStyle}>
           <option value="">Select country...</option>
           {LOCATION_COUNTRIES.map(c => (
             <option key={c.code} value={c.label}>{c.label}</option>
@@ -824,10 +875,10 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
         <div style={{
           marginTop: 6,
           padding: "7px 9px",
-          borderRadius: 4,
-          border: "1px solid rgba(125, 249, 255, 0.22)",
-          background: "rgba(125, 249, 255, 0.06)",
-          color: "rgba(232, 236, 244, 0.92)",
+          borderRadius: isLight ? 6 : 4,
+          border: isLight ? "1px solid rgba(30, 64, 175, 0.15)" : "1px solid rgba(125, 249, 255, 0.22)",
+          background: isLight ? "rgba(30, 64, 175, 0.04)" : "rgba(125, 249, 255, 0.06)",
+          color: isLight ? "#4A5360" : "rgba(232, 236, 244, 0.92)",
           fontSize: 12,
           lineHeight: 1.45,
           fontStyle: "italic",
@@ -841,8 +892,8 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
       {/* State dropdown (only for countries with states) */}
       {hasLocation && hasStates && (
         <div>
-          <label style={labelStyle}>State / Region</label>
-          <select value={stored.state || ""} onChange={onStateChange} style={selectStyle}>
+          <label style={lLabelStyle}>State / Region</label>
+          <select value={stored.state || ""} onChange={onStateChange} style={lSelectStyle}>
             <option value="">Select state...</option>
             {stateList.map(s => (
               <option key={s} value={s}>{s}</option>
@@ -853,8 +904,8 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
       {/* City dropdown */}
       {hasLocation && cityList.length > 0 && (
         <div>
-          <label style={labelStyle}>City</label>
-          <select value={stored.city || ""} onChange={e => update({ city: e.target.value })} style={selectStyle}>
+          <label style={lLabelStyle}>City</label>
+          <select value={stored.city || ""} onChange={e => update({ city: e.target.value })} style={lSelectStyle}>
             <option value="">Select city...</option>
             {cityList.map(c => (
               <option key={c} value={c}>{c}</option>
@@ -865,16 +916,16 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
       {/* Fallback: show city text input if no dropdown data */}
       {hasLocation && cityList.length === 0 && (hasStates ? !!stored.state : true) && (
         <div>
-          <label style={labelStyle}>City</label>
+          <label style={lLabelStyle}>City</label>
           <input type="text" value={stored.city || ""} placeholder="Enter city name"
-            onChange={e => update({ city: e.target.value })} style={inputStyle} />
+            onChange={e => update({ city: e.target.value })} style={lInputStyle} />
         </div>
       )}
       {/* Currency */}
       {hasLocation && (
         <div>
-          <label style={labelStyle}>Currency</label>
-          <select value={stored.currency || ""} onChange={e => update({ currency: e.target.value })} style={selectStyle}>
+          <label style={lLabelStyle}>Currency</label>
+          <select value={stored.currency || ""} onChange={e => update({ currency: e.target.value })} style={lSelectStyle}>
             {[...new Set(LOCATION_COUNTRIES.map(c => c.currency))].map(cur => {
               const entry = LOCATION_COUNTRIES.find(c => c.currency === cur);
               return <option key={cur} value={cur}>{entry?.symbol} {cur}</option>;
@@ -886,19 +937,19 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
       {hasLocation && (
         <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Escalation %/yr</label>
+            <label style={lLabelStyle}>Escalation %/yr</label>
             <input type="number" value={stored.escalation ?? "6"} min={0} max={20} step={0.5}
-              onChange={e => update({ escalation: e.target.value })} style={inputStyle} />
+              onChange={e => update({ escalation: e.target.value })} style={lInputStyle} />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Contingency %</label>
+            <label style={lLabelStyle}>Contingency %</label>
             <input type="number" value={stored.contingency ?? "10"} min={0} max={30} step={1}
-              onChange={e => update({ contingency: e.target.value })} style={inputStyle} />
+              onChange={e => update({ contingency: e.target.value })} style={lInputStyle} />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Months</label>
+            <label style={lLabelStyle}>Months</label>
             <input type="number" value={stored.months ?? "6"} min={0} max={36} step={1}
-              onChange={e => update({ months: e.target.value })} style={inputStyle} />
+              onChange={e => update({ months: e.target.value })} style={lInputStyle} />
           </div>
         </div>
       )}
@@ -906,8 +957,8 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
       {hasLocation && (
         <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Soil type</label>
-            <select value={stored.soilType || ""} onChange={e => update({ soilType: e.target.value })} style={selectStyle}>
+            <label style={lLabelStyle}>Soil type</label>
+            <select value={stored.soilType || ""} onChange={e => update({ soilType: e.target.value })} style={lSelectStyle}>
               <option value="">Auto (from floors)</option>
               <option value="hard_rock">Hard Rock</option>
               <option value="medium">Medium Soil</option>
@@ -916,19 +967,19 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
             </select>
           </div>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Plot area m²</label>
+            <label style={lLabelStyle}>Plot area m²</label>
             <input type="number" value={stored.plotArea || ""} placeholder="Optional" min={0} max={100000} step={10}
-              onChange={e => update({ plotArea: e.target.value })} style={inputStyle} />
+              onChange={e => update({ plotArea: e.target.value })} style={lInputStyle} />
           </div>
         </div>
       )}
       {/* Summary */}
       {hasLocation && stored.city && (
         <div style={{
-          fontSize: 11, fontWeight: 500, color: "#4FE8F5",
+          fontSize: 11, fontWeight: 500, color: isLight ? "#2563EB" : "#4FE8F5",
           textAlign: "center", marginTop: 6,
           letterSpacing: "0.02em",
-          textShadow: "0 1px 2px rgba(0,0,0,0.65)",
+          textShadow: isLight ? "none" : "0 1px 2px rgba(0,0,0,0.65)",
         }}>
           📍 {stored.city}{stored.state ? ", " + stored.state : ""}, {stored.country} ({stored.currency})
         </div>
@@ -942,6 +993,8 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
 export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
+  const { theme } = useCanvasTheme();
+  const isLight = theme === "light";
   const inputRef = useRef<HTMLInputElement>(null);
   const maxMB = 10;
 
@@ -1089,8 +1142,8 @@ export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeI
           {storedFiles.map((file, idx) => (
             <div key={`${file.name}-${idx}`} style={{
               position: "relative", borderRadius: 4, overflow: "hidden",
-              border: "1px solid rgba(16,185,129,0.25)",
-              background: "rgba(16,185,129,0.06)",
+              border: isLight ? "1px solid rgba(5,150,105,0.15)" : "1px solid rgba(16,185,129,0.25)",
+              background: isLight ? "rgba(5,150,105,0.04)" : "rgba(16,185,129,0.06)",
             }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -1112,7 +1165,7 @@ export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeI
                 ✕
               </button>
               <div style={{
-                fontSize: 10, fontWeight: 500, color: "#34D399",
+                fontSize: 10, fontWeight: 500, color: isLight ? "#059669" : "#34D399",
                 padding: "3px 6px",
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 letterSpacing: "0.01em",
@@ -1133,28 +1186,30 @@ export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeI
           marginTop: imageCount > 0 ? 4 : 8,
           padding: imageCount > 0 ? "6px 8px" : "10px 8px",
           borderRadius: 6, cursor: "pointer",
-          border: "1px dashed rgba(0,245,255,0.25)",
-          background: "rgba(0,245,255,0.03)",
+          border: isLight ? "1px dashed rgba(30, 64, 175, 0.20)" : "1px dashed rgba(0,245,255,0.25)",
+          background: isLight ? "rgba(30, 64, 175, 0.03)" : "rgba(0,245,255,0.03)",
           textAlign: "center",
           transition: "all 0.15s",
         }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,245,255,0.5)";
-          (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.07)";
+          const el = e.currentTarget as HTMLElement;
+          el.style.borderColor = isLight ? "rgba(30, 64, 175, 0.40)" : "rgba(0,245,255,0.5)";
+          el.style.background = isLight ? "rgba(30, 64, 175, 0.06)" : "rgba(0,245,255,0.07)";
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,245,255,0.25)";
-          (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.03)";
+          const el = e.currentTarget as HTMLElement;
+          el.style.borderColor = isLight ? "rgba(30, 64, 175, 0.20)" : "rgba(0,245,255,0.25)";
+          el.style.background = isLight ? "rgba(30, 64, 175, 0.03)" : "rgba(0,245,255,0.03)";
         }}
       >
-        <div style={nodeText.helper}>
+        <div style={isLight ? nodeTextLight.helper : nodeText.helper}>
           {imageCount > 0
-            ? <><span style={nodeText.hintLink}>+ Add more images</span></>
-            : <>Drop images {t('input.dropHereOr')} <span style={nodeText.hintLink}>{t('input.clickToBrowse')}</span></>
+            ? <><span style={isLight ? nodeTextLight.hintLink : nodeText.hintLink}>+ Add more images</span></>
+            : <>Drop images {t('input.dropHereOr')} <span style={isLight ? nodeTextLight.hintLink : nodeText.hintLink}>{t('input.clickToBrowse')}</span></>
           }
         </div>
         {imageCount === 0 && (
-          <div style={{ ...nodeText.meta, marginTop: 3 }}>
+          <div style={{ ...(isLight ? nodeTextLight.meta : nodeText.meta), marginTop: 3 }}>
             .png,.jpg,.jpeg,.webp · max {maxMB}MB each · multiple allowed
           </div>
         )}
@@ -1162,7 +1217,7 @@ export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeI
 
       {/* Summary */}
       {imageCount > 0 && (
-        <div style={{ fontSize: 11, fontWeight: 500, color: "#34D399", marginTop: 6, textAlign: "center", letterSpacing: "0.02em" }}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: isLight ? "#059669" : "#34D399", marginTop: 6, textAlign: "center", letterSpacing: "0.02em" }}>
           {imageCount} image{imageCount > 1 ? "s" : ""} · {((data.fileSizes as number[] | undefined)?.reduce((a, b) => a + b, 0) ?? 0 / 1024).toFixed(0)} KB total
         </div>
       )}

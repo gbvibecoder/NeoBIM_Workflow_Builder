@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Terminal, X } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
+import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
 
 export interface LogEntry {
   timestamp: Date;
@@ -21,13 +22,15 @@ interface ExecutionLogProps {
   autoExpand?: boolean;
 }
 
-const TYPE_COLOR: Record<LogEntry["type"], string> = {
-  start:   "var(--canvas-accent)",
-  running: "var(--canvas-status-warning)",
-  success: "var(--canvas-status-success)",
-  error:   "var(--canvas-status-error)",
-  info:    "var(--canvas-log-muted)",
-};
+function getTypeColor(tk: ReturnType<typeof useCanvasToken>): Record<LogEntry["type"], string> {
+  return {
+    start:   tk.accent,
+    running: tk.statusWarning,
+    success: tk.statusSuccess,
+    error:   tk.statusError,
+    info:    tk.logMuted,
+  };
+}
 
 const TYPE_SYMBOL: Record<LogEntry["type"], string> = {
   start:   "\u25B6",
@@ -44,6 +47,8 @@ function fmt(d: Date) {
 export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: ExecutionLogProps) {
   const { t } = useLocale();
   const canvasTheme = useCanvasTheme((s) => s.theme);
+  const tk = useCanvasToken();
+  const TYPE_COLOR = getTypeColor(tk);
   // Initialize expanded from autoExpand so it's open on first mount during execution
   const [expanded, setExpanded] = useState(!!autoExpand);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -71,10 +76,10 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
   if (entries.length === 0 && !isRunning) return null;
 
   const statusColor = isRunning
-    ? "var(--canvas-status-warning)"
+    ? tk.statusWarning
     : entries[entries.length - 1]?.type === "error"
-      ? "var(--canvas-status-error)"
-      : "var(--canvas-status-success)";
+      ? tk.statusError
+      : tk.statusSuccess;
 
   const latestEntry = entries[entries.length - 1];
 
@@ -93,11 +98,11 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
         zIndex: 25,
         borderRadius: 4,
         overflow: "hidden",
-        background: "var(--canvas-notebook-bg)",
-        border: "1px solid var(--canvas-panel-border)",
+        background: tk.notebookBg,
+        border: `1px solid ${tk.panelBorder}`,
         backdropFilter: "blur(24px) saturate(1.3)",
         WebkitBackdropFilter: "blur(24px) saturate(1.3)",
-        boxShadow: "var(--canvas-panel-shadow)",
+        boxShadow: tk.panelShadow,
         fontFamily: "var(--font-jetbrains), monospace",
         transition: "border-radius 0.2s ease",
       }}
@@ -110,7 +115,7 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
           alignItems: "center",
           gap: 8,
           padding: expanded ? "9px 12px" : "7px 14px",
-          borderBottom: expanded ? "1px solid var(--canvas-panel-border)" : "none",
+          borderBottom: expanded ? `1px solid ${tk.panelBorder}` : "none",
           cursor: "pointer",
           userSelect: "none",
           minWidth: expanded ? 380 : 0,
@@ -130,7 +135,7 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
         {!expanded && latestEntry && (
           <span style={{
             fontSize: 11,
-            color: "var(--canvas-log-muted)",
+            color: tk.logMuted,
             maxWidth: 220,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -141,8 +146,8 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
         )}
         {expanded && (
           <>
-            <Terminal size={11} style={{ color: "var(--canvas-log-muted)", flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: "var(--canvas-log-muted)", fontWeight: 500, flex: 1 }}>
+            <Terminal size={11} style={{ color: tk.logMuted, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: tk.logMuted, fontWeight: 500, flex: 1 }}>
               {isRunning ? t('execution.executing') : "Field Notes"}
             </span>
           </>
@@ -150,11 +155,11 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
         <span
           style={{
             fontSize: 9,
-            color: "var(--canvas-log-badge-text)",
+            color: tk.logBadgeText,
             fontWeight: 500,
             padding: "1px 6px",
             borderRadius: 8,
-            background: "var(--canvas-log-badge-bg)",
+            background: tk.logBadgeBg,
           }}
         >
           {entries.length}
@@ -162,7 +167,7 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
         <motion.div
           animate={{ rotate: expanded ? 0 : -90 }}
           transition={{ duration: 0.15 }}
-          style={{ color: "var(--canvas-log-badge-text)", display: "flex", flexShrink: 0 }}
+          style={{ color: tk.logBadgeText, display: "flex", flexShrink: 0 }}
         >
           <ChevronDown size={11} />
         </motion.div>
@@ -177,7 +182,7 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: "var(--canvas-log-badge-text)",
+              color: tk.logBadgeText,
               padding: 2,
               borderRadius: 4,
               display: "flex",
@@ -185,8 +190,8 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
               justifyContent: "center",
               flexShrink: 0,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--canvas-status-error)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--canvas-log-badge-text)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = tk.statusError; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = tk.logBadgeText; }}
           >
             <X size={11} />
           </button>
@@ -230,7 +235,7 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
                     padding: "1px 0",
                   }}
                 >
-                  <span style={{ color: "var(--canvas-log-timestamp)", flexShrink: 0, fontWeight: 500 }}>
+                  <span style={{ color: tk.logTimestamp, flexShrink: 0, fontWeight: 500 }}>
                     {fmt(entry.timestamp)}
                   </span>
                   <span
@@ -247,9 +252,9 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
                   <span
                     style={{
                       color:
-                        entry.type === "error" ? "var(--canvas-log-msg-error)" :
-                        entry.type === "success" ? "var(--canvas-log-msg-success)" :
-                        "var(--canvas-log-muted)",
+                        entry.type === "error" ? tk.logMsgError :
+                        entry.type === "success" ? tk.logMsgSuccess :
+                        tk.logMuted,
                       flex: 1,
                       overflow: "hidden",
                       // Wrap long smart-summary lines (e.g. "TR-008: 155 line items
@@ -263,7 +268,7 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
                   >
                     {entry.message}
                     {entry.detail && (
-                      <span style={{ color: "var(--canvas-log-muted)", marginLeft: 6 }}>
+                      <span style={{ color: tk.logMuted, marginLeft: 6 }}>
                         {entry.detail}
                       </span>
                     )}

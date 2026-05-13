@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Play, Square, Save, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2,
+  Play, Square, Save, Undo2, Redo2,
   Share2, Sparkles, MousePointer2, Layers, Layers3, ChevronDown,
   Loader2, CheckCircle2, Pencil,
 } from "lucide-react";
@@ -17,6 +17,8 @@ import {
 } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
+import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
+import { ThemeToggle } from "@/features/canvas/components/chrome/ThemeToggle";
 import {
   shareWorkflowToTwitter,
   shareWorkflowToLinkedIn,
@@ -55,9 +57,6 @@ interface CanvasToolbarProps {
   onSave: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onFitView: () => void;
   onShare: () => void;
   onModeChange: (mode: CreationMode) => void;
   onPromptMode: () => void;
@@ -76,8 +75,9 @@ const MODE_ICONS: Record<CreationMode, React.ReactNode> = {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Sep() {
+  const tk = useCanvasToken();
   return (
-    <div style={{ width: 1, height: 20, background: "var(--canvas-line-1)", margin: "0 8px", flexShrink: 0 }} />
+    <div style={{ width: 1, height: 20, background: tk.line1, margin: "0 8px", flexShrink: 0 }} />
   );
 }
 
@@ -89,6 +89,7 @@ interface TBBtnProps {
 }
 
 function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
+  const tk = useCanvasToken();
   return (
     <button
       onClick={onClick}
@@ -99,13 +100,13 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
         width: 44, height: 44, borderRadius: 8,
         display: "flex", alignItems: "center", justifyContent: "center",
         background: "transparent", border: "none",
-        color: "var(--canvas-text-1)", cursor: disabled ? "not-allowed" : "pointer",
+        color: tk.text1, cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.35 : 1,
         transition: "all 150ms ease",
       }}
       onMouseEnter={e => {
         if (!disabled) {
-          e.currentTarget.style.background = "var(--canvas-hover-bg)";
+          e.currentTarget.style.background = tk.hoverBg;
         }
       }}
       onMouseLeave={e => {
@@ -113,7 +114,7 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
       }}
       onFocus={e => {
         if (!disabled) {
-          e.currentTarget.style.background = "var(--canvas-hover-bg)";
+          e.currentTarget.style.background = tk.hoverBg;
         }
       }}
       onBlur={e => {
@@ -141,9 +142,6 @@ export function CanvasToolbar({
   onSave,
   onUndo,
   onRedo,
-  onZoomIn,
-  onZoomOut,
-  onFitView,
   onShare,
   onModeChange,
   onPromptMode,
@@ -152,6 +150,7 @@ export function CanvasToolbar({
 }: CanvasToolbarProps) {
   const { t } = useLocale();
   const canvasTheme = useCanvasTheme((s) => s.theme);
+  const tk = useCanvasToken();
 
   const MODE_CONFIG: Record<CreationMode, { label: string; icon: React.ReactNode; description: string }> = {
     manual: { label: t('canvas.manual'),    icon: MODE_ICONS.manual, description: t('canvas.manualDesc')    },
@@ -242,18 +241,18 @@ export function CanvasToolbar({
         style={{
           position: "absolute" as const,
           top: 16,
-          left: 16,
-          right: 16,
+          left: "50%",
+          transform: "translateX(-50%)",
           zIndex: 20,
           height: 56,
           alignItems: "center",
           padding: "0 10px",
-          border: "1px solid var(--canvas-line-2)",
+          border: `1px solid ${tk.line2}`,
           borderRadius: 14,
-          background: "var(--canvas-surface-1)",
+          background: tk.surface1,
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
-          boxShadow: "var(--canvas-shadow-md)",
+          boxShadow: tk.shadowMd,
           gap: 2,
         }}
       >
@@ -269,14 +268,14 @@ export function CanvasToolbar({
             style={{
               width: 44, height: 44, borderRadius: 8,
               display: "flex", alignItems: "center", justifyContent: "center",
-              background: isNodeLibraryOpen ? "var(--canvas-accent-bg-active)" : "transparent",
-              border: isNodeLibraryOpen ? "1px solid var(--canvas-accent-border)" : "1px solid transparent",
-              color: isNodeLibraryOpen ? "var(--canvas-accent)" : "var(--canvas-text-1)",
+              background: isNodeLibraryOpen ? tk.accentBgActive : "transparent",
+              border: isNodeLibraryOpen ? `1px solid ${tk.accentBorder}` : "1px solid transparent",
+              color: isNodeLibraryOpen ? tk.accent : tk.text1,
               cursor: "pointer", transition: "all 0.15s ease",
             }}
             onMouseEnter={e => {
               if (!isNodeLibraryOpen) {
-                e.currentTarget.style.background = "var(--canvas-hover-bg)";
+                e.currentTarget.style.background = tk.hoverBg;
               }
             }}
             onMouseLeave={e => {
@@ -300,17 +299,17 @@ export function CanvasToolbar({
               style={{
                 display: "flex", alignItems: "center", gap: 5,
                 height: 30, padding: "0 10px", borderRadius: 7,
-                background: showModeMenu ? "var(--canvas-hover-bg)" : "transparent",
-                border: showModeMenu ? "1px solid var(--canvas-line-2)" : "1px solid transparent",
-                color: "var(--canvas-text-1)", cursor: "pointer",
+                background: showModeMenu ? tk.hoverBg : "transparent",
+                border: showModeMenu ? `1px solid ${tk.line2}` : "1px solid transparent",
+                color: tk.text1, cursor: "pointer",
                 transition: "all 0.15s ease",
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "var(--canvas-hover-bg)"; }}
+              onMouseEnter={e => { e.currentTarget.style.background = tk.hoverBg; }}
               onMouseLeave={e => { if (!showModeMenu) e.currentTarget.style.background = "transparent"; }}
             >
-              <span style={{ color: "var(--canvas-accent)", display: "flex" }}>{currentMode.icon}</span>
+              <span style={{ color: tk.accent, display: "flex" }}>{currentMode.icon}</span>
               <span style={{ fontSize: 12, fontWeight: 500 }}>{currentMode.label}</span>
-              <ChevronDown size={9} style={{ color: "var(--canvas-text-3)" }} />
+              <ChevronDown size={9} style={{ color: tk.text3 }} />
             </button>
 
             <AnimatePresence>
@@ -323,8 +322,8 @@ export function CanvasToolbar({
                   style={{
                     position: "absolute", top: "calc(100% + 6px)", left: 0,
                     width: 200, borderRadius: 12, overflow: "hidden",
-                    background: "var(--canvas-dropdown-bg)", border: "1px solid var(--canvas-dropdown-border)",
-                    boxShadow: "var(--canvas-dropdown-shadow)", zIndex: 50,
+                    background: tk.dropdownBg, border: `1px solid ${tk.dropdownBorder}`,
+                    boxShadow: tk.dropdownShadow, zIndex: 50,
                   }}
                 >
                   <div style={{ padding: 4 }}>
@@ -341,21 +340,21 @@ export function CanvasToolbar({
                           style={{
                             width: "100%", display: "flex", alignItems: "flex-start", gap: 10,
                             padding: "8px 10px", borderRadius: 8,
-                            background: active ? "var(--canvas-accent-bg)" : "transparent",
+                            background: active ? tk.accentBg : "transparent",
                             border: "none", cursor: "pointer", textAlign: "left",
                             transition: "background 0.1s",
                           }}
-                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--canvas-hover-bg)"; }}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = tk.hoverBg; }}
                           onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
                         >
-                          <span style={{ color: active ? "var(--canvas-accent)" : "var(--canvas-text-3)", marginTop: 1, display: "flex" }}>
+                          <span style={{ color: active ? tk.accent : tk.text3, marginTop: 1, display: "flex" }}>
                             {cfg.icon}
                           </span>
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 500, color: active ? "var(--canvas-accent)" : "var(--canvas-text-1)" }}>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: active ? tk.accent : tk.text1 }}>
                               {cfg.label}
                             </div>
-                            <div style={{ fontSize: 10, color: "var(--canvas-text-3)", marginTop: 1 }}>
+                            <div style={{ fontSize: 10, color: tk.text3, marginTop: 1 }}>
                               {cfg.description}
                             </div>
                           </div>
@@ -394,8 +393,8 @@ export function CanvasToolbar({
               style={{
                 background: "transparent",
                 borderTop: "none", borderLeft: "none", borderRight: "none",
-                borderBottom: "1px solid var(--canvas-name-focus-border)",
-                color: "var(--canvas-text-1)", fontSize: 12, fontWeight: 500,
+                borderBottom: `1px solid ${tk.nameFocusBorder}`,
+                color: tk.text1, fontSize: 12, fontWeight: 500,
                 outline: "none", textAlign: "center",
                 minWidth: 80, maxWidth: 200, padding: "2px 4px",
               }}
@@ -414,38 +413,40 @@ export function CanvasToolbar({
                 padding: "4px 8px", borderRadius: 6,
                 maxWidth: 200, transition: "background 0.1s ease",
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "var(--canvas-hover-bg)"; }}
+              onMouseEnter={e => { e.currentTarget.style.background = tk.hoverBg; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
               <span style={{
-                fontSize: 12, fontWeight: 500, color: "var(--canvas-text-2)",
+                fontSize: 12, fontWeight: 500, color: tk.text2,
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 maxWidth: 160,
               }}>
                 {workflowName}
               </span>
-              <Pencil size={9} style={{ color: "var(--canvas-text-4)", flexShrink: 0 }} />
-              {isDirty && (
+              <Pencil size={9} style={{ color: tk.text4, flexShrink: 0 }} />
+              {isSaving ? (
+                <div title={`${t('canvas.saving')}…`} style={{ display: "flex", flexShrink: 0 }}>
+                  <Loader2 size={10} className="animate-spin" style={{ color: tk.text3 }} />
+                </div>
+              ) : savedFlash ? (
+                <div
+                  title={t('canvas.saved')}
+                  style={{ width: 5, height: 5, borderRadius: "50%", background: tk.saveFlashText, flexShrink: 0 }}
+                />
+              ) : isDirty ? (
                 <div
                   title={t('canvas.unsavedChanges')}
-                  style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--canvas-dirty-dot)", flexShrink: 0 }}
+                  style={{ width: 5, height: 5, borderRadius: "50%", background: tk.dirtyDot, flexShrink: 0 }}
                 />
-              )}
+              ) : null}
             </button>
           )}
         </div>
 
         <Sep />
 
-        {/* ── Right group: Zoom + AI + Share + Save + Run ─────────────── */}
+        {/* ── Right group: AI + Theme + Share + Save + Run ──────────── */}
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-
-          {/* Zoom controls */}
-          <TBBtn onClick={onZoomOut} icon={<ZoomOut size={14} />} title={t('canvas.zoomOut')} />
-          <TBBtn onClick={onZoomIn} icon={<ZoomIn size={14} />} title={t('canvas.zoomIn')} />
-          <TBBtn onClick={onFitView} icon={<Maximize2 size={14} />} title={t('canvas.fitToScreen')} />
-
-          <Sep />
 
           {/* Project Date — construction start date for BOQ escalation */}
           <ProjectDatePill />
@@ -459,23 +460,26 @@ export function CanvasToolbar({
             style={{
               display: "flex", alignItems: "center", gap: 5,
               height: 30, padding: "0 12px", borderRadius: 7,
-              background: "var(--canvas-ai-bg)",
-              border: "1px solid var(--canvas-ai-border)",
-              color: "var(--canvas-ai-text)", fontSize: 12, fontWeight: 500,
+              background: tk.aiBg,
+              border: `1px solid ${tk.aiBorder}`,
+              color: tk.aiText, fontSize: 12, fontWeight: 500,
               cursor: "pointer", transition: "all 150ms ease",
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = "var(--canvas-ai-bg-hover)";
-              e.currentTarget.style.borderColor = "var(--canvas-ai-border-hover)";
+              e.currentTarget.style.background = tk.aiBgHover;
+              e.currentTarget.style.borderColor = tk.aiBorderHover;
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "var(--canvas-ai-bg)";
-              e.currentTarget.style.borderColor = "var(--canvas-ai-border)";
+              e.currentTarget.style.background = tk.aiBg;
+              e.currentTarget.style.borderColor = tk.aiBorder;
             }}
           >
             <Sparkles size={11} />
             {t('canvas.ai')}
           </button>
+
+          {/* Theme toggle */}
+          <ThemeToggle inline />
 
           {/* Share dropdown */}
           <div style={{ position: "relative" }} ref={shareMenuRef}>
@@ -494,8 +498,8 @@ export function CanvasToolbar({
                   style={{
                     position: "absolute", top: "calc(100% + 6px)", right: 0,
                     width: 180, borderRadius: 12, overflow: "hidden",
-                    background: "var(--canvas-dropdown-bg)", border: "1px solid var(--canvas-dropdown-border)",
-                    boxShadow: "var(--canvas-dropdown-shadow)", zIndex: 50,
+                    background: tk.dropdownBg, border: `1px solid ${tk.dropdownBorder}`,
+                    boxShadow: tk.dropdownShadow, zIndex: 50,
                   }}
                 >
                   <div style={{ padding: 4 }}>
@@ -511,10 +515,10 @@ export function CanvasToolbar({
                           width: "100%", display: "flex", alignItems: "center", gap: 8,
                           padding: "8px 10px", borderRadius: 8, background: "transparent",
                           border: "none", cursor: "pointer", textAlign: "left",
-                          fontSize: 12, fontWeight: 500, color: "var(--canvas-text-1)",
+                          fontSize: 12, fontWeight: 500, color: tk.text1,
                           transition: "background 0.1s",
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "var(--canvas-hover-bg)"; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = tk.hoverBg; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                       >
                         {item.label}
@@ -535,20 +539,20 @@ export function CanvasToolbar({
               display: "flex", alignItems: "center", gap: 5,
               height: 30, padding: "0 12px", borderRadius: 7,
               background: savedFlash
-                ? "var(--canvas-save-flash-bg)"
+                ? tk.saveFlashBg
                 : canSave
-                  ? "var(--canvas-hover-bg)"
+                  ? tk.hoverBg
                   : "transparent",
               border: savedFlash
-                ? "1px solid var(--canvas-save-flash-border)"
+                ? `1px solid ${tk.saveFlashBorder}`
                 : canSave
-                  ? "1px solid var(--canvas-line-2)"
+                  ? `1px solid ${tk.line2}`
                   : "1px solid transparent",
               color: savedFlash
-                ? "var(--canvas-save-flash-text)"
+                ? tk.saveFlashText
                 : canSave
-                  ? "var(--canvas-text-1)"
-                  : "var(--canvas-text-4)",
+                  ? tk.text1
+                  : tk.text4,
               fontSize: 12, fontWeight: 500,
               cursor: saveDisabled ? "default" : "pointer",
               transition: "all 150ms ease",
@@ -556,12 +560,12 @@ export function CanvasToolbar({
             }}
             onMouseEnter={e => {
               if (!saveDisabled) {
-                e.currentTarget.style.background = "var(--canvas-hover-bg-strong)";
+                e.currentTarget.style.background = tk.hoverBgStrong;
               }
             }}
             onMouseLeave={e => {
               if (!saveDisabled) {
-                e.currentTarget.style.background = canSave ? "var(--canvas-hover-bg)" : "transparent";
+                e.currentTarget.style.background = canSave ? tk.hoverBg : "transparent";
               }
             }}
           >
@@ -596,15 +600,15 @@ export function CanvasToolbar({
               style={{
                 display: "flex", alignItems: "center", gap: 7,
                 height: 32, padding: "0 16px", borderRadius: 8,
-                background: "var(--canvas-stop-bg)", border: "1px solid var(--canvas-stop-border)",
-                color: "var(--canvas-stop-text)", fontSize: 12, fontWeight: 600,
+                background: tk.stopBg, border: `1px solid ${tk.stopBorder}`,
+                color: tk.stopText, fontSize: 12, fontWeight: 600,
                 cursor: "pointer", transition: "all 0.15s ease",
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = "var(--canvas-stop-bg-hover)";
+                e.currentTarget.style.background = tk.stopBgHover;
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = "var(--canvas-stop-bg)";
+                e.currentTarget.style.background = tk.stopBg;
               }}
             >
               <Square size={12} fill="currentColor" />
@@ -625,19 +629,19 @@ export function CanvasToolbar({
                   height: 32, paddingLeft: 14, paddingRight: 10,
                   borderRadius: "8px 0 0 8px",
                   background: isWorkflowReady
-                    ? "var(--canvas-run-bg)"
+                    ? tk.runBg
                     : "transparent",
                   borderTop: isWorkflowReady
-                    ? "1px solid var(--canvas-run-border)"
-                    : "1px solid var(--canvas-line-1)",
+                    ? `1px solid ${tk.runBorder}`
+                    : `1px solid ${tk.line1}`,
                   borderBottom: isWorkflowReady
-                    ? "1px solid var(--canvas-run-border)"
-                    : "1px solid var(--canvas-line-1)",
+                    ? `1px solid ${tk.runBorder}`
+                    : `1px solid ${tk.line1}`,
                   borderLeft: isWorkflowReady
-                    ? "1px solid var(--canvas-run-border)"
-                    : "1px solid var(--canvas-line-1)",
+                    ? `1px solid ${tk.runBorder}`
+                    : `1px solid ${tk.line1}`,
                   borderRight: "none",
-                  color: isWorkflowReady ? "var(--canvas-run-text)" : "var(--canvas-text-4)",
+                  color: isWorkflowReady ? tk.runText : tk.text4,
                   fontSize: 11, fontWeight: 600,
                   letterSpacing: "0.04em",
                   textTransform: "uppercase" as const,
@@ -647,12 +651,12 @@ export function CanvasToolbar({
                 }}
                 onMouseEnter={e => {
                   if (isWorkflowReady) {
-                    e.currentTarget.style.background = "var(--canvas-run-bg-hover)";
+                    e.currentTarget.style.background = tk.runBgHover;
                   }
                 }}
                 onMouseLeave={e => {
                   if (isWorkflowReady) {
-                    e.currentTarget.style.background = "var(--canvas-run-bg)";
+                    e.currentTarget.style.background = tk.runBg;
                   }
                 }}
               >
@@ -684,26 +688,26 @@ export function CanvasToolbar({
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 28, height: 32, padding: 0,
                   borderRadius: "0 8px 8px 0",
-                  background: isWorkflowReady ? "var(--canvas-run-bg)" : "transparent",
+                  background: isWorkflowReady ? tk.runBg : "transparent",
                   borderTop: isWorkflowReady
-                    ? "1px solid var(--canvas-run-border)"
-                    : "1px solid var(--canvas-line-1)",
+                    ? `1px solid ${tk.runBorder}`
+                    : `1px solid ${tk.line1}`,
                   borderRight: isWorkflowReady
-                    ? "1px solid var(--canvas-run-border)"
-                    : "1px solid var(--canvas-line-1)",
+                    ? `1px solid ${tk.runBorder}`
+                    : `1px solid ${tk.line1}`,
                   borderBottom: isWorkflowReady
-                    ? "1px solid var(--canvas-run-border)"
-                    : "1px solid var(--canvas-line-1)",
+                    ? `1px solid ${tk.runBorder}`
+                    : `1px solid ${tk.line1}`,
                   borderLeft: isWorkflowReady
-                    ? "1px solid var(--canvas-run-border-split)"
-                    : "1px solid var(--canvas-line-1)",
-                  color: isWorkflowReady ? "var(--canvas-run-text)" : "var(--canvas-text-4)",
+                    ? `1px solid ${tk.runBorderSplit}`
+                    : `1px solid ${tk.line1}`,
+                  color: isWorkflowReady ? tk.runText : tk.text4,
                   cursor: isWorkflowReady ? "pointer" : "not-allowed",
                   transition: "all 180ms ease",
                   opacity: isWorkflowReady ? 1 : 0.5,
                 }}
-                onMouseEnter={e => { if (isWorkflowReady) e.currentTarget.style.background = "var(--canvas-run-bg-hover)"; }}
-                onMouseLeave={e => { if (isWorkflowReady) e.currentTarget.style.background = "var(--canvas-run-bg)"; }}
+                onMouseEnter={e => { if (isWorkflowReady) e.currentTarget.style.background = tk.runBgHover; }}
+                onMouseLeave={e => { if (isWorkflowReady) e.currentTarget.style.background = tk.runBg; }}
               >
                 <ChevronDown size={11} />
               </button>
@@ -719,8 +723,8 @@ export function CanvasToolbar({
                     style={{
                       position: "absolute", top: "calc(100% + 6px)", right: 0,
                       width: 200, borderRadius: 12, overflow: "hidden",
-                      background: "var(--canvas-dropdown-bg)", border: "1px solid var(--canvas-dropdown-border)",
-                      boxShadow: "var(--canvas-dropdown-shadow)", zIndex: 50,
+                      background: tk.dropdownBg, border: `1px solid ${tk.dropdownBorder}`,
+                      boxShadow: tk.dropdownShadow, zIndex: 50,
                     }}
                   >
                     <div style={{ padding: 4 }}>
@@ -738,11 +742,11 @@ export function CanvasToolbar({
                             border: "none", cursor: "pointer", textAlign: "left",
                             transition: "background 0.1s",
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.background = "var(--canvas-hover-bg)"; }}
+                          onMouseEnter={e => { e.currentTarget.style.background = tk.hoverBg; }}
                           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                         >
-                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--canvas-text-1)" }}>{item.label}</span>
-                          <span style={{ fontSize: 10, color: "var(--canvas-text-3)" }}>{item.sub}</span>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: tk.text1 }}>{item.label}</span>
+                          <span style={{ fontSize: 10, color: tk.text3 }}>{item.sub}</span>
                         </button>
                       ))}
                     </div>
@@ -772,11 +776,11 @@ export function CanvasToolbar({
           right: 0,
           zIndex: 50,
           padding: "12px 16px",
-          background: "var(--canvas-surface-2)",
+          background: tk.surface2,
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
-          borderTop: "1px solid var(--canvas-line-1)",
-          boxShadow: "var(--canvas-shadow-md)",
+          borderTop: `1px solid ${tk.line1}`,
+          boxShadow: tk.shadowMd,
         }}
       >
         {/* Full-width Run button for mobile */}
@@ -791,9 +795,9 @@ export function CanvasToolbar({
               alignItems: "center",
               justifyContent: "center",
               gap: 8,
-              background: "var(--canvas-stop-bg)",
-              border: "1px solid var(--canvas-stop-border)",
-              color: "var(--canvas-stop-text)",
+              background: tk.stopBg,
+              border: `1px solid ${tk.stopBorder}`,
+              color: tk.stopText,
               fontSize: 15,
               fontWeight: 600,
               cursor: "pointer",
@@ -816,12 +820,12 @@ export function CanvasToolbar({
               justifyContent: "center",
               gap: 8,
               background: isWorkflowReady
-                ? "var(--canvas-run-bg)"
+                ? tk.runBg
                 : "transparent",
               border: isWorkflowReady
-                ? "1px solid var(--canvas-run-border)"
-                : "1px solid var(--canvas-line-1)",
-              color: isWorkflowReady ? "var(--canvas-run-text)" : "var(--canvas-text-4)",
+                ? `1px solid ${tk.runBorder}`
+                : `1px solid ${tk.line1}`,
+              color: isWorkflowReady ? tk.runText : tk.text4,
               fontSize: 15,
               fontWeight: 600,
               cursor: isWorkflowReady ? "pointer" : "not-allowed",
@@ -841,7 +845,7 @@ export function CanvasToolbar({
           justifyContent: "space-between",
           marginTop: 10,
           paddingTop: 10,
-          borderTop: "1px solid var(--canvas-line-1)",
+          borderTop: `1px solid ${tk.line1}`,
         }}>
           <button
             onClick={onToggleLibrary}
@@ -851,9 +855,9 @@ export function CanvasToolbar({
               gap: 4,
               padding: "6px 12px",
               borderRadius: 8,
-              background: isNodeLibraryOpen ? "var(--canvas-accent-bg-active)" : "transparent",
-              border: `1px solid ${isNodeLibraryOpen ? "var(--canvas-accent-border)" : "var(--canvas-line-1)"}`,
-              color: isNodeLibraryOpen ? "var(--canvas-accent)" : "var(--canvas-text-1)",
+              background: isNodeLibraryOpen ? tk.accentBgActive : "transparent",
+              border: `1px solid ${isNodeLibraryOpen ? tk.accentBorder : tk.line1}`,
+              color: isNodeLibraryOpen ? tk.accent : tk.text1,
               fontSize: 12,
               fontWeight: 500,
               cursor: "pointer",
@@ -874,11 +878,11 @@ export function CanvasToolbar({
               borderRadius: 8,
               background: "transparent",
               border: savedFlash
-                ? "1px solid var(--canvas-save-flash-border)"
+                ? `1px solid ${tk.saveFlashBorder}`
                 : canSave
-                  ? "1px solid var(--canvas-line-2)"
+                  ? `1px solid ${tk.line2}`
                   : "1px solid transparent",
-              color: savedFlash ? "var(--canvas-save-flash-text)" : canSave ? "var(--canvas-text-1)" : "var(--canvas-text-4)",
+              color: savedFlash ? tk.saveFlashText : canSave ? tk.text1 : tk.text4,
               fontSize: 12,
               fontWeight: 500,
               cursor: saveDisabled ? "default" : "pointer",
@@ -897,8 +901,8 @@ export function CanvasToolbar({
                 width: 36, height: 36, borderRadius: 8,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: "transparent",
-                border: "1px solid var(--canvas-line-1)",
-                color: "var(--canvas-text-1)",
+                border: `1px solid ${tk.line1}`,
+                color: tk.text1,
                 cursor: "pointer",
               }}
             >
@@ -911,8 +915,8 @@ export function CanvasToolbar({
                 width: 36, height: 36, borderRadius: 8,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: "transparent",
-                border: "1px solid var(--canvas-line-1)",
-                color: "var(--canvas-text-1)",
+                border: `1px solid ${tk.line1}`,
+                color: tk.text1,
                 cursor: "pointer",
               }}
             >
@@ -928,9 +932,9 @@ export function CanvasToolbar({
               gap: 4,
               padding: "6px 12px",
               borderRadius: 8,
-              background: "var(--canvas-ai-bg)",
-              border: "1px solid var(--canvas-ai-border)",
-              color: "var(--canvas-ai-text)",
+              background: tk.aiBg,
+              border: `1px solid ${tk.aiBorder}`,
+              color: tk.aiText,
               fontSize: 12,
               fontWeight: 500,
               cursor: "pointer",

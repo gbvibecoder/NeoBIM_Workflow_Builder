@@ -259,8 +259,14 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        {/* Z.CANVAS.SHIP: FOUC prevention — set canvas theme attribute before React hydrates */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('bf:canvas:theme')||'light';if(t!=='light'&&t!=='dark')t='light';document.documentElement.setAttribute('data-canvas-theme',t)}catch(e){}})()`,
+          }}
+        />
         {/* 🔍 JSON-LD Structured Data */}
         <script
           type="application/ld+json"
