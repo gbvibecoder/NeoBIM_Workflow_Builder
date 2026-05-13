@@ -349,10 +349,10 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             exit={{ opacity: 0, y: 20 }}
             onClick={onToggle}
             style={{
-              position: "absolute", right: isLibraryOpen ? 344 : 64, bottom: 64,
+              position: "absolute", right: isLibraryOpen ? 344 : 175, bottom: 16,
               zIndex: 25, padding: "10px 16px",
               background: tk.aiPanelBg, border: `1px solid ${tk.aiPanelBorder}`,
-              borderRadius: 4,
+              borderRadius: 10,
               cursor: "pointer", color: tk.aiText,
               display: "flex", alignItems: "center", gap: 8,
               boxShadow: tk.aiPanelGlow,
