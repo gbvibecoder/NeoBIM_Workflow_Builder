@@ -7,11 +7,16 @@
  */
 
 import { memo, useCallback } from "react";
-import { Minus, Plus, Maximize2 } from "lucide-react";
+import { Minus, Plus, Maximize2, Sparkles } from "lucide-react";
 import { useReactFlow, useViewport } from "@xyflow/react";
 import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
 
-export const CanvasControls = memo(function CanvasControls() {
+interface CanvasControlsProps {
+  onChatToggle?: () => void;
+  isChatOpen?: boolean;
+}
+
+export const CanvasControls = memo(function CanvasControls({ onChatToggle, isChatOpen }: CanvasControlsProps) {
   const tk = useCanvasToken();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const viewport = useViewport();
@@ -65,6 +70,30 @@ export const CanvasControls = memo(function CanvasControls() {
           WebkitBackdropFilter: "blur(12px)",
         }}
       >
+        {/* AI Chat pill — integrated into controls cluster */}
+        {onChatToggle && !isChatOpen && (
+          <>
+            <button
+              onClick={onChatToggle}
+              title="AI Chat"
+              aria-label="AI Chat"
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                height: 28, padding: "0 10px", borderRadius: 6,
+                background: tk.aiBg, border: `1px solid ${tk.aiBorder}`,
+                color: tk.aiText, fontSize: 11, fontWeight: 600,
+                cursor: "pointer", transition: "background 0.12s ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = tk.aiBgHover; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = tk.aiBg; }}
+            >
+              <Sparkles size={12} />
+              AI CHAT
+            </button>
+            <div style={{ width: 1, height: 20, background: tk.line2, margin: "0 2px", flexShrink: 0 }} />
+          </>
+        )}
+
         {/* Zoom out */}
         <button
           onClick={handleZoomOut}

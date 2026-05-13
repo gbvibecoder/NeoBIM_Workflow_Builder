@@ -340,34 +340,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
 
   return (
     <div className={`canvas-theme-${canvasTheme}`} style={{ display: "contents" }}>
-      {/* Floating pill when closed */}
-      <AnimatePresence>
-        {!isOpen && (
-          <motion.button
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            onClick={onToggle}
-            style={{
-              position: "absolute", right: 175, bottom: 16,
-              zIndex: 25, padding: "10px 16px",
-              background: tk.aiPanelBg, border: `1px solid ${tk.aiPanelBorder}`,
-              borderRadius: 10,
-              cursor: "pointer", color: tk.aiText,
-              display: "flex", alignItems: "center", gap: 8,
-              boxShadow: tk.aiPanelGlow,
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = tk.aiBorderHover; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = tk.aiPanelBorder; }}
-          >
-            <Sparkles size={14} />
-            <span style={{ fontSize: 12, fontWeight: 600 }}>{t('aiChat.title')}</span>
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* AI Chat pill is now rendered inside CanvasControls cluster */}
 
       {/* Floating chat panel */}
       <AnimatePresence>

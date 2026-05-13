@@ -1158,7 +1158,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
           >
 
             {/* Z.CANVAS.2B: Canvas Controls (bottom-right) */}
-            <CanvasControls />
+            <CanvasControls onChatToggle={() => setIsChatOpen(o => !o)} isChatOpen={isChatOpen} />
 
             {/* Z.CANVAS.2B: Smart alignment guides overlay */}
             <AlignmentGuides guides={smartGuides} />
