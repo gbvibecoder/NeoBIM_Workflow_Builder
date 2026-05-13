@@ -5,12 +5,20 @@ import { isMetaTrackingAllowedBrowser } from "./tracking-env";
 
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2072969213494487";
 
-/** Standard Meta event values — keep browser and server in sync. INR only. */
+/**
+ * Standard Meta event values — keep browser and server (`server-conversions.ts`)
+ * in sync. Currency unified on EUR for ad-platform reporting; per-plan
+ * Purchase amounts live in `plan-pricing.ts` (`getPlanValueEUR`).
+ *
+ * LEAD and REGISTRATION are flat €1 — these aren't revenue, just signals,
+ * but Meta requires a numeric `value` + `currency` on every fire (otherwise
+ * the "Send valid price and currency information" diagnostic flags 100%).
+ */
 export const META_EVENT_VALUE = {
-  LEAD_INR: 1000,
-  REGISTRATION_INR: 100,
+  LEAD: 1,
+  REGISTRATION: 1,
 } as const;
-export const META_CURRENCY = "INR" as const;
+export const META_CURRENCY = "EUR" as const;
 
 type FbqParams = Record<string, string | number | boolean | undefined>;
 type FbqOptions = { eventID?: string };

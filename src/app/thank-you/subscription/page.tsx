@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { trackAdsConversion, trackPurchase } from "@/lib/meta-pixel";
-import { getPurchaseEventId, getPlanValueINR } from "@/lib/plan-pricing";
+import { getPurchaseEventId, getPlanValueEUR } from "@/lib/plan-pricing";
 import { STRIPE_PLANS } from "@/features/billing/lib/plan-data";
 import { toPlanKey, formatPlanLimit, type PlanKey } from "@/features/billing/lib/plan-helpers";
 
@@ -127,7 +127,9 @@ function Content() {
 
     const userId = (session.user as { id?: string }).id;
     const planKey = planFromUrl || userRole;
-    const value = getPlanValueINR(planKey);
+    // Ad-platform reporting currency is EUR (see plan-pricing.ts header).
+    // Actual user billing remains INR — this is only what we report to Meta + Google.
+    const value = getPlanValueEUR(planKey);
     const eventID = userId ? getPurchaseEventId(userId, planKey) : undefined;
 
     // Idempotency guard: skip conversion fires if this purchase was already
@@ -140,14 +142,14 @@ function Content() {
     trackPurchase(
       {
         content_name: `BuildFlow ${plan?.name || "Subscription"}`,
-        currency: "INR",
+        currency: "EUR",
         value,
       },
       eventID ? { eventID } : undefined,
     );
     pushToDataLayer("purchase_complete", {
       plan: plan?.name || userRole,
-      currency: "INR",
+      currency: "EUR",
       value,
       ...(eventID && { event_id: eventID }),
     });
@@ -156,7 +158,7 @@ function Content() {
     if (purchaseAdsLabel) {
       trackAdsConversion(purchaseAdsLabel, {
         value,
-        currency: "INR",
+        currency: "EUR",
         ...(eventID && { transaction_id: eventID }),
       });
     }

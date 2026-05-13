@@ -198,6 +198,23 @@ describe("server-conversions — Meta CAPI", () => {
     );
   });
 
+  it("REGRESSION: trackServerSignup CAPI payload carries value + currency (Meta diagnostic guard)", async () => {
+    // Meta's "Send valid price and currency information for website
+    // CompleteRegistration events" diagnostic flags 100% of fires whose
+    // custom_data is missing either field. This test pins the CAPI payload
+    // shape so we cannot regress that diagnostic back to red.
+    const fetchSpy = installFetchSpy();
+    await mod.trackServerSignup({
+      email: "diag@user.com",
+      eventId: "signup-diag",
+    });
+    const event = (fetchSpy.calls[0].body.data as Array<Record<string, unknown>>)[0];
+    const customData = event.custom_data as Record<string, unknown>;
+    expect(customData.currency).toBe("EUR");
+    expect(typeof customData.value).toBe("number");
+    expect(customData.value as number).toBeGreaterThan(0);
+  });
+
   it("trackServerSignup mints a UUID-shaped eventId when none is given", async () => {
     const fetchSpy = installFetchSpy();
     await mod.trackServerSignup({ email: "new@user.com" });

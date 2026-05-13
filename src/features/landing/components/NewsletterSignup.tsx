@@ -36,7 +36,7 @@ export function NewsletterSignup() {
       trackLead(
         {
           content_name: "newsletter_signup",
-          value: META_EVENT_VALUE.LEAD_INR,
+          value: META_EVENT_VALUE.LEAD,
           currency: META_CURRENCY,
         },
         { eventID: eventId },
@@ -47,7 +47,7 @@ export function NewsletterSignup() {
         body: JSON.stringify({
           eventId,
           contentName: "newsletter_signup",
-          value: META_EVENT_VALUE.LEAD_INR,
+          value: META_EVENT_VALUE.LEAD,
           currency: META_CURRENCY,
           eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
           email: trimmedEmail,

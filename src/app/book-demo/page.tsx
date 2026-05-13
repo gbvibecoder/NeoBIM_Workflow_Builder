@@ -281,7 +281,7 @@ export default function BookDemoPage() {
         trackLead(
           {
             content_name: "book_demo",
-            value: META_EVENT_VALUE.LEAD_INR,
+            value: META_EVENT_VALUE.LEAD,
             currency: META_CURRENCY,
           },
           { eventID: eventId },
@@ -292,7 +292,7 @@ export default function BookDemoPage() {
           body: JSON.stringify({
             eventId,
             contentName: "book_demo",
-            value: META_EVENT_VALUE.LEAD_INR,
+            value: META_EVENT_VALUE.LEAD,
             currency: META_CURRENCY,
             eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
             email: formData.email?.trim().toLowerCase() || undefined,

@@ -47,7 +47,7 @@ function fireLead(
 
   const pixelParams: Record<string, string | number> = {
     content_name: contentName,
-    value: META_EVENT_VALUE.LEAD_INR,
+    value: META_EVENT_VALUE.LEAD,
     currency: META_CURRENCY,
   };
   if (extra?.contentCategory) pixelParams.content_category = extra.contentCategory;
@@ -56,7 +56,7 @@ function fireLead(
   const capiBody: Record<string, string | number> = {
     eventId,
     contentName,
-    value: META_EVENT_VALUE.LEAD_INR,
+    value: META_EVENT_VALUE.LEAD,
     currency: META_CURRENCY,
   };
   if (typeof window !== "undefined") capiBody.eventSourceUrl = window.location.href;

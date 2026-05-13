@@ -187,7 +187,7 @@ function RegisterForm() {
       trackCompleteRegistration(
         {
           content_name: isEmail ? "email_signup" : "phone_signup",
-          value: META_EVENT_VALUE.REGISTRATION_INR,
+          value: META_EVENT_VALUE.REGISTRATION,
           currency: META_CURRENCY,
           ...(isEmail && { user_email: identifier.trim().toLowerCase() }),
           user_name: name.trim(),
@@ -251,7 +251,7 @@ function RegisterForm() {
       trackCompleteRegistration(
         {
           content_name: "google_signup",
-          value: META_EVENT_VALUE.REGISTRATION_INR,
+          value: META_EVENT_VALUE.REGISTRATION,
           currency: META_CURRENCY,
         },
         { eventID: googleEventId },
