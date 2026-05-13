@@ -416,11 +416,14 @@ export function CanvasToolbar({
               onMouseEnter={e => { e.currentTarget.style.background = tk.hoverBg; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
-              <span style={{
-                fontSize: 12, fontWeight: 500, color: tk.text2,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                maxWidth: 160,
-              }}>
+              <span
+                title={workflowName}
+                style={{
+                  fontSize: 12, fontWeight: 500, color: tk.text2,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  maxWidth: 160,
+                }}
+              >
                 {workflowName}
               </span>
               <Pencil size={9} style={{ color: tk.text4, flexShrink: 0 }} />

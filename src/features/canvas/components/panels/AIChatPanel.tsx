@@ -22,6 +22,7 @@ import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
 import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
+import { useUIStore } from "@/shared/stores/ui-store";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -229,6 +230,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
   const { t } = useLocale();
   const canvasTheme = useCanvasTheme((s) => s.theme);
   const tk = useCanvasToken();
+  const isLibraryOpen = useUIStore((s) => s.isNodeLibraryOpen);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [minimized, setMinimized] = useState(false);
@@ -347,7 +349,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             exit={{ opacity: 0, y: 20 }}
             onClick={onToggle}
             style={{
-              position: "absolute", right: 16, bottom: 64,
+              position: "absolute", right: isLibraryOpen ? 344 : 64, bottom: 64,
               zIndex: 25, padding: "10px 16px",
               background: tk.aiPanelBg, border: `1px solid ${tk.aiPanelBorder}`,
               borderRadius: 4,
@@ -379,7 +381,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             style={{
               position: "fixed",
               bottom: 24,
-              right: 96,
+              right: isLibraryOpen ? 344 : 96,
               width: 380,
               height: minimized ? "auto" : 500,
               zIndex: 55,

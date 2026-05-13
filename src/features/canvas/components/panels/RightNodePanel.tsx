@@ -84,16 +84,29 @@ export const RightNodePanel = memo(function RightNodePanel() {
       ) : (
         /* ── Expanded: library content ───────────────────────────── */
         <>
-          {/* Collapse button */}
+          {/* Header bar with label + collapse chevron */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "flex-end",
-              padding: "6px 8px 0",
+              padding: "10px 10px 6px 14px",
               flexShrink: 0,
+              borderBottom: `1px solid ${tk.line1}`,
             }}
           >
+            <Layers3 size={14} style={{ color: tk.accent, flexShrink: 0 }} />
+            <span style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: tk.text3,
+              marginLeft: 8,
+              flex: 1,
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              {t("canvas.nodeLibraryLabel")}
+            </span>
             <button
               onClick={toggleNodeLibrary}
               title={t("canvas.collapseNodeLibrary")}
@@ -108,13 +121,15 @@ export const RightNodePanel = memo(function RightNodePanel() {
                 background: "transparent",
                 cursor: "pointer",
                 color: tk.text3,
-                transition: "color 150ms ease",
+                transition: "color 150ms ease, background 150ms ease",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = tk.text1;
+                e.currentTarget.style.background = tk.hoverBg;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.color = tk.text3;
+                e.currentTarget.style.background = "transparent";
               }}
             >
               <ChevronRight size={14} />
