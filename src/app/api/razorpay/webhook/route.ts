@@ -12,7 +12,7 @@ import {
 } from '@/shared/services/email';
 import { checkWebhookIdempotency, clearWebhookIdempotency } from '@/lib/webhook-idempotency';
 import { trackServerPurchase } from '@/lib/server-conversions';
-import { getPlanValueINR } from '@/lib/plan-pricing';
+import { getPlanValueINR, getPlanValueEUR } from '@/lib/plan-pricing';
 import { billingFeatureFlags } from '@/features/billing/lib/feature-flags';
 import {
   billingGraceWindowFlagOff,
@@ -287,8 +287,10 @@ async function activateSubscription(subscription: {
       phone: user.phoneNumber,
       firstName: user.name?.split(" ")[0],
       plan: newRole,
-      currency: "INR",
-      value: getPlanValueINR(newRole),
+      // Ad-platform reporting currency is EUR (see plan-pricing.ts header).
+      // User is still charged in INR by Razorpay; this is the Meta/Google value.
+      currency: "EUR",
+      value: getPlanValueEUR(newRole),
       fbp: notesStr('fbp'),
       fbc: notesStr('fbc'),
       ip: notesStr('clientIp'),

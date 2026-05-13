@@ -64,26 +64,27 @@ export function trackPricingClick(
 ) {
   pushToDataLayer("pricing_cta_click", { plan });
   // Paid-plan clicks = InitiateCheckout conversion signal (Meta + GA4).
-  // Values mirror the actual Razorpay subscription amount the user is about
-  // to pay, so attribution downstream (Meta CAPI, GA4 ecommerce) is honest.
+  // EUR values match the Purchase event mapping (see plan-pricing.ts
+  // getPlanValueEUR) so Meta sees a coherent funnel: InitiateCheckout
+  // currency == Purchase currency for the same plan.
   if (plan === "mini") {
     trackInitiateCheckout({
-      value: 99,
-      currency: "INR",
+      value: 1,
+      currency: "EUR",
       content_name: "mini_plan",
       content_category: "onboarding",
     });
   } else if (plan === "starter") {
     trackInitiateCheckout({
-      value: 799,
-      currency: "INR",
+      value: 8,
+      currency: "EUR",
       content_name: "starter_plan",
       content_category: "onboarding",
     });
   } else if (plan === "pro") {
     trackInitiateCheckout({
-      value: 1999,
-      currency: "INR",
+      value: 20,
+      currency: "EUR",
       content_name: "pro_plan",
       content_category: "onboarding",
     });
@@ -134,7 +135,7 @@ export function trackComplete(total_time_seconds: number, profile: SurveyProfile
   const eventId = `lead_${crypto.randomUUID()}`;
   const leadParams: Record<string, string | number> = {
     content_name: "onboarding_survey_complete",
-    value: META_EVENT_VALUE.LEAD_INR,
+    value: META_EVENT_VALUE.LEAD,
     currency: META_CURRENCY,
   };
   if (profile.profession) leadParams.profession = profile.profession;
@@ -147,7 +148,7 @@ export function trackComplete(total_time_seconds: number, profile: SurveyProfile
   const capiBody: Record<string, string | number> = {
     eventId,
     contentName: "onboarding_survey_complete",
-    value: META_EVENT_VALUE.LEAD_INR,
+    value: META_EVENT_VALUE.LEAD,
     currency: META_CURRENCY,
   };
   if (typeof window !== "undefined") capiBody.eventSourceUrl = window.location.href;

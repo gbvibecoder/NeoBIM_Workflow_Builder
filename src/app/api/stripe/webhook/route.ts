@@ -15,7 +15,7 @@ import { checkWebhookIdempotency, clearWebhookIdempotency } from '@/lib/webhook-
 import { invalidateUserRoleCache } from '@/lib/auth';
 import { logAudit } from "@/lib/admin-server";
 import { trackServerPurchase } from "@/lib/server-conversions";
-import { getPlanValueINR } from "@/lib/plan-pricing";
+import { getPlanValueINR, getPlanValueEUR } from "@/lib/plan-pricing";
 import { billingFeatureFlags } from '@/features/billing/lib/feature-flags';
 import {
   billingGraceWindowFlagOff,
@@ -93,20 +93,22 @@ export async function POST(req: NextRequest) {
             sendWelcomeEmail(checkoutUser.email, checkoutUser.name, checkoutUser.role).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
 
             // Server-side conversion: Meta CAPI (fire-and-forget)
-            // Prefer real amount from Stripe session when present, fall back to plan map.
+            // Currency reported to ad platforms is EUR — see plan-pricing.ts
+            // header. Stripe charges users in INR (`session.amount_total`),
+            // but we deliberately do NOT pass that through; the EUR plan map
+            // is the single source of truth for ad-side value.
             // fbp/fbc/clientIp/clientUa are stashed on session.metadata at
             // checkout creation so this webhook (which fires from Stripe's
             // servers, no browser cookies) can still attribute the Purchase to
             // the browser session that initiated it.
-            const amountTotalINR = session.amount_total ? session.amount_total / 100 : undefined;
             trackServerPurchase({
               userId: checkoutUser.id,
               email: checkoutUser.email,
               phone: checkoutUser.phoneNumber,
               firstName: checkoutUser.name?.split(" ")[0],
               plan: checkoutUser.role,
-              currency: "INR",
-              value: amountTotalINR ?? getPlanValueINR(checkoutUser.role),
+              currency: "EUR",
+              value: getPlanValueEUR(checkoutUser.role),
               fbp: session.metadata?.fbp || undefined,
               fbc: session.metadata?.fbc || undefined,
               ip: session.metadata?.clientIp || undefined,

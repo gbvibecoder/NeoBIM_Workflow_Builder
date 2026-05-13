@@ -21,12 +21,13 @@ const META_PIXEL_ID =
 const META_API_VERSION = "v21.0";
 const META_CAPI_URL = `https://graph.facebook.com/${META_API_VERSION}/${META_PIXEL_ID}/events`;
 
-/** Duplicated from meta-pixel.ts so this module stays server-safe (no client deps). */
+/** Duplicated from meta-pixel.ts so this module stays server-safe (no client deps).
+ *  Currency unified on EUR — see meta-pixel.ts header for rationale. */
 const META_EVENT_VALUE = {
-  LEAD_INR: 1000,
-  REGISTRATION_INR: 100,
+  LEAD: 1,
+  REGISTRATION: 1,
 } as const;
-const META_CURRENCY = "INR" as const;
+const META_CURRENCY = "EUR" as const;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ export async function trackServerSignup(params: {
     customData: {
       content_name: "BuildFlow Signup",
       status: "complete",
-      value: META_EVENT_VALUE.REGISTRATION_INR,
+      value: META_EVENT_VALUE.REGISTRATION,
       currency: META_CURRENCY,
     },
     eventSourceUrl: "https://trybuildflow.in/register",
@@ -214,7 +215,7 @@ export async function trackServerLead(params: {
     },
     customData: {
       content_name: params.contentName || "BuildFlow Lead",
-      value: params.value ?? META_EVENT_VALUE.LEAD_INR,
+      value: params.value ?? META_EVENT_VALUE.LEAD,
       currency: params.currency || META_CURRENCY,
     },
     eventSourceUrl: params.eventSourceUrl,

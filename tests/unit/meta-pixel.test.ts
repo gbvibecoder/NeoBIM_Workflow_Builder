@@ -380,6 +380,61 @@ describe("layout.tsx — <noscript> Meta Pixel fallback", () => {
 // CSP — the security headers must allow Facebook's pixel domains
 // ────────────────────────────────────────────────────────────────────────────
 
+// ────────────────────────────────────────────────────────────────────────────
+// Value/currency contract — regression guard for the Meta diagnostic
+// "Send valid price and currency information for website CompleteRegistration
+// events" (100% missing value+currency). Every Lead/CompleteRegistration fire
+// MUST carry a numeric value > 0 and currency = "EUR".
+// ────────────────────────────────────────────────────────────────────────────
+
+describe("meta-pixel — value/currency contract (Meta diagnostic guard)", () => {
+  let mod: typeof import("@/lib/meta-pixel");
+
+  beforeEach(async () => {
+    vi.resetModules();
+    mod = await import("@/lib/meta-pixel");
+  });
+
+  it("META_CURRENCY is EUR (ad-platform reporting currency)", () => {
+    expect(mod.META_CURRENCY).toBe("EUR");
+  });
+
+  it("META_EVENT_VALUE.LEAD is a positive number (Meta requires value > 0)", () => {
+    expect(typeof mod.META_EVENT_VALUE.LEAD).toBe("number");
+    expect(mod.META_EVENT_VALUE.LEAD).toBeGreaterThan(0);
+  });
+
+  it("META_EVENT_VALUE.REGISTRATION is a positive number (Meta requires value > 0)", () => {
+    expect(typeof mod.META_EVENT_VALUE.REGISTRATION).toBe("number");
+    expect(mod.META_EVENT_VALUE.REGISTRATION).toBeGreaterThan(0);
+  });
+
+  it("REGRESSION: no legacy LEAD_INR / REGISTRATION_INR keys exist on META_EVENT_VALUE", () => {
+    const keys = Object.keys(mod.META_EVENT_VALUE);
+    expect(keys).not.toContain("LEAD_INR");
+    expect(keys).not.toContain("REGISTRATION_INR");
+  });
+});
+
+describe("plan-pricing — getPlanValueEUR (Purchase value contract)", () => {
+  it("maps each paid plan to its locked EUR ad-reporting value", async () => {
+    const { getPlanValueEUR } = await import("@/lib/plan-pricing");
+    expect(getPlanValueEUR("FREE")).toBe(0);
+    expect(getPlanValueEUR("MINI")).toBe(1);
+    expect(getPlanValueEUR("STARTER")).toBe(8);
+    expect(getPlanValueEUR("PRO")).toBe(20);
+    expect(getPlanValueEUR("TEAM")).toBe(45);
+    expect(getPlanValueEUR("TEAM_ADMIN")).toBe(45);
+  });
+
+  it("returns 0 for unknown / null / undefined roles (never throws, never NaN)", async () => {
+    const { getPlanValueEUR } = await import("@/lib/plan-pricing");
+    expect(getPlanValueEUR(null)).toBe(0);
+    expect(getPlanValueEUR(undefined)).toBe(0);
+    expect(getPlanValueEUR("BOGUS")).toBe(0);
+  });
+});
+
 describe("next.config.ts — CSP allows Meta Pixel domains", () => {
   const src = readFileSync(resolve(repoRoot, "next.config.ts"), "utf8");
 
