@@ -68,3 +68,50 @@ export const nodeText = {
     letterSpacing: "0.05em",
   } satisfies CSSProperties,
 } as const;
+
+// ── Light theme variant (V3 Modern Creative Studio) ─────────────────────────
+// Used inside the V3 light card where node bg is #FFFFFF. Dark stays untouched.
+
+export const nodeTextLight = {
+  value: {
+    fontSize: 14,
+    fontWeight: 400,
+    color: "#0F1419",
+    letterSpacing: "0.005em",
+  } satisfies CSSProperties,
+
+  sectionHdr: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#4A5360",
+    letterSpacing: "0.1em",
+    textTransform: "uppercase",
+  } satisfies CSSProperties,
+
+  label: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: "#4A5360",
+    letterSpacing: "0.02em",
+  } satisfies CSSProperties,
+
+  helper: {
+    fontSize: 12,
+    fontWeight: 400,
+    color: "#8089A0",
+    lineHeight: 1.5,
+  } satisfies CSSProperties,
+
+  hintLink: {
+    color: "#2563EB",
+    fontWeight: 600,
+  } satisfies CSSProperties,
+
+  meta: {
+    fontSize: 11,
+    fontWeight: 500,
+    color: "#8089A0",
+    fontFamily: "var(--font-jetbrains), monospace",
+    letterSpacing: "0.05em",
+  } satisfies CSSProperties,
+} as const;

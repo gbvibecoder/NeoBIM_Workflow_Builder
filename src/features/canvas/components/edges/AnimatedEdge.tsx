@@ -2,6 +2,7 @@
 
 import React, { memo, useState } from "react";
 import { getSmoothStepPath, type EdgeProps } from "@xyflow/react";
+import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,10 +26,12 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   selected,
 }: EdgeProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const canvasTheme = useCanvasTheme((s) => s.theme);
+  const fallback = canvasTheme === "light" ? "#94A3B8" : "#B87333";
 
   const edgeData = data as EdgeData | undefined;
-  const sourceColor = edgeData?.sourceColor ?? "#B87333";
-  const targetColor = edgeData?.targetColor ?? "#B87333";
+  const sourceColor = edgeData?.sourceColor ?? fallback;
+  const targetColor = edgeData?.targetColor ?? fallback;
   const isFlowing   = edgeData?.isFlowing   ?? false;
 
   const [edgePath] = getSmoothStepPath({

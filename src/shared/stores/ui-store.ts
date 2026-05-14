@@ -3,6 +3,8 @@
 import { create } from "zustand";
 
 type PanelId = "nodeLibrary" | "executionHistory" | "workflowMeta" | "none";
+export type CanvasMode = "select" | "comment" | "group";
+export type SlimCategory = "input" | "transform" | "generate" | "export" | "all";
 
 interface UIState {
   // Panel visibility
@@ -16,6 +18,8 @@ interface UIState {
 
   // Canvas state
   canvasZoom: number;
+  canvasMode: CanvasMode;
+  setCanvasMode: (mode: CanvasMode) => void;
 
   // Modal states
   isRequestDialogOpen: boolean;
@@ -28,6 +32,13 @@ interface UIState {
 
   // Demo mode
   isDemoMode: boolean;
+
+  // Slim library drawer
+  slimDrawerOpen: boolean;
+  slimDrawerCategory: SlimCategory | null;
+  openSlimDrawer: (category: SlimCategory) => void;
+  closeSlimDrawer: () => void;
+  toggleSlimDrawer: (category: SlimCategory) => void;
 
   // Pending node add — sidebar click-to-add, consumed by WorkflowCanvas
   pendingNodeAdd: string | null;
@@ -69,6 +80,8 @@ export const useUIStore = create<UIState>()((set) => ({
 
   selectedNodeIds: [],
   canvasZoom: 1,
+  canvasMode: "select",
+  setCanvasMode: (mode) => set({ canvasMode: mode }),
 
   isRequestDialogOpen: false,
   isNewWorkflowDialogOpen: false,
@@ -78,6 +91,16 @@ export const useUIStore = create<UIState>()((set) => ({
   isGeneratingWorkflow: false,
 
   isDemoMode: false,
+
+  slimDrawerOpen: false,
+  slimDrawerCategory: null,
+  openSlimDrawer: (category) => set({ slimDrawerOpen: true, slimDrawerCategory: category }),
+  closeSlimDrawer: () => set({ slimDrawerOpen: false }),
+  toggleSlimDrawer: (category) => set((s) =>
+    s.slimDrawerOpen && s.slimDrawerCategory === category
+      ? { slimDrawerOpen: false }
+      : { slimDrawerOpen: true, slimDrawerCategory: category }
+  ),
 
   pendingNodeAdd: null,
   requestAddNode: (catalogueId) => set({ pendingNodeAdd: catalogueId }),
@@ -133,3 +156,9 @@ export const selectIsDemoMode = (s: UIState) => s.isDemoMode;
 export const selectActivePanel = (s: UIState) => s.activePanel;
 export const selectSelectedNodeIds = (s: UIState) => s.selectedNodeIds;
 export const selectIsNodeLibraryOpen = (s: UIState) => s.isNodeLibraryOpen;
+export const selectCanvasMode = (s: UIState) => s.canvasMode;
+export const selectSetCanvasMode = (s: UIState) => s.setCanvasMode;
+export const selectSlimDrawerOpen = (s: UIState) => s.slimDrawerOpen;
+export const selectSlimDrawerCategory = (s: UIState) => s.slimDrawerCategory;
+export const selectToggleSlimDrawer = (s: UIState) => s.toggleSlimDrawer;
+export const selectCloseSlimDrawer = (s: UIState) => s.closeSlimDrawer;

@@ -45,6 +45,17 @@ export async function POST(req: Request) {
       });
       if (!conv) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+  } else if (channel.startsWith("private-canvas-")) {
+    // Z.CANVAS.COLLAB-COMPLETE: Canvas collaboration channels.
+    // Verify user owns the workflow (or is admin).
+    const workflowId = channel.slice("private-canvas-".length);
+    if (!isAdmin) {
+      const wf = await prisma.workflow.findFirst({
+        where: { id: workflowId, ownerId: userId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!wf) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   } else {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

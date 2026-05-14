@@ -15,18 +15,21 @@ export const handleTR001: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId, apiKey } = ctx;
   // Brief Parser — PDF text extraction + GPT structuring
   const rawText = inputData?.content ?? inputData?.prompt ?? inputData?.rawText ?? "";
-  const pdfBase64 = inputData?.fileData ?? inputData?.buffer ?? null;
+  // IN-002's picker accepts BOTH .pdf and .docx, so this base64 may be
+  // either format. The extraction block below sniffs the magic bytes and
+  // routes DOCX → mammoth, PDF → the multi-layer PDF extractor.
+  const uploadBase64 = inputData?.fileData ?? inputData?.buffer ?? null;
 
-  // Validate PDF file size (base64 → ~20MB raw ≈ 26.7MB base64)
-  const MAX_PDF_BASE64_LEN = 27 * 1024 * 1024;
-  if (pdfBase64 && typeof pdfBase64 === "string") {
-    if (pdfBase64.length === 0) {
+  // Validate uploaded file size (base64 → ~20MB raw ≈ 26.7MB base64)
+  const MAX_UPLOAD_BASE64_LEN = 27 * 1024 * 1024;
+  if (uploadBase64 && typeof uploadBase64 === "string") {
+    if (uploadBase64.length === 0) {
       return NextResponse.json(
-        formatErrorResponse({ title: "Empty file", message: "The uploaded file is empty. Please select a valid PDF file.", code: "EMPTY_FILE" }),
+        formatErrorResponse({ title: "Empty file", message: "The uploaded file is empty. Please select a valid PDF or DOCX file.", code: "EMPTY_FILE" }),
         { status: 400 }
       );
     }
-    if (pdfBase64.length > MAX_PDF_BASE64_LEN) {
+    if (uploadBase64.length > MAX_UPLOAD_BASE64_LEN) {
       return NextResponse.json(
         formatErrorResponse({ title: "File too large", message: "File too large. Maximum size is 20MB.", code: "FILE_TOO_LARGE" }),
         { status: 413 }
@@ -41,7 +44,7 @@ export const handleTR001: NodeHandler = async (ctx) => {
   let pdfBuffer: Buffer | undefined;
 
   logger.debug("[TR-001] rawText from inputData:", typeof rawText, "length:", typeof rawText === "string" ? rawText.length : 0);
-  logger.debug("[TR-001] pdfBase64 present:", !!pdfBase64, "type:", typeof pdfBase64, "length:", typeof pdfBase64 === "string" ? pdfBase64.length : 0);
+  logger.debug("[TR-001] uploadBase64 present:", !!uploadBase64, "type:", typeof uploadBase64, "length:", typeof uploadBase64 === "string" ? uploadBase64.length : 0);
 
   // ── Slice P3.1.B — Multi-layer PDF text extraction ──────────────────
   // The previous implementation called `pdf-parse` directly inside a
@@ -64,47 +67,93 @@ export const handleTR001: NodeHandler = async (ctx) => {
   // The result carries per-layer error captures so the failure mode is
   // visible in logs and so the gate below can fail loud instead of
   // letting hallucinations cascade.
-  if (pdfBase64 && typeof pdfBase64 === "string") {
-    pdfBuffer = Buffer.from(pdfBase64, "base64");
-    logger.debug("[TR-001] PDF buffer size:", pdfBuffer.length, "bytes");
-    const { extractTextFromPdf, summariseExtractResult } = await import(
-      "@/lib/pdf-text-extractor"
-    );
-    const extracted = await extractTextFromPdf(pdfBuffer, {
-      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-      enableVisionFallback: true,
-    });
-    logger.info(
-      "[TR-001] pdf-extract " + summariseExtractResult(extracted),
-    );
-    if (extracted.text) {
-      extractedText = extracted.text;
+  if (uploadBase64 && typeof uploadBase64 === "string") {
+    const uploadBuffer = Buffer.from(uploadBase64, "base64");
+
+    // ── Format sniff — magic bytes are authoritative ──────────────────
+    // IN-002 accepts .pdf AND .docx. The client-supplied mimeType /
+    // fileName can be missing or wrong, so we sniff the buffer itself:
+    // a DOCX is a ZIP container (`PK\x03\x04`), a PDF starts with `%PDF`.
+    // Feeding DOCX bytes to the PDF chain is exactly what produced the
+    // "Invalid PDF structure" / "PDF cannot be empty" failures.
+    const { isDocxBuffer } = await import("@/lib/docx-text-extractor");
+
+    if (isDocxBuffer(uploadBuffer)) {
+      // ── DOCX path — mammoth raw-text extraction ─────────────────────
+      // `pdfBuffer` stays undefined: DOCX embedded-image extraction is
+      // not wired here, and parseBriefDocument treats a missing buffer
+      // as its text-only path (backward compatible).
+      logger.debug("[TR-001] DOCX detected — buffer size:", uploadBuffer.length, "bytes");
+      const { extractTextFromDocx } = await import("@/lib/docx-text-extractor");
+      const docx = await extractTextFromDocx(uploadBuffer);
+      logger.info(
+        `[TR-001] docx-extract source=${docx.source} chars=${docx.text.length}` +
+          (docx.errors.mammoth ? ` error=${docx.errors.mammoth}` : ""),
+      );
+      if (docx.text) {
+        extractedText = docx.text;
+      } else {
+        // Extraction failed. Do NOT fall back to the filename / GPT.
+        console.error(
+          "[TR-001] DOCX extraction failed — surfacing clear error to UI",
+          docx.errors,
+        );
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Could not read DOCX",
+            message:
+              `The DOCX file could not be parsed. Try one of: (a) re-save it ` +
+              `as .docx from your word processor, (b) export it as a text-based ` +
+              `PDF, or (c) paste the brief as plain text into a Text Prompt ` +
+              `node.\n\nUnderlying parser error: ${docx.errors.mammoth ?? "unknown"}`,
+            code: "DOCX_EXTRACTION_FAILED",
+          }),
+          { status: 422 },
+        );
+      }
     } else {
-      // All layers failed. Do NOT fall back to the filename / GPT.
-      console.error(
-        "[TR-001] All PDF extractors failed — surfacing clear error to UI",
-        extracted.errors,
+      // ── PDF path — multi-layer extractor (unpdf → pdf-parse → vision) ─
+      pdfBuffer = uploadBuffer;
+      logger.debug("[TR-001] PDF buffer size:", pdfBuffer.length, "bytes");
+      const { extractTextFromPdf, summariseExtractResult } = await import(
+        "@/lib/pdf-text-extractor"
       );
-      const errSummary = [
-        extracted.errors.unpdf && `unpdf: ${extracted.errors.unpdf}`,
-        extracted.errors.pdfParse && `pdf-parse: ${extracted.errors.pdfParse}`,
-        extracted.errors.vision && `vision: ${extracted.errors.vision}`,
-      ]
-        .filter(Boolean)
-        .join(" | ");
-      return NextResponse.json(
-        formatErrorResponse({
-          title: "Could not read PDF",
-          message:
-            `The PDF could not be parsed by any of our text extractors. ` +
-            `Try one of: (a) re-export the PDF as text-based from your tool ` +
-            `(File → Export → PDF with selectable text), (b) paste the brief ` +
-            `as plain text into a Text Prompt node, or (c) make sure the file ` +
-            `is not password-protected.\n\nUnderlying parser errors: ${errSummary}`,
-          code: "PDF_EXTRACTION_FAILED",
-        }),
-        { status: 422 },
+      const extracted = await extractTextFromPdf(pdfBuffer, {
+        anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+        enableVisionFallback: true,
+      });
+      logger.info(
+        "[TR-001] pdf-extract " + summariseExtractResult(extracted),
       );
+      if (extracted.text) {
+        extractedText = extracted.text;
+      } else {
+        // All layers failed. Do NOT fall back to the filename / GPT.
+        console.error(
+          "[TR-001] All PDF extractors failed — surfacing clear error to UI",
+          extracted.errors,
+        );
+        const errSummary = [
+          extracted.errors.unpdf && `unpdf: ${extracted.errors.unpdf}`,
+          extracted.errors.pdfParse && `pdf-parse: ${extracted.errors.pdfParse}`,
+          extracted.errors.vision && `vision: ${extracted.errors.vision}`,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Could not read PDF",
+            message:
+              `The PDF could not be parsed by any of our text extractors. ` +
+              `Try one of: (a) re-export the PDF as text-based from your tool ` +
+              `(File → Export → PDF with selectable text), (b) paste the brief ` +
+              `as plain text into a Text Prompt node, or (c) make sure the file ` +
+              `is not password-protected.\n\nUnderlying parser errors: ${errSummary}`,
+            code: "PDF_EXTRACTION_FAILED",
+          }),
+          { status: 422 },
+        );
+      }
     }
   }
 

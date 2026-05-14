@@ -20,6 +20,9 @@ import { processWorkflowChat } from "@/features/ai/services/ai-chat-service";
 import type { ChatAction } from "@/features/ai/services/ai-chat-service";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
+import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
+import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
+import { useUIStore } from "@/shared/stores/ui-store";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -86,7 +89,7 @@ function keywordFallback(
         sourceHandle: lastNode.data.outputs[0]?.id ?? "output",
         target: newNode.id, targetHandle: newNode.data.inputs[0]?.id ?? "input",
         type: "animatedEdge",
-        data: { sourceColor: COLORS[lastNode.data.category as NodeCategory] ?? "#00F5FF", targetColor: COLORS[found.category as NodeCategory] ?? "#00F5FF" },
+        data: { sourceColor: COLORS[lastNode.data.category as NodeCategory] ?? "#B87333", targetColor: COLORS[found.category as NodeCategory] ?? "#B87333" },
       });
     }
     return t('aiChat.addedToWorkflow').replace('{0}', found.name);
@@ -153,8 +156,8 @@ function applyActions(
           target: newNode.id, targetHandle: newNode.data.inputs[0]?.id ?? "input",
           type: "animatedEdge",
           data: {
-            sourceColor: COLORS[connectFrom.data.category as NodeCategory] ?? "#00F5FF",
-            targetColor: COLORS[catalogueNode.category as NodeCategory] ?? "#00F5FF",
+            sourceColor: COLORS[connectFrom.data.category as NodeCategory] ?? "#B87333",
+            targetColor: COLORS[catalogueNode.category as NodeCategory] ?? "#B87333",
           },
         });
       }
@@ -200,12 +203,12 @@ function applyActions(
 
 // ─── Markdown-ish renderer ───────────────────────────────────────────────────
 
-function renderMessage(text: string) {
+function renderMessage(text: string, tk: ReturnType<typeof useCanvasToken>) {
   return text.split("\n").map((line, i) => (
     <React.Fragment key={i}>
       {line.split(/(\*\*[^*]+\*\*)/).map((part, j) =>
         part.startsWith("**") && part.endsWith("**")
-          ? <strong key={j} style={{ color: "#F0F0F5" }}>{part.slice(2, -2)}</strong>
+          ? <strong key={j} style={{ color: tk.text1 }}>{part.slice(2, -2)}</strong>
           : part
       )}
       {i < text.split("\n").length - 1 && <br />}
@@ -225,6 +228,9 @@ interface AIChatPanelProps {
 
 export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle }: AIChatPanelProps) {
   const { t } = useLocale();
+  const canvasTheme = useCanvasTheme((s) => s.theme);
+  const tk = useCanvasToken();
+  const isLibraryOpen = useUIStore((s) => s.isNodeLibraryOpen);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [minimized, setMinimized] = useState(false);
@@ -333,35 +339,8 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
   }, [handleSend]);
 
   return (
-    <>
-      {/* Floating pill when closed */}
-      <AnimatePresence>
-        {!isOpen && (
-          <motion.button
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            onClick={onToggle}
-            style={{
-              position: "absolute", right: 96, bottom: 24,
-              zIndex: 25, padding: "10px 16px",
-              background: "rgba(7,8,9,0.92)", border: "1px solid rgba(0,245,255,0.2)",
-              borderRadius: 4,
-              cursor: "pointer", color: "#00F5FF",
-              display: "flex", alignItems: "center", gap: 8,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(0,245,255,0.08)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.4)"; e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,0,0,0.5), 0 0 25px rgba(0,245,255,0.12)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.2)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(0,245,255,0.08)"; }}
-          >
-            <Sparkles size={14} />
-            <span style={{ fontSize: 12, fontWeight: 600 }}>{t('aiChat.title')}</span>
-          </motion.button>
-        )}
-      </AnimatePresence>
+    <div className={`canvas-theme-${canvasTheme}`} style={{ display: "contents" }}>
+      {/* AI Chat pill is now rendered inside CanvasControls cluster */}
 
       {/* Floating chat panel */}
       <AnimatePresence>
@@ -375,17 +354,17 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             style={{
               position: "fixed",
               bottom: 24,
-              right: 96,
+              right: isLibraryOpen ? 344 : 96,
               width: 380,
               height: minimized ? "auto" : 500,
               zIndex: 55,
-              background: "rgba(7,8,9,0.95)",
+              background: tk.panelBg,
               backdropFilter: "blur(12px) saturate(1.1)",
               WebkitBackdropFilter: "blur(12px) saturate(1.1)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: `1px solid ${tk.panelBorder}`,
               borderRadius: 4,
               display: "flex", flexDirection: "column",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.04) inset",
+              boxShadow: tk.panelShadow,
               overflow: "hidden",
               transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
             }}
@@ -395,24 +374,24 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               onMouseDown={onDragHeaderDown}
               style={{
                 height: 44, padding: "0 14px",
-                borderBottom: minimized ? "none" : "1px solid rgba(255,255,255,0.06)",
+                borderBottom: minimized ? "none" : `1px solid ${tk.panelBorder}`,
                 display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
                 cursor: "grab", userSelect: "none",
               }}
             >
-              <Sparkles size={13} style={{ color: "#00F5FF" }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5", flex: 1 }}>
+              <Sparkles size={13} style={{ color: tk.aiText }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: tk.text1, flex: 1 }}>
                 {t('aiChat.aiAssistant')}
               </span>
               <button
                 onClick={() => setAiMode(m => m === "gpt" ? "keyword" : "gpt")}
                 title={aiMode === "gpt" ? t('aiChat.usingGpt') : t('aiChat.usingKeyword')}
                 style={{
-                  background: aiMode === "gpt" ? "rgba(0,245,255,0.15)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${aiMode === "gpt" ? "rgba(0,245,255,0.3)" : "rgba(255,255,255,0.06)"}`,
+                  background: aiMode === "gpt" ? tk.accentBgHover : tk.hoverBg,
+                  border: `1px solid ${aiMode === "gpt" ? tk.accentBorderStrong : tk.panelBorder}`,
                   borderRadius: 5, padding: "2px 6px", cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 3,
-                  color: aiMode === "gpt" ? "#00F5FF" : "#5C5C78",
+                  color: aiMode === "gpt" ? tk.accent : tk.logMuted,
                   fontSize: 10, fontWeight: 600,
                 }}
                 onMouseDown={e => e.stopPropagation()}
@@ -422,29 +401,29 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               </button>
               <button onClick={onClear} title={t('aiChat.clearChat')} style={{
                 background: "none", border: "none", cursor: "pointer",
-                color: "#3A3A50", padding: 4, borderRadius: 4,
+                color: tk.logBadgeText, padding: 4, borderRadius: 4,
               }} onMouseDown={e => e.stopPropagation()}
-                onMouseEnter={e => { e.currentTarget.style.color = "#5C5C78"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = tk.logMuted; }}
+                onMouseLeave={e => { e.currentTarget.style.color = tk.logBadgeText; }}
               >
                 <Trash2 size={11} />
               </button>
               <button onClick={() => setMinimized(m => !m)} style={{
                 background: "none", border: "none", cursor: "pointer",
-                color: "#3A3A50", padding: 4, borderRadius: 4,
+                color: tk.logBadgeText, padding: 4, borderRadius: 4,
                 fontSize: 14, lineHeight: 1,
               }} onMouseDown={e => e.stopPropagation()}
-                onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = tk.text2; }}
+                onMouseLeave={e => { e.currentTarget.style.color = tk.logBadgeText; }}
               >
                 {minimized ? "+" : "−"}
               </button>
               <button onClick={onToggle} style={{
                 background: "none", border: "none", cursor: "pointer",
-                color: "#3A3A50", padding: 4, borderRadius: 4,
+                color: tk.logBadgeText, padding: 4, borderRadius: 4,
               }} onMouseDown={e => e.stopPropagation()}
-                onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = tk.text2; }}
+                onMouseLeave={e => { e.currentTarget.style.color = tk.logBadgeText; }}
               >
                 <X size={12} />
               </button>
@@ -458,10 +437,10 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                   {messages.length === 0 && (
                     <div style={{
                       textAlign: "center", padding: "28px 14px",
-                      color: "#3A3A50", fontSize: 11,
+                      color: tk.logBadgeText, fontSize: 11,
                     }}>
                       <MessageSquare size={24} style={{ margin: "0 auto 8px", opacity: 0.3 }} />
-                      <div style={{ fontWeight: 600, color: "#5C5C78", marginBottom: 6 }}>
+                      <div style={{ fontWeight: 600, color: tk.logMuted, marginBottom: 6 }}>
                         {aiMode === "gpt" ? t('aiChat.gptPowered') : t('aiChat.workflowAssistant')}
                       </div>
                       <div style={{ lineHeight: 1.5 }}>
@@ -492,14 +471,14 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                         maxWidth: "85%", padding: "10px 14px",
                         borderRadius: 4,
                         ...(msg.role === "user"
-                          ? { borderBottomRightRadius: 2, background: "rgba(0,245,255,0.12)", border: "1px solid rgba(0,245,255,0.1)" }
-                          : { borderBottomLeftRadius: 2, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.04)" }
+                          ? { borderBottomRightRadius: 2, background: tk.accentBg, border: `1px solid ${tk.accentBorder}` }
+                          : { borderBottomLeftRadius: 2, background: tk.hoverBg, border: `1px solid ${tk.panelBorder}` }
                         ),
-                        fontSize: 12, color: msg.role === "user" ? "#F0F0F5" : "#9898B0", lineHeight: 1.6,
+                        fontSize: 12, color: msg.role === "user" ? tk.text1 : tk.text2, lineHeight: 1.6,
                       }}>
-                        {renderMessage(msg.content)}
+                        {renderMessage(msg.content, tk)}
                       </div>
-                      <span style={{ fontSize: 9, color: "#3A3A50" }}>
+                      <span style={{ fontSize: 9, color: tk.logBadgeText }}>
                         {msg.timestamp.toTimeString().slice(0, 5)}
                       </span>
                     </div>
@@ -508,13 +487,13 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                   {isTyping && (
                     <div style={{
                       display: "flex", gap: 4, padding: "8px 11px",
-                      background: "rgba(255,255,255,0.03)", borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,0.04)",
+                      background: tk.hoverBg, borderRadius: 10,
+                      border: `1px solid ${tk.panelBorder}`,
                       width: "fit-content",
                     }}>
                       {[0, 1, 2].map(i => (
                         <div key={i} style={{
-                          width: 4, height: 4, borderRadius: "50%", background: "#5C5C78",
+                          width: 4, height: 4, borderRadius: "50%", background: tk.logMuted,
                           animation: `dotPulse 1s ease-in-out ${i * 0.2}s infinite`,
                         }} />
                       ))}
@@ -525,7 +504,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
 
                 {/* Input */}
                 <div style={{
-                  padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
+                  padding: "10px 12px", borderTop: `1px solid ${tk.panelBorder}`, flexShrink: 0,
                   display: "flex", gap: 8, alignItems: "flex-end",
                 }}>
                   <textarea
@@ -540,8 +519,8 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                     rows={2}
                     style={{
                       flex: 1, resize: "none", padding: "10px 14px",
-                      borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)",
-                      background: "rgba(255,255,255,0.03)", color: "#F0F0F5",
+                      borderRadius: 4, border: `1px solid ${tk.aiInputBorder}`,
+                      background: tk.aiInputBg, color: tk.text1,
                       fontSize: 13, fontFamily: "inherit", outline: "none",
                       lineHeight: 1.5, maxHeight: 80, overflowY: "auto",
                       transition: "all 150ms ease",
@@ -552,8 +531,8 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                     disabled={!input.trim() || isTyping}
                     style={{
                       width: 32, height: 32, borderRadius: 8, border: "none",
-                      background: input.trim() && !isTyping ? "#00F5FF" : "rgba(255,255,255,0.06)",
-                      color: input.trim() && !isTyping ? "#fff" : "#3A3A50",
+                      background: input.trim() && !isTyping ? tk.aiSendActive : tk.hoverBg,
+                      color: input.trim() && !isTyping ? tk.surface1 : tk.logBadgeText,
                       cursor: input.trim() && !isTyping ? "pointer" : "default",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       flexShrink: 0, transition: "all 0.15s",
@@ -574,7 +553,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
           50% { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </>
+    </div>
   );
 }
 

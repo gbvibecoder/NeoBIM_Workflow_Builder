@@ -27,7 +27,8 @@ import {
 import dynamic from "next/dynamic";
 import { BaseNode } from "@/features/canvas/components/nodes/BaseNode";
 import { AnimatedEdge } from "@/features/canvas/components/edges/AnimatedEdge";
-import { RightNodePanel } from "@/features/canvas/components/panels/RightNodePanel";
+import { SlimLibraryStrip } from "@/features/canvas/components/panels/SlimLibraryStrip";
+import { SlimLibraryDrawer } from "@/features/canvas/components/panels/SlimLibraryDrawer";
 import { CanvasToolbar } from "@/features/canvas/components/toolbar/CanvasToolbar";
 
 import { ExecutionLog } from "@/features/canvas/components/ExecutionLog";
@@ -42,6 +43,38 @@ import type { ContextMenuState } from "@/features/canvas/components/ContextMenu"
 import { PromptInput } from "@/features/ai/components/PromptInput";
 import { CanvasEmptyState } from "@/features/canvas/components/CanvasEmptyState";
 import { FullscreenArtifactViewer } from "@/features/canvas/components/FullscreenArtifactViewer";
+import { CanvasControls } from "@/features/canvas/components/chrome/CanvasControls";
+// CanvasTools (Comment + Group mode) removed per user request
+import { QuickSearch } from "@/features/canvas/components/chrome/QuickSearch";
+import { AlignmentGuides } from "@/features/canvas/components/chrome/AlignmentGuides";
+import { ConnectionLine } from "@/features/canvas/components/edges/ConnectionLine";
+import { useSmartGuides } from "@/features/canvas/hooks/useSmartGuides";
+import { useCanvasRealtime } from "@/features/canvas/hooks/useCanvasRealtime";
+import { StickyNote } from "@/features/canvas/components/collab/StickyNote";
+import { CommentThread } from "@/features/canvas/components/collab/CommentThread";
+import { CommentComposer } from "@/features/canvas/components/collab/CommentComposer";
+import { GroupFrame } from "@/features/canvas/components/collab/GroupFrame";
+import { GroupDrawPreview } from "@/features/canvas/components/collab/GroupDrawPreview";
+import {
+  useCanvasComments,
+  selectComments,
+  selectActiveCommentId,
+  selectComposerPosition,
+  selectFetchComments,
+  selectSetActiveComment,
+  selectSetComposerPosition,
+} from "@/features/canvas/stores/canvas-comments-store";
+import {
+  useCanvasGroups,
+  selectGroups,
+  selectActiveGroupId,
+  selectDrawingGroup,
+  selectFetchGroups,
+  selectCreateGroup,
+  selectSetDrawingGroup,
+} from "@/features/canvas/stores/canvas-groups-store";
+import { selectCanvasMode, selectSetCanvasMode } from "@/shared/stores/ui-store";
+import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 
 // ContextMenu is right-click only — load lazily
 const ContextMenu = dynamic(
@@ -124,11 +157,33 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   const router = useRouter();
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { guides: smartGuides, onNodeDrag: onSmartGuideDrag, onNodeDragStop: onSmartGuideDragStop } = useSmartGuides();
+
+  // ─── Collab stores (Z.CANVAS.SCHEMA) ─────────────────────────────────────
+  const canvasComments = useCanvasComments(selectComments);
+  const activeCommentId = useCanvasComments(selectActiveCommentId);
+  const composerPosition = useCanvasComments(selectComposerPosition);
+  const fetchComments = useCanvasComments(selectFetchComments);
+  const setActiveComment = useCanvasComments(selectSetActiveComment);
+  const setComposerPosition = useCanvasComments(selectSetComposerPosition);
+
+  const canvasGroups = useCanvasGroups(selectGroups);
+  const activeGroupId = useCanvasGroups(selectActiveGroupId);
+  const drawingGroup = useCanvasGroups(selectDrawingGroup);
+  const fetchGroups = useCanvasGroups(selectFetchGroups);
+  const createGroup = useCanvasGroups(selectCreateGroup);
+  const setDrawingGroup = useCanvasGroups(selectSetDrawingGroup);
+
+  const canvasMode = useUIStore(selectCanvasMode);
+  const setCanvasMode = useUIStore(selectSetCanvasMode);
+
+  // (Real-time Pusher subscription moved below currentWorkflow declaration)
 
   // ─── Workflow store: selective subscriptions (only re-render when specific slice changes) ──
   const storeNodes = useWorkflowStore(selectWfNodes);
   const storeEdges = useWorkflowStore(selectWfEdges);
   const currentWorkflow = useWorkflowStore(selectCurrentWorkflow);
+  useCanvasRealtime(currentWorkflow?.id); // Z.CANVAS.COLLAB-COMPLETE
   const creationMode = useWorkflowStore(selectCreationMode);
   const isDirty = useWorkflowStore(selectIsDirty);
   const isSaving = useWorkflowStore(selectIsSaving);
@@ -163,6 +218,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   const hydrateRegenerationCounts = useExecutionStore(selectHydrateRegenerationCounts);
 
   const { t: tLocale } = useLocale();
+
+  // ─── Canvas theme (Z.CANVAS.1A) ──────────────────────────────────
+  const canvasTheme = useCanvasTheme((s) => s.theme);
 
   // ─── Loading state: prevent empty-canvas flash while workflow loads from DB ──
   const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(!!urlWorkflowId);
@@ -351,6 +409,14 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
        IndexedDB cache. Placing it there avoids racing template load /
        React Flow commit / Zustand persist rehydration from here. */
   }, [templateId, urlWorkflowId, loadFromTemplate, fitView]);
+
+  // ─── Fetch comments + groups on workflow load (Z.CANVAS.SCHEMA) ──
+  React.useEffect(() => {
+    const wfId = currentWorkflow?.id;
+    if (!wfId) return;
+    fetchComments(wfId).catch(() => {});
+    fetchGroups(wfId).catch(() => {});
+  }, [currentWorkflow?.id, fetchComments, fetchGroups]);
 
   const isNodeLibraryOpen = useUIStore(s => s.isNodeLibraryOpen);
   const setPromptModeActive = useUIStore(s => s.setPromptModeActive);
@@ -544,6 +610,41 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
     e.preventDefault();
   }, []);
 
+  // Z.CANVAS.SCHEMA: Pane click handler for comment + group modes
+  const onPaneClick = useCallback((e: React.MouseEvent) => {
+    if (canvasMode === "comment") {
+      const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      setComposerPosition(pos);
+      setCanvasMode("select");
+    }
+  }, [canvasMode, screenToFlowPosition, setComposerPosition, setCanvasMode]);
+
+  // Z.CANVAS.SCHEMA: Group draw handlers
+  const onCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    if (canvasMode !== "group") return;
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    setDrawingGroup({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
+  }, [canvasMode, screenToFlowPosition, setDrawingGroup]);
+
+  const onCanvasMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!drawingGroup) return;
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    setDrawingGroup({ ...drawingGroup, currentX: pos.x, currentY: pos.y });
+  }, [drawingGroup, screenToFlowPosition, setDrawingGroup]);
+
+  const onCanvasMouseUp = useCallback(() => {
+    if (!drawingGroup || !currentWorkflow?.id) return;
+    const x = Math.min(drawingGroup.startX, drawingGroup.currentX);
+    const y = Math.min(drawingGroup.startY, drawingGroup.currentY);
+    const w = Math.abs(drawingGroup.currentX - drawingGroup.startX);
+    const h = Math.abs(drawingGroup.currentY - drawingGroup.startY);
+    if (w > 40 && h > 40) {
+      createGroup(currentWorkflow.id, { x, y, w, h });
+    }
+    setDrawingGroup(null);
+    setCanvasMode("select");
+  }, [drawingGroup, currentWorkflow?.id, createGroup, setDrawingGroup, setCanvasMode]);
+
   // Long-press touch handler for mobile context menu (500ms hold)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
@@ -620,7 +721,8 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   // Sync drag positions back to Zustand so store→ReactFlow effect doesn't reset them
   const onNodeDragStop = useCallback((_: React.MouseEvent, _node: Node, draggedNodes: Node[]) => {
     draggedNodes.forEach((n) => updateNode(n.id, { position: n.position }));
-  }, [updateNode]);
+    onSmartGuideDragStop();
+  }, [updateNode, onSmartGuideDragStop]);
 
   const onConnect: OnConnect = useCallback(
     (connection: Connection) => {
@@ -632,7 +734,11 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
       const tgtNode = nodes.find(n => n.id === connection.target);
       const sourceColor = CAT_COLORS[(srcNode?.data as WorkflowNodeData)?.category ?? ""] ?? "#4F8AFF";
       const targetColor = CAT_COLORS[(tgtNode?.data as WorkflowNodeData)?.category ?? ""] ?? "#4F8AFF";
-      const edgeData = { sourceColor, targetColor };
+      // Derive source port type for edge label chip (Z.CANVAS.2B)
+      const srcData = srcNode?.data as WorkflowNodeData | undefined;
+      const sourcePort = srcData?.outputs?.find(p => p.id === connection.sourceHandle);
+      const sourcePortType = sourcePort?.type ?? srcData?.outputs?.[0]?.type;
+      const edgeData = { sourceColor, targetColor, sourcePortType };
 
       const newEdge: WorkflowEdge = {
         id: `e${connection.source}-${connection.target}-${generateId()}`,
@@ -858,7 +964,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   })();
 
   return (
-    <div className="relative flex h-full w-full">
+    <div className={`relative flex h-full w-full canvas-theme-${canvasTheme}`} data-canvas-theme={canvasTheme}>
       {/* Onboarding tour (fixed overlay, renders once) */}
       <OnboardingTour />
 
@@ -869,8 +975,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
         )}
       </AnimatePresence>
 
-      {/* Right-side Node Library panel — canvas only */}
-      <RightNodePanel />
+      {/* Slim library — VS Code activity-rail UX (Z.CANVAS.SLIM-LIBRARY) */}
+      <SlimLibraryStrip />
+      <SlimLibraryDrawer />
 
       {/* Canvas area */}
       <div
@@ -965,9 +1072,6 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             onSave={handleSave}
             onUndo={undo}
             onRedo={redo}
-            onZoomIn={() => zoomIn({ duration: 250 })}
-            onZoomOut={() => zoomOut({ duration: 250 })}
-            onFitView={() => fitView({ padding: 0.15, duration: 400 })}
             onShare={handleShare}
             onModeChange={setCreationMode}
             onPromptMode={() => setPromptModeActive(true)}
@@ -1011,11 +1115,17 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
           )}
         </AnimatePresence>
 
+        {/* Collab tools removed per user request */}
+
         {/* React Flow canvas — bg handled by .bf-canvas-surface on the
             outer wrapper. This div is transparent so the bg shows through. */}
         <div
           className="absolute inset-0"
           data-canvas-bg="v6-outer"
+          onMouseDown={onCanvasMouseDown}
+          onMouseMove={onCanvasMouseMove}
+          onMouseUp={onCanvasMouseUp}
+          style={{ cursor: canvasMode === "comment" || canvasMode === "group" ? "crosshair" : undefined }}
         >
 
           <ReactFlow
@@ -1024,11 +1134,14 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
+            onNodeDrag={onSmartGuideDrag}
             onNodeDragStop={onNodeDragStop}
             onNodeContextMenu={onNodeContextMenu}
+            onPaneClick={onPaneClick}
             onPaneContextMenu={onPaneContextMenu}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            connectionLineComponent={ConnectionLine}
             proOptions={{ hideAttribution: true }}
             fitView
             fitViewOptions={{ padding: 0.3 }}
@@ -1039,17 +1152,17 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             minZoom={0.15}
             maxZoom={2.5}
             snapToGrid
-            snapGrid={[16, 16]}
-            connectionLineStyle={{
-              stroke: "#B87333",
-              strokeWidth: 1,
-              strokeDasharray: "20 8",
-              opacity: 0.4,
-            }}
+            snapGrid={[8, 8]}
             style={{
               background: 'transparent',
             }}
           >
+
+            {/* Z.CANVAS.2B: Canvas Controls (bottom-right) */}
+            <CanvasControls onChatToggle={() => setIsChatOpen(o => !o)} isChatOpen={isChatOpen} />
+
+            {/* Z.CANVAS.2B: Smart alignment guides overlay */}
+            <AlignmentGuides guides={smartGuides} />
 
             {/* Minimap — bottom-left, compact, low opacity — hidden when canvas is empty */}
             {nodes.length > 0 && (
@@ -1057,13 +1170,13 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
                 position="bottom-left"
                 nodeStrokeWidth={0}
                 nodeColor={miniMapNodeColor}
-                maskColor="rgba(7,8,9,0.7)"
-                className="canvas-minimap"
+                maskColor={canvasTheme === "light" ? "rgba(15,20,25,0.04)" : "rgba(7,8,9,0.7)"}
+                className={`canvas-minimap canvas-theme-${canvasTheme}`}
                 style={{
                   width: 120,
                   height: 80,
-                  backgroundColor: "rgba(10,12,14,0.85)",
-                  border: "1px solid rgba(184,115,51,0.1)",
+                  backgroundColor: canvasTheme === "light" ? "rgba(255,255,255,0.92)" : "rgba(10,12,14,0.85)",
+                  border: canvasTheme === "light" ? "1px solid rgba(15,20,25,0.10)" : "1px solid rgba(184,115,51,0.1)",
                   borderRadius: 8,
                   marginBottom: 16,
                   marginLeft: 16,
@@ -1128,6 +1241,42 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             )}
           </AnimatePresence>
 
+          {/* Z.CANVAS.2B: Quick Search palette (⌘K) */}
+          <QuickSearch />
+
+          {/* ── Z.CANVAS.SCHEMA: Collab overlays ── */}
+
+          {/* Group frames (below nodes, z-index 1) */}
+          {canvasGroups.map((g) => (
+            <GroupFrame key={g.id} group={g} isActive={activeGroupId === g.id} />
+          ))}
+
+          {/* Group drag-create preview */}
+          {drawingGroup && <GroupDrawPreview drawing={drawingGroup} />}
+
+          {/* Sticky notes */}
+          {canvasComments
+            .filter((c) => !c.parentId)
+            .map((c) => (
+              <StickyNote
+                key={c.id}
+                comment={c}
+                isActive={activeCommentId === c.id}
+                onClick={() => setActiveComment(c.id)}
+              />
+            ))}
+
+          {/* Comment thread modal */}
+          {activeCommentId && (() => {
+            const comment = canvasComments.find((c) => c.id === activeCommentId);
+            return comment ? <CommentThread comment={comment} /> : null;
+          })()}
+
+          {/* Comment composer */}
+          {composerPosition && currentWorkflow?.id && (
+            <CommentComposer workflowId={currentWorkflow.id} position={composerPosition} />
+          )}
+
           {/* Phase 1 redesign:
               - The post-execution showcase no longer mounts as a canvas
                 overlay — it lives at /dashboard/results/[executionId].
@@ -1157,11 +1306,10 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
                 aria-label={tLocale('showcase.viewResults') ?? "View Results"}
                 style={{
                   // True-centered over the visible canvas. Compensate for the
-                  // right node-library width: 300px when open, 44px tab when
-                  // collapsed. Half of that width is added as a left offset.
+                  // Slim library strip is 56px — compensate for centering.
                   position: "absolute",
                   bottom: 28,
-                  left: `calc(50% - ${(isNodeLibraryOpen ? 300 : 44) / 2}px)`,
+                  left: `calc(50% - ${56 / 2}px)`,
                   transform: "translateX(-50%)",
                   zIndex: 12,
                   display: "inline-flex",

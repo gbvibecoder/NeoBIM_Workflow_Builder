@@ -1,12 +1,42 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
+import type { CanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
+
+/** SSR-safe theme read for skeleton FOUC prevention. */
+function getInitialTheme(): CanvasTheme {
+  if (typeof window === "undefined") return "light";
+  try {
+    const stored = localStorage.getItem("bf:canvas:theme");
+    return stored === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+}
 
 // ─── Skeleton Canvas Loading Screen ──────────────────────────────
 function CanvasSkeletonLoader() {
+  const [theme] = useState<CanvasTheme>(getInitialTheme);
+  const isDark = theme === "dark";
+  const bg = isDark ? "#07070D" : "#FAF7F2";
+  const dotColor = isDark ? "rgba(255,255,255,0.04)" : "rgba(15,20,25,0.06)";
+  const lineColor = isDark ? "rgba(99,102,241,0.25)" : "rgba(15,20,25,0.12)";
+  const nodeBg = isDark ? "rgba(255,255,255,0.04)" : "rgba(15,20,25,0.04)";
+  const nodeBorder = isDark ? "rgba(255,255,255,0.08)" : "rgba(15,20,25,0.08)";
+  const barColor = isDark ? "rgba(99,102,241,0.2)" : "rgba(37,99,235,0.15)";
+  const subLineColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(15,20,25,0.06)";
+  const subLine2 = isDark ? "rgba(255,255,255,0.04)" : "rgba(15,20,25,0.04)";
+  const portColor = isDark ? "rgba(99,102,241,0.3)" : "rgba(37,99,235,0.2)";
+  const portBorder = isDark ? "rgba(99,102,241,0.15)" : "rgba(37,99,235,0.1)";
+  const progressGrad = isDark
+    ? "linear-gradient(90deg, transparent, rgba(99,102,241,0.5), transparent)"
+    : "linear-gradient(90deg, transparent, rgba(37,99,235,0.35), transparent)";
+  const textColor = isDark ? "rgba(255,255,255,0.4)" : "rgba(15,20,25,0.35)";
+  const progressTrack = isDark ? "rgba(255,255,255,0.06)" : "rgba(15,20,25,0.06)";
+
   const keyframes = `
     @keyframes pulse {
       0%, 100% { opacity: 0.3; }
@@ -53,7 +83,7 @@ function CanvasSkeletonLoader() {
         position: "relative",
         width: "100%",
         height: "100vh",
-        background: "#07070D",
+        background: bg,
         overflow: "hidden",
         display: "flex",
         alignItems: "center",
@@ -73,7 +103,7 @@ function CanvasSkeletonLoader() {
       >
         <defs>
           <pattern id="grid-dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
-            <circle cx="12" cy="12" r="1" fill="rgba(255,255,255,0.04)" />
+            <circle cx="12" cy="12" r="1" fill={dotColor} />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid-dots)" />
@@ -110,7 +140,7 @@ function CanvasSkeletonLoader() {
                 key={i}
                 d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`}
                 fill="none"
-                stroke="rgba(99,102,241,0.25)"
+                stroke={lineColor}
                 strokeWidth="2"
                 strokeDasharray="6 4"
                 style={{
@@ -132,8 +162,8 @@ function CanvasSkeletonLoader() {
               width: node.w,
               height: node.h,
               borderRadius: "12px",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: nodeBg,
+              border: `1px solid ${nodeBorder}`,
               backdropFilter: "blur(4px)",
               animation: `nodeAppear 0.5s ease-out ${node.delay}s both, pulse 2.5s ease-in-out ${node.delay}s infinite`,
               display: "flex",
@@ -149,7 +179,7 @@ function CanvasSkeletonLoader() {
                 width: "40%",
                 height: "8px",
                 borderRadius: "4px",
-                background: "rgba(99,102,241,0.2)",
+                background: barColor,
               }}
             />
             {/* Node content lines */}
@@ -158,7 +188,7 @@ function CanvasSkeletonLoader() {
                 width: "75%",
                 height: "6px",
                 borderRadius: "3px",
-                background: "rgba(255,255,255,0.06)",
+                background: subLineColor,
               }}
             />
             <div
@@ -166,7 +196,7 @@ function CanvasSkeletonLoader() {
                 width: "55%",
                 height: "6px",
                 borderRadius: "3px",
-                background: "rgba(255,255,255,0.04)",
+                background: subLine2,
               }}
             />
             {/* Connection port dots */}
@@ -180,8 +210,8 @@ function CanvasSkeletonLoader() {
                   width: "10px",
                   height: "10px",
                   borderRadius: "50%",
-                  background: "rgba(99,102,241,0.3)",
-                  border: "2px solid rgba(99,102,241,0.15)",
+                  background: portColor,
+                  border: `2px solid ${portBorder}`,
                   animation: `dotPulse 2s ease-in-out ${node.delay + 0.3}s infinite`,
                 }}
               />
@@ -196,8 +226,8 @@ function CanvasSkeletonLoader() {
                   width: "10px",
                   height: "10px",
                   borderRadius: "50%",
-                  background: "rgba(99,102,241,0.3)",
-                  border: "2px solid rgba(99,102,241,0.15)",
+                  background: portColor,
+                  border: `2px solid ${portBorder}`,
                   animation: `dotPulse 2s ease-in-out ${node.delay + 0.3}s infinite`,
                 }}
               />
@@ -226,7 +256,7 @@ function CanvasSkeletonLoader() {
             width: "200px",
             height: "3px",
             borderRadius: "2px",
-            background: "rgba(255,255,255,0.06)",
+            background: progressTrack,
             overflow: "hidden",
           }}
         >
@@ -235,7 +265,7 @@ function CanvasSkeletonLoader() {
               width: "40%",
               height: "100%",
               borderRadius: "2px",
-              background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.5), transparent)",
+              background: progressGrad,
               animation: "progressSweep 1.8s ease-in-out infinite",
             }}
           />
@@ -247,7 +277,7 @@ function CanvasSkeletonLoader() {
             margin: 0,
             fontSize: "13px",
             fontWeight: 400,
-            color: "rgba(255,255,255,0.4)",
+            color: textColor,
             letterSpacing: "0.02em",
             fontFamily:
               "var(--font-dm-sans), sans-serif",

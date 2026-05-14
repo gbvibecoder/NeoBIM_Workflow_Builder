@@ -70,6 +70,9 @@ model User {
   vipJobs              VipJob[]
   videoJobs            VideoJob[]
   briefRenderJobs      BriefRenderJob[]
+  canvasComments         CanvasComment[]  @relation("CanvasCommentAuthor")
+  resolvedCanvasComments CanvasComment[]  @relation("CanvasCommentResolver")
+  canvasGroups           CanvasGroup[]    @relation("CanvasGroupCreator")
 
   @@map("users")
 }
@@ -176,6 +179,8 @@ model Workflow {
   clones       WorkflowClone[]
   versions     WorkflowVersion[]
   owner        User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  comments     CanvasComment[]
+  groups       CanvasGroup[]
 
   @@index([ownerId])
   @@index([isTemplate])
@@ -1085,4 +1090,52 @@ model BriefRenderJob {
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
   @@map("brief_render_jobs")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Z.CANVAS.SCHEMA — Canvas Collaboration Models
+// ═══════════════════════════════════════════════════════════════════
+
+model CanvasComment {
+  id           String          @id @default(cuid())
+  workflowId   String
+  workflow     Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User             @relation("CanvasCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  parentId     String?
+  parent       CanvasComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      CanvasComment[]  @relation("CommentReplies")
+  body         String           @db.Text
+  mentions     String[]
+  positionX    Float
+  positionY    Float
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?            @relation("CanvasCommentResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([workflowId])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("canvas_comments")
+}
+
+model CanvasGroup {
+  id          String   @id @default(cuid())
+  workflowId  String
+  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  label       String   @default("Group")
+  color       String   @default("purple")
+  positionX   Float
+  positionY   Float
+  width       Float
+  height      Float
+  createdById String
+  createdBy   User     @relation("CanvasGroupCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workflowId])
+  @@map("canvas_groups")
 }

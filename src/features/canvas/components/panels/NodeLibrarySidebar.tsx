@@ -1,39 +1,198 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Package, ChevronRight, Search, X, GripVertical } from "lucide-react";
+import { Package, ChevronRight, Search, X } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { NODE_CATALOGUE, CATEGORY_CONFIG, LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
+import { NODE_CATALOGUE, LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
 import type { NodeCatalogueItem, NodeCategory } from "@/types/nodes";
 import { useUIStore } from "@/shared/stores/ui-store";
 import { useLocale } from "@/hooks/useLocale";
+import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
+import { useCanvasToken, useIsLight } from "@/features/canvas/lib/canvas-tokens";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function hexToRgb(hex: string): string {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!r) return "0, 245, 255";
-  return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
-}
-
-function getIcon(name: string, size = 12): React.ReactNode {
-  const icons = LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; strokeWidth?: number }>>;
+function getIcon(name: string, size = 16): React.ReactNode {
+  const icons = LucideIcons as unknown as Record<
+    string,
+    React.ComponentType<{ size?: number; strokeWidth?: number }>
+  >;
   const Icon = icons[name];
   if (Icon) return <Icon size={size} strokeWidth={1.5} />;
   return <LucideIcons.Box size={size} strokeWidth={1.5} />;
 }
 
-// ─── Filter tabs ──────────────────────────────────────────────────────────────
+function getCategoryColors(
+  category: string,
+  tk: ReturnType<typeof useCanvasToken>,
+) {
+  switch (category) {
+    case "input":
+      return { solid: tk.catInput, soft: tk.catInputSoft };
+    case "transform":
+      return { solid: tk.catTransform, soft: tk.catTransformSoft };
+    case "generate":
+      return { solid: tk.catGenerate, soft: tk.catGenerateSoft };
+    case "export":
+      return { solid: tk.catExport, soft: tk.catExportSoft };
+    default:
+      return { solid: tk.text2, soft: tk.surface2 };
+  }
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 type FilterValue = "all" | NodeCategory;
 
 const FILTER_TABS: { value: FilterValue; label: string }[] = [
-  { value: "all",       label: "ALL"   },
-  { value: "input",     label: "INPUT" },
-  { value: "transform", label: "AI"    },
-  { value: "generate",  label: "GEO"   },
-  { value: "export",    label: "OUT"   },
+  { value: "all", label: "All" },
+  { value: "input", label: "Input" },
+  { value: "transform", label: "AI" },
+  { value: "generate", label: "Geo" },
+  { value: "export", label: "Out" },
 ];
+
+const SECTION_LABELS: [NodeCategory, string][] = [
+  ["input", "Design Inputs"],
+  ["transform", "AI Transforms"],
+  ["generate", "Geometry & Generation"],
+  ["export", "Exports & Reports"],
+];
+
+// ─── Badge ────────────────────────────────────────────────────────────────────
+
+function LibBadge({
+  variant,
+  children,
+}: {
+  variant: "live" | "demo" | "vip";
+  children: React.ReactNode;
+}) {
+  const tk = useCanvasToken();
+  const colors = {
+    live: { bg: tk.badgeLiveBg, text: tk.badgeLiveText },
+    demo: { bg: tk.badgeDemoBg, text: tk.badgeDemoText },
+    vip: { bg: tk.badgeVipBg, text: tk.badgeVipText },
+  };
+  const c = colors[variant];
+  return (
+    <span
+      style={{
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 9,
+        fontWeight: 700,
+        padding: "2px 6px",
+        borderRadius: 4,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase" as const,
+        flexShrink: 0,
+        background: c.bg,
+        color: c.text,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+// ─── Node row ─────────────────────────────────────────────────────────────────
+
+function NodeRow({
+  node,
+  onDragStart,
+}: {
+  node: NodeCatalogueItem;
+  onDragStart: (e: React.DragEvent, nodeId: string) => void;
+}) {
+  const tk = useCanvasToken();
+  const [hovered, setHovered] = useState(false);
+  const isLive = LIVE_NODES.has(node.id);
+  const { solid: catSolid, soft: catSoft } = getCategoryColors(
+    node.category,
+    tk,
+  );
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, node.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={`${node.name} — ${node.description}\nDrag to canvas to add`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 10px",
+        borderRadius: 8,
+        cursor: "grab",
+        transition: "background 120ms, transform 120ms, box-shadow 120ms",
+        marginBottom: 2,
+        userSelect: "none" as const,
+        background: hovered ? tk.libBgHover : "transparent",
+        transform: hovered ? "translateY(-1px)" : "none",
+        boxShadow: hovered ? tk.shadowSm : "none",
+      }}
+    >
+      {/* Icon pill 32×32 */}
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          background: catSoft,
+          color: catSolid,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {getIcon(node.icon, 16)}
+      </div>
+
+      {/* Title + description */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: "Geist, sans-serif",
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: tk.text1,
+            lineHeight: 1.3,
+            whiteSpace: "nowrap" as const,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {node.name}
+        </div>
+        <div
+          style={{
+            fontFamily: "Geist, sans-serif",
+            fontSize: 10.5,
+            color: tk.text3,
+            marginTop: 2,
+            lineHeight: 1.4,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical" as const,
+            overflow: "hidden",
+          }}
+        >
+          {node.description}
+        </div>
+      </div>
+
+      {/* Right-side badge */}
+      {isLive ? (
+        <LibBadge variant="live">Live</LibBadge>
+      ) : (
+        <LibBadge variant="demo">Demo</LibBadge>
+      )}
+    </div>
+  );
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -42,12 +201,18 @@ interface NodeLibrarySidebarProps {
   alwaysOpen?: boolean;
 }
 
-export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarProps) {
+export function NodeLibrarySidebar({
+  alwaysOpen = false,
+}: NodeLibrarySidebarProps) {
   const { t } = useLocale();
-  const isNodeLibraryOpen = useUIStore(s => s.isNodeLibraryOpen);
-  const toggleNodeLibrary = useUIStore(s => s.toggleNodeLibrary);
+  const canvasTheme = useCanvasTheme((s) => s.theme);
+  const tk = useCanvasToken();
+  const isLight = useIsLight();
+  const isNodeLibraryOpen = useUIStore((s) => s.isNodeLibraryOpen);
+  const toggleNodeLibrary = useUIStore((s) => s.toggleNodeLibrary);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterValue>("all");
+  const [focusedSearch, setFocusedSearch] = useState(false);
 
   const displayNodes = useMemo(() => {
     let result = NODE_CATALOGUE as NodeCatalogueItem[];
@@ -60,13 +225,11 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
         (n) =>
           n.name.toLowerCase().includes(q) ||
           n.description.toLowerCase().includes(q) ||
-          n.tags?.some((t) => t.toLowerCase().includes(q))
+          n.tags?.some((tag) => tag.toLowerCase().includes(q)),
       );
     }
     return result;
   }, [search, activeFilter]);
-
-  // Click-to-add removed — nodes should only be added via drag-and-drop
 
   const handleDragStart = (e: React.DragEvent, nodeId: string) => {
     e.dataTransfer.setData("application/reactflow-nodeid", nodeId);
@@ -74,202 +237,305 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
   };
 
   const showContent = alwaysOpen || isNodeLibraryOpen;
+  const showSections = activeFilter === "all" && !search.trim();
 
   return (
-    <div style={{ padding: "0 8px", position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: alwaysOpen ? "100%" : "auto" }}>
-
-      {/* ── Header (hidden in alwaysOpen / right-panel mode) ──────────── */}
+    <div
+      className={`canvas-theme-${canvasTheme}`}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: alwaysOpen ? "100%" : "auto",
+      }}
+    >
+      {/* ── Header (hidden in alwaysOpen / right-panel mode) ─────── */}
       {!alwaysOpen && (
-        <button
-          onClick={toggleNodeLibrary}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 10px",
-            borderRadius: 10,
-            background: isNodeLibraryOpen ? "rgba(0,245,255,0.06)" : "transparent",
-            border: `1px solid ${isNodeLibraryOpen ? "rgba(0,245,255,0.14)" : "transparent"}`,
-            cursor: "pointer",
-            transition: "all 180ms ease",
-          }}
-        >
-          <Package
-            size={15}
+        <div style={{ padding: "0 8px" }}>
+          <button
+            onClick={toggleNodeLibrary}
             style={{
-              color: isNodeLibraryOpen ? "#00F5FF" : "rgba(255,255,255,0.35)",
-              flexShrink: 0,
-              transition: "color 180ms ease",
-            }}
-          />
-          <span
-            style={{
-              flex: 1,
-              textAlign: "left",
-              fontSize: 12.5,
-              fontWeight: 550,
-              color: isNodeLibraryOpen ? "#E2E8F0" : "rgba(255,255,255,0.45)",
-              fontFamily: "var(--font-dm-sans), sans-serif",
-              letterSpacing: "0.2px",
-              whiteSpace: "nowrap",
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 10px",
+              borderRadius: 10,
+              background: isNodeLibraryOpen
+                ? tk.libActiveBg
+                : "transparent",
+              border: `1px solid ${isNodeLibraryOpen ? tk.libActiveBorder : "transparent"}`,
+              cursor: "pointer",
+              transition: "all 180ms ease",
             }}
           >
-            {t('canvas.nodeLibrary')}
-          </span>
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: "0.5px",
-              color: "rgba(0,245,255,0.5)",
-              fontFamily: "var(--font-jetbrains), monospace",
-              padding: "1px 5px",
-              borderRadius: 4,
-              background: "rgba(0,245,255,0.06)",
-              border: "1px solid rgba(0,245,255,0.12)",
-              flexShrink: 0,
-            }}
-          >
-            {NODE_CATALOGUE.length}
-          </span>
-          <ChevronRight
-            size={13}
-            style={{
-              color: "rgba(255,255,255,0.3)",
-              transform: isNodeLibraryOpen ? "rotate(90deg)" : "rotate(0deg)",
-              transition: "transform 200ms ease",
-              flexShrink: 0,
-            }}
-          />
-        </button>
+            <Package
+              size={15}
+              style={{
+                color: isNodeLibraryOpen
+                  ? tk.libActiveText
+                  : tk.libIconMuted,
+                flexShrink: 0,
+                transition: "color 180ms ease",
+              }}
+            />
+            <span
+              style={{
+                flex: 1,
+                textAlign: "left",
+                fontSize: 12.5,
+                fontWeight: 550,
+                color: isNodeLibraryOpen
+                  ? tk.libTextPrimary
+                  : tk.libTextSecondary,
+                fontFamily: "var(--font-dm-sans), sans-serif",
+                letterSpacing: "0.2px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {t("canvas.nodeLibrary")}
+            </span>
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                color: tk.libCountText,
+                fontFamily: "var(--font-jetbrains), monospace",
+                padding: "1px 5px",
+                borderRadius: 4,
+                background: tk.libCountBg,
+                border: `1px solid ${tk.libCountBorder}`,
+                flexShrink: 0,
+              }}
+            >
+              {NODE_CATALOGUE.length}
+            </span>
+            <ChevronRight
+              size={13}
+              style={{
+                color: tk.libIconChevron,
+                transform: isNodeLibraryOpen
+                  ? "rotate(90deg)"
+                  : "rotate(0deg)",
+                transition: "transform 200ms ease",
+                flexShrink: 0,
+              }}
+            />
+          </button>
+        </div>
       )}
 
-      {/* ── Expanded content ──────────────────────────────────────────── */}
+      {/* ── Content ─────────────────────────────────────────────── */}
       {showContent && (
-        <div style={{ marginTop: alwaysOpen ? 0 : 6, display: "flex", flexDirection: "column", flex: alwaysOpen ? 1 : "none", minHeight: 0 }}>
-
-          {/* Search */}
-          <div style={{ position: "relative", marginBottom: 6 }}>
-            <Search
-              size={11}
-              style={{
-                position: "absolute",
-                left: 9,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "rgba(255,255,255,0.3)",
-                pointerEvents: "none",
-              }}
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('canvas.searchNodes')}
-              style={{
-                width: "100%",
-                padding: "7px 28px 7px 27px",
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8,
-                color: "#E2E8F0",
-                fontSize: 11.5,
-                outline: "none",
-                boxSizing: "border-box",
-                fontFamily: "var(--font-dm-sans), sans-serif",
-                transition: "border-color 150ms ease",
-              }}
-              onFocus={(e) => { e.target.style.borderColor = "rgba(0,245,255,0.25)"; }}
-              onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
+        <div
+          style={{
+            marginTop: alwaysOpen ? 0 : 6,
+            display: "flex",
+            flexDirection: "column",
+            flex: alwaysOpen ? 1 : "none",
+            minHeight: 0,
+          }}
+        >
+          {/* ── Search ────────────────────────────────────────────── */}
+          <div
+            style={{
+              padding: 12,
+              borderBottom: `1px solid ${tk.line1}`,
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ position: "relative" }}>
+              <Search
+                size={14}
                 style={{
                   position: "absolute",
-                  right: 7,
+                  left: 12,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "rgba(255,255,255,0.35)",
-                  padding: 2,
-                  display: "flex",
-                  alignItems: "center",
+                  color: tk.text3,
+                  pointerEvents: "none",
                 }}
-              >
-                <X size={11} />
-              </button>
-            )}
-          </div>
-
-          {/* Category filter tabs */}
-          <div style={{ display: "flex", gap: 3, marginBottom: 8, flexWrap: "wrap" }}>
-            {FILTER_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setActiveFilter(tab.value)}
+              />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("canvas.searchNodes")}
+                onFocus={() => setFocusedSearch(true)}
+                onBlur={() => setFocusedSearch(false)}
                 style={{
-                  padding: "3px 7px",
-                  borderRadius: 5,
-                  fontSize: 9.5,
-                  fontWeight: 600,
-                  letterSpacing: "0.5px",
-                  cursor: "pointer",
-                  border: "1px solid",
-                  fontFamily: "var(--font-jetbrains), monospace",
-                  background:
-                    activeFilter === tab.value ? "rgba(0,245,255,0.12)" : "rgba(255,255,255,0.03)",
-                  borderColor:
-                    activeFilter === tab.value ? "rgba(0,245,255,0.3)" : "rgba(255,255,255,0.08)",
-                  color:
-                    activeFilter === tab.value ? "#00F5FF" : "rgba(255,255,255,0.4)",
-                  transition: "all 150ms ease",
+                  width: "100%",
+                  background: tk.libSearchBg,
+                  border: `1px solid ${focusedSearch ? tk.lineFocus : tk.line1}`,
+                  borderRadius: 8,
+                  padding: "10px 36px 10px 36px",
+                  fontFamily: "Geist, sans-serif",
+                  fontSize: 13,
+                  color: tk.text1,
+                  outline: "none",
+                  boxSizing: "border-box" as const,
+                  transition:
+                    "border-color 150ms ease, box-shadow 150ms ease",
+                  boxShadow: focusedSearch
+                    ? `0 0 0 3px ${isLight ? "rgba(37,99,235,0.10)" : "rgba(0,245,255,0.10)"}`
+                    : "none",
                 }}
-              >
-                {tab.label}
-              </button>
-            ))}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: tk.text3,
+                    padding: 2,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Node count */}
-          <div style={{
-            fontSize: 9.5,
-            color: "rgba(255,255,255,0.2)",
-            fontFamily: "var(--font-jetbrains), monospace",
-            marginBottom: 4,
-            paddingLeft: 2,
-          }}>
-            {displayNodes.length} {t('canvas.nodes')}
-            {activeFilter !== "all" || search ? ` ${t('canvas.shown')}` : ` ${t('canvas.total')}`}
+          {/* ── Tab pills ─────────────────────────────────────────── */}
+          <div
+            style={{
+              display: "flex",
+              gap: 4,
+              padding: "10px 12px 10px",
+              borderBottom: `1px solid ${tk.line1}`,
+              flexShrink: 0,
+            }}
+          >
+            {FILTER_TABS.map((tab) => {
+              const active = activeFilter === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setActiveFilter(tab.value)}
+                  style={{
+                    padding: "5px 10px",
+                    borderRadius: 6,
+                    background: active
+                      ? tk.libTabActiveBg
+                      : "transparent",
+                    border: `1px solid ${active ? tk.libTabActiveBorder : "transparent"}`,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: active ? tk.libTabActiveText : tk.text3,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase" as const,
+                    cursor: "pointer",
+                    transition: "background 120ms",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Scrollable node list */}
+          {/* ── Scrollable list ────────────────────────────────────── */}
           <div
             style={{
               flex: 1,
+              overflowY: "auto" as const,
+              padding: 8,
               minHeight: 0,
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              paddingRight: 2,
             }}
           >
+            {/* Count indicator */}
+            <div
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 10,
+                color: tk.text3,
+                padding: "6px 10px",
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.06em",
+              }}
+            >
+              {displayNodes.length} {t("canvas.nodes")}{" "}
+              {showSections ? t("canvas.total") : t("canvas.shown")}
+            </div>
+
+            {/* Content */}
             {displayNodes.length === 0 ? (
-              <div style={{
-                padding: "20px 8px",
-                textAlign: "center",
-                color: "rgba(255,255,255,0.2)",
-                fontSize: 11,
-                fontFamily: "var(--font-dm-sans), sans-serif",
-              }}>
-                {t('canvas.noNodes')}
+              /* ── Empty state ────────────────────────────────────── */
+              <div
+                style={{
+                  padding: "40px 20px",
+                  textAlign: "center" as const,
+                  color: tk.text3,
+                }}
+              >
+                <div style={{ marginBottom: 12 }}>
+                  <Search size={32} style={{ opacity: 0.4 }} />
+                </div>
+                <div
+                  style={{
+                    fontFamily: "Geist, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: tk.text2,
+                    marginBottom: 4,
+                  }}
+                >
+                  No nodes found
+                </div>
+                <div
+                  style={{
+                    fontFamily: "Geist, sans-serif",
+                    fontSize: 11,
+                    color: tk.text3,
+                  }}
+                >
+                  Try different keywords or check filters
+                </div>
               </div>
+            ) : showSections ? (
+              /* ── Grouped by category ─────────────────────────────── */
+              SECTION_LABELS.map(([cat, label]) => {
+                const catNodes = displayNodes.filter(
+                  (n) => n.category === cat,
+                );
+                if (catNodes.length === 0) return null;
+                return (
+                  <React.Fragment key={cat}>
+                    <div
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: tk.text3,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase" as const,
+                        padding: "10px 10px 6px",
+                      }}
+                    >
+                      {label}
+                    </div>
+                    {catNodes.map((node) => (
+                      <NodeRow
+                        key={node.id}
+                        node={node}
+                        onDragStart={handleDragStart}
+                      />
+                    ))}
+                  </React.Fragment>
+                );
+              })
             ) : (
+              /* ── Flat list ───────────────────────────────────────── */
               displayNodes.map((node) => (
-                <NodeItem
+                <NodeRow
                   key={node.id}
                   node={node}
                   onDragStart={handleDragStart}
@@ -277,137 +543,7 @@ export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarPro
               ))
             )}
           </div>
-
-          {/* Hint */}
-          <div style={{
-            marginTop: 6,
-            padding: "5px 8px",
-            fontSize: 9.5,
-            color: "rgba(255,255,255,0.15)",
-            fontFamily: "var(--font-jetbrains), monospace",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
-            textAlign: "center",
-            letterSpacing: "0.3px",
-          }}>
-            {t('canvas.dragToCanvasLabel')}
-          </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Node item ────────────────────────────────────────────────────────────────
-
-interface NodeItemProps {
-  node: NodeCatalogueItem;
-  onDragStart: (e: React.DragEvent, nodeId: string) => void;
-}
-
-function NodeItem({ node, onDragStart }: NodeItemProps) {
-  const [hovered, setHovered] = useState(false);
-  const cfg = CATEGORY_CONFIG[node.category];
-  const rgb = hexToRgb(cfg.color);
-  const isLive = LIVE_NODES.has(node.id);
-
-  return (
-    <div
-      draggable
-      onDragStart={(e) => onDragStart(e, node.id)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      title={`${node.name} — ${node.description}\nDrag to canvas to add`}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "7px 8px",
-        borderRadius: 8,
-        cursor: "grab",
-        userSelect: "none",
-        background: hovered ? `rgba(${rgb}, 0.07)` : "transparent",
-        border: `1px solid ${hovered ? `rgba(${rgb}, 0.18)` : "transparent"}`,
-        transition: "all 120ms ease",
-      }}
-    >
-      {/* Icon */}
-      <div
-        style={{
-          width: 24,
-          height: 24,
-          borderRadius: 7,
-          flexShrink: 0,
-          background: `rgba(${rgb}, 0.15)`,
-          border: `1px solid rgba(${rgb}, 0.3)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: cfg.color,
-          boxShadow: hovered ? `0 0 8px rgba(${rgb}, 0.2)` : "none",
-          transition: "box-shadow 120ms ease",
-        }}
-      >
-        {getIcon(node.icon, 12)}
-      </div>
-
-      {/* Name + description */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: hovered ? "#E8EDF8" : "#B0BCD4",
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical" as const,
-            overflow: "hidden",
-            wordBreak: "break-word" as const,
-            lineHeight: 1.3,
-            transition: "color 120ms ease",
-          }}
-        >
-          {node.name}
-        </div>
-        <div
-          style={{
-            fontSize: 10,
-            color: "rgba(255,255,255,0.25)",
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical" as const,
-            overflow: "hidden",
-            wordBreak: "break-word" as const,
-            lineHeight: 1.3,
-            marginTop: 1,
-          }}
-        >
-          {node.description}
-        </div>
-      </div>
-
-      {/* Live badge */}
-      {isLive && (
-        <span
-          style={{
-            fontSize: 8,
-            fontWeight: 700,
-            padding: "1px 4px",
-            borderRadius: 4,
-            background: "rgba(0,245,255,0.1)",
-            color: "#00F5FF",
-            border: "1px solid rgba(0,245,255,0.2)",
-            letterSpacing: "0.5px",
-            flexShrink: 0,
-            fontFamily: "var(--font-jetbrains), monospace",
-          }}
-        >
-          LIVE
-        </span>
-      )}
-
-      {/* Drag handle hint */}
-      {hovered && (
-        <GripVertical size={11} style={{ color: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
       )}
     </div>
   );

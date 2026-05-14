@@ -19,6 +19,7 @@ const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN
 import { CATEGORY_COLORS, hexToRgb } from "@/lib/ui-constants";
 import { LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
 import { nodeText } from "@/features/canvas/components/nodes/node-text-styles";
+import { useCanvasToken, useIsLight } from "@/features/canvas/lib/canvas-tokens";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -719,6 +720,9 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
   const prefersReduced = useReducedMotion();
   const [showResult] = useState(true);
 
+  const tk = useCanvasToken();
+  const isLight = useIsLight();
+
   const category = data.category as NodeCategory;
   const status   = data.status   as NodeStatus;
   const color    = CATEGORY_COLOR[category];
@@ -736,6 +740,280 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
     null;
 
   const errorMessage = (data as WorkflowNodeData & { errorMessage?: string })?.errorMessage;
+
+  // ── V3 Light Theme Branch ──────────────────────────────────────────────────
+  // White card with category strip, icon pill header, status pill, footer.
+  // Dark branch below is UNTOUCHED — pixel-identical to production.
+  if (isLight) {
+    const catSolid =
+      category === "input"     ? tk.catInput :
+      category === "transform" ? tk.catTransform :
+      category === "generate"  ? tk.catGenerate :
+      category === "export"    ? tk.catExport :
+      tk.text2;
+    const catSoft =
+      category === "input"     ? tk.catInputSoft :
+      category === "transform" ? tk.catTransformSoft :
+      category === "generate"  ? tk.catGenerateSoft :
+      category === "export"    ? tk.catExportSoft :
+      tk.surface2;
+    const sp =
+      status === "running" ? { bg: tk.nodeStatusRunningBg, color: tk.nodeStatusRunningText, label: "RUNNING" } :
+      status === "success" ? { bg: tk.nodeStatusSuccessBg, color: tk.nodeStatusSuccessText, label: "READY" } :
+      status === "error"   ? { bg: tk.nodeStatusErrorBg,   color: tk.nodeStatusErrorText,   label: "ERROR" } :
+                             { bg: tk.nodeStatusIdleBg,     color: tk.nodeStatusIdleText,     label: "IDLE" };
+
+    return (
+      <>
+        <motion.div
+          initial={prefersReduced ? false : { opacity: 0, scale: 0.96, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: prefersReduced ? 0 : 0.2, ease: [0.4, 0, 0.2, 1] }}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          className={status === "running" ? "node-running" : undefined}
+          style={{
+            position: "relative",
+            width: isInput ? 320 : 250,
+            cursor: "pointer",
+          }}
+        >
+          {/* Card shell — overflow hidden clips strip + footer at rounded corners */}
+          <div style={{
+            position: "relative",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: tk.nodeBg,
+            border: `1px solid ${selected ? tk.lineFocus : isHovered ? tk.nodeBorderHover : tk.nodeBorder}`,
+            boxShadow: selected ? tk.nodeShadowSelected : isHovered ? tk.nodeShadowHover : tk.nodeShadow,
+            transition: "box-shadow 150ms ease, border-color 150ms ease, transform 150ms ease",
+            transform: isHovered && !selected ? "translateY(-2px)" : "translateY(0)",
+          }}>
+            {/* 3px left category strip */}
+            <div style={{
+              position: "absolute", left: 0, top: 0, bottom: 0,
+              width: 3, background: catSolid, zIndex: 1,
+            }} />
+
+            {/* ── Header ── */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 12px 10px 18px",
+              borderBottom: `1px solid ${tk.nodeDivider}`,
+            }}>
+              {/* Icon pill 32×32 */}
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: catSoft,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <div style={{ color: catSolid, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {getIcon(data.icon, 16)}
+                </div>
+              </div>
+
+              {/* Title + catalogue ID */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 13, fontWeight: 600, color: tk.text1,
+                  lineHeight: 1.25,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical" as const,
+                  overflow: "hidden",
+                  wordBreak: "break-word" as const,
+                }}>
+                  {data.label}
+                </div>
+                <div style={{
+                  fontFamily: "var(--font-jetbrains, monospace)",
+                  fontSize: 9, color: tk.text3,
+                  letterSpacing: "0.04em", marginTop: 2,
+                }}>
+                  {data.catalogueId} · {category.toUpperCase()}
+                </div>
+              </div>
+
+              {/* Status pill */}
+              <div style={{
+                fontSize: 9, fontWeight: 600,
+                color: sp.color, background: sp.bg,
+                padding: "3px 8px", borderRadius: 4,
+                letterSpacing: "0.06em",
+                fontFamily: "var(--font-jetbrains, monospace)",
+                flexShrink: 0,
+                animation: status === "running" ? "v3-status-pulse 1.5s ease-in-out infinite" : "none",
+              }}>
+                {sp.label}
+              </div>
+            </div>
+
+            {/* ── Body ── */}
+            <div style={{ padding: "10px 12px 10px 18px", position: "relative" }}>
+              {/* DEMO badge — moved from header to free title space */}
+              {!isInput && !LIVE_NODES.has(data.catalogueId) && (
+                <div style={{ marginBottom: 6 }}>
+                  <span style={{
+                    fontSize: 8, fontWeight: 700,
+                    color: "#D97706", padding: "2px 6px",
+                    background: "rgba(217,119,6,0.08)",
+                    border: "1px solid rgba(217,119,6,0.20)",
+                    borderRadius: 3, letterSpacing: "0.1em",
+                    textTransform: "uppercase" as const,
+                    fontFamily: "var(--font-jetbrains, monospace)",
+                  }}>
+                    DEMO
+                  </span>
+                </div>
+              )}
+              {typeLabel && (
+                <div style={{
+                  fontSize: 11, fontWeight: 500, color: tk.text2,
+                  marginBottom: 6, lineHeight: 1.4,
+                  overflow: "hidden", textOverflow: "ellipsis",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical" as const,
+                }}>
+                  {typeLabel}
+                </div>
+              )}
+              {isInput && <InputNodeContent nodeId={id} data={data} />}
+              {data.catalogueId === "GN-003" && <ViewTypeSelect nodeId={id} data={data} />}
+              <AnimatePresence>
+                {artifact && showResult && status === "success" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <InlineResult artifact={artifact} nodeId={id} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* ── Footer ── */}
+            <div style={{
+              padding: "6px 12px 6px 18px",
+              background: tk.nodeFooterBg,
+              borderTop: `1px solid ${tk.nodeDivider}`,
+              display: "flex", alignItems: "center", gap: 8,
+              fontSize: 10,
+              fontFamily: "var(--font-jetbrains, monospace)",
+              color: tk.text3,
+            }}>
+              <span>⏱ {data.executionTime ?? "< 2s"}</span>
+              <div style={{ marginLeft: "auto" }} />
+            </div>
+
+            {/* Running progress bar */}
+            {status === "running" && (
+              <div style={{
+                position: "absolute", left: 0, right: 0, bottom: 0,
+                height: 2, background: tk.nodeProgressTrack,
+                overflow: "hidden",
+              }}>
+                <div style={{
+                  position: "absolute", left: 0, top: 0, bottom: 0,
+                  width: "40%", background: catSolid,
+                  animation: "shimmer 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                }} />
+              </div>
+            )}
+          </div>
+
+          {/* ── Handles — outside card shell, positioned relative to outer div ── */}
+          {data.inputs.map((port, i) => (
+            <Handle
+              key={port.id}
+              type="target"
+              position={Position.Left}
+              id={port.id}
+              title={`Input: ${port.label}`}
+              style={{
+                top: `${portPercent(i, data.inputs.length)}%`,
+                width: 9, height: 9,
+                background: "#FFFFFF",
+                border: `2px solid ${catSolid}`,
+                borderRadius: "50%",
+                cursor: "crosshair",
+                zIndex: 10,
+              }}
+            />
+          ))}
+          {data.outputs.map((port, i) => (
+            <Handle
+              key={port.id}
+              type="source"
+              position={Position.Right}
+              id={port.id}
+              title={`Output: ${port.label}`}
+              style={{
+                top: `${portPercent(i, data.outputs.length)}%`,
+                width: 9, height: 9,
+                background: "#FFFFFF",
+                border: `2px solid ${catSolid}`,
+                borderRadius: "50%",
+                cursor: "crosshair",
+                zIndex: 10,
+              }}
+            />
+          ))}
+        </motion.div>
+
+        {/* ── Error tooltip (light themed) ── */}
+        <AnimatePresence>
+          {status === "error" && errorMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -5, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 28 }}
+              style={{
+                position: "absolute",
+                top: "100%", left: "50%",
+                transform: "translateX(-50%)",
+                marginTop: 8, padding: "8px 12px",
+                borderRadius: 6,
+                background: "#FFFFFF",
+                border: "1px solid rgba(220, 38, 38, 0.25)",
+                boxShadow: "0 4px 12px rgba(15,20,25,0.10)",
+                maxWidth: 280, zIndex: 1000,
+                pointerEvents: "none",
+              }}
+            >
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <AlertCircle size={14} style={{ color: "#DC2626", flexShrink: 0, marginTop: 1 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#DC2626", marginBottom: 3 }}>
+                    {t('execution.executionError')}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#6B7280", lineHeight: 1.55 }}>
+                    {errorMessage}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <style>{`
+          @keyframes v3-status-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+          }
+          @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(300%); }
+          }
+        `}</style>
+      </>
+    );
+  }
 
   // Dynamic styling
   const accentOpacity = selected ? 0.7 : isHovered ? 0.45 : 0.2;

@@ -1384,8 +1384,12 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
   // Cleanup polling on unmount to prevent memory leaks (#20)
   useEffect(() => {
     return () => {
-      pollAbortRef.current?.abort();
-      pollAbortRef.current = null;
+      if (pollAbortRef.current) {
+        pollAbortRef.current.abort(
+          new DOMException("Component unmounted", "AbortError")
+        );
+        pollAbortRef.current = null;
+      }
     };
   }, []);
 
@@ -1911,7 +1915,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
 
             const taskIdStr = artData.taskId as string;
             // Create new AbortController for this poll (aborts previous if any)
-            pollAbortRef.current?.abort();
+            pollAbortRef.current?.abort(new DOMException("New poll replacing previous", "AbortError"));
             const pollCtrl = new AbortController();
             pollAbortRef.current = pollCtrl;
             pollSingleVideoGeneration(
@@ -1943,7 +1947,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
             });
 
             // Create new AbortController for this poll (aborts previous if any)
-            pollAbortRef.current?.abort();
+            pollAbortRef.current?.abort(new DOMException("New poll replacing previous", "AbortError"));
             const dualPollCtrl = new AbortController();
             pollAbortRef.current = dualPollCtrl;
             pollVideoGeneration(

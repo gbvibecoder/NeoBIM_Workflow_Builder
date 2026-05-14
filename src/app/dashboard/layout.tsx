@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/features/dashboard/components/Sidebar";
 import { Header } from "@/features/dashboard/components/Header";
@@ -36,17 +36,30 @@ export default function DashboardLayout({
     pathname === "/dashboard/floor-plan" ||
     pathname === "/dashboard/brief-renders" ||
     pathname.startsWith("/dashboard/results/");
-  // Canvas page has a 44px-wide Node Library tab pinned to the right edge;
-  // push the floating avatar left so it isn't clipped behind the tab.
-  const isCanvasPage = pathname === "/dashboard/canvas";
+  // Canvas page — uses startsWith to handle pathname edge cases (trailing
+  // slash, null from usePathname, or future sub-routes under canvas/).
+  const isCanvasPage = pathname?.startsWith("/dashboard/canvas") ?? false;
 
-  // BetaBanner: hidden on light surfaces (cream pages stay clean) and on
-  // immersive landing.
-  const hideBetaBanner = isImmersive || isLightSurface;
+  // BetaBanner: hidden on light surfaces (cream pages stay clean), on the
+  // immersive landing, and on the canvas page (focused workspace needs all
+  // vertical space — the banner also extends past the workspace when panels
+  // are open).
+  const hideBetaBanner = isImmersive || isLightSurface || isCanvasPage;
+
+  // Full-bleed: canvas hides sidebar for immersive experience.
+  // Deferred to useEffect so the INITIAL render always includes Sidebar
+  // (matches SSR output — avoids hydration mismatch from conditional DOM).
+  const [isFullBleed, setIsFullBleed] = useState(false);
+  useEffect(() => {
+    setIsFullBleed(isCanvasPage);
+  }, [isCanvasPage]);
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ minHeight: "-webkit-fill-available", background: isLightSurface ? "#F6F4EE" : "#0a0c10" }}>
-      <Sidebar />
+    <div className="flex h-screen overflow-hidden" style={{
+      minHeight: "-webkit-fill-available",
+      background: isLightSurface ? "#F6F4EE" : "#0a0c10",
+    }}>
+      {!isFullBleed && <Sidebar />}
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ transition: "flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
           {!hideBetaBanner && <BetaBanner />}
@@ -63,12 +76,14 @@ export default function DashboardLayout({
       {/* Floating chrome overlay — sits OUTSIDE the flex column so it
           reserves zero vertical space. Just an avatar circle in the
           top-right corner. */}
-      <Header theme={isLightSurface ? "light" : "dark"} rightOffset={isCanvasPage ? 64 : 16} />
+      <Header theme={(isLightSurface || isCanvasPage) ? "light" : "dark"} rightOffset={isCanvasPage ? 64 : 16} />
       <CommandPaletteLoader />
       <SessionGuard />
       <OnboardingModal />
       <PendingReferralClaimer />
-      <SupportChatLoader />
+      {/* Hide support chat on canvas — canvas has its own AI Chat panel.
+          Uses isFullBleed (deferred) so initial render matches SSR. */}
+      {!isFullBleed && <SupportChatLoader />}
       <SubscriptionSelfHeal />
     </div>
   );
