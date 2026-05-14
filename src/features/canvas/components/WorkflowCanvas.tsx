@@ -44,7 +44,7 @@ import { PromptInput } from "@/features/ai/components/PromptInput";
 import { CanvasEmptyState } from "@/features/canvas/components/CanvasEmptyState";
 import { FullscreenArtifactViewer } from "@/features/canvas/components/FullscreenArtifactViewer";
 import { CanvasControls } from "@/features/canvas/components/chrome/CanvasControls";
-import { CanvasTools } from "@/features/canvas/components/chrome/CanvasTools";
+// CanvasTools (Comment + Group mode) removed per user request
 import { QuickSearch } from "@/features/canvas/components/chrome/QuickSearch";
 import { AlignmentGuides } from "@/features/canvas/components/chrome/AlignmentGuides";
 import { ConnectionLine } from "@/features/canvas/components/edges/ConnectionLine";
@@ -1115,8 +1115,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
           )}
         </AnimatePresence>
 
-        {/* Collab tools — bottom-left, above minimap (Z.CANVAS.TOOLS-RESTORE) */}
-        <CanvasTools />
+        {/* Collab tools removed per user request */}
 
         {/* React Flow canvas — bg handled by .bf-canvas-surface on the
             outer wrapper. This div is transparent so the bg shows through. */}
