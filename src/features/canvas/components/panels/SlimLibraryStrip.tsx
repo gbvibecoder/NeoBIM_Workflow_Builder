@@ -118,7 +118,6 @@ export const SlimLibraryStrip = memo(function SlimLibraryStrip() {
         position: "absolute",
         top: 80,
         right: 16,
-        bottom: 16,
         width: 56,
         background: tk.slimStripBg,
         border: `1px solid ${tk.slimStripBorder}`,
@@ -183,9 +182,6 @@ export const SlimLibraryStrip = memo(function SlimLibraryStrip() {
         activeBg={tk.catExportSoft}
         onClick={() => handleCategory("export")}
       />
-
-      {/* Spacer */}
-      <div style={{ flex: 1, minHeight: 8 }} />
 
       {divider}
 
