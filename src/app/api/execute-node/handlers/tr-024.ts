@@ -37,10 +37,16 @@ import type { EnrichedBriefData } from "@/features/ifc/services/brief-to-ifc-v2/
 const MAX_UPLOAD_BASE64_LEN = 27 * 1024 * 1024;
 /** Reject briefs over this estimated input size rather than truncating. */
 const ENRICHER_INPUT_TOKEN_CAP = 150_000;
-/** Sonnet 4.6 streamed output ceiling for the enriched spec. 16k output
- *  tokens ≈ 10-12k words — plenty for a tender-grade spec, and keeps the
- *  call comfortably inside the wall-clock cap. Phase 1.5: lowered from 48k. */
-const ENRICHER_MAX_TOKENS = 16_000;
+/** Sonnet 4.6 streamed output ceiling for the enriched spec. Phase 1.6:
+ *  raised back to 48k. Phase 1.5's 16k was the WRONG lever — `max_tokens`
+ *  is a ceiling, not a throttle. Lowering it didn't speed the call up; it
+ *  just TRUNCATED a faithful surgical spec (`stop_reason: "max_tokens"` →
+ *  ENRICHMENT_TRUNCATED — exactly what failed in prod, exec 3z6q0v443m6q).
+ *  A surgical brief is reproduced near-verbatim, so the enriched output is
+ *  roughly input-sized: the SOL spec (~68 KB / ~19k input tokens) needs
+ *  ~25-35k output tokens. Sonnet 4.6 supports 64k; 48k clears the SOL spec
+ *  with margin and the model stops at `end_turn` well before the ceiling. */
+const ENRICHER_MAX_TOKENS = 48_000;
 /** Wall-clock cap for the Anthropic call. Phase 1.5: raised from 180s — the
  *  180s AbortSignal was the actual cause of the prod "Request was aborted"
  *  failure. 540s uses the route's 600s maxDuration budget while leaving

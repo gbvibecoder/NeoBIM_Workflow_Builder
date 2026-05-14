@@ -39,10 +39,12 @@ import {
 
 /** Reject enriched specs over this estimated size rather than truncating. */
 const ARCHITECT_INPUT_TOKEN_CAP = 200_000;
-/** Opus 4.7 streamed output ceiling for the builder script. 24k output
- *  tokens is enough Python to author 1500+ IFC elements. Phase 1.5:
- *  lowered from 30k. */
-const ARCHITECT_MAX_TOKENS = 24_000;
+/** Opus 4.7 streamed output ceiling for the builder script. Phase 1.6:
+ *  raised to 48k. Phase 1.5's 24k was the same wrong lever as TR-024's —
+ *  a truncated builder script is as useless as a truncated spec. A script
+ *  authoring a Concierge-grade IFC needs real room; Opus 4.7 supports
+ *  128k, so 48k is a safe ceiling the model stops short of at `end_turn`. */
+const ARCHITECT_MAX_TOKENS = 48_000;
 /** Wall-clock cap for the Anthropic call — Opus authoring a full script is
  *  the slowest node in the pipeline. Phase 1.5: raised from 280s to 540s to
  *  use the route's 600s maxDuration budget (with headroom for response
