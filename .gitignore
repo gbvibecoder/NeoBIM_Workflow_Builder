@@ -107,3 +107,7 @@ eng.traineddata
 
 # Local Claude Code artifacts
 temp/
+
+# SOL Properties concierge brief — locally generated authoring artefact,
+# not product source. Uploaded through the /brief-renders UI, not committed.
+SOL_Rendering_Brief*.docx

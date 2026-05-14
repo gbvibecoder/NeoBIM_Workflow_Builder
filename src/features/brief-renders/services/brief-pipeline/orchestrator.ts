@@ -195,8 +195,22 @@ export async function runBriefRenderOrchestrator(
         jobId,
         logger,
       });
-      stage1Spec = stage1.spec;
       stage1CostUsd = stage1.costUsd;
+      // Wire Stage 1's extracted reference images into the spec before
+      // anything downstream reads it. Stage 1 returns `referenceImages`
+      // as a separate field, and Claude is instructed to leave
+      // `spec.referenceImageUrls` empty — so without this merge the URLs
+      // never reach Stage 3, and the `images.edit()` +
+      // `input_fidelity:"high"` anchoring path stays dead code for every
+      // brief. Capped at 4 (the gpt-image API reference-image limit).
+      // Zero reference images → empty array → Stage 3 falls back to
+      // `images.generate()`, unchanged.
+      stage1Spec = {
+        ...stage1.spec,
+        referenceImageUrls: stage1.referenceImages
+          .slice(0, 4)
+          .map((ref) => ref.r2Url),
+      };
 
       // Persist Stage 1 result + atomically increment cost. We use a plain
       // update here (not conditional) because we hold the RUNNING claim,
@@ -204,7 +218,7 @@ export async function runBriefRenderOrchestrator(
       await prisma.briefRenderJob.update({
         where: { id: jobId },
         data: {
-          specResult: stage1.spec as unknown as Prisma.InputJsonValue,
+          specResult: stage1Spec as unknown as Prisma.InputJsonValue,
           costUsd: { increment: stage1.costUsd },
           currentStage: "Prompt Gen",
           progress: PROGRESS_AFTER_STAGE_1,
