@@ -39,11 +39,15 @@ import {
 
 /** Reject enriched specs over this estimated size rather than truncating. */
 const ARCHITECT_INPUT_TOKEN_CAP = 200_000;
-/** Opus 4.7 streamed output ceiling for the builder script. */
-const ARCHITECT_MAX_TOKENS = 30_000;
-/** Wall-clock cap for the Anthropic call — Opus authoring a full script
- *  is the slowest node in the pipeline; kept under the route's 600 s limit. */
-const ARCHITECT_TIMEOUT_MS = 280_000;
+/** Opus 4.7 streamed output ceiling for the builder script. 24k output
+ *  tokens is enough Python to author 1500+ IFC elements. Phase 1.5:
+ *  lowered from 30k. */
+const ARCHITECT_MAX_TOKENS = 24_000;
+/** Wall-clock cap for the Anthropic call — Opus authoring a full script is
+ *  the slowest node in the pipeline. Phase 1.5: raised from 280s to 540s to
+ *  use the route's 600s maxDuration budget (with headroom for response
+ *  handling) so a slow-but-working call isn't aborted prematurely. */
+const ARCHITECT_TIMEOUT_MS = 540_000;
 /** Below this the upstream "spec" is too thin to author an IFC from. */
 const MIN_SPEC_CHARS = 50;
 
@@ -111,6 +115,9 @@ export const handleTR022: NodeHandler = async (ctx) => {
   let cacheReadTokens = 0;
   let cacheCreationTokens = 0;
   try {
+    console.log(
+      `[TR-022] starting Anthropic call · inputTokens=~${estimatedInputTokens} · maxTokens=${ARCHITECT_MAX_TOKENS} · specSize=${enrichedSpec.length}`,
+    );
     const stream = client.messages.stream(
       {
         model: IFC_ARCHITECT_MODEL,
@@ -131,6 +138,9 @@ export const handleTR022: NodeHandler = async (ctx) => {
       { signal: AbortSignal.timeout(ARCHITECT_TIMEOUT_MS) },
     );
     const message = await stream.finalMessage();
+    console.log(
+      `[TR-022] Anthropic call complete · outputTokens=${message.usage.output_tokens} · stopReason=${message.stop_reason}`,
+    );
 
     inputTokens = message.usage.input_tokens;
     outputTokens = message.usage.output_tokens;

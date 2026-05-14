@@ -37,10 +37,15 @@ import type { EnrichedBriefData } from "@/features/ifc/services/brief-to-ifc-v2/
 const MAX_UPLOAD_BASE64_LEN = 27 * 1024 * 1024;
 /** Reject briefs over this estimated input size rather than truncating. */
 const ENRICHER_INPUT_TOKEN_CAP = 150_000;
-/** Sonnet 4.6 streamed output ceiling for the enriched spec. */
-const ENRICHER_MAX_TOKENS = 48_000;
-/** Wall-clock cap for the Anthropic call. */
-const ENRICHER_TIMEOUT_MS = 180_000;
+/** Sonnet 4.6 streamed output ceiling for the enriched spec. 16k output
+ *  tokens ≈ 10-12k words — plenty for a tender-grade spec, and keeps the
+ *  call comfortably inside the wall-clock cap. Phase 1.5: lowered from 48k. */
+const ENRICHER_MAX_TOKENS = 16_000;
+/** Wall-clock cap for the Anthropic call. Phase 1.5: raised from 180s — the
+ *  180s AbortSignal was the actual cause of the prod "Request was aborted"
+ *  failure. 540s uses the route's 600s maxDuration budget while leaving
+ *  headroom for brief extraction + response handling. */
+const ENRICHER_TIMEOUT_MS = 540_000;
 /** Below this the "brief" is too short to be a real brief. */
 const MIN_BRIEF_CHARS = 100;
 
@@ -191,6 +196,9 @@ export const handleTR024: NodeHandler = async (ctx) => {
   let cacheReadTokens = 0;
   let cacheCreationTokens = 0;
   try {
+    console.log(
+      `[TR-024] starting Anthropic call · inputTokens=~${estimatedInputTokens} · maxTokens=${ENRICHER_MAX_TOKENS} · briefSize=${briefText.length}`,
+    );
     const stream = client.messages.stream(
       {
         model: BRIEF_ENRICHER_MODEL,
@@ -212,6 +220,9 @@ export const handleTR024: NodeHandler = async (ctx) => {
       { signal: AbortSignal.timeout(ENRICHER_TIMEOUT_MS) },
     );
     const message = await stream.finalMessage();
+    console.log(
+      `[TR-024] Anthropic call complete · outputTokens=${message.usage.output_tokens} · stopReason=${message.stop_reason}`,
+    );
 
     inputTokens = message.usage.input_tokens;
     outputTokens = message.usage.output_tokens;
