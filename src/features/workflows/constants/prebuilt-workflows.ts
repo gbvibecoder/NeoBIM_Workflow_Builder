@@ -768,6 +768,88 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       ],
     },
   },
+  {
+    id: "wf-13",
+    name: "Brief → AI-Powered IFC (faithful)",
+    description:
+      "Upload any architectural brief — surgical, sparse, or somewhere in between. AI enriches it into a tender-grade spec, then authors the IFC element-by-element. Renderable directly in the BIM viewer.",
+    tags: ["ai-powered", "ifc", "v2", "concierge-grade", "brief", "bim"],
+    category: "Concept Design",
+    complexity: "advanced",
+    estimatedRunTime: "~3-6 minutes",
+    requiredInputs: ["Architectural brief (PDF or DOCX — surgical or sparse)"],
+    expectedOutputs: [
+      "Enriched tender-grade IFC specification",
+      "IfcOpenShell builder script (authored by AI)",
+      "Downloadable IFC file, openable in the BIM viewer",
+    ],
+    thumbnail: "https://picsum.photos/seed/wf13/600/400",
+    tileGraph: {
+      nodes: [
+        {
+          id: "n1",
+          type: "workflowNode",
+          position: { x: X1, y: Y },
+          data: {
+            catalogueId: "IN-002",
+            label: "Brief Upload",
+            category: "input",
+            status: "idle",
+            inputs: [],
+            outputs: [{ id: "pdf-out", label: "PDF", type: "pdf" }],
+            icon: "FileText",
+          },
+        },
+        {
+          id: "n2",
+          type: "workflowNode",
+          position: { x: X2, y: Y },
+          data: {
+            catalogueId: "TR-024",
+            label: "Brief Enricher",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "brief-in", label: "Brief", type: "text" }],
+            outputs: [{ id: "enriched-out", label: "Enriched Spec", type: "text" }],
+            icon: "Wand2",
+          },
+        },
+        {
+          id: "n3",
+          type: "workflowNode",
+          position: { x: X3, y: Y },
+          data: {
+            catalogueId: "TR-022",
+            label: "IFC Architect",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "brief-in", label: "Enriched Spec", type: "text" }],
+            outputs: [{ id: "script-out", label: "Builder Script", type: "text" }],
+            icon: "DraftingCompass",
+          },
+        },
+        {
+          id: "n4",
+          type: "workflowNode",
+          position: { x: X4, y: Y },
+          data: {
+            catalogueId: "EX-006",
+            label: "AI IFC Generator",
+            category: "export",
+            status: "idle",
+            inputs: [{ id: "script-in", label: "Builder Script", type: "text" }],
+            outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }],
+            icon: "Boxes",
+          },
+        },
+      ],
+      edges: [
+        { id: "e1-2", source: "n1", sourceHandle: "pdf-out", target: "n2", targetHandle: "brief-in", type: "animatedEdge" },
+        { id: "e2-3", source: "n2", sourceHandle: "enriched-out", target: "n3", targetHandle: "brief-in", type: "animatedEdge" },
+        { id: "e3-4", source: "n3", sourceHandle: "script-out", target: "n4", targetHandle: "script-in", type: "animatedEdge" },
+      ],
+    },
+  },
 ];
 
 export const PREBUILT_WORKFLOWS_MAP = new Map(

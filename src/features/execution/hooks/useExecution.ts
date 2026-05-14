@@ -52,8 +52,13 @@ import type { Execution, ExecutionArtifact } from "@/types/execution";
 import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/features/canvas/components/ExecutionLog";
 
-// All node IDs that have real API implementations on the server
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003"]);
+// All node IDs that have real API implementations on the server.
+// NOTE: TR-022/TR-024/EX-006 (Brief-to-IFC v2, Phase 1) were added to
+// BOTH this set and the server-side REAL_NODE_IDS in
+// src/app/api/execute-node/route.ts. The pre-existing divergence flagged
+// in Phase 0 §1.4 (client set missing GN-007/GN-008/TR-013/TR-014) is
+// left untouched here — out of scope for Phase 1.
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "TR-022", "TR-024", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003", "EX-006"]);
 
 // Live nodes — ALWAYS use real API execution regardless of NEXT_PUBLIC_ENABLE_MOCK_EXECUTION.
 // These are production-ready and should never fall through to mock when authenticated.
@@ -71,6 +76,9 @@ const LIVE_NODE_IDS = new Set([
   "GN-012",  // Floor Plan Editor (pure computation — adapts upstream geometry, no API key)
   "EX-001",  // IFC Exporter (pure computation, no API key)
   "EX-002",  // BOQ Spreadsheet Exporter (xlsx, no API key)
+  "TR-024",  // Brief Enricher (Anthropic Sonnet 4.6 — no useful mock, must be live)
+  "TR-022",  // IFC Architect (Anthropic Opus 4.7 — no useful mock, must be live)
+  "EX-006",  // AI IFC Generator (Railway Python sandbox — no useful mock, must be live)
 ]);
 
 interface APIErrorResponse {

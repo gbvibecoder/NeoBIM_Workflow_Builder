@@ -24,6 +24,8 @@ import { handleTR013 } from "./tr-013";
 import { handleTR014 } from "./tr-014";
 import { handleTR015 } from "./tr-015";
 import { handleTR016 } from "./tr-016";
+import { handleTR022 } from "./tr-022";
+import { handleTR024 } from "./tr-024";
 import { handleGN001 } from "./gn-001";
 import { handleGN003 } from "./gn-003";
 import { handleGN004 } from "./gn-004";
@@ -36,6 +38,7 @@ import { handleGN012 } from "./gn-012";
 import { handleEX001 } from "./ex-001";
 import { handleEX002 } from "./ex-002";
 import { handleEX003 } from "./ex-003";
+import { handleEX006 } from "./ex-006";
 
 export const nodeHandlers: Record<string, NodeHandler> = {
   "TR-001": handleTR001,
@@ -49,6 +52,8 @@ export const nodeHandlers: Record<string, NodeHandler> = {
   "TR-014": handleTR014,
   "TR-015": handleTR015,
   "TR-016": handleTR016,
+  "TR-022": handleTR022,
+  "TR-024": handleTR024,
   "GN-001": handleGN001,
   "GN-003": handleGN003,
   "GN-004": handleGN004,
@@ -61,6 +66,7 @@ export const nodeHandlers: Record<string, NodeHandler> = {
   "EX-001": handleEX001,
   "EX-002": handleEX002,
   "EX-003": handleEX003,
+  "EX-006": handleEX006,
 };
 
 export type { NodeHandler, NodeHandlerContext, NodeHandlerResult } from "./types";

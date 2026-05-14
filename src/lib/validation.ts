@@ -356,6 +356,67 @@ export function validateTR016Input(inputData: unknown): ValidationResult {
 }
 
 /**
+ * TR-024: Brief Enricher (Brief-to-IFC v2)
+ * Accepts an uploaded PDF/DOCX (fileData) OR upstream text content.
+ */
+export function validateTR024Input(inputData: unknown): ValidationResult {
+  const input = inputData as Record<string, unknown> | null | undefined;
+  const fileData = input?.fileData ?? input?.buffer ?? null;
+  const text = input?.content ?? input?.prompt ?? input?.rawText ?? "";
+
+  if (!fileData && (!text || (typeof text === "string" && text.trim().length < 20))) {
+    return {
+      valid: false,
+      error: "No brief provided",
+      userError: UserErrors.MISSING_REQUIRED_FIELD("brief file or text content"),
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * TR-022: IFC Architect (Brief-to-IFC v2)
+ * Requires upstream text — the enriched specification from TR-024.
+ */
+export function validateTR022Input(inputData: unknown): ValidationResult {
+  const input = inputData as Record<string, unknown> | null | undefined;
+  const spec = input?.content ?? input?.prompt ?? input?.rawText ?? "";
+
+  if (typeof spec !== "string" || spec.trim().length < 50) {
+    return {
+      valid: false,
+      error: "No enriched specification to author from",
+      userError: UserErrors.MISSING_REQUIRED_FIELD("enriched specification"),
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * EX-006: AI IFC Generator (Brief-to-IFC v2)
+ * Requires an IfcOpenShell builder script — `_script.python_code` from
+ * TR-022, or a bare `python_code` field for direct wiring.
+ */
+export function validateEX006Input(inputData: unknown): ValidationResult {
+  const input = inputData as Record<string, unknown> | null | undefined;
+  const script = input?._script as Record<string, unknown> | undefined;
+  const scriptCode = typeof script?.python_code === "string" ? script.python_code : "";
+  const bareCode = typeof input?.python_code === "string" ? input.python_code : "";
+
+  if (scriptCode.trim().length === 0 && bareCode.trim().length === 0) {
+    return {
+      valid: false,
+      error: "No IFC builder script provided",
+      userError: UserErrors.MISSING_REQUIRED_FIELD("IFC builder script"),
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Validate input based on node catalogue ID
  */
 export function validateNodeInput(
@@ -365,6 +426,12 @@ export function validateNodeInput(
   switch (catalogueId) {
     case "TR-001":
       return validateTR001Input(inputData);
+    case "TR-022":
+      return validateTR022Input(inputData);
+    case "TR-024":
+      return validateTR024Input(inputData);
+    case "EX-006":
+      return validateEX006Input(inputData);
     case "TR-003":
       return validateTR003Input(inputData);
     case "TR-004":
