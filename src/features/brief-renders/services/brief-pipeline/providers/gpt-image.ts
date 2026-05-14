@@ -171,6 +171,45 @@ function createClient(): OpenAI {
 
 // ─── Reference-image fetcher ───────────────────────────────────────
 
+/** MIME types OpenAI's `images.edit()` accepts for reference images. */
+const SUPPORTED_REFERENCE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+/**
+ * Resolve a supported image MIME type for an `images.edit()` reference
+ * upload.
+ *
+ * `toFile()` does NOT infer the MIME type from the filename extension:
+ * given a raw Buffer with no `options.type`, the resulting `File` has an
+ * empty `type`, which OpenAI's multipart layer sends as
+ * `application/octet-stream` and the API rejects with a 400. The type
+ * MUST therefore be passed to `toFile()` explicitly.
+ *
+ * Priority:
+ *   1. The fetch response's `Content-Type` header (R2 stores it on upload).
+ *   2. Inference from the URL's file extension.
+ *   3. `image/jpeg` — the pipeline's reference images are sharp-encoded
+ *      JPEG, so this is the safe final fallback.
+ */
+function resolveReferenceMimeType(
+  responseContentType: string | null,
+  url: string,
+): string {
+  if (responseContentType) {
+    const ct = responseContentType.split(";")[0].trim().toLowerCase();
+    if (SUPPORTED_REFERENCE_MIME_TYPES.has(ct)) return ct;
+    if (ct === "image/jpg") return "image/jpeg"; // normalise the common alias
+  }
+  const lower = url.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  return "image/jpeg";
+}
+
 async function fetchReferenceFiles(
   urls: string[],
   signal: AbortSignal,
@@ -187,7 +226,13 @@ async function fetchReferenceFiles(
     }
     const buffer = Buffer.from(await res.arrayBuffer());
     const ext = guessExtensionFromUrl(url);
-    const file = await toFile(buffer, `ref-${i}.${ext}`);
+    // toFile() does NOT derive the MIME type from the filename extension —
+    // without an explicit `type`, OpenAI receives application/octet-stream
+    // and rejects the upload with a 400. Resolve it from the R2 response
+    // Content-Type, the URL extension, or fall back to JPEG.
+    const file = await toFile(buffer, `ref-${i}.${ext}`, {
+      type: resolveReferenceMimeType(res.headers.get("content-type"), url),
+    });
     files.push(file);
   }
   return files;

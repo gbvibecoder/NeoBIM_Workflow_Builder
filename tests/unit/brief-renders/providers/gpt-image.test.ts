@@ -13,8 +13,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const { imagesEditMock, imagesGenerateMock, toFileMock } = vi.hoisted(() => ({
   imagesEditMock: vi.fn(),
   imagesGenerateMock: vi.fn(),
-  toFileMock: vi.fn((buf: Buffer, name: string) =>
-    Promise.resolve({ name, size: buf.length, _isFile: true }),
+  toFileMock: vi.fn((buf: Buffer, name: string, options?: { type?: string }) =>
+    Promise.resolve({ name, type: options?.type ?? "", size: buf.length, _isFile: true }),
   ),
 }));
 
@@ -325,5 +325,71 @@ describe("gpt-image.ts source-level guarantees", () => {
     expect(typeof mod.generateShotImage).toBe("function");
     expect(typeof mod.normalizeAspectRatio).toBe("function");
     expect(mod.GPT_IMAGE_15_HIGH_COST_USD).toBeDefined();
+  });
+});
+
+// ─── Reference-image MIME type (Z.BR.6 regression) ────────────────
+//
+// toFile() does not derive the MIME type from the filename extension, so
+// the provider must pass `{ type }` explicitly — otherwise OpenAI receives
+// application/octet-stream and rejects images.edit() with a 400. These
+// tests lock the type resolution: response Content-Type → URL extension →
+// image/jpeg fallback.
+
+describe("generateShotImage — reference-image MIME type", () => {
+  function mockFetch(contentType: string | null, bytes: number[]) {
+    const headers: Record<string, string> = {};
+    if (contentType !== null) headers["content-type"] = contentType;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(new Uint8Array(bytes), { status: 200, headers }),
+      ),
+    );
+  }
+
+  /** Run one reference-anchored shot and return the toFile() call args. */
+  async function runWith(url: string): Promise<unknown[]> {
+    imagesEditMock.mockResolvedValueOnce({ data: [{ b64_json: "AAAA" }] });
+    await generateShotImage({
+      prompt: "p",
+      aspectRatio: "3:2",
+      referenceImageUrls: [url],
+      inputFidelity: "high",
+      requestId: "j:0:0",
+    });
+    return toFileMock.mock.calls[0];
+  }
+
+  it("Content-Type image/jpeg → toFile receives type image/jpeg", async () => {
+    mockFetch("image/jpeg", [0xff, 0xd8, 0xff, 0xe0]);
+    const call = await runWith("https://r2.example/briefs-refs-job-0.jpg");
+    expect(call[1]).toBe("ref-0.jpg");
+    expect(call[2]).toEqual({ type: "image/jpeg" });
+  });
+
+  it("Content-Type image/png → toFile receives type image/png", async () => {
+    mockFetch("image/png", [0x89, 0x50, 0x4e, 0x47]);
+    const call = await runWith("https://r2.example/briefs-refs-job-0.png");
+    expect(call[1]).toBe("ref-0.png");
+    expect(call[2]).toEqual({ type: "image/png" });
+  });
+
+  it("missing Content-Type, URL ends .jpg → falls back to type image/jpeg", async () => {
+    mockFetch(null, [0xff, 0xd8, 0xff, 0xe0]);
+    const call = await runWith("https://r2.example/briefs-refs-job-0.jpg");
+    expect(call[2]).toEqual({ type: "image/jpeg" });
+  });
+
+  it("Content-Type application/octet-stream, URL ends .png → recovers via URL extension (the production-bug case)", async () => {
+    mockFetch("application/octet-stream", [0x89, 0x50, 0x4e, 0x47]);
+    const call = await runWith("https://r2.example/briefs-refs-job-0.png");
+    expect(call[2]).toEqual({ type: "image/png" });
+  });
+
+  it("no Content-Type and no recognisable extension → final fallback image/jpeg", async () => {
+    mockFetch(null, [0xff, 0xd8, 0xff, 0xe0]);
+    const call = await runWith("https://r2.example/briefs-refs-job-0");
+    expect(call[2]).toEqual({ type: "image/jpeg" });
   });
 });
