@@ -240,7 +240,7 @@ export const SlimLibraryDrawer = memo(function SlimLibraryDrawer() {
             position: "absolute",
             top: 80,
             right: 88,
-            bottom: 16,
+            bottom: 68,
             width: 320,
             background: tk.drawerBg,
             border: `1px solid ${tk.slimStripBorder}`,
