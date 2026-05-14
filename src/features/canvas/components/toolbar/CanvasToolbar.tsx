@@ -19,6 +19,7 @@ import { useLocale } from "@/hooks/useLocale";
 import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
 import { ThemeToggle } from "@/features/canvas/components/chrome/ThemeToggle";
+import { BeastRunButton } from "@/features/canvas/components/toolbar/BeastRunButton";
 import {
   shareWorkflowToTwitter,
   shareWorkflowToLinkedIn,
@@ -159,14 +160,12 @@ export function CanvasToolbar({
   };
 
   const [showModeMenu, setShowModeMenu] = useState(false);
-  const [showRunMenu, setShowRunMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(workflowName);
   const [savedFlash, setSavedFlash] = useState(false);
 
   const modeMenuRef = useRef<HTMLDivElement>(null);
-  const runMenuRef = useRef<HTMLDivElement>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -206,7 +205,6 @@ export function CanvasToolbar({
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (modeMenuRef.current && !modeMenuRef.current.contains(e.target as Node)) setShowModeMenu(false);
-      if (runMenuRef.current && !runMenuRef.current.contains(e.target as Node)) setShowRunMenu(false);
       if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) setShowShareMenu(false);
     };
     // Use capture phase — ReactFlow's pane stops propagation on mousedown,
@@ -595,169 +593,16 @@ export function CanvasToolbar({
 
           <Sep />
 
-          {/* Run / Stop */}
-          {isExecuting ? (
-            <button
-              onClick={onStop}
-              title={`${t('canvas.stopExecution')} (Esc)`}
-              style={{
-                display: "flex", alignItems: "center", gap: 7,
-                height: 32, padding: "0 16px", borderRadius: 8,
-                background: tk.stopBg, border: `1px solid ${tk.stopBorder}`,
-                color: tk.stopText, fontSize: 12, fontWeight: 600,
-                cursor: "pointer", transition: "all 0.15s ease",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = tk.stopBgHover;
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = tk.stopBg;
-              }}
-            >
-              <Square size={12} fill="currentColor" />
-              {t('canvas.stop')}
-            </button>
-          ) : (
-            <div style={{ display: "flex", position: "relative" }} ref={runMenuRef}>
-              <button
-                onClick={onRun}
-                title={
-                  workflowLocked
-                    ? "This workflow has already been executed — open a new workflow to run again"
-                    : `${t('canvas.runWorkflow')} (⌘↵)`
-                }
-                disabled={!isWorkflowReady}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  height: 32, paddingLeft: 14, paddingRight: 10,
-                  borderRadius: "8px 0 0 8px",
-                  background: isWorkflowReady
-                    ? tk.runBg
-                    : "transparent",
-                  borderTop: isWorkflowReady
-                    ? `1px solid ${tk.runBorder}`
-                    : `1px solid ${tk.line1}`,
-                  borderBottom: isWorkflowReady
-                    ? `1px solid ${tk.runBorder}`
-                    : `1px solid ${tk.line1}`,
-                  borderLeft: isWorkflowReady
-                    ? `1px solid ${tk.runBorder}`
-                    : `1px solid ${tk.line1}`,
-                  borderRight: "none",
-                  color: isWorkflowReady ? tk.runText : tk.text4,
-                  fontSize: 11, fontWeight: 600,
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase" as const,
-                  cursor: isWorkflowReady ? "pointer" : "not-allowed",
-                  transition: "all 180ms ease",
-                  opacity: isWorkflowReady ? 1 : 0.5,
-                }}
-                onMouseEnter={e => {
-                  if (isWorkflowReady) {
-                    e.currentTarget.style.background = tk.runBgHover;
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (isWorkflowReady) {
-                    e.currentTarget.style.background = tk.runBg;
-                  }
-                }}
-              >
-                {isStartingRun ? (
-                  <>
-                    <Loader2 size={13} style={{ animation: "spin 0.9s linear infinite" }} />
-                    {/* Plain literal — no i18n key yet; t() returns the key
-                        verbatim when the key is missing, which would render
-                        "canvas.starting" to the user. Add the key to i18n.ts
-                        in a follow-up to localize. */}
-                    Starting…
-                    <style>{`@keyframes spin { from {transform:rotate(0deg)} to {transform:rotate(360deg)} }`}</style>
-                  </>
-                ) : (
-                  <>
-                    <Play size={13} fill="currentColor" />
-                    {t('canvas.runWorkflow')}
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={() => setShowRunMenu(v => !v)}
-                aria-label={t('canvas.moreRunOptions')}
-                aria-expanded={showRunMenu}
-                aria-haspopup="menu"
-                disabled={!isWorkflowReady}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 28, height: 32, padding: 0,
-                  borderRadius: "0 8px 8px 0",
-                  background: isWorkflowReady ? tk.runBg : "transparent",
-                  borderTop: isWorkflowReady
-                    ? `1px solid ${tk.runBorder}`
-                    : `1px solid ${tk.line1}`,
-                  borderRight: isWorkflowReady
-                    ? `1px solid ${tk.runBorder}`
-                    : `1px solid ${tk.line1}`,
-                  borderBottom: isWorkflowReady
-                    ? `1px solid ${tk.runBorder}`
-                    : `1px solid ${tk.line1}`,
-                  borderLeft: isWorkflowReady
-                    ? `1px solid ${tk.runBorderSplit}`
-                    : `1px solid ${tk.line1}`,
-                  color: isWorkflowReady ? tk.runText : tk.text4,
-                  cursor: isWorkflowReady ? "pointer" : "not-allowed",
-                  transition: "all 180ms ease",
-                  opacity: isWorkflowReady ? 1 : 0.5,
-                }}
-                onMouseEnter={e => { if (isWorkflowReady) e.currentTarget.style.background = tk.runBgHover; }}
-                onMouseLeave={e => { if (isWorkflowReady) e.currentTarget.style.background = tk.runBg; }}
-              >
-                <ChevronDown size={11} />
-              </button>
-
-              {/* Run dropdown */}
-              <AnimatePresence>
-                {showRunMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                    transition={{ duration: 0.12 }}
-                    style={{
-                      position: "absolute", top: "calc(100% + 6px)", right: 0,
-                      width: 200, borderRadius: 12, overflow: "hidden",
-                      background: tk.dropdownBg, border: `1px solid ${tk.dropdownBorder}`,
-                      boxShadow: tk.dropdownShadow, zIndex: 50,
-                    }}
-                  >
-                    <div style={{ padding: 4 }}>
-                      {[
-                        { label: t('canvas.runAllNodes'),       sub: t('canvas.executeFullWorkflow')  },
-                        { label: t('canvas.runFromSelection'),  sub: t('canvas.startFromSelected')    },
-                        { label: t('canvas.stepThrough'),       sub: t('canvas.executeOneNode')       },
-                      ].map(item => (
-                        <button
-                          key={item.label}
-                          onClick={() => { onRun(); setShowRunMenu(false); }}
-                          style={{
-                            width: "100%", display: "flex", flexDirection: "column", gap: 1,
-                            padding: "8px 10px", borderRadius: 8, background: "transparent",
-                            border: "none", cursor: "pointer", textAlign: "left",
-                            transition: "background 0.1s",
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = tk.hoverBg; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
-                        >
-                          <span style={{ fontSize: 12, fontWeight: 500, color: tk.text1 }}>{item.label}</span>
-                          <span style={{ fontSize: 10, color: tk.text3 }}>{item.sub}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
+          {/* Beast Run button — 4-state: ready/starting/running/complete */}
+          <BeastRunButton
+            isExecuting={isExecuting}
+            isStartingRun={isStartingRun}
+            isWorkflowReady={isWorkflowReady}
+            workflowLocked={workflowLocked}
+            isDirty={isDirty}
+            onRun={onRun}
+            onStop={onStop}
+          />
         </div>
       </div>
   );

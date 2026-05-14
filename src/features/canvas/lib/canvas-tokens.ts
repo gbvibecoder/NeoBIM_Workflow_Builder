@@ -86,6 +86,18 @@ const T = {
   runBorderSplit:  { l: "rgba(255, 255, 255, 0.18)",                   d: "rgba(0, 245, 255, 0.15)" },
   runText:         { l: "#FFFFFF",                                     d: "#00F5FF" },
 
+  // ── Beast Run button ───────────────────────────────────────────
+  beastReadyBg:        { l: "linear-gradient(180deg, #22C55E 0%, #15803D 50%, #0F5E2C 100%)",
+                         d: "linear-gradient(180deg, #22C55E 0%, #15803D 50%, #0F5E2C 100%)" },
+  beastReadyGlow:      { l: "rgba(34,197,94,0.30)",                      d: "rgba(34,197,94,0.40)" },
+  beastReadyShadow:    { l: "rgba(21,128,61,0.30)",                      d: "rgba(21,128,61,0.50)" },
+  beastRunningBg:      { l: "linear-gradient(180deg, #FB923C 0%, #EA580C 50%, #C2410C 100%)",
+                         d: "linear-gradient(180deg, #FB923C 0%, #EA580C 50%, #C2410C 100%)" },
+  beastRunningShadow:  { l: "rgba(234,88,12,0.30)",                      d: "rgba(234,88,12,0.50)" },
+  beastCompleteBg:     { l: "linear-gradient(180deg, #10B981 0%, #059669 50%, #047857 100%)",
+                         d: "linear-gradient(180deg, #10B981 0%, #059669 50%, #047857 100%)" },
+  beastCompleteShadow: { l: "rgba(5,150,105,0.30)",                      d: "rgba(5,150,105,0.50)" },
+
   // ── Stop button ───────────────────────────────────────────────
   stopBg:          { l: "rgba(220, 38, 38, 0.08)",                     d: "rgba(239, 68, 68, 0.12)" },
   stopBgHover:     { l: "rgba(220, 38, 38, 0.14)",                     d: "rgba(239, 68, 68, 0.20)" },
