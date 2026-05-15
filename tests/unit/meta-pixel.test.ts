@@ -533,6 +533,28 @@ describe("plan-pricing — getPlanValueEUR (Purchase value contract)", () => {
   });
 });
 
+describe("plan-pricing — getPurchaseEventId (browser↔CAPI dedup contract)", () => {
+  it("derives a deterministic, case-insensitive id from userId + plan", async () => {
+    const { getPurchaseEventId } = await import("@/lib/plan-pricing");
+    expect(getPurchaseEventId("u1", "PRO")).toBe("purchase_u1_PRO");
+    expect(getPurchaseEventId("u1", "pro")).toBe("purchase_u1_PRO");
+  });
+
+  it("REGRESSION: collapses the TEAM / TEAM_ADMIN alias to ONE canonical id", async () => {
+    // The browser thank-you redirect carries `?plan=TEAM` (the dashboard
+    // normalizes TEAM_ADMIN → TEAM for display), but the Stripe/Razorpay
+    // webhooks resolve the role to `TEAM_ADMIN`. If these two produced
+    // different event_ids, Meta could not dedupe the browser pixel against
+    // the server CAPI fire and would DOUBLE-COUNT every Team purchase.
+    // Both aliases MUST map to the same id.
+    const { getPurchaseEventId } = await import("@/lib/plan-pricing");
+    const browserId = getPurchaseEventId("u1", "TEAM");       // from ?plan=TEAM
+    const serverId = getPurchaseEventId("u1", "TEAM_ADMIN");  // from webhook role
+    expect(browserId).toBe(serverId);
+    expect(browserId).toBe("purchase_u1_TEAM_ADMIN");
+  });
+});
+
 describe("next.config.ts — CSP allows Meta Pixel domains", () => {
   const src = readFileSync(resolve(repoRoot, "next.config.ts"), "utf8");
 
