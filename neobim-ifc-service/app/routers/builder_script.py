@@ -13,7 +13,7 @@ SANDBOX MODEL (v1 — hardened further in Phase 2)
 * The subprocess gets a MINIMAL environment: no `API_KEY`, no `R2_*`, no
   `ANTHROPIC_API_KEY`. The script cannot read or exfiltrate service
   secrets because they are simply not present in its environment.
-* Resource limits via `preexec_fn` + `setrlimit`: 1 GB address space,
+* Resource limits via `preexec_fn` + `setrlimit`: 4 GB address space,
   60 s CPU, 100 MB max file write. Wall-clock cap: 120 s.
 * Network: best-effort `unshare -rn` namespace when the container grants
   the capability. Railway containers usually do NOT (no CAP_SYS_ADMIN),
@@ -57,7 +57,9 @@ log = structlog.get_logger()
 router = APIRouter(tags=["builder-script"])
 
 # ── Sandbox limits ─────────────────────────────────────────────────────
-RLIMIT_AS_BYTES = 1 * 1024 * 1024 * 1024  # 1 GB virtual address space
+# Phase 2.1: raised from 1GB — ifcopenshell + Opus-generated scripts
+# authoring 1000+ elements need more headroom.
+RLIMIT_AS_BYTES = 4 * 1024 * 1024 * 1024  # 4 GB virtual address space
 RLIMIT_CPU_SECONDS = 60  # 60 s CPU time
 RLIMIT_FSIZE_BYTES = 100 * 1024 * 1024  # 100 MB max single-file write
 WALL_TIMEOUT_SECONDS = 120  # hard wall-clock cap
@@ -170,6 +172,15 @@ def execute_builder_script(
 
         # Minimal environment — deliberately excludes every service
         # secret so the script cannot read or exfiltrate credentials.
+        #
+        # Phase 2.1: pin BLAS / OpenMP / MKL / NumExpr / vecLib thread
+        # pools to a single thread. OpenBLAS's per-thread scratch space
+        # (32-256 MB × n_cpus) was exhausting the RLIMIT_AS budget at
+        # `import numpy` time, well before any IFC code ran ("OpenBLAS
+        # error: Memory allocation still failed after 10 retries"). These
+        # vars are read at LIBRARY LOAD time, so they MUST be present in
+        # the child's env from the start — setting them in the parent is
+        # too late.
         sandbox_env = {
             "PATH": "/usr/local/bin:/usr/bin:/bin",
             "HOME": sandbox_dir,
@@ -178,6 +189,12 @@ def execute_builder_script(
             "LC_ALL": "C.UTF-8",
             "PYTHONUNBUFFERED": "1",
             "PYTHONDONTWRITEBYTECODE": "1",
+            # BLAS / threading pinning — see comment block above.
+            "OPENBLAS_NUM_THREADS": "1",
+            "OMP_NUM_THREADS": "1",
+            "MKL_NUM_THREADS": "1",
+            "NUMEXPR_NUM_THREADS": "1",
+            "VECLIB_MAXIMUM_THREADS": "1",
         }
 
         base_cmd = [sys.executable, script_path]
