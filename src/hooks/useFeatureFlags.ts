@@ -21,11 +21,16 @@ import { useEffect, useState } from "react";
 export interface FeatureFlags {
   vipJobsEnabled: boolean;
   briefRendersEnabled: boolean;
+  /** Brief-to-IFC v2 queued pipeline (Phase 2). When true, `useExecution`
+   *  routes the wf-13 composition through the QStash-backed queued path
+   *  instead of the synchronous node-loop. */
+  briefToIfcV2QueueEnabled: boolean;
 }
 
 const DEFAULT_FLAGS: FeatureFlags = {
   vipJobsEnabled: false,
   briefRendersEnabled: false,
+  briefToIfcV2QueueEnabled: false,
 };
 
 let cachedFlags: FeatureFlags | null = null;

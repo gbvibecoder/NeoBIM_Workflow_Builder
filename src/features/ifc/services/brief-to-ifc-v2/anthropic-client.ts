@@ -32,6 +32,16 @@ export const IFC_ARCHITECT_INPUT_COST_PER_MILLION = 5;
 export const IFC_ARCHITECT_OUTPUT_COST_PER_MILLION = 25;
 
 /**
+ * Phase 2 — the queued pipeline runs BOTH stages on Opus 4.7 (the Phase 1
+ * synchronous handlers keep Sonnet for the enricher). These aliases keep
+ * the queued-stage call sites self-documenting; values mirror the
+ * `IFC_ARCHITECT_*` Opus 4.7 rates ($5 / $25 per million).
+ */
+export const BRIEF_TO_IFC_V2_MODEL = "claude-opus-4-7";
+export const OPUS_47_INPUT_COST_PER_MILLION = 5;
+export const OPUS_47_OUTPUT_COST_PER_MILLION = 25;
+
+/**
  * Conservative chars→tokens estimate. English prose averages ~4 chars/token;
  * structured specs + code run denser, so `/ 3.5` errs on the safe side
  * (over-estimates token count → caps trigger earlier rather than later).
