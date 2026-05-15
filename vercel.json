@@ -25,6 +25,9 @@
     "src/app/api/parse-ifc/route.ts": {
       "memory": 3008,
       "maxDuration": 60
+    },
+    "src/app/api/execute-node/route.ts": {
+      "maxDuration": 600
     }
   }
 }

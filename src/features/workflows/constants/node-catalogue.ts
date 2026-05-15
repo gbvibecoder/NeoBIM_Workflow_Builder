@@ -115,7 +115,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     icon: "ScanText",
     inputs: [{ id: "pdf-in", label: "PDF", type: "pdf" }],
     outputs: [{ id: "text-out", label: "Structured Text", type: "text" }],
-    apiEngine: "Azure AI Document Intelligence",
+    apiEngine: "OpenAI GPT-4o-mini + Anthropic Claude (PDF vision fallback)",
     tags: ["pdf", "parse", "ocr", "extract", "text"],
     executionTime: "< 10s",
   },
@@ -309,6 +309,34 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     apiEngine: "web-ifc (WASM)",
     tags: ["clash", "detection", "collision", "coordination", "bim", "ifc", "quality", "mep", "structural"],
     executionTime: "< 60s",
+  },
+
+  // ── Brief-to-IFC v2 (Phase 1) — AI-powered faithful IFC creation ──
+  {
+    id: "TR-024",
+    name: "Brief Enricher",
+    description:
+      "Reads the user's brief and enriches it into a surgical-grade IFC specification ready for direct translation.",
+    category: "transform",
+    icon: "Wand2",
+    inputs: [{ id: "brief-in", label: "Brief", type: "text" }],
+    outputs: [{ id: "enriched-out", label: "Enriched Spec", type: "text" }],
+    apiEngine: "Anthropic Claude Sonnet 4.6",
+    tags: ["ai", "brief", "enrich", "spec", "ifc", "v2", "claude"],
+    executionTime: "30-90s",
+  },
+  {
+    id: "TR-022",
+    name: "IFC Architect",
+    description:
+      "Generates IfcOpenShell Python that authors the IFC from the enriched brief.",
+    category: "transform",
+    icon: "DraftingCompass",
+    inputs: [{ id: "brief-in", label: "Enriched Spec", type: "text" }],
+    outputs: [{ id: "script-out", label: "Builder Script", type: "text" }],
+    apiEngine: "Anthropic Claude Opus 4.7",
+    tags: ["ai", "ifc", "architect", "ifcopenshell", "opus", "v2", "claude"],
+    executionTime: "1-4 min",
   },
 
   // ── Control Flow / Branching ──
@@ -622,16 +650,22 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "< 10s",
   },
   {
+    // Brief-to-IFC v2 (Phase 1). NOTE: this slot previously held a
+    // mock-only "Image Exporter" node (no handler, not in REAL_NODE_IDS,
+    // not in LIVE_NODES, referenced by zero prebuilt workflows). It is
+    // replaced here by the AI IFC Generator — see the Phase 1 report's
+    // "Ambiguities Resolved" section.
     id: "EX-006",
-    name: "Image Exporter",
-    description: "Export generated images in high-resolution format",
+    name: "AI IFC Generator",
+    description:
+      "Executes the architect's script in a sandboxed container and returns the IFC file.",
     category: "export",
-    icon: "ImageDown",
-    inputs: [{ id: "images-in", label: "Images", type: "image" }],
-    outputs: [{ id: "files-out", label: "JPEG/PNG Files", type: "binary" }],
-    apiEngine: "Native",
-    tags: ["image", "export", "download", "hires", "jpeg", "png"],
-    executionTime: "< 5s",
+    icon: "Boxes",
+    inputs: [{ id: "script-in", label: "Builder Script", type: "text" }],
+    outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }],
+    apiEngine: "BuildFlow Python Sandbox (Railway)",
+    tags: ["ifc", "sandbox", "python", "generate", "ai", "v2", "ifcopenshell"],
+    executionTime: "30-120s",
   },
 ];
 
@@ -677,8 +711,11 @@ export const CATEGORY_CONFIG = {
   },
 } as const;
 
-/** Nodes that use real API calls (not mock/sample data) */
-export const LIVE_NODES = new Set(['TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002']);
+/** Nodes that use real API calls (not mock/sample data).
+ *  TR-001 added — it has had a real handler all along; its absence here
+ *  was the source of the "DEMO" badge bug (Phase 0 §1.2). TR-024/TR-022/
+ *  EX-006 are the Brief-to-IFC v2 (Phase 1) nodes. */
+export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {
