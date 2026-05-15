@@ -130,6 +130,13 @@ export const SandboxLogSchema = z.object({
   stdout_tail: z.string(),
   stderr_tail: z.string(),
   exit_code: z.number().int(),
+  // Phase 3 additions — newline count of the FULL stderr (i.e. before
+  // tail-truncation) and the subprocess's wall-clock seconds. Both are
+  // `.optional().default(...)` so a sandbox that hasn't been redeployed
+  // yet (still on the Phase 1/2 contract) parses cleanly with sensible
+  // defaults — no hard cutover required.
+  stderr_line_count: z.number().int().nonnegative().optional().default(0),
+  runtime_seconds: z.number().nonnegative().optional().default(0),
 });
 export type SandboxLog = z.infer<typeof SandboxLogSchema>;
 
