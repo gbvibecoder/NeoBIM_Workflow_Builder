@@ -51,6 +51,11 @@ import { trackWorkflowExecuted, trackNodeUsed, trackRegenerationUsed } from "@/l
 import type { Execution, ExecutionArtifact } from "@/types/execution";
 import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/features/canvas/components/ExecutionLog";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import {
+  runBriefToIfcQueued,
+  isBriefToIfcV2Composition,
+} from "@/features/ifc/services/brief-to-ifc-v2/run-brief-to-ifc-queued";
 
 // All node IDs that have real API implementations on the server.
 // NOTE: TR-022/TR-024/EX-006 (Brief-to-IFC v2, Phase 1) were added to
@@ -1386,6 +1391,11 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
   const isDemoMode = useUIStore(s => s.isDemoMode);
   const [rateLimitHit, setRateLimitHit] = useState<RateLimitInfo | null>(null);
 
+  // Brief-to-IFC v2 queued-pipeline canary flag (Phase 2). When on AND the
+  // canvas is the wf-13 composition, runWorkflow hands the whole run to the
+  // QStash-backed queued pipeline instead of the synchronous node-loop.
+  const { briefToIfcV2QueueEnabled } = useFeatureFlags();
+
   // AbortController for cancelling background polling on unmount
   const pollAbortRef = useRef<AbortController | null>(null);
 
@@ -1581,6 +1591,35 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
 
     startExecution(execution);
     log("start", "Workflow execution started", `${nodes.length} nodes queued`);
+
+    // ── Brief-to-IFC v2 queued pipeline (Phase 2) ─────────────────────────
+    // wf-13 ("Brief → AI-Powered IFC") is detected by NODE COMPOSITION —
+    // loadFromTemplate remaps node ids so a workflow-id match is unreliable.
+    // When the canary flag is on, the whole run is handed to the QStash-
+    // backed queued pipeline (three Opus 4.7 stages, each its own worker
+    // invocation). `runBriefToIfcQueued` awaits the job to a terminal state,
+    // driving the four canvas node statuses and publishing the final
+    // artifacts itself. The synchronous node-loop below is the parallel-
+    // alive Phase 1 path used whenever the flag is off.
+    if (
+      briefToIfcV2QueueEnabled &&
+      isBriefToIfcV2Composition(nodes as WorkflowNode[])
+    ) {
+      const queuedOk = await runBriefToIfcQueued({
+        nodes: nodes as WorkflowNode[],
+        executionId,
+        log,
+      });
+      setProgress(100);
+      completeExecution(queuedOk ? "success" : "failed");
+      if (queuedOk) {
+        toast.success("AI IFC generated", { duration: 4000 });
+        awardXP("workflow-run");
+      } else {
+        toast.error("AI IFC pipeline failed", { duration: 6000 });
+      }
+      return;
+    }
 
     // ── Initialize universal execution trace ──────────────────────────────
     // Captures every node's attempts, API calls, timings, and the data that
@@ -2289,6 +2328,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     currentWorkflow,
     isExecuting,
     isDemoMode,
+    briefToIfcV2QueueEnabled,
     startExecution,
     updateNodeStatus,
     setEdgeFlowing,

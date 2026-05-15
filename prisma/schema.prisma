@@ -46,33 +46,33 @@ model User {
   xp                     Int       @default(0)
   level                  Int       @default(1)
 
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  accounts             Account[]
-  achievements         UserAchievement[]
-  publications         CommunityPublication[]
-  communityVideos      CommunityVideo[]
-  executions           Execution[]
-  reviews              Review[]
-  sessions             Session[]
-  clones               WorkflowClone[]
-  feedbacks            Feedback[]
-  quantityCorrections  QuantityCorrection[]
-  workflows            Workflow[]
-  referralsSent        Referral[]             @relation("ReferralsSent")
-  referralsReceived    Referral[]             @relation("ReferralReceived")
-  supportConversations SupportConversation[]
-  liveChats            LiveChatConversation[] @relation("UserLiveChats")
-  videoShareLinks      VideoShareLink[]
-  videoLikes           CommunityVideoLike[]
-  survey               UserSurvey?
-  vipGenerations       VipGeneration[]
-  vipJobs              VipJob[]
-  videoJobs            VideoJob[]
-  briefRenderJobs      BriefRenderJob[]
-  canvasComments         CanvasComment[]  @relation("CanvasCommentAuthor")
-  resolvedCanvasComments CanvasComment[]  @relation("CanvasCommentResolver")
-  canvasGroups           CanvasGroup[]    @relation("CanvasGroupCreator")
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  accounts               Account[]
+  achievements           UserAchievement[]
+  publications           CommunityPublication[]
+  communityVideos        CommunityVideo[]
+  executions             Execution[]
+  reviews                Review[]
+  sessions               Session[]
+  clones                 WorkflowClone[]
+  feedbacks              Feedback[]
+  quantityCorrections    QuantityCorrection[]
+  workflows              Workflow[]
+  referralsSent          Referral[]             @relation("ReferralsSent")
+  referralsReceived      Referral[]             @relation("ReferralReceived")
+  supportConversations   SupportConversation[]
+  liveChats              LiveChatConversation[] @relation("UserLiveChats")
+  videoShareLinks        VideoShareLink[]
+  videoLikes             CommunityVideoLike[]
+  survey                 UserSurvey?
+  vipGenerations         VipGeneration[]
+  vipJobs                VipJob[]
+  videoJobs              VideoJob[]
+  briefRenderJobs        BriefRenderJob[]
+  canvasComments         CanvasComment[]        @relation("CanvasCommentAuthor")
+  resolvedCanvasComments CanvasComment[]        @relation("CanvasCommentResolver")
+  canvasGroups           CanvasGroup[]          @relation("CanvasGroupCreator")
 
   @@map("users")
 }
@@ -221,24 +221,24 @@ model TileInstance {
 }
 
 model Execution {
-  id           String          @id @default(cuid())
-  workflowId   String
-  userId       String
-  status       ExecutionStatus @default(PENDING)
-  startedAt    DateTime?
-  completedAt  DateTime?
-  tileResults  Json            @default("[]")
-  errorMessage String?
+  id            String          @id @default(cuid())
+  workflowId    String
+  userId        String
+  status        ExecutionStatus @default(PENDING)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  tileResults   Json            @default("[]")
+  errorMessage  String?
   // Per-execution UI/state metadata (e.g. quantityOverrides for Task 2,
   // videoGenProgress for Task 3). Nullable JSON column written via
   // PATCH /api/executions/[id]/metadata. Stays null for executions
   // created before this column existed.
-  metadata     Json?
-  createdAt    DateTime        @default(now())
-  artifacts    Artifact[]
+  metadata      Json?
+  createdAt     DateTime        @default(now())
+  artifacts     Artifact[]
   buildingModel BuildingModel?
-  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workflow     Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflow      Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([workflowId])
   @@index([userId])
@@ -254,14 +254,14 @@ model Execution {
 // through replica (r2Key); DB is the source of truth, R2 is for cheap
 // hot-reads + downstream pipelines (Phase 2 design agent input).
 model BuildingModel {
-  id           String   @id @default(cuid())
-  executionId  String   @unique
+  id           String    @id @default(cuid())
+  executionId  String    @unique
   execution    Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
   modelVersion String
   graph        Json
   r2Key        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([executionId])
   @@map("building_models")
@@ -1093,27 +1093,92 @@ model BriefRenderJob {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// Z.BRIEF_TO_IFC_V2 — Phase 2 queued AI IFC-creation pipeline
+// ═══════════════════════════════════════════════════════════════════
+// One row per wf-13 ("Brief → AI-Powered IFC") queued run. The worker
+// (QStash-invoked — src/app/api/brief-to-ifc-job/worker) advances the
+// job through three Opus-4.7 stages — enrich → architect → generate —
+// re-enqueuing itself between stages to reset Vercel's per-invocation
+// budget. Mirrors BriefRenderJob's status-machine + stage-log shape.
+// No formal `user` relation: a plain `userId` keeps this strictly
+// additive — no back-relation field on the User model.
+
+enum BriefToIfcJobStatus {
+  QUEUED
+  RUNNING_ENRICH
+  RUNNING_ARCHITECT
+  RUNNING_GENERATE
+  COMPLETED
+  FAILED
+  AWAITING_RETRY
+}
+
+model BriefToIfcJob {
+  id                String              @id @default(cuid())
+  userId            String
+  // Client-generated execution correlation id — links this job back to
+  // the canvas Execution trace. Not a foreign key.
+  executionId       String?
+  status            BriefToIfcJobStatus @default(QUEUED)
+  // R2 key/URL of the uploaded brief (PDF or DOCX).
+  briefFileR2Key    String
+  briefSourceFormat String?
+  // Stage 1 output — the enriched, tender-grade Markdown spec.
+  enrichedSpec      String?             @db.Text
+  // Stage 2 output — JSON-encoded ArchitectScriptData (python_code +
+  // expected_entity_count + summary + elements_emitted). Stage 3 parses
+  // it back; stored whole so a future refinement loop keeps full context.
+  architectScript   String?             @db.Text
+  // Stage 3 output — the generated IFC.
+  ifcR2Url          String?
+  ifcEntityCount    Int?
+  ifcAudit          Json?
+  progress          Int                 @default(0)
+  // Stable stage key — "enrich" | "architect" | "generate" (null while QUEUED).
+  currentStage      String?
+  // BriefToIfcStageLogEntry[] — written incrementally by the worker.
+  stageLog          Json?
+  // { code, message, stage } on failure.
+  error             Json?
+  // Global transient-retry counter across the whole job.
+  attempts          Int                 @default(0)
+  // Worker lock — set when a worker claims a stage, cleared on stage
+  // success/failure. Guards against QStash at-least-once double-delivery
+  // running the same stage twice. A lock older than the stage timeout is
+  // considered stale and reclaimable / swept by the cleanup cron.
+  lockedAt          DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("brief_to_ifc_jobs")
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // Z.CANVAS.SCHEMA — Canvas Collaboration Models
 // ═══════════════════════════════════════════════════════════════════
 
 model CanvasComment {
   id           String          @id @default(cuid())
   workflowId   String
-  workflow     Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflow     Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   authorId     String
-  author       User             @relation("CanvasCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  author       User            @relation("CanvasCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   parentId     String?
-  parent       CanvasComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies      CanvasComment[]  @relation("CommentReplies")
-  body         String           @db.Text
+  parent       CanvasComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      CanvasComment[] @relation("CommentReplies")
+  body         String          @db.Text
   mentions     String[]
   positionX    Float
   positionY    Float
   resolvedAt   DateTime?
   resolvedById String?
-  resolvedBy   User?            @relation("CanvasCommentResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  resolvedBy   User?           @relation("CanvasCommentResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   @@index([workflowId])
   @@index([authorId])
@@ -1124,7 +1189,7 @@ model CanvasComment {
 model CanvasGroup {
   id          String   @id @default(cuid())
   workflowId  String
-  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   label       String   @default("Group")
   color       String   @default("purple")
   positionX   Float

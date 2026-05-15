@@ -42,6 +42,11 @@ export interface WorkflowTemplate {
    *  user's role via canAccessTemplate() — see
    *  src/features/billing/lib/template-access.ts. */
   requiredTier?: "FREE" | "MINI" | "STARTER" | "PRO" | "TEAM";
+  /** Execution model. Default (undefined) is the synchronous canvas
+   *  node-loop. `"queued"` routes the workflow through the async
+   *  QStash-backed pipeline instead — see useExecution.ts's wf-13 branch
+   *  and src/features/ifc/services/brief-to-ifc-v2/. */
+  executionMode?: "sync" | "queued";
 }
 
 export interface CommunityPublication {

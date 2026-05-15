@@ -184,6 +184,40 @@ export async function scheduleBriefRenderCompileWorker(
   return result.messageId;
 }
 
+// ─── Brief-to-IFC v2 (Phase 2 queued pipeline) ──────────────────────
+
+/**
+ * Schedule the Brief-to-IFC v2 worker for a job. QStash POSTs to
+ * `/api/brief-to-ifc-job/worker` with `{ jobId }`. Used both to kick off
+ * a freshly-created job AND by the worker to re-enqueue itself between
+ * the three stages (enrich → architect → generate) so each stage gets a
+ * fresh Vercel per-invocation budget.
+ *
+ * Mirrors `scheduleBriefRenderWorker` — `retries: 0` (the worker owns its
+ * own idempotent retries via atomic claims), `timeout: "10m"`. `delay`
+ * (seconds) backs off transient-failure re-enqueues.
+ */
+export async function scheduleBriefToIfcWorker(
+  jobId: string,
+  options: { delay?: number } = {},
+): Promise<string> {
+  const client = getClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const workerUrl = `${appUrl}/api/brief-to-ifc-job/worker`;
+
+  const result = await client.publishJSON({
+    url: workerUrl,
+    body: { jobId },
+    retries: 0,
+    timeout: "10m",
+    ...(typeof options.delay === "number" && options.delay > 0
+      ? { delay: options.delay }
+      : {}),
+  });
+
+  return result.messageId;
+}
+
 /**
  * Verify that a request came from QStash (signature validation).
  * Returns true if valid, false otherwise.
