@@ -53,7 +53,16 @@ export function getPlanValueEUR(role: string | null | undefined): number {
 /**
  * Deterministic event_id for Purchase dedup between client pixel and server CAPI.
  * Both sides derive the same id from userId + normalized plan, so Meta dedups.
+ *
+ * `TEAM` and `TEAM_ADMIN` are the SAME tier. The Stripe/Razorpay webhooks resolve
+ * the role to `TEAM_ADMIN`, but the browser thank-you redirect can carry the bare
+ * `TEAM` URL param (the dashboard normalizes `TEAM_ADMIN → TEAM` for display).
+ * Collapse the alias to one canonical key here so the browser pixel and the
+ * server CAPI fire can never disagree on the event_id — a mismatch would make
+ * Meta count every Team purchase twice.
  */
 export function getPurchaseEventId(userId: string, plan: string): string {
-  return `purchase_${userId}_${plan.toUpperCase()}`;
+  const upper = plan.toUpperCase();
+  const normalized = upper === "TEAM" ? "TEAM_ADMIN" : upper;
+  return `purchase_${userId}_${normalized}`;
 }
