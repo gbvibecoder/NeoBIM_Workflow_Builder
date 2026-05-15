@@ -45,11 +45,24 @@ class ExecuteBuilderScriptRequest(BaseModel):
 
 
 class SandboxLog(BaseModel):
-    """Captured subprocess diagnostics. stdout/stderr are tail-truncated."""
+    """Captured subprocess diagnostics. stdout/stderr are tail-truncated.
+
+    Phase 3: added `stderr_line_count` and `runtime_seconds` so the
+    self-heal repair Opus call (TypeScript side) and the canvas error
+    artifact have the full diagnostic surface they need without parsing
+    the tail themselves.
+    """
 
     stdout_tail: str
     stderr_tail: str
     exit_code: int
+    # Phase 3 — number of newline-terminated lines in the FULL stderr the
+    # subprocess produced (i.e. *before* tail-truncation). Lets the UI say
+    # "10 stderr lines, last 16 KB shown" honestly even when stderr was
+    # larger than the tail window.
+    stderr_line_count: int = 0
+    # Phase 3 — wall-clock seconds spent inside the subprocess.
+    runtime_seconds: float = 0.0
 
 
 class SandboxAudit(BaseModel):

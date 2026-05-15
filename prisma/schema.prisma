@@ -1147,6 +1147,24 @@ model BriefToIfcJob {
   // running the same stage twice. A lock older than the stage timeout is
   // considered stale and reclaimable / swept by the cleanup cron.
   lockedAt          DateTime?
+  // Phase 3 — self-heal diagnostics ─────────────────────────────────
+  // Full Python traceback (stderr_tail) from the last failing sandbox
+  // run, kept VERBATIM so the user / repair Opus can pinpoint the bug.
+  errorTraceback    String?             @db.Text
+  // Compact classifier ("IFCOPENSHELL_RUNTIME_ERROR" | "INVALID_IFC" |
+  // "MISSING_OUTPUT" | "SANDBOX_TIMEOUT" | ...). Distinct from
+  // `error.code` because that's the whole-stage error code; this is
+  // the inner sandbox/script failure label.
+  errorType         String?
+  // Stage-3 self-heal attempt counter (DISTINCT from the global
+  // `attempts` transient-retry counter above). 0 → not yet attempted;
+  // 1-3 → which of the up-to-three attempts we're on / finished on.
+  attemptCount      Int                 @default(0)
+  // BriefToIfcRetryAttempt[] — one entry per sandbox attempt, with
+  // full scriptCode (so any failed version is downloadable), exit
+  // code, durationMs, traceback. The original architect script is
+  // retryHistory[0]; subsequent entries are Opus repair outputs.
+  retryHistory      Json?
   startedAt         DateTime?
   completedAt       DateTime?
   createdAt         DateTime            @default(now())

@@ -26,6 +26,7 @@ import type {
   BriefToIfcStageLogEntry,
   BriefToIfcJobError,
   BriefToIfcAudit,
+  BriefToIfcRetryAttempt,
 } from "@/features/ifc/services/brief-to-ifc-v2/job-types";
 
 const NOT_AVAILABLE_ERROR = {
@@ -91,6 +92,39 @@ function coerceAudit(raw: unknown): BriefToIfcAudit | null {
   return { total_entities: a.total_entities, by_class: byClass };
 }
 
+/** Phase 3 — `BriefToIfcJob.retryHistory` is `BriefToIfcRetryAttempt[]`. */
+function coerceRetryHistory(raw: unknown): BriefToIfcRetryAttempt[] {
+  if (!Array.isArray(raw)) return [];
+  const out: BriefToIfcRetryAttempt[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const e = item as Record<string, unknown>;
+    if (
+      typeof e.attempt !== "number" ||
+      (e.status !== "succeeded" && e.status !== "failed") ||
+      typeof e.scriptCode !== "string"
+    ) {
+      continue;
+    }
+    out.push({
+      attempt: e.attempt,
+      status: e.status,
+      scriptCode: e.scriptCode,
+      scriptLength:
+        typeof e.scriptLength === "number"
+          ? e.scriptLength
+          : e.scriptCode.length,
+      durationMs: typeof e.durationMs === "number" ? e.durationMs : 0,
+      errorType: typeof e.errorType === "string" ? e.errorType : null,
+      errorTraceback:
+        typeof e.errorTraceback === "string" ? e.errorTraceback : null,
+      sandboxExitCode:
+        typeof e.sandboxExitCode === "number" ? e.sandboxExitCode : null,
+    });
+  }
+  return out;
+}
+
 // ─── GET ────────────────────────────────────────────────────────────
 
 export async function GET(
@@ -122,10 +156,15 @@ export async function GET(
       currentStage: true,
       stageLog: true,
       enrichedSpec: true,
+      architectScript: true,
       ifcR2Url: true,
       ifcEntityCount: true,
       ifcAudit: true,
       error: true,
+      errorTraceback: true,
+      errorType: true,
+      attemptCount: true,
+      retryHistory: true,
       createdAt: true,
       updatedAt: true,
       completedAt: true,
@@ -145,10 +184,15 @@ export async function GET(
     currentStage: job.currentStage,
     stageLog: coerceStageLog(job.stageLog),
     enrichedSpec: job.enrichedSpec,
+    architectScript: job.architectScript,
     ifcR2Url: job.ifcR2Url,
     ifcEntityCount: job.ifcEntityCount,
     ifcAudit: coerceAudit(job.ifcAudit),
     error: coerceJobError(job.error),
+    errorTraceback: job.errorTraceback,
+    errorType: job.errorType,
+    attemptCount: job.attemptCount,
+    retryHistory: coerceRetryHistory(job.retryHistory),
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
     completedAt: job.completedAt?.toISOString() ?? null,

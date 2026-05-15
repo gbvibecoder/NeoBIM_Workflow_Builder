@@ -64,7 +64,10 @@ RLIMIT_CPU_SECONDS = 60  # 60 s CPU time
 RLIMIT_FSIZE_BYTES = 100 * 1024 * 1024  # 100 MB max single-file write
 WALL_TIMEOUT_SECONDS = 120  # hard wall-clock cap
 MAX_OUTPUT_IFC_BYTES = 50 * 1024 * 1024  # app-level cap on the produced IFC
-STDIO_TAIL_BYTES = 8 * 1024  # tail of stdout / stderr kept for diagnostics
+# Phase 3: bumped 8 KB → 16 KB so the FULL ifcopenshell traceback (typically
+# 30-50 frames, ~200 chars/line) survives intact for the self-heal repair
+# Opus call — truncating mid-traceback would hide the root cause.
+STDIO_TAIL_BYTES = 16 * 1024  # tail of stdout / stderr kept for diagnostics
 OUTPUT_FILENAME = "output.ifc"  # the script MUST write exactly this, in cwd
 SCRIPT_FILENAME = "script.py"
 
@@ -221,8 +224,10 @@ def execute_builder_script(
             )
         except subprocess.TimeoutExpired as exc:
             elapsed_ms = round((time.monotonic() - start) * 1000)
-            stdout_tail = (exc.stdout or "")[-STDIO_TAIL_BYTES:]
-            stderr_tail = (exc.stderr or "")[-STDIO_TAIL_BYTES:]
+            stdout_full = exc.stdout if isinstance(exc.stdout, str) else ""
+            stderr_full = exc.stderr if isinstance(exc.stderr, str) else ""
+            stdout_tail = stdout_full[-STDIO_TAIL_BYTES:]
+            stderr_tail = stderr_full[-STDIO_TAIL_BYTES:]
             log.warning(
                 "builder_script_timeout",
                 request_id=rid,
@@ -233,22 +238,24 @@ def execute_builder_script(
                 ERR_TIMEOUT,
                 f"Script exceeded the {WALL_TIMEOUT_SECONDS}s wall-clock budget.",
                 SandboxLog(
-                    stdout_tail=stdout_tail
-                    if isinstance(stdout_tail, str)
-                    else "",
-                    stderr_tail=stderr_tail
-                    if isinstance(stderr_tail, str)
-                    else "",
+                    stdout_tail=stdout_tail,
+                    stderr_tail=stderr_tail,
                     exit_code=-1,
+                    stderr_line_count=stderr_full.count("\n"),
+                    runtime_seconds=elapsed_ms / 1000.0,
                 ),
                 elapsed_ms,
             )
 
         elapsed_ms = round((time.monotonic() - start) * 1000)
+        stdout_full = proc.stdout or ""
+        stderr_full = proc.stderr or ""
         sandbox_log = SandboxLog(
-            stdout_tail=(proc.stdout or "")[-STDIO_TAIL_BYTES:],
-            stderr_tail=(proc.stderr or "")[-STDIO_TAIL_BYTES:],
+            stdout_tail=stdout_full[-STDIO_TAIL_BYTES:],
+            stderr_tail=stderr_full[-STDIO_TAIL_BYTES:],
             exit_code=proc.returncode,
+            stderr_line_count=stderr_full.count("\n"),
+            runtime_seconds=elapsed_ms / 1000.0,
         )
 
         # ── Non-zero exit → the script raised ─────────────────────────

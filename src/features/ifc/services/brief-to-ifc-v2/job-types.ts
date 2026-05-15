@@ -49,6 +49,56 @@ export const BRIEF_TO_IFC_MAX_ATTEMPTS = 3;
 /** Backoff (seconds) for transient-failure re-enqueues, indexed by attempt-1. */
 export const BRIEF_TO_IFC_RETRY_BACKOFF_SECONDS = [10, 30, 60] as const;
 
+/**
+ * Phase 3 — self-heal budgets for Stage 3 (sandbox + Opus repair).
+ *
+ * `BRIEF_TO_IFC_STAGE_3_MAX_ATTEMPTS = 3` ⇒ at most 1 original run + 2
+ * Opus-repair iterations. Worst-case timeline under the 800 s worker
+ * budget (Vercel Fluid Compute):
+ *
+ *   sandbox₁ 120 s + repair₁ 200 s + sandbox₂ 120 s + repair₂ 200 s + sandbox₃ 120 s
+ *   = 760 s  ⟶ ~40 s margin under the 800 s wall.
+ *
+ * The repair Opus timeout is intentionally TIGHTER than Stage 1/2's 540 s
+ * because a repair is a focused fix of a ~12 KB script, not authoring
+ * from scratch — Opus typically lands a repair in 30-90 s; 200 s is a
+ * generous ceiling that still fits three attempts in one worker
+ * invocation.
+ */
+export const BRIEF_TO_IFC_STAGE_3_MAX_ATTEMPTS = 3;
+/** Per-call wall-clock cap for the repair Opus message stream. */
+export const BRIEF_TO_IFC_REPAIR_TIMEOUT_MS = 200_000;
+/** `max_tokens` for the repair Opus call. A repaired script is the same
+ *  size as the original — 48 k is plenty and matches the Phase 1 architect's
+ *  ceiling for comparable output. */
+export const BRIEF_TO_IFC_REPAIR_MAX_TOKENS = 48_000;
+/** Stage-wide wall-clock budget; if exceeded the loop bails before the
+ *  next attempt rather than risk the Vercel 800 s hard kill. */
+export const BRIEF_TO_IFC_STAGE_3_WALL_BUDGET_MS = 700_000;
+
+/** One row in `BriefToIfcJob.retryHistory`. `retryHistory[0]` is always
+ *  the original architect script's run; entries 1+ are Opus-repair
+ *  outputs. `scriptCode` is the full Python the sandbox ran (so any
+ *  failed version is downloadable from the canvas error artifact). */
+export interface BriefToIfcRetryAttempt {
+  /** 1-indexed attempt number. */
+  attempt: number;
+  /** "succeeded" — sandbox produced a valid IFC; "failed" — anything else. */
+  status: "succeeded" | "failed";
+  /** Full Python source the sandbox ran on this attempt. */
+  scriptCode: string;
+  /** `scriptCode.length` — handy for the UI without re-counting. */
+  scriptLength: number;
+  /** Wall-clock ms the sandbox actually spent on this run. */
+  durationMs: number;
+  /** Inner failure label ("IFCOPENSHELL_RUNTIME_ERROR" | …) or `null` on success. */
+  errorType: string | null;
+  /** Full Python traceback tail (stderr_tail) or `null` on success. */
+  errorTraceback: string | null;
+  /** Sandbox exit code (-1 on wall-clock timeout). `null` on success. */
+  sandboxExitCode: number | null;
+}
+
 /** Per-stage lifecycle status inside a stage-log entry. */
 export type BriefToIfcStageStatus = "running" | "success" | "failed";
 
@@ -88,10 +138,22 @@ export interface BriefToIfcJobView {
   currentStage: string | null;
   stageLog: BriefToIfcStageLogEntry[];
   enrichedSpec: string | null;
+  /** Phase 3 — the full JSON-encoded ArchitectScriptData (python_code +
+   *  expected_entity_count + summary + elements_emitted). The client
+   *  parses out `python_code` to render / download the script. */
+  architectScript: string | null;
   ifcR2Url: string | null;
   ifcEntityCount: number | null;
   ifcAudit: BriefToIfcAudit | null;
   error: BriefToIfcJobError | null;
+  /** Phase 3 — last failing sandbox traceback (verbatim stderr tail). */
+  errorTraceback: string | null;
+  /** Phase 3 — inner sandbox failure label, e.g. `IFCOPENSHELL_RUNTIME_ERROR`. */
+  errorType: string | null;
+  /** Phase 3 — how many Stage-3 attempts have run (0 if pre-Stage-3). */
+  attemptCount: number;
+  /** Phase 3 — one entry per Stage-3 sandbox attempt. */
+  retryHistory: BriefToIfcRetryAttempt[];
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;

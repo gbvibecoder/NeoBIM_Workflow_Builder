@@ -230,8 +230,125 @@ function buildEnrichedSpecArtifact(
     executionId,
     tileInstanceId: tr024.id,
     type: "text",
-    data: { content: spec, label: "Enriched Spec" },
+    data: {
+      content: spec,
+      label: "Enriched Spec",
+      // Phase 3 — hints for the artifact viewer / downloader.
+      language: "markdown",
+      downloadFileName: `enriched-spec-${view.id.slice(0, 12)}.md`,
+      kind: "document",
+    },
     metadata: { real: true, jobId: view.id, charCount: spec.length },
+    createdAt: new Date(),
+  };
+}
+
+/** Build the TR-022 architect-script text artifact. `architectScript` is a
+ *  JSON-encoded `ArchitectScriptData`; this extracts `python_code` for
+ *  display + download. Returns `null` when the column is empty. */
+function buildArchitectScriptArtifact(
+  view: BriefToIfcJobView,
+  executionId: string,
+  tr022: WorkflowNode,
+): ExecutionArtifact | null {
+  const raw = view.architectScript ?? "";
+  if (!raw) return null;
+  let pythonCode = raw;
+  let scriptSummary = "";
+  let expectedCount = 0;
+  try {
+    const parsed = JSON.parse(raw) as {
+      python_code?: unknown;
+      summary?: unknown;
+      expected_entity_count?: unknown;
+    };
+    if (parsed && typeof parsed.python_code === "string") {
+      pythonCode = parsed.python_code;
+    }
+    if (typeof parsed.summary === "string") scriptSummary = parsed.summary;
+    if (typeof parsed.expected_entity_count === "number") {
+      expectedCount = parsed.expected_entity_count;
+    }
+  } catch {
+    // `raw` isn't valid JSON — treat the whole thing as the code body.
+    // Defensive: this case shouldn't happen for jobs created by Phase 2+.
+  }
+  return {
+    id: generateId(),
+    executionId,
+    tileInstanceId: tr022.id,
+    type: "text",
+    data: {
+      content: pythonCode,
+      label: "IFC Builder Script",
+      language: "python",
+      summary: scriptSummary,
+      downloadFileName: `ifc-builder-${view.id.slice(0, 12)}.py`,
+      kind: "code",
+    },
+    metadata: {
+      real: true,
+      jobId: view.id,
+      charCount: pythonCode.length,
+      expectedEntityCount: expectedCount,
+    },
+    createdAt: new Date(),
+  };
+}
+
+/** Phase 3 — build a rich error artifact for the failing node. Embeds the
+ *  full traceback in `data.content`, and the retry history (with every
+ *  failed script version's full code) in `metadata.retryHistory` so the
+ *  canvas / result-showcase can render a per-attempt download list. */
+function buildFailureArtifact(
+  view: BriefToIfcJobView,
+  executionId: string,
+  failingNodeId: string,
+  catalogueId: string,
+): ExecutionArtifact {
+  const traceback = view.errorTraceback ?? "";
+  const errorMessage = view.error?.message ?? "AI IFC pipeline failed.";
+  const errorCode = view.error?.code ?? null;
+  const attemptsRan = view.attemptCount || view.retryHistory.length || 0;
+  const stage3MaxAttempts = 3; // matches BRIEF_TO_IFC_STAGE_3_MAX_ATTEMPTS
+  const isStage3 = catalogueId === "EX-006";
+  const label = isStage3
+    ? `${catalogueId} — Failed (${attemptsRan} of ${stage3MaxAttempts} attempts)`
+    : `${catalogueId} — Failed`;
+
+  // Body of the artifact = traceback when present, message otherwise.
+  // Multi-section text so the result-showcase / file-viewer can render
+  // it as one scrollable block without parsing JSON.
+  const body =
+    `# ${label}\n\n` +
+    `Error: ${errorMessage}` +
+    (errorCode ? `\nCode:  ${errorCode}` : "") +
+    (view.errorType ? `\nKind:  ${view.errorType}` : "") +
+    (traceback ? `\n\n--- Python traceback (sandbox stderr tail) ---\n${traceback}` : "");
+
+  return {
+    id: generateId(),
+    executionId,
+    tileInstanceId: failingNodeId,
+    type: "text",
+    data: {
+      content: body,
+      label,
+      kind: "error",
+      downloadFileName: `error-${view.id.slice(0, 12)}.log`,
+    },
+    metadata: {
+      real: true,
+      jobId: view.id,
+      errorCode,
+      errorType: view.errorType,
+      errorMessage,
+      attemptCount: attemptsRan,
+      // Full retry history with every attempt's complete script code —
+      // the canvas / showcase can offer each as a downloadable .py file.
+      retryHistory: view.retryHistory,
+      tracebackLineCount: traceback ? traceback.split("\n").length : 0,
+    },
     createdAt: new Date(),
   };
 }
@@ -243,6 +360,25 @@ function failingNodeId(view: BriefToIfcJobView, n: Wf13Nodes): string {
   if (stage === "architect") return n.tr022.id;
   if (stage === "generate") return n.ex006.id;
   return n.ex006.id;
+}
+
+/** Short summary string for the canvas `node.data.errorMessage` tooltip.
+ *  ~200 chars — fits the 280px BaseNode tooltip width while still being
+ *  actionable. The full diagnostic lives in the artifact, not here. */
+function buildShortErrorMessage(
+  view: BriefToIfcJobView,
+  catalogueId: string,
+): string {
+  const code = view.error?.code ?? view.errorType ?? "FAILED";
+  const attemptsRan = view.attemptCount || view.retryHistory.length || 0;
+  if (catalogueId === "EX-006" && attemptsRan > 0) {
+    return (
+      `${code} after ${attemptsRan} of 3 attempts. ` +
+      `Click View Results for the full traceback and failed-script versions.`
+    );
+  }
+  const message = view.error?.message ?? "AI IFC pipeline failed.";
+  return message.length > 200 ? `${message.slice(0, 197)}…` : message;
 }
 
 /**
@@ -363,6 +499,57 @@ export async function runBriefToIfcQueued(
   log("info", "AI IFC pipeline queued", `job ${jobId}`);
 
   // ── 3. Poll until terminal, driving canvas statuses ────────────────
+  // Phase 3 — publish each upstream-stage artifact AS SOON AS the server
+  // has written its output, not at the terminal COMPLETED branch. This
+  // means the user sees the enriched spec on TR-024 the moment Stage 2
+  // kicks off; the builder script on TR-022 the moment Stage 3 kicks
+  // off; etc. `publishedSpec` / `publishedScript` flags make publication
+  // idempotent — the poll loop fires every 4-15s but each artifact is
+  // added to the store exactly once.
+  let publishedSpec = false;
+  let publishedScript = false;
+
+  const publishSpecIfReady = (view: BriefToIfcJobView) => {
+    if (publishedSpec || !view.enrichedSpec) return;
+    const artifact = buildEnrichedSpecArtifact(view, executionId, tr024);
+    es.addArtifact(tr024.id, artifact);
+    es.addTileResult({
+      tileInstanceId: tr024.id,
+      catalogueId: "TR-024",
+      status: "success",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      artifact,
+    });
+    publishedSpec = true;
+    log(
+      "success",
+      "Brief enriched",
+      `${view.enrichedSpec.length.toLocaleString()} chars`,
+    );
+  };
+
+  const publishScriptIfReady = (view: BriefToIfcJobView) => {
+    if (publishedScript || !view.architectScript) return;
+    const artifact = buildArchitectScriptArtifact(view, executionId, tr022);
+    if (!artifact) return;
+    es.addArtifact(tr022.id, artifact);
+    es.addTileResult({
+      tileInstanceId: tr022.id,
+      catalogueId: "TR-022",
+      status: "success",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      artifact,
+    });
+    publishedScript = true;
+    const charCount =
+      (artifact.metadata.charCount as number | undefined) ??
+      (artifact.data as { content?: string }).content?.length ??
+      0;
+    log("success", "IFC builder script authored", `${charCount.toLocaleString()} chars`);
+  };
+
   const startedAt = Date.now();
   while (true) {
     const elapsed = Date.now() - startedAt;
@@ -398,6 +585,10 @@ export async function runBriefToIfcQueued(
 
     if (!isBriefToIfcTerminal(view.status)) {
       applyStatusToCanvas(view, wf13);
+      // Phase 3 — publish each stage's artifact as soon as the server
+      // has its output, not at the terminal branch.
+      publishSpecIfReady(view);
+      publishScriptIfReady(view);
       await sleep(pollIntervalMs(elapsed));
       continue;
     }
@@ -410,16 +601,10 @@ export async function runBriefToIfcQueued(
       ws.updateNodeStatus(tr022.id, "success");
       ws.updateNodeStatus(ex006.id, "success");
 
-      const specArtifact = buildEnrichedSpecArtifact(view, executionId, tr024);
-      es.addArtifact(tr024.id, specArtifact);
-      es.addTileResult({
-        tileInstanceId: tr024.id,
-        catalogueId: "TR-024",
-        status: "success",
-        startedAt: now,
-        completedAt: now,
-        artifact: specArtifact,
-      });
+      // Idempotent — these publish ONLY if the corresponding flag is
+      // still false (i.e. the poll loop never saw the data mid-flight).
+      publishSpecIfReady(view);
+      publishScriptIfReady(view);
 
       const ifcArtifact = buildIfcArtifact(view, executionId, ex006);
       es.addArtifact(ex006.id, ifcArtifact);
@@ -442,6 +627,12 @@ export async function runBriefToIfcQueued(
     }
 
     // FAILED
+    // Surface any upstream stage that DID succeed before the failure —
+    // a Stage-3 failure should still leave the enriched spec + builder
+    // script downloadable on TR-024 / TR-022.
+    publishSpecIfReady(view);
+    publishScriptIfReady(view);
+
     const failNodeId = failingNodeId(view, wf13);
     const failCatalogueId =
       failNodeId === tr024.id
@@ -450,16 +641,34 @@ export async function runBriefToIfcQueued(
           ? "TR-022"
           : "EX-006";
     ws.updateNodeStatus(failNodeId, "error");
-    const errMsg = view.error?.message ?? "The AI IFC pipeline failed.";
-    log("error", "AI IFC pipeline failed", `${view.error?.code ?? ""} ${errMsg}`);
+
+    // Phase 3 — short message for the BaseNode tooltip, full diagnostic
+    // in the artifact for the result-showcase / future error panel.
+    const shortMsg = buildShortErrorMessage(view, failCatalogueId);
+    ws.updateNodeError(failNodeId, shortMsg);
+
+    const failureArtifact = buildFailureArtifact(
+      view,
+      executionId,
+      failNodeId,
+      failCatalogueId,
+    );
+    es.addArtifact(failNodeId, failureArtifact);
     es.addTileResult({
       tileInstanceId: failNodeId,
       catalogueId: failCatalogueId,
       status: "error",
       startedAt: new Date(),
       completedAt: new Date(),
-      errorMessage: errMsg,
+      errorMessage: shortMsg,
+      artifact: failureArtifact,
     });
+
+    log(
+      "error",
+      "AI IFC pipeline failed",
+      `${view.error?.code ?? view.errorType ?? ""} ${view.error?.message ?? ""}`.trim(),
+    );
     return false;
   }
 }

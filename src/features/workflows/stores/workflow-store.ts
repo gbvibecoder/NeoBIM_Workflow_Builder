@@ -69,6 +69,11 @@ interface WorkflowState {
   removeNode: (nodeId: string) => void;
   updateNode: (nodeId: string, updates: Partial<WorkflowNode>) => void;
   updateNodeStatus: (nodeId: string, status: NodeStatus) => void;
+  /** Phase 3 — set the short error summary that BaseNode's tooltip
+   *  displays when `status === "error"`. Pass `null` to clear it (e.g.
+   *  on a retry that succeeds). Distinct from `updateNodeStatus` so a
+   *  caller can update only the message without touching status. */
+  updateNodeError: (nodeId: string, errorMessage: string | null) => void;
   setNodes: (nodes: WorkflowNode[]) => void;
 
   // Edge operations
@@ -276,6 +281,15 @@ export const useWorkflowStore = create<WorkflowState>()(
         nodes: state.nodes.map((n) =>
           n.id === nodeId
             ? { ...n, data: { ...n.data, status } }
+            : n
+        ),
+      })),
+
+    updateNodeError: (nodeId, errorMessage) =>
+      set((state) => ({
+        nodes: state.nodes.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, errorMessage: errorMessage ?? undefined } }
             : n
         ),
       })),
