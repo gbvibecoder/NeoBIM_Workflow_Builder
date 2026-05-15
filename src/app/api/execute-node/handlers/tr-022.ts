@@ -48,8 +48,12 @@ const ARCHITECT_MAX_TOKENS = 48_000;
 /** Wall-clock cap for the Anthropic call — Opus authoring a full script is
  *  the slowest node in the pipeline. Phase 1.5: raised from 280s to 540s to
  *  use the route's 600s maxDuration budget (with headroom for response
- *  handling) so a slow-but-working call isn't aborted prematurely. */
-const ARCHITECT_TIMEOUT_MS = 540_000;
+ *  handling) so a slow-but-working call isn't aborted prematurely.
+ *  Phase 2.2: raised 540 → 580s — matches the TR-024 bump and keeps the
+ *  handler's own abort firing 20s inside Vercel's 600s ceiling so the
+ *  user sees SCRIPT_TRUNCATED / ARCHITECT_FAILED instead of the platform's
+ *  bare "Request was aborted." */
+const ARCHITECT_TIMEOUT_MS = 580_000;
 /** Below this the upstream "spec" is too thin to author an IFC from. */
 const MIN_SPEC_CHARS = 50;
 

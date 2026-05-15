@@ -50,8 +50,13 @@ const ENRICHER_MAX_TOKENS = 48_000;
 /** Wall-clock cap for the Anthropic call. Phase 1.5: raised from 180s — the
  *  180s AbortSignal was the actual cause of the prod "Request was aborted"
  *  failure. 540s uses the route's 600s maxDuration budget while leaving
- *  headroom for brief extraction + response handling. */
-const ENRICHER_TIMEOUT_MS = 540_000;
+ *  headroom for brief extraction + response handling.
+ *  Phase 2.2: raised 540 → 580s. SOL-class enrichments hit the wall right
+ *  at 540, and the 60s gap to Vercel's 600s ceiling was big enough that
+ *  the platform's bare "Request was aborted" sometimes beat the handler's
+ *  own clean ENRICHMENT_TIMEOUT message. 20s headroom is enough for
+ *  response serialization back through the platform. */
+const ENRICHER_TIMEOUT_MS = 580_000;
 /** Below this the "brief" is too short to be a real brief. */
 const MIN_BRIEF_CHARS = 100;
 

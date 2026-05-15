@@ -119,6 +119,11 @@ function isAuthorizedBriefUrl(briefUrl: string): boolean {
 // ─── POST /api/brief-to-ifc-job ─────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Phase 2.2: one-line "I was reached" beacon. If this line never appears
+  // in Vercel logs for a wf-13 run, the canvas dispatched on the SYNC path
+  // (the `/api/execute-node` node-loop) — i.e. the client never even tried
+  // the queued endpoint. Confirms the canary axis of the dispatch decision.
+  console.log("[brief-to-ifc-job POST] received request — canary check downstream");
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), {

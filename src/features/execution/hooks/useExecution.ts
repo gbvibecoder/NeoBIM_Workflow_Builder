@@ -1601,10 +1601,17 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     // driving the four canvas node statuses and publishing the final
     // artifacts itself. The synchronous node-loop below is the parallel-
     // alive Phase 1 path used whenever the flag is off.
-    if (
-      briefToIfcV2QueueEnabled &&
-      isBriefToIfcV2Composition(nodes as WorkflowNode[])
-    ) {
+    //
+    // Phase 2.2: log each axis of the dispatch decision so a SYNC-vs-QUEUE
+    // misroute is diagnosable from browser dev tools without a redeploy.
+    const queueEnabled = briefToIfcV2QueueEnabled;
+    const isComposition = isBriefToIfcV2Composition(nodes as WorkflowNode[]);
+    console.log(
+      "[wf-13 dispatch] canary.enabled=", queueEnabled,
+      "composition.matched=", isComposition,
+      "→ path=", queueEnabled && isComposition ? "QUEUE" : "SYNC",
+    );
+    if (queueEnabled && isComposition) {
       const queuedOk = await runBriefToIfcQueued({
         nodes: nodes as WorkflowNode[],
         executionId,
