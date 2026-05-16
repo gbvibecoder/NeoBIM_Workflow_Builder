@@ -53,10 +53,15 @@ playwright-report/
 blob-report/
 tests/floor-plan/snapshots/snapshot-*.json
 
-# Logs
+# Logs — root-anchored so we only ignore the top-level runtime log dirs.
+# An UNanchored `logs/` matches any directory named `logs` ANYWHERE in
+# the tree, which silently swallows Next.js route segments whose URL
+# path includes `/logs` (e.g. `src/app/api/brief-to-ifc/v3/runs/[id]/logs/`).
+# Git can't recurse into excluded dirs, so `!path/to/logs/` negations
+# don't rescue files inside them — root-anchoring is the only safe fix.
 *.log
-logs/
-analytics-logs/
+/logs/
+/analytics-logs/
 
 # Generated files (AI tools, reports, scripts)
 *.sh
