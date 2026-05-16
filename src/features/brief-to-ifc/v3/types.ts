@@ -116,6 +116,55 @@ export interface SandboxExecResult {
   duration_ms: number;
 }
 
+export interface SandboxWorldBboxValidation {
+  verdict:
+    | "OK"
+    | "SCALED_TOO_SMALL"
+    | "SCALED_TOO_LARGE"
+    | "COLLAPSED_AT_ORIGIN"
+    | "OUT_OF_RANGE"
+    | "EMPTY"
+    | "ERROR";
+  expected_extent: [number, number, number] | null;
+  actual_bbox: {
+    xmin: number; ymin: number; zmin: number;
+    xmax: number; ymax: number; zmax: number;
+  } | null;
+  actual_extent: [number, number, number] | null;
+  extent_ratio: [number, number, number] | null;
+  suggested_unit_fix: string | null;
+  error?: string;
+}
+
+export interface SandboxSpacePolygonValidation {
+  space_id: string;
+  verdict: "OK" | "MISSING" | "MISMATCH" | "NO_POLYGON_REP" | "NO_EXPECTED_POLYGON" | "ERROR";
+  expected_polygon: [number, number][];
+  actual_polygon: [number, number][] | null;
+  max_vertex_delta_m: number | null;
+  error?: string;
+}
+
+export interface SandboxElementCoverageValidation {
+  verdict: "OK" | "MISSING_ELEMENTS" | "ERROR";
+  total_expected: number;
+  total_actual_in_expected_classes: number;
+  by_class_expected: Record<string, number>;
+  by_class_actual: Record<string, number>;
+  missing_ids: { id: string; expected_class: string }[];
+  missing_id_count: number;
+  error?: string;
+}
+
+export interface SandboxOriginCollapseValidation {
+  verdict: "OK" | "COLLAPSED" | "NO_ELEMENTS" | "ERROR";
+  total_elements: number;
+  at_origin_count: number;
+  fraction_at_origin: number;
+  collapsed: boolean;
+  error?: string;
+}
+
 export interface SandboxValidateResult {
   session_id: string;
   schema_name: string | null;
@@ -127,6 +176,11 @@ export interface SandboxValidateResult {
   web_ifc_load_test: "PASS" | "FAIL" | "SKIP";
   ascii_only: boolean;
   ascii_first_bad_offset: number | null;
+  // Brief-aware visual validators (null when no brief on session).
+  world_bbox: SandboxWorldBboxValidation | null;
+  space_polygons: SandboxSpacePolygonValidation[] | null;
+  element_coverage: SandboxElementCoverageValidation | null;
+  origin_collapse: SandboxOriginCollapseValidation | null;
 }
 
 export interface SandboxSummaryResult {

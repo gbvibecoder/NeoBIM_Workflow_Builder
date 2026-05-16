@@ -41,6 +41,7 @@ export const STRIPE_PLANS = {
       rendersPerMonth: 1,
       floorPlansPerMonth: 1,
       briefRendersPerMonth: 0,
+      briefToIfcV3RunsPerMonth: 0,
     },
   },
   MINI: {
@@ -64,6 +65,7 @@ export const STRIPE_PLANS = {
       rendersPerMonth: 3,
       floorPlansPerMonth: 1,
       briefRendersPerMonth: 1,
+      briefToIfcV3RunsPerMonth: 2,
     },
   },
   STARTER: {
@@ -90,6 +92,7 @@ export const STRIPE_PLANS = {
       rendersPerMonth: 8,
       floorPlansPerMonth: 5,
       briefRendersPerMonth: 5,
+      briefToIfcV3RunsPerMonth: 5,
     },
   },
   PRO: {
@@ -114,6 +117,7 @@ export const STRIPE_PLANS = {
       rendersPerMonth: 25,
       floorPlansPerMonth: 15,
       briefRendersPerMonth: 15,
+      briefToIfcV3RunsPerMonth: 20,
     },
   },
   TEAM: {
@@ -141,6 +145,7 @@ export const STRIPE_PLANS = {
       rendersPerMonth: 60,
       floorPlansPerMonth: 50,
       briefRendersPerMonth: 50,
+      briefToIfcV3RunsPerMonth: 999,
     },
   },
 } as const;
@@ -166,6 +171,30 @@ export function getBriefRendersMonthlyLimit(role: string): number {
       return STRIPE_PLANS.MINI.limits.briefRendersPerMonth;
     default:
       return STRIPE_PLANS.FREE.limits.briefRendersPerMonth;
+  }
+}
+
+/**
+ * Monthly cap on Brief-to-IFC v3 runs per user, by plan.
+ *
+ * FREE=0 prevents anyone using v3 without a paid plan (each run costs
+ * ~$1.50 in Anthropic spend — FREE would burn margin instantly).
+ * MINI=2 is taster, PRO=20 is production usage, TEAM=999 is effectively
+ * unlimited with a guardrail.
+ */
+export function getBriefToIfcV3MonthlyLimit(role: string): number {
+  switch (role) {
+    case 'PLATFORM_ADMIN':
+    case 'TEAM_ADMIN':
+      return STRIPE_PLANS.TEAM.limits.briefToIfcV3RunsPerMonth;
+    case 'PRO':
+      return STRIPE_PLANS.PRO.limits.briefToIfcV3RunsPerMonth;
+    case 'STARTER':
+      return STRIPE_PLANS.STARTER.limits.briefToIfcV3RunsPerMonth;
+    case 'MINI':
+      return STRIPE_PLANS.MINI.limits.briefToIfcV3RunsPerMonth;
+    default:
+      return STRIPE_PLANS.FREE.limits.briefToIfcV3RunsPerMonth;
   }
 }
 

@@ -307,3 +307,208 @@ def test_short_polygon_rejected():
     bf = BuildFlowIFC(_minimal_brief())
     with pytest.raises(BuildFlowIFCError, match="must have >= 3 points"):
         bf.add_space("SP-01", polygon=[(0.0, 0.0), (1.0, 0.0)], height=3.0)
+
+
+# ── Bug 5 (visual collapse): unit declaration must be METRE ──────────
+
+
+def test_length_unit_is_metre_not_millimetre():
+    """Regression for the 2026-05-16 visual-collapse bug.
+
+    The bootstrap previously called `unit.assign_unit(file)` with no
+    args, which ifcopenshell silently defaults to MILLI.METRE — every
+    metre-valued brief coordinate then rendered 1000x smaller in
+    viewers. forensics/diagnosis.md has the trail.
+
+    This test re-opens a written IFC and asserts the LENGTHUNIT
+    IfcSIUnit has no prefix and is METRE. AREAUNIT / VOLUMEUNIT must
+    likewise be base SI (no prefix → SQUARE_METRE, CUBIC_METRE).
+    """
+    bf = BuildFlowIFC(_minimal_brief())
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "units.ifc")
+        bf.write(path)
+        f = ifcopenshell.open(path)
+        units_by_type: dict[str, ifcopenshell.entity_instance] = {}
+        for ua in f.by_type("IfcUnitAssignment"):
+            for u in ua.Units or []:
+                if u.is_a("IfcSIUnit"):
+                    units_by_type[u.UnitType] = u
+
+        length = units_by_type.get("LENGTHUNIT")
+        assert length is not None, "LENGTHUNIT IfcSIUnit missing from file"
+        assert length.Prefix is None, (
+            f"LENGTHUNIT prefix should be None (METRE) but got {length.Prefix!r}. "
+            "If this is MILLI, the unit-declaration regression has returned — "
+            "see forensics/diagnosis.md."
+        )
+        assert length.Name == "METRE"
+
+        area = units_by_type.get("AREAUNIT")
+        assert area is not None
+        assert area.Prefix is None and area.Name == "SQUARE_METRE"
+
+        vol = units_by_type.get("VOLUMEUNIT")
+        assert vol is not None
+        assert vol.Prefix is None and vol.Name == "CUBIC_METRE"
+
+
+def _world_bbox_of(element, settings) -> tuple[float, float, float, float, float, float]:
+    """Compute world (xmin,ymin,zmin,xmax,ymax,zmax) of `element` via
+    ifcopenshell.geom — mirrors `scripts/forensics/ifc-inspect.py`."""
+    import ifcopenshell.geom
+    import ifcopenshell.util.shape
+    import numpy as np
+
+    shape = ifcopenshell.geom.create_shape(settings, element)
+    verts = ifcopenshell.util.shape.get_vertices(shape.geometry)
+    arr = np.asarray(verts, dtype=float).reshape(-1, 3)
+    return (
+        float(arr[:, 0].min()), float(arr[:, 1].min()), float(arr[:, 2].min()),
+        float(arr[:, 0].max()), float(arr[:, 1].max()), float(arr[:, 2].max()),
+    )
+
+
+def test_wall_world_bbox_matches_brief_dimensions():
+    """A 4m-long, 0.1m-thick, 2.8m-tall wall must render at those
+    dimensions in world coordinates. This is the load-bearing test for
+    the unit-fix — if MILLIMETRE creeps back in, this fails by 1000x."""
+    import ifcopenshell.geom
+
+    bf = BuildFlowIFC(_minimal_brief())
+    wall = bf.add_wall(
+        "W-001", origin=(1.0, 2.0, 0.05),
+        dims=(4.0, 0.1), depth=2.8, material="mat-concrete",
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "wall.ifc")
+        bf.write(path)
+        f = ifcopenshell.open(path)
+        settings = ifcopenshell.geom.settings()
+        settings.set(settings.USE_WORLD_COORDS, True)
+        walls = f.by_type("IfcWall")
+        assert len(walls) == 1
+        xmin, ymin, zmin, xmax, ymax, zmax = _world_bbox_of(walls[0], settings)
+        # 4m length on X (within 0.05 tolerance)
+        assert 3.95 < (xmax - xmin) < 4.05, f"wall X-extent {xmax-xmin}"
+        # 0.1m thickness on Y
+        assert 0.05 < (ymax - ymin) < 0.15, f"wall Y-extent {ymax-ymin}"
+        # 2.8m height on Z
+        assert 2.75 < (zmax - zmin) < 2.85, f"wall Z-extent {zmax-zmin}"
+        # World origin shifted by (1, 2, 0.05)
+        assert 0.95 < xmin < 1.05, f"wall x_min {xmin}"
+        assert 1.95 < ymin < 2.05, f"wall y_min {ymin}"
+
+
+def test_slab_world_bbox_matches_brief_dimensions():
+    """A 5x5x0.2m slab at world origin must read back at those dims."""
+    import ifcopenshell.geom
+
+    bf = BuildFlowIFC(_minimal_brief())
+    bf.add_slab(
+        "S-001", origin=(0.0, 0.0, 0.0),
+        dims=(5.0, 5.0), depth=0.2, material="mat-concrete",
+        predefined_type="FLOOR",
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "slab.ifc")
+        bf.write(path)
+        f = ifcopenshell.open(path)
+        settings = ifcopenshell.geom.settings()
+        settings.set(settings.USE_WORLD_COORDS, True)
+        slabs = f.by_type("IfcSlab")
+        xmin, ymin, zmin, xmax, ymax, zmax = _world_bbox_of(slabs[0], settings)
+        assert 4.95 < (xmax - xmin) < 5.05
+        assert 4.95 < (ymax - ymin) < 5.05
+        assert 0.15 < (zmax - zmin) < 0.25
+
+
+def test_space_world_bbox_matches_polygon():
+    """A 4x5m IfcSpace polygon extruded 2.7m must read back at those dims."""
+    import ifcopenshell.geom
+
+    bf = BuildFlowIFC(_minimal_brief())
+    bf.add_space(
+        "SP-01", polygon=[(0.0, 0.0), (4.0, 0.0), (4.0, 5.0), (0.0, 5.0)],
+        height=2.7, long_name="Bedroom",
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "space.ifc")
+        bf.write(path)
+        f = ifcopenshell.open(path)
+        settings = ifcopenshell.geom.settings()
+        settings.set(settings.USE_WORLD_COORDS, True)
+        spaces = f.by_type("IfcSpace")
+        xmin, ymin, zmin, xmax, ymax, zmax = _world_bbox_of(spaces[0], settings)
+        assert 3.95 < (xmax - xmin) < 4.05, f"space X-extent {xmax-xmin}"
+        assert 4.95 < (ymax - ymin) < 5.05, f"space Y-extent {ymax-ymin}"
+        assert 2.65 < (zmax - zmin) < 2.75, f"space Z-extent {zmax-zmin}"
+
+
+def test_full_residential_bedroom_brief_world_bbox():
+    """End-to-end: take the residential-bedroom brief (smallest real brief
+    in our eval set), run it through the helper, and assert the aggregate
+    world bbox matches the brief site bounds within 10% per axis.
+
+    This is the integration test that would have caught the original bug —
+    yesterday's prod-eval-outputs/residential-bedroom.ifc rendered at
+    0.0059 x 0.0075 x 0.0027 m, ratio ~0.0015. With the fix, the same
+    brief must produce ~4 x 5 x 2.8 m."""
+    import ifcopenshell.geom
+    import numpy as np
+
+    brief = _minimal_brief()
+    brief["spaces"] = [{
+        "id": "SP-BEDROOM",
+        "name": "SP-BEDROOM",
+        "long_name": "Master Bedroom",
+        "polygon_world_m": [[0.0, 0.0], [4.0, 0.0], [4.0, 5.0], [0.0, 5.0]],
+        "height_m": 2.7,
+        "occupancy_type": "PrivateLiving",
+    }]
+    bf = BuildFlowIFC(brief)
+    # Manually bootstrap the space (sandbox runner normally does this).
+    bf.add_space(
+        "SP-BEDROOM",
+        polygon=[(0.0, 0.0), (4.0, 0.0), (4.0, 5.0), (0.0, 5.0)],
+        height=2.7, long_name="Master Bedroom",
+    )
+    # 4 walls + 1 floor — abbreviated from the real brief.
+    bf.add_slab("FLOOR", origin=(0.0, 0.0, 0.0), dims=(4.0, 5.0),
+                depth=0.05, material="mat-concrete")
+    bf.add_wall("WALL-N", origin=(0.0, 4.9, 0.05), dims=(4.0, 0.1),
+                depth=2.65, material="mat-concrete")
+    bf.add_wall("WALL-S", origin=(0.0, 0.0, 0.05), dims=(4.0, 0.1),
+                depth=2.65, material="mat-concrete")
+    bf.add_wall("WALL-E", origin=(3.9, 0.0, 0.05), dims=(0.1, 5.0),
+                depth=2.65, material="mat-concrete")
+    bf.add_wall("WALL-W", origin=(0.0, 0.0, 0.05), dims=(0.1, 5.0),
+                depth=2.65, material="mat-concrete")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "bedroom.ifc")
+        bf.write(path)
+        f = ifcopenshell.open(path)
+        settings = ifcopenshell.geom.settings()
+        settings.set(settings.USE_WORLD_COORDS, True)
+
+        # Compute aggregate world bbox across walls + slab.
+        bboxes = []
+        for ifc_class in ("IfcWall", "IfcSlab"):
+            for e in f.by_type(ifc_class):
+                bboxes.append(_world_bbox_of(e, settings))
+        assert bboxes, "no geometric elements in file"
+        xmin = min(b[0] for b in bboxes)
+        ymin = min(b[1] for b in bboxes)
+        zmin = min(b[2] for b in bboxes)
+        xmax = max(b[3] for b in bboxes)
+        ymax = max(b[4] for b in bboxes)
+        zmax = max(b[5] for b in bboxes)
+        xext, yext, zext = xmax - xmin, ymax - ymin, zmax - zmin
+
+        # Expected: 4m x 5m floorplate + 2.7m height (-0.05 slab thickness).
+        # Tolerance: ±10% on each axis (generous to allow rounding /
+        # wall-corner overlap).
+        assert 3.6 < xext < 4.4, f"aggregate X {xext} not in [3.6, 4.4]"
+        assert 4.5 < yext < 5.5, f"aggregate Y {yext} not in [4.5, 5.5]"
+        assert 2.4 < zext < 3.0, f"aggregate Z {zext} not in [2.4, 3.0]"

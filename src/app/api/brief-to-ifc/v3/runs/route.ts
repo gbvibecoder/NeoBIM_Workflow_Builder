@@ -49,6 +49,10 @@ import {
 import { runBackground } from "@/features/brief-to-ifc/v3/runtime/background-runner";
 import { appendLog } from "@/features/brief-to-ifc/v3/runtime/append-log";
 import { toBriefToIfcV3ErrorCode } from "@/features/brief-to-ifc/v3/lifecycle/error-codes";
+import {
+  checkBriefToIfcV3Quota,
+  incrementBriefToIfcV3Usage,
+} from "@/features/brief-to-ifc/v3/quota/quota";
 
 export const maxDuration = 800;
 
@@ -103,6 +107,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         title: "Too many requests",
         message: "You've started too many v3 runs in the last hour.",
         code: "RATE_001",
+      }),
+      { status: 429 },
+    );
+  }
+
+  // Per-user monthly quota — separate from the per-hour rate limit.
+  // Conservative defaults (FREE=0, MINI=2, STARTER=5, PRO=20, TEAM=999)
+  // protect margin: each v3 run costs ~$1.50 in Anthropic spend.
+  // PLATFORM_ADMIN / TEAM_ADMIN bypass via the TEAM tier limit (999).
+  const role = (session.user as { role?: string }).role ?? "FREE";
+  const quota = await checkBriefToIfcV3Quota(prisma, userId, role);
+  if (!quota.ok) {
+    return NextResponse.json(
+      formatErrorResponse({
+        title: "Monthly quota exceeded",
+        message: quota.message ?? "Monthly run limit reached.",
+        code: quota.errorCode ?? "QUOTA_EXCEEDED",
       }),
       { status: 429 },
     );
@@ -181,6 +202,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       costCapUsd: body.cost_cap_usd,
     },
     select: { id: true, createdAt: true, status: true },
+  });
+
+  // Increment monthly quota counter AFTER the row creation succeeds.
+  // If this fails (e.g. transient DB error), the run is still created
+  // — better to over-allow a single run than fail an already-confirmed
+  // submission. The next request will see the un-incremented counter
+  // and re-check. Atomicity isn't strict here because the quota check
+  // is run-creation pre-flight, not a hard accounting boundary.
+  await incrementBriefToIfcV3Usage(prisma, userId).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error(`[bf-v3 quota] increment failed for ${userId}:`, err);
   });
 
   await appendLog(prisma, {

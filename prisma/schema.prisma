@@ -1243,6 +1243,29 @@ model BriefToIfcV3Run {
   @@map("brief_to_ifc_v3_runs")
 }
 
+/// Per-user monthly counters for Brief-to-IFC v3 quota enforcement.
+///
+/// Lazy-reset semantics: the application checks `currentMonthStart` on
+/// each call and resets `runsThisMonth` + `costThisMonthUsd` if a new
+/// calendar month has begun. No cron required.
+///
+/// `runsThisMonth` is incremented atomically as part of run creation in
+/// POST /api/brief-to-ifc/v3/runs. Defaults per role come from
+/// `getBriefToIfcV3MonthlyLimit` in plan-data.ts.
+model BriefToIfcV3UserQuota {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  /// First day of the month this counter belongs to, at 00:00 UTC.
+  /// When the wall clock crosses into a new month, the next call
+  /// rewrites this to the new month-start and zeros the counters.
+  currentMonthStart DateTime @default(now())
+  runsThisMonth     Int      @default(0)
+  costThisMonthUsd  Float    @default(0)
+  updatedAt         DateTime @updatedAt
+
+  @@map("brief_to_ifc_v3_user_quotas")
+}
+
 // Structured execution log. `executionId` is a plain string column,
 // NOT a Prisma relation, so the same table can carry logs for any
 // future execution shape (v2 job, v3 run, future v4) without a

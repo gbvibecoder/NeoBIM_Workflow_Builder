@@ -28,6 +28,7 @@ surface to the user.
 
 from __future__ import annotations
 
+import json
 import os
 import time
 import uuid
@@ -52,6 +53,23 @@ log = structlog.get_logger()
 router = APIRouter(tags=["v3-generator"])
 
 _store = SessionStore()
+
+
+def _load_brief_from_handle(handle) -> Optional[Dict[str, Any]]:
+    """Recover the brief from the session's `meta.json`.
+
+    `BuildFlowIFC.save_state` always writes the brief alongside state.ifc;
+    this helper exists so the brief-aware validators don't need the
+    caller to thread the brief through every endpoint."""
+    meta_path = os.path.join(handle.path, "meta.json")
+    if not os.path.isfile(meta_path):
+        return None
+    try:
+        with open(meta_path, "r", encoding="ascii") as f:
+            meta = json.load(f)
+        return meta.get("brief")
+    except Exception:
+        return None
 
 
 # ── Request / response models ─────────────────────────────────────────
@@ -92,6 +110,11 @@ class ValidateResponse(BaseModel):
     web_ifc_load_test: str = "FAIL"
     ascii_only: bool = False
     ascii_first_bad_offset: Optional[int] = None
+    # Brief-aware visual validators (None when no brief on disk).
+    world_bbox: Optional[Dict[str, Any]] = None
+    space_polygons: Optional[list] = None
+    element_coverage: Optional[Dict[str, Any]] = None
+    origin_collapse: Optional[Dict[str, Any]] = None
 
 
 class SummaryResponse(BaseModel):
@@ -245,13 +268,16 @@ def validate(
 ) -> ValidateResponse:
     rid = getattr(http_request.state, "request_id", "unknown")
     handle = _resolve_session(bf_session_id, require_state=True)
-    result = validate_ifc_file(handle.state_ifc_path)
+    brief = _load_brief_from_handle(handle)
+    result = validate_ifc_file(handle.state_ifc_path, brief=brief)
     log.info(
         "v3_validate",
         request_id=rid, session_id=handle.session_id,
         entity_count=result.get("entity_count"),
         refs_resolve=result.get("refs_resolve"),
         ascii_only=result.get("ascii_only"),
+        world_bbox_verdict=(result.get("world_bbox") or {}).get("verdict"),
+        origin_collapsed=(result.get("origin_collapse") or {}).get("collapsed"),
     )
     return ValidateResponse(
         session_id=handle.session_id,
@@ -264,6 +290,10 @@ def validate(
         web_ifc_load_test=result.get("web_ifc_load_test", "FAIL"),
         ascii_only=result.get("ascii_only", False),
         ascii_first_bad_offset=result.get("ascii_first_bad_offset"),
+        world_bbox=result.get("world_bbox"),
+        space_polygons=result.get("space_polygons"),
+        element_coverage=result.get("element_coverage"),
+        origin_collapse=result.get("origin_collapse"),
     )
 
 
@@ -288,8 +318,49 @@ def finalize(
     rid = getattr(http_request.state, "request_id", "unknown")
     handle = _resolve_session(bf_session_id, require_state=True)
 
-    # Validate one more time — finalize is the last gate.
-    validation = validate_ifc_file(handle.state_ifc_path)
+    # Validate one more time — finalize is the last gate. Brief-aware
+    # visual checks gate this: world bbox must verdict OK, no
+    # origin-collapse, otherwise the IFC is rejected with
+    # VISUAL_GEOMETRY_INVALID so the agent can retry rather than ship a
+    # broken file. (This is the safeguard for the 2026-05-16 visual
+    # collapse — see forensics/diagnosis.md.)
+    brief = _load_brief_from_handle(handle)
+    validation = validate_ifc_file(handle.state_ifc_path, brief=brief)
+
+    world_bbox = validation.get("world_bbox") or {}
+    origin_collapse = validation.get("origin_collapse") or {}
+    bbox_verdict = world_bbox.get("verdict")
+    if brief is not None and bbox_verdict not in (None, "OK"):
+        log.warning(
+            "v3_finalize_refused_visual",
+            request_id=rid, session_id=handle.session_id,
+            world_bbox_verdict=bbox_verdict,
+            actual_extent=world_bbox.get("actual_extent"),
+            expected_extent=world_bbox.get("expected_extent"),
+        )
+        raise HTTPException(status_code=422, detail={
+            "code": "VISUAL_GEOMETRY_INVALID",
+            "message": (
+                f"Geometric world-bbox verdict is {bbox_verdict!r}: "
+                f"{world_bbox.get('suggested_unit_fix') or 'see validation.world_bbox for details'}"
+            ),
+            "validation": validation,
+        })
+    if origin_collapse.get("collapsed"):
+        log.warning(
+            "v3_finalize_refused_origin_collapse",
+            request_id=rid, session_id=handle.session_id,
+            fraction_at_origin=origin_collapse.get("fraction_at_origin"),
+        )
+        raise HTTPException(status_code=422, detail={
+            "code": "VISUAL_GEOMETRY_INVALID",
+            "message": (
+                f"{origin_collapse.get('at_origin_count')} of "
+                f"{origin_collapse.get('total_elements')} elements collapsed "
+                "at world origin. Most elements need non-zero placements."
+            ),
+            "validation": validation,
+        })
 
     # Upload to R2 (or fall back to a base64 data URI when R2 is
     # unconfigured — matches the Phase 1 sandbox's fallback so the

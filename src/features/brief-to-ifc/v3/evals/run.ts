@@ -38,6 +38,13 @@ interface EvalRow {
   spacesMissing: number;
   asciiOnly: boolean;
   refsResolve: boolean;
+  // Brief-aware visual checks (added 2026-05-16 — see forensics/diagnosis.md).
+  worldBboxVerdict: string | null;
+  worldBboxExtent: [number, number, number] | null;
+  spacePolygonsAllOk: boolean;
+  elementCoverageVerdict: string | null;
+  missingElementCount: number;
+  originCollapsed: boolean;
   errorCode: string | null;
   errorMessage: string | null;
 }
@@ -58,6 +65,12 @@ async function runOne(briefPath: string): Promise<EvalRow> {
       spacesMissing: 0,
       asciiOnly: false,
       refsResolve: false,
+      worldBboxVerdict: null,
+      worldBboxExtent: null,
+      spacePolygonsAllOk: false,
+      elementCoverageVerdict: null,
+      missingElementCount: 0,
+      originCollapsed: false,
       errorCode: "INVALID_BRIEF_JSON",
       errorMessage: parsed.error.issues
         .map((i) => `${i.path.join(".")}: ${i.message}`)
@@ -81,9 +94,31 @@ async function runOne(briefPath: string): Promise<EvalRow> {
   });
 
   const v = result.finalValidation;
+  // Visual quality gates — these were the 2026-05-16 false-green miss.
+  // A run only passes when the geometric bbox matches the brief AND
+  // no large origin cluster exists. See forensics/diagnosis.md.
+  const wb = v?.world_bbox;
+  const oc = v?.origin_collapse;
+  const ec = v?.element_coverage;
+  const sp = v?.space_polygons;
+  const worldBboxOk = wb ? wb.verdict === "OK" : true;
+  // space_polygons treats NO_EXPECTED_POLYGON (circular spaces) as
+  // non-failing — only MISSING / MISMATCH / NO_POLYGON_REP / ERROR count.
+  const spacePolygonsAllOk = sp
+    ? sp.every((s) =>
+        s.verdict === "OK" ||
+        s.verdict === "NO_EXPECTED_POLYGON",
+      )
+    : true;
+  const originCollapsed = oc?.collapsed ?? false;
+  const elementCoverageOk = ec ? ec.verdict === "OK" : true;
+
+  const visualOk =
+    worldBboxOk && spacePolygonsAllOk && !originCollapsed && elementCoverageOk;
+
   return {
     brief_id: briefId,
-    ok: result.ok && Boolean(v?.refs_resolve),
+    ok: result.ok && Boolean(v?.refs_resolve) && visualOk,
     entityCount: result.entityCount,
     costUsd: result.costUsd,
     durationMs: result.durationMs,
@@ -92,6 +127,12 @@ async function runOne(briefPath: string): Promise<EvalRow> {
     spacesMissing: v?.spaces_missing.length ?? 0,
     asciiOnly: v?.ascii_only ?? false,
     refsResolve: v?.refs_resolve ?? false,
+    worldBboxVerdict: wb?.verdict ?? null,
+    worldBboxExtent: wb?.actual_extent ?? null,
+    spacePolygonsAllOk,
+    elementCoverageVerdict: ec?.verdict ?? null,
+    missingElementCount: ec?.missing_id_count ?? 0,
+    originCollapsed,
     errorCode: result.error?.code ?? null,
     errorMessage: result.error?.message ?? null,
   };
@@ -101,13 +142,21 @@ function fmtCsv(rows: EvalRow[]): string {
   const header = [
     "brief_id", "ok", "entityCount", "costUsd", "durationMs",
     "turns", "spacesPresent", "spacesMissing", "asciiOnly",
-    "refsResolve", "errorCode", "errorMessage",
+    "refsResolve", "worldBboxVerdict", "worldBboxExtent",
+    "spacePolygonsAllOk", "elementCoverageVerdict", "missingElementCount",
+    "originCollapsed", "errorCode", "errorMessage",
   ].join(",");
   const lines = rows.map((r) =>
     [
       r.brief_id, r.ok, r.entityCount, r.costUsd.toFixed(4),
       r.durationMs, r.turns, r.spacesPresent, r.spacesMissing,
       r.asciiOnly, r.refsResolve,
+      r.worldBboxVerdict ?? "",
+      r.worldBboxExtent
+        ? `"${r.worldBboxExtent.map((n) => n.toFixed(3)).join("x")}"`
+        : "",
+      r.spacePolygonsAllOk, r.elementCoverageVerdict ?? "",
+      r.missingElementCount, r.originCollapsed,
       r.errorCode ?? "", `"${(r.errorMessage ?? "").replace(/"/g, '""')}"`,
     ].join(","),
   );
@@ -141,6 +190,12 @@ async function main(): Promise<void> {
         brief_id: path.basename(bp, ".json"),
         ok: false, entityCount: 0, costUsd: 0, durationMs: 0, turns: 0,
         spacesPresent: 0, spacesMissing: 0, asciiOnly: false, refsResolve: false,
+        worldBboxVerdict: null,
+        worldBboxExtent: null,
+        spacePolygonsAllOk: false,
+        elementCoverageVerdict: null,
+        missingElementCount: 0,
+        originCollapsed: false,
         errorCode: "UNCAUGHT",
         errorMessage: err instanceof Error ? err.message : String(err),
       });

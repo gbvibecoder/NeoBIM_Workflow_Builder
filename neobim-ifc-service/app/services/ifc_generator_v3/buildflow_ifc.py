@@ -241,11 +241,25 @@ class BuildFlowIFC:
             name=str(proj_meta.get("name", "BuildFlow Project")),
         )
 
-        # Units — metric SI (METRE / SQUARE_METRE / CUBIC_METRE). The
-        # 0.8 `unit.assign_unit` defaults to metric when called with no
-        # length kwarg; explicit kwargs were API-shape-shifty across
-        # 0.8.x patch releases and are safer left implicit.
-        api.run("unit.assign_unit", self._ifc)
+        # Units — explicit METRE / SQUARE_METRE / CUBIC_METRE.
+        #
+        # IMPORTANT: `ifcopenshell.api.unit.assign_unit(file)` without a
+        # `units=` kwarg silently defaults to LENGTHUNIT = MILLI.METRE
+        # (Revit/BIM-tool convention), per the upstream docstring:
+        # "you may specify without any arguments to automatically create
+        # millimeters, square meters, and cubic meters as a convenience
+        # for testing purposes". Our BriefSpec is metre-valued, so
+        # accepting the default silently rescales every coordinate by
+        # 1/1000 — a 4m wall renders as 4mm. Forensic root cause for
+        # the visual-collapse bug shipped on 2026-05-16. See
+        # forensics/diagnosis.md for the evidence trail.
+        length_unit = api.run("unit.add_si_unit", self._ifc, unit_type="LENGTHUNIT")
+        area_unit = api.run("unit.add_si_unit", self._ifc, unit_type="AREAUNIT")
+        volume_unit = api.run("unit.add_si_unit", self._ifc, unit_type="VOLUMEUNIT")
+        api.run(
+            "unit.assign_unit", self._ifc,
+            units=[length_unit, area_unit, volume_unit],
+        )
 
         # Contexts — Model / Body subcontext (web-ifc requires this).
         ctx = api.run("context.add_context", self._ifc, context_type="Model")
@@ -896,13 +910,27 @@ class BuildFlowIFC:
                 pass
 
         # Geometry: rectangle profile extruded along +Z by `depth`.
+        #
+        # IFC2X3 IfcRectangleProfileDef is *centered* on its Position —
+        # XDim / YDim are TOTAL widths, and Position.Location is the
+        # centre point. Placing the profile centre at (dx/2, dy/2) means
+        # the rectangle spans (0, 0) to (dx, dy) in local space, so the
+        # element's placement origin (ox, oy, oz) becomes the SW corner
+        # of the bbox in world space — matching the BriefSpec's SW-corner
+        # convention for `origin_world_m`. Without this offset, walls
+        # land centred on their origin, so a WALL-N at origin=(0, 4.9)
+        # overshoots by half its length westwards. See
+        # forensics/diagnosis.md follow-ups.
         rect = self._ifc.create_entity(
             "IfcRectangleProfileDef",
             ProfileType="AREA",
             ProfileName=None,
             Position=self._ifc.create_entity(
                 "IfcAxis2Placement2D",
-                Location=self._ifc.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0)),
+                Location=self._ifc.create_entity(
+                    "IfcCartesianPoint",
+                    Coordinates=(dx / 2.0, dy / 2.0),
+                ),
                 RefDirection=None,
             ),
             XDim=dx,

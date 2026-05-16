@@ -48,6 +48,41 @@ try to outsmart this** by passing pre-encoded bytes; pass plain English.
 by ifcopenshell automatically. **Don't backslash-escape** them in
 Python source - `\'` will write a literal backslash to the IFC.
 
+## UNITS AND COORDINATES
+
+- ALL dimensions in the BriefSpec are METRES. Never millimetres.
+- ALL world coordinates in `polygon_world_m`, `origin_world_m`, etc.
+  are METRES, relative to the site SW corner at `(0, 0, 0)`.
+- The IFC file declares `IfcSIUnit LENGTHUNIT = METRE` - the helper
+  bootstrap forces this. Pass metre-valued numbers straight through;
+  don't multiply by 1000 to "convert to mm". Viewers will then render
+  the model 1000x too large.
+- When calling `bf.add_*` helpers, pass dimensions in METRES.
+- `origin_world_m` is the SW corner of an element's bbox (NOT the
+  centre). A wall with `origin=(0, 4.9, 0.05)` and `dims=(4.0, 0.1)`
+  occupies world X `[0, 4]`, Y `[4.9, 5.0]`, Z `[0.05, 0.05 + depth]`.
+- A 4-metre wall has `dims=(4.0, 0.1)`. NOT `dims=(4000, 100)`.
+- A 3cm-thick countertop has `depth=0.03`. NOT `depth=30`.
+
+### Common mistakes you must avoid
+
+WRONG:  `bf.add_wall("W", origin=(0, 0, 0), dims=(4000, 100), depth=2800)`
+RIGHT:  `bf.add_wall("W", origin=(0.0, 0.0, 0.0), dims=(4.0, 0.1), depth=2.8)`
+
+WRONG:  `bf.add_furniture("F", origin=(...), dims=(1500, 600), depth=900)`
+RIGHT:  `bf.add_furniture("F", origin=(...), dims=(1.5, 0.6), depth=0.9)`
+
+### How to verify
+
+After adding several elements, call `read_ifc_summary`. The reported
+`tracked_element_ids` and the per-class counts should match the brief.
+
+If you finalize and the viewer reports the building bbox in the
+millimetre range (e.g. 4mm x 5mm), STOP - you've passed dimensions in
+mm. The helper now refuses to finalize when the geometric bbox is
+clearly outside the brief's site bounds (see `VISUAL_GEOMETRY_INVALID`
+error code).
+
 ## Recommended workflow
 
 1. **Inspect.** First call: `read_ifc_summary`. The bootstrap has
@@ -76,6 +111,31 @@ Python source - `\'` will write a literal backslash to the IFC.
 5. **Finalize.** Call `finalize_ifc` exactly once. The tool returns
    the public IFC URL. After this you're done - do NOT call any more
    tools, just respond with the final summary.
+
+## FINALIZATION CHECKLIST
+
+Before calling `finalize_ifc`, verify with `read_ifc_summary` +
+`validate_ifc`:
+
+- [ ] Every space declared in the BriefSpec is present in the IFC
+      (match by `Name`).
+- [ ] Every element declared in the BriefSpec is present in the IFC
+      (match by `Tag`).
+- [ ] `validate_ifc -> refs_resolve: true` and `web_ifc_load_test: PASS`.
+- [ ] `validate_ifc -> world_bbox.verdict: "OK"`. If the verdict is
+      `SCALED_TOO_SMALL` you've passed mm values; `SCALED_TOO_LARGE`
+      means kilometre-scale numbers; `COLLAPSED_AT_ORIGIN` means every
+      element has zero extent or sits at the same point. Each is a
+      diagnostic - read it, fix, retry.
+- [ ] `validate_ifc -> space_polygons` reports all spaces match their
+      brief polygons within 0.1m.
+- [ ] `validate_ifc -> origin_collapse: false` - no large cluster of
+      elements stacked at (0, 0, 0).
+
+If any check fails, fix the underlying call (re-add the offending
+element with corrected values) and re-verify before finalizing.
+`finalize_ifc` will refuse with `VISUAL_GEOMETRY_INVALID` if the
+world-bbox verdict is not `OK`.
 
 ## Stop conditions
 

@@ -45,7 +45,7 @@ export function Sidebar() {
   const userRank = PLAN_RANK[userRole] ?? 0;
   const isFreeUser = userRole === "FREE";
   const isAdminBypass = userRole === "PLATFORM_ADMIN" || userRole === "TEAM_ADMIN";
-  const { briefRendersEnabled } = useFeatureFlags();
+  const { briefRendersEnabled, briefToIfcV3Enabled } = useFeatureFlags();
 
   // §P UX polish: detect at-workflow-cap so the "+ New Workflow" CTA
   // surfaces the cap proactively instead of letting the user navigate to
@@ -97,6 +97,10 @@ export function Sidebar() {
     // canary in `/api/config/feature-flags`).
     ...(briefRendersEnabled
       ? [{ href: "/dashboard/brief-renders", label: "Brief → Renders", icon: ScrollText, badge: "Beta" }]
+      : []),
+    // AI IFC v3 — same canary pattern; hidden until BRIEF_TO_IFC_V3_ENABLED.
+    ...(briefToIfcV3Enabled
+      ? [{ href: "/dashboard/brief-to-ifc/v3/new", label: "AI IFC v3", icon: Zap, badge: "Beta" }]
       : []),
   ];
 

@@ -66,7 +66,24 @@ vi.mock("@/lib/db", () => ({
         status: "PENDING",
       })),
     },
+    // PHASE 6 quota — the route now consults the quota table after
+    // the rate-limit check; the test user defaults to STARTER tier
+    // (test mock above sets `email: test@buildflow.dev`; session role
+    // defaults to FREE which would block, so we mock the quota helper
+    // call below to bypass).
+    briefToIfcV3UserQuota: {
+      findUnique: vi.fn(async () => null),
+      create: vi.fn(async () => ({})),
+      update: vi.fn(async () => ({})),
+    },
   },
+}));
+
+// Bypass the quota check — the focus of this test is the after() wrap,
+// not the quota subsystem. Quota behaviour has its own test file.
+vi.mock("@/features/brief-to-ifc/v3/quota/quota", () => ({
+  checkBriefToIfcV3Quota: vi.fn(async () => ({ ok: true, limit: 99, used: 0 })),
+  incrementBriefToIfcV3Usage: vi.fn(async () => {}),
 }));
 
 vi.mock("@/features/brief-to-ifc/v3", async (importOriginal) => {
