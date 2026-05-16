@@ -1,0 +1,16 @@
+{
+    "id": "cmp8l63bb000004kzm3507dw3",
+    "status": "COMPLETED",
+    "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/16/ai-ifc-v3-d3bf6a09c013.ifc",
+    "entityCount": 754,
+    "errorCode": null,
+    "errorMessage": null,
+    "generatorCostUsd": 0.195625,
+    "generatorMs": 56741,
+    "turns": 10,
+    "lastHeartbeatAt": "2026-05-16T16:55:12.210Z",
+    "startedAt": "2026-05-16T16:54:15.009Z",
+    "completedAt": "2026-05-16T16:55:12.210Z",
+    "createdAt": "2026-05-16T16:54:14.087Z",
+    "updatedAt": "2026-05-16T16:55:12.213Z"
+}
