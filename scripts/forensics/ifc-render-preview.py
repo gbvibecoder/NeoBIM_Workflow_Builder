@@ -165,14 +165,21 @@ def render_iso(meshes, out_path: Path, title: str) -> None:
 def main(argv: List[str]) -> int:
     if len(argv) < 2:
         print(
-            "usage: ifc-render-preview.py <file.ifc> [more.ifc ...]",
+            "usage: ifc-render-preview.py [--out-dir <dir>] <file.ifc> [more.ifc ...]",
             file=sys.stderr,
         )
         return 2
     out_dir = Path("forensics")
+    args = list(argv[1:])
+    if args and args[0] == "--out-dir":
+        if len(args) < 2:
+            print("--out-dir requires a path", file=sys.stderr)
+            return 2
+        out_dir = Path(args[1])
+        args = args[2:]
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for arg in argv[1:]:
+    for arg in args:
         path = Path(arg)
         if not path.exists():
             print(f"skip {path}: not found", file=sys.stderr)

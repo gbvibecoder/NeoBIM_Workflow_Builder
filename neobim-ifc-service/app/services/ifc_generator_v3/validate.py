@@ -514,9 +514,17 @@ def validate_space_polygons(
 def validate_element_coverage(
     f: ifcopenshell.file, brief: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """Count elements per `brief.elements[].type` and compare to actual
-    counts per IFC class. Returns missing IDs and a per-class count
-    summary."""
+    """Confirm every brief.elements[].id is present in the IFC (by Tag),
+    regardless of which IFC class it lands in.
+
+    Class lookup is intentionally PERMISSIVE: an element declared as
+    `type: "lighting"` in the brief will end up as IfcBuildingElementProxy
+    or IfcFurnishingElement in IFC2X3 because IfcLightFixture is an IFC4
+    class. As long as the same Tag exists somewhere in the file, the
+    element is considered present. The by_class counts are still
+    reported per the expected class so a caller can see the
+    representation choice the helper made.
+    """
     type_to_class = {
         "slab": "IfcSlab",
         "wall": "IfcWall",
@@ -524,7 +532,7 @@ def validate_element_coverage(
         "beam": "IfcBeam",
         "covering": "IfcCovering",
         "furniture": "IfcFurnishingElement",
-        "lighting": "IfcLightFixture",
+        "lighting": "IfcLightFixture",  # IFC4-only; falls back in 2X3
         "proxy": "IfcBuildingElementProxy",
         "space": "IfcSpace",
     }
@@ -538,23 +546,37 @@ def validate_element_coverage(
         expected_by_class[klass] = expected_by_class.get(klass, 0) + 1
         expected_ids_by_class.setdefault(klass, []).append(el_id)
 
+    # Build the "by class" count map for reporting purposes.
     actual_by_class: Dict[str, int] = {}
-    actual_tags_by_class: Dict[str, set] = {}
     for klass in expected_by_class:
         try:
             es = f.by_type(klass)
         except RuntimeError:
             actual_by_class[klass] = 0
-            actual_tags_by_class[klass] = set()
             continue
         actual_by_class[klass] = len(es)
-        actual_tags_by_class[klass] = {getattr(e, "Tag", None) for e in es}
+
+    # Build the FULL tag → class lookup so we can find an element by
+    # Tag anywhere in the file. Brief elements that match by Tag
+    # but land in a different class are still considered present.
+    tag_to_class: Dict[str, str] = {}
+    for p in f.by_type("IfcProduct"):
+        if p.is_a("IfcSpace"):
+            continue  # spaces are matched by Name in validate_space_polygons
+        try:
+            tag = getattr(p, "Tag", None)
+        except AttributeError:
+            tag = None
+        if tag:
+            tag_to_class[tag] = p.is_a()
 
     missing_ids: List[Dict[str, str]] = []
     for klass, ids in expected_ids_by_class.items():
-        present_tags = actual_tags_by_class.get(klass, set())
+        if klass == "IfcSpace":
+            # Spaces are validated separately.
+            continue
         for eid in ids:
-            if eid not in present_tags:
+            if eid not in tag_to_class:
                 missing_ids.append({"id": eid, "expected_class": klass})
 
     total_expected = sum(expected_by_class.values())
