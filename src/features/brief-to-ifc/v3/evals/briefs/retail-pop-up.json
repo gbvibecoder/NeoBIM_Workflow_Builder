@@ -1,0 +1,213 @@
+{
+  "project": {
+    "name": "Retail Pop-Up",
+    "type": "retail",
+    "location": "Bangalore Indiranagar",
+    "description": "6m x 6m retail pop-up booth with central product display island, perimeter walls open on one face, and four pendant lights. Mid-complexity eval - exercises the proxy / furniture / lighting paths together."
+  },
+  "site": {
+    "bounds_m": [6.0, 6.0],
+    "height_limit_m": 3.2,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SP-RETAIL",
+      "name": "SP-RETAIL",
+      "long_name": "Retail Floor",
+      "polygon_world_m": [
+        [0.0, 0.0],
+        [6.0, 0.0],
+        [6.0, 6.0],
+        [0.0, 6.0]
+      ],
+      "height_m": 3.0,
+      "occupancy_type": "Retail Floor"
+    }
+  ],
+  "elements": [
+    {
+      "id": "SLAB-FLOOR",
+      "type": "slab",
+      "origin_world_m": [0.0, 0.0, 0.0],
+      "dims_m": [6.0, 6.0, 0.1],
+      "material_id": "mat-polished-concrete",
+      "description": "Polished concrete floor",
+      "object_type": "Floor Slab",
+      "tag": "SLAB-FLOOR"
+    },
+    {
+      "id": "WALL-N",
+      "type": "wall",
+      "origin_world_m": [0.0, 6.0, 0.0],
+      "dims_m": [6.0, 0.12, 3.0],
+      "material_id": "mat-feature-panel",
+      "description": "North backdrop wall with brand logo",
+      "object_type": "Backdrop",
+      "tag": "WALL-N"
+    },
+    {
+      "id": "WALL-E",
+      "type": "wall",
+      "origin_world_m": [5.88, 0.0, 0.0],
+      "dims_m": [0.12, 6.0, 3.0],
+      "material_id": "mat-feature-panel",
+      "description": "East partition",
+      "object_type": "Partition",
+      "tag": "WALL-E"
+    },
+    {
+      "id": "WALL-W",
+      "type": "wall",
+      "origin_world_m": [0.0, 0.0, 0.0],
+      "dims_m": [0.12, 6.0, 3.0],
+      "material_id": "mat-feature-panel",
+      "description": "West partition",
+      "object_type": "Partition",
+      "tag": "WALL-W"
+    },
+    {
+      "id": "DISPLAY-CENTRE",
+      "type": "furniture",
+      "origin_world_m": [2.0, 2.0, 0.0],
+      "dims_m": [2.0, 2.0, 0.9],
+      "material_id": "mat-oak",
+      "description": "Central product display island",
+      "object_type": "Product Display Island",
+      "tag": "DISPLAY-CENTRE",
+      "contained_in_space_id": "SP-RETAIL"
+    },
+    {
+      "id": "DISPLAY-LEFT",
+      "type": "furniture",
+      "origin_world_m": [0.3, 0.5, 0.0],
+      "dims_m": [0.6, 1.5, 1.8],
+      "material_id": "mat-oak",
+      "description": "Left wall shelving",
+      "object_type": "Wall Shelving",
+      "tag": "DISPLAY-LEFT",
+      "contained_in_space_id": "SP-RETAIL"
+    },
+    {
+      "id": "DISPLAY-RIGHT",
+      "type": "furniture",
+      "origin_world_m": [5.1, 0.5, 0.0],
+      "dims_m": [0.6, 1.5, 1.8],
+      "material_id": "mat-oak",
+      "description": "Right wall shelving",
+      "object_type": "Wall Shelving",
+      "tag": "DISPLAY-RIGHT",
+      "contained_in_space_id": "SP-RETAIL"
+    },
+    {
+      "id": "CASH-COUNTER",
+      "type": "furniture",
+      "origin_world_m": [4.5, 4.5, 0.0],
+      "dims_m": [1.2, 0.6, 1.05],
+      "material_id": "mat-oak",
+      "description": "Cash counter",
+      "object_type": "Cash Counter",
+      "tag": "CASH-COUNTER",
+      "contained_in_space_id": "SP-RETAIL"
+    },
+    {
+      "id": "LIGHT-PEND-01",
+      "type": "lighting",
+      "origin_world_m": [1.5, 1.5, 2.5],
+      "dims_m": [0.3, 0.3, 0.4],
+      "material_id": "mat-brass",
+      "description": "Pendant light SW",
+      "object_type": "Pendant Light",
+      "tag": "LIGHT-PEND-01"
+    },
+    {
+      "id": "LIGHT-PEND-02",
+      "type": "lighting",
+      "origin_world_m": [4.5, 1.5, 2.5],
+      "dims_m": [0.3, 0.3, 0.4],
+      "material_id": "mat-brass",
+      "description": "Pendant light SE",
+      "object_type": "Pendant Light",
+      "tag": "LIGHT-PEND-02"
+    },
+    {
+      "id": "LIGHT-PEND-03",
+      "type": "lighting",
+      "origin_world_m": [1.5, 4.5, 2.5],
+      "dims_m": [0.3, 0.3, 0.4],
+      "material_id": "mat-brass",
+      "description": "Pendant light NW",
+      "object_type": "Pendant Light",
+      "tag": "LIGHT-PEND-03"
+    },
+    {
+      "id": "LIGHT-PEND-04",
+      "type": "lighting",
+      "origin_world_m": [4.5, 4.5, 2.5],
+      "dims_m": [0.3, 0.3, 0.4],
+      "material_id": "mat-brass",
+      "description": "Pendant light NE",
+      "object_type": "Pendant Light",
+      "tag": "LIGHT-PEND-04"
+    },
+    {
+      "id": "PROXY-LOGO",
+      "type": "proxy",
+      "origin_world_m": [2.0, 5.96, 1.0],
+      "dims_m": [2.0, 0.04, 0.6],
+      "material_id": "mat-brass",
+      "description": "Brushed brass brand logo plaque",
+      "object_type": "Brand Logo",
+      "tag": "PROXY-LOGO"
+    },
+    {
+      "id": "PROXY-PRICE-BOARD",
+      "type": "proxy",
+      "origin_world_m": [4.5, 4.4, 1.2],
+      "dims_m": [0.8, 0.1, 0.5],
+      "material_id": "mat-feature-panel",
+      "description": "Price board above cash counter",
+      "object_type": "Signage",
+      "tag": "PROXY-PRICE-BOARD"
+    }
+  ],
+  "materials": [
+    {
+      "id": "mat-polished-concrete",
+      "name": "Polished Concrete",
+      "rgb": [0.55, 0.55, 0.55],
+      "roughness": 0.4,
+      "method": "MATT",
+      "category": "floor"
+    },
+    {
+      "id": "mat-feature-panel",
+      "name": "Dark Walnut Panel",
+      "rgb": [0.18, 0.12, 0.08],
+      "roughness": 0.6,
+      "method": "MATT",
+      "category": "wall"
+    },
+    {
+      "id": "mat-oak",
+      "name": "Oak Veneer",
+      "rgb": [0.72, 0.55, 0.35],
+      "roughness": 0.55,
+      "method": "MATT",
+      "category": "wood"
+    },
+    {
+      "id": "mat-brass",
+      "name": "Brushed Brass",
+      "rgb": [0.86, 0.7, 0.42],
+      "roughness": 0.3,
+      "method": "METAL",
+      "category": "metal"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "BuildFlow Retail",
+    "approved_terms": ["Display", "Cash Counter", "Pendant"],
+    "forbidden_terms": []
+  }
+}

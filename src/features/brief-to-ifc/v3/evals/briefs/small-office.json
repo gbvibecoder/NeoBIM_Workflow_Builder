@@ -1,0 +1,224 @@
+{
+  "project": {
+    "name": "Small Office Cell",
+    "type": "office",
+    "location": "Mumbai BKC",
+    "description": "A 5m x 5m single-room office cell with a reception desk and four workstations. Used as the smallest possible end-to-end eval - every code path should hit it in under 60s with under 30 elements."
+  },
+  "site": {
+    "bounds_m": [5.0, 5.0],
+    "height_limit_m": 3.0,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SP-OFFICE",
+      "name": "SP-OFFICE",
+      "long_name": "Open-plan Office",
+      "polygon_world_m": [
+        [0.0, 0.0],
+        [5.0, 0.0],
+        [5.0, 5.0],
+        [0.0, 5.0]
+      ],
+      "height_m": 2.8,
+      "occupancy_type": "Office Workstation"
+    }
+  ],
+  "elements": [
+    {
+      "id": "SLAB-FLOOR",
+      "type": "slab",
+      "origin_world_m": [0.0, 0.0, 0.0],
+      "dims_m": [5.0, 5.0, 0.2],
+      "material_id": "mat-concrete",
+      "description": "Floor slab",
+      "object_type": "Floor Slab",
+      "tag": "SLAB-FLOOR"
+    },
+    {
+      "id": "SLAB-CEILING",
+      "type": "slab",
+      "origin_world_m": [0.0, 0.0, 2.8],
+      "dims_m": [5.0, 5.0, 0.15],
+      "material_id": "mat-concrete",
+      "description": "Ceiling slab",
+      "object_type": "Ceiling Slab",
+      "tag": "SLAB-CEILING"
+    },
+    {
+      "id": "WALL-N",
+      "type": "wall",
+      "origin_world_m": [0.0, 5.0, 0.0],
+      "dims_m": [5.0, 0.15, 2.8],
+      "material_id": "mat-drywall",
+      "description": "North wall",
+      "object_type": "Partition",
+      "tag": "WALL-N"
+    },
+    {
+      "id": "WALL-S",
+      "type": "wall",
+      "origin_world_m": [0.0, 0.0, 0.0],
+      "dims_m": [5.0, 0.15, 2.8],
+      "material_id": "mat-drywall",
+      "description": "South wall",
+      "object_type": "Partition",
+      "tag": "WALL-S"
+    },
+    {
+      "id": "WALL-E",
+      "type": "wall",
+      "origin_world_m": [4.85, 0.0, 0.0],
+      "dims_m": [0.15, 5.0, 2.8],
+      "material_id": "mat-drywall",
+      "description": "East wall",
+      "object_type": "Partition",
+      "tag": "WALL-E"
+    },
+    {
+      "id": "WALL-W",
+      "type": "wall",
+      "origin_world_m": [0.0, 0.0, 0.0],
+      "dims_m": [0.15, 5.0, 2.8],
+      "material_id": "mat-drywall",
+      "description": "West wall",
+      "object_type": "Partition",
+      "tag": "WALL-W"
+    },
+    {
+      "id": "DESK-RECEPTION",
+      "type": "furniture",
+      "origin_world_m": [0.3, 4.3, 0.0],
+      "dims_m": [1.6, 0.7, 0.75],
+      "material_id": "mat-oak",
+      "description": "Reception desk",
+      "object_type": "Reception Desk",
+      "tag": "DESK-RECEPTION",
+      "contained_in_space_id": "SP-OFFICE"
+    },
+    {
+      "id": "DESK-WS-01",
+      "type": "furniture",
+      "origin_world_m": [0.5, 0.5, 0.0],
+      "dims_m": [1.4, 0.7, 0.74],
+      "material_id": "mat-oak",
+      "description": "Workstation 1",
+      "object_type": "Workstation",
+      "tag": "DESK-WS-01",
+      "contained_in_space_id": "SP-OFFICE"
+    },
+    {
+      "id": "DESK-WS-02",
+      "type": "furniture",
+      "origin_world_m": [3.1, 0.5, 0.0],
+      "dims_m": [1.4, 0.7, 0.74],
+      "material_id": "mat-oak",
+      "description": "Workstation 2",
+      "object_type": "Workstation",
+      "tag": "DESK-WS-02",
+      "contained_in_space_id": "SP-OFFICE"
+    },
+    {
+      "id": "DESK-WS-03",
+      "type": "furniture",
+      "origin_world_m": [0.5, 2.0, 0.0],
+      "dims_m": [1.4, 0.7, 0.74],
+      "material_id": "mat-oak",
+      "description": "Workstation 3",
+      "object_type": "Workstation",
+      "tag": "DESK-WS-03",
+      "contained_in_space_id": "SP-OFFICE"
+    },
+    {
+      "id": "DESK-WS-04",
+      "type": "furniture",
+      "origin_world_m": [3.1, 2.0, 0.0],
+      "dims_m": [1.4, 0.7, 0.74],
+      "material_id": "mat-oak",
+      "description": "Workstation 4",
+      "object_type": "Workstation",
+      "tag": "DESK-WS-04",
+      "contained_in_space_id": "SP-OFFICE"
+    },
+    {
+      "id": "LIGHT-01",
+      "type": "lighting",
+      "origin_world_m": [1.25, 1.25, 2.7],
+      "dims_m": [0.6, 0.6, 0.05],
+      "material_id": "mat-aluminium",
+      "description": "Ceiling LED panel SW",
+      "object_type": "LED Panel",
+      "tag": "LIGHT-01"
+    },
+    {
+      "id": "LIGHT-02",
+      "type": "lighting",
+      "origin_world_m": [3.75, 1.25, 2.7],
+      "dims_m": [0.6, 0.6, 0.05],
+      "material_id": "mat-aluminium",
+      "description": "Ceiling LED panel SE",
+      "object_type": "LED Panel",
+      "tag": "LIGHT-02"
+    },
+    {
+      "id": "LIGHT-03",
+      "type": "lighting",
+      "origin_world_m": [1.25, 3.75, 2.7],
+      "dims_m": [0.6, 0.6, 0.05],
+      "material_id": "mat-aluminium",
+      "description": "Ceiling LED panel NW",
+      "object_type": "LED Panel",
+      "tag": "LIGHT-03"
+    },
+    {
+      "id": "LIGHT-04",
+      "type": "lighting",
+      "origin_world_m": [3.75, 3.75, 2.7],
+      "dims_m": [0.6, 0.6, 0.05],
+      "material_id": "mat-aluminium",
+      "description": "Ceiling LED panel NE",
+      "object_type": "LED Panel",
+      "tag": "LIGHT-04"
+    }
+  ],
+  "materials": [
+    {
+      "id": "mat-concrete",
+      "name": "Concrete",
+      "rgb": [0.65, 0.65, 0.65],
+      "roughness": 0.85,
+      "method": "MATT",
+      "category": "concrete"
+    },
+    {
+      "id": "mat-drywall",
+      "name": "Painted Drywall",
+      "rgb": [0.92, 0.92, 0.9],
+      "roughness": 0.78,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "mat-oak",
+      "name": "Oak Veneer",
+      "rgb": [0.72, 0.55, 0.35],
+      "roughness": 0.55,
+      "method": "MATT",
+      "category": "wood"
+    },
+    {
+      "id": "mat-aluminium",
+      "name": "Brushed Aluminium",
+      "rgb": [0.82, 0.82, 0.85],
+      "roughness": 0.35,
+      "method": "METAL",
+      "category": "metal"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "BuildFlow Small Office",
+    "approved_terms": ["Office", "Workstation", "Reception"],
+    "forbidden_terms": []
+  }
+}

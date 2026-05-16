@@ -25,12 +25,17 @@ export interface FeatureFlags {
    *  routes the wf-13 composition through the QStash-backed queued path
    *  instead of the synchronous node-loop. */
   briefToIfcV2QueueEnabled: boolean;
+  /** Brief-to-IFC v3 generator-agent pipeline. When true, surfaces the
+   *  v3 endpoints (`/api/brief-to-ifc/v3/*`) and any future v3 canvas
+   *  nodes to this user. */
+  briefToIfcV3Enabled: boolean;
 }
 
 const DEFAULT_FLAGS: FeatureFlags = {
   vipJobsEnabled: false,
   briefRendersEnabled: false,
   briefToIfcV2QueueEnabled: false,
+  briefToIfcV3Enabled: false,
 };
 
 let cachedFlags: FeatureFlags | null = null;

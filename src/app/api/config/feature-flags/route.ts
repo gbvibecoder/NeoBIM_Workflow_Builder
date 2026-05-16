@@ -11,6 +11,7 @@ import { auth } from "@/lib/auth";
 import { shouldUserSeeVip } from "@/features/floor-plan/lib/vip-pipeline/canary";
 import { shouldUserSeeBriefRenders } from "@/features/brief-renders/services/brief-pipeline/canary";
 import { shouldUseBriefToIfcV2Queue } from "@/features/ifc/services/brief-to-ifc-v2/canary";
+import { shouldUseBriefToIfcV3 } from "@/features/brief-to-ifc/v3";
 
 export async function GET() {
   const session = await auth();
@@ -22,5 +23,6 @@ export async function GET() {
     vipJobsEnabled: shouldUserSeeVip(email, userId),
     briefRendersEnabled: shouldUserSeeBriefRenders(email, userId),
     briefToIfcV2QueueEnabled: shouldUseBriefToIfcV2Queue(email),
+    briefToIfcV3Enabled: shouldUseBriefToIfcV3(email),
   });
 }

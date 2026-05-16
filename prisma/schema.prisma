@@ -1175,6 +1175,98 @@ model BriefToIfcJob {
   @@map("brief_to_ifc_jobs")
 }
 
+// ─── Brief-to-IFC v3 — observability surface (Phase v3 hardening) ────
+//
+// v3 runs in a DEDICATED state machine — distinct from v2's
+// `BriefToIfcJob` and from the canvas-tied `Execution`. The v3 lifecycle
+// is "agent loop with tools" (one Run per generate call), not v2's
+// three-stage queue OR v1's per-tile artifact map.
+//
+// Sharing tables across pipelines would conflate three different state
+// machines; keeping v3 isolated lets the observability layer (status
+// transitions, heartbeat, error-code enum, log stream) ship strictly
+// "v3 only" per the Phase observability spec Rule 8.
+
+enum BriefToIfcV3RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model BriefToIfcV3Run {
+  id                String                @id @default(cuid())
+  userId            String
+  workflowId        String? // optional — caller correlation, not enforced
+  status            BriefToIfcV3RunStatus @default(PENDING)
+  // Snapshot of the BriefSpec the agent operated on (post-Layer 1
+  // enrichment, or the user-supplied briefSpec if Layer 1 was skipped).
+  briefSpec         Json
+  // Layer 1 telemetry — null when caller passed `briefSpec` directly.
+  enrichmentCostUsd Float?
+  enrichmentMs      Int?
+  // Layer 2 (generator) telemetry. Populated incrementally by the
+  // background runner so a stuck run still has the partial ledger
+  // visible in the diagnostic CLI.
+  generatorCostUsd  Float                 @default(0)
+  generatorMs       Int                   @default(0)
+  turns             Int                   @default(0)
+  ledger            Json                  @default("[]") // AgentTokenLedgerEntry[]
+  turnRecords       Json                  @default("[]") // AgentTurnRecord[]
+  // Final IFC artifact. Set ONLY when status=COMPLETED.
+  ifcUrl            String?
+  entityCount       Int?
+  finalValidation   Json?
+  // Failure detail. Set ONLY when status=FAILED (or CANCELLED).
+  // `errorCode` MUST be a member of BRIEF_TO_IFC_V3_ERROR_CODES;
+  // refusal is enforced at the `transitionStatus()` helper.
+  errorCode         String?
+  errorMessage      String?
+  // Liveness — set by the background runner's heartbeat ticker every
+  // ~5s. A sweep job marks RUNNING rows whose lastHeartbeatAt is
+  // older than 5 min as FAILED with code STUCK_NO_HEARTBEAT.
+  lastHeartbeatAt   DateTime?
+  // Cost cap honoured by the run (echoed back for audit).
+  costCapUsd        Float?
+  // Cost-cap-exceeded short-circuit and other partial-ledger results
+  // keep these intermediate fields trustworthy at any moment in time.
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([workflowId])
+  @@index([lastHeartbeatAt])
+  @@map("brief_to_ifc_v3_runs")
+}
+
+// Structured execution log. `executionId` is a plain string column,
+// NOT a Prisma relation, so the same table can carry logs for any
+// future execution shape (v2 job, v3 run, future v4) without a
+// polymorphic FK kludge. Index makes per-run timeline retrieval fast.
+model ExecutionLog {
+  id          String   @id @default(cuid())
+  executionId String
+  // INFO | WARN | ERROR | DEBUG — kept as a plain string so callers
+  // can't typo their way into a 500. Enforced at appendLog().
+  level       String
+  // Free-form source label so the dashboard can group logs by stage.
+  // Common values: ENRICH | GENERATE | TOOL_CALL | SANDBOX |
+  // HEARTBEAT | LIFECYCLE | DIAGNOSTIC.
+  source      String
+  message     String   @db.Text
+  // Structured metadata — tool input/output, token counts, durations.
+  // Kept Json? so a log line with no metadata stays cheap.
+  metadata    Json?
+  timestamp   DateTime @default(now())
+
+  @@index([executionId, timestamp])
+  @@map("execution_logs")
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Z.CANVAS.SCHEMA — Canvas Collaboration Models
 // ═══════════════════════════════════════════════════════════════════
