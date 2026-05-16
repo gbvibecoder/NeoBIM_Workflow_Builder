@@ -1,0 +1,665 @@
+{
+  "file": "residential-bedroom.ifc",
+  "schema": "IFC2X3",
+  "entity_count_total": 603,
+  "length_unit": {
+    "kind": "SI",
+    "prefix": "MILLI",
+    "name": "METRE",
+    "label": ".MILLI.METRE."
+  },
+  "spatial": {
+    "site_count": 1,
+    "building_count": 1,
+    "storey_count": 1,
+    "space_count": 1
+  },
+  "products_by_class": {
+    "IfcBuildingElementProxy": 7,
+    "IfcSlab": 1,
+    "IfcWall": 4,
+    "IfcFurnishingElement": 9,
+    "IfcBuilding": 1,
+    "IfcBuildingStorey": 1,
+    "IfcSite": 1,
+    "IfcSpace": 1
+  },
+  "spaces": [
+    {
+      "name": "SP-BEDROOM",
+      "long_name": "Master Bedroom",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 0.004,
+        "ymax": 0.005,
+        "zmax": 0.0027,
+        "xext": 0.004,
+        "yext": 0.005,
+        "zext": 0.0027
+      }
+    }
+  ],
+  "elements": [
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL-N",
+      "tag": "WALL-N",
+      "placement_origin": [
+        0.0,
+        4.9,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.002,
+        "ymin": 0.004850000000000001,
+        "zmin": 5e-05,
+        "xmax": 0.002,
+        "ymax": 0.00495,
+        "zmax": 0.0027,
+        "xext": 0.004,
+        "yext": 9.99999999999994e-05,
+        "zext": 0.00265
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL-S",
+      "tag": "WALL-S",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.002,
+        "ymin": -5e-05,
+        "zmin": 5e-05,
+        "xmax": 0.002,
+        "ymax": 5e-05,
+        "zmax": 0.0027,
+        "xext": 0.004,
+        "yext": 0.0001,
+        "zext": 0.00265
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL-E",
+      "tag": "WALL-E",
+      "placement_origin": [
+        3.9,
+        0.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.0038499999999999997,
+        "ymin": -0.0025,
+        "zmin": 5e-05,
+        "xmax": 0.0039499999999999995,
+        "ymax": 0.0025,
+        "zmax": 0.0027,
+        "xext": 9.999999999999983e-05,
+        "yext": 0.005,
+        "zext": 0.00265
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL-W",
+      "tag": "WALL-W",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -5e-05,
+        "ymin": -0.0025,
+        "zmin": 5e-05,
+        "xmax": 5e-05,
+        "ymax": 0.0025,
+        "zmax": 0.0027,
+        "xext": 0.0001,
+        "yext": 0.005,
+        "zext": 0.00265
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "FLOOR",
+      "tag": "FLOOR",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": -0.002,
+        "ymin": -0.0025,
+        "zmin": 0.0,
+        "xmax": 0.002,
+        "ymax": 0.0025,
+        "zmax": 5e-05,
+        "xext": 0.004,
+        "yext": 0.005,
+        "zext": 5e-05
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "BED-FRAME",
+      "tag": "BED-FRAME",
+      "placement_origin": [
+        1.25,
+        0.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.0005,
+        "ymin": -0.0005,
+        "zmin": 5e-05,
+        "xmax": 0.002,
+        "ymax": 0.0015,
+        "zmax": 0.00045000000000000004,
+        "xext": 0.0015,
+        "yext": 0.002,
+        "zext": 0.0004
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "BEDSIDE-L",
+      "tag": "BEDSIDE-L",
+      "placement_origin": [
+        0.55,
+        1.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00030000000000000003,
+        "ymin": 0.0008,
+        "zmin": 5e-05,
+        "xmax": 0.0008,
+        "ymax": 0.0012000000000000001,
+        "zmax": 0.0006000000000000001,
+        "xext": 0.0005,
+        "yext": 0.0004000000000000001,
+        "zext": 0.00055
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "BEDSIDE-R",
+      "tag": "BEDSIDE-R",
+      "placement_origin": [
+        2.95,
+        1.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.0027,
+        "ymin": 0.0008,
+        "zmin": 5e-05,
+        "xmax": 0.0032000000000000006,
+        "ymax": 0.0012000000000000001,
+        "zmax": 0.0006000000000000001,
+        "xext": 0.0005000000000000004,
+        "yext": 0.0004000000000000001,
+        "zext": 0.00055
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "LAMP-L-BODY",
+      "tag": "LAMP-L-BODY",
+      "placement_origin": [
+        0.7,
+        1.15,
+        0.6
+      ],
+      "world_bbox": {
+        "xmin": 0.00065,
+        "ymin": 0.0011,
+        "zmin": 0.0006,
+        "xmax": 0.00075,
+        "ymax": 0.0012,
+        "zmax": 0.00085,
+        "xext": 0.00010000000000000005,
+        "yext": 9.999999999999983e-05,
+        "zext": 0.00025
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "LAMP-R-BODY",
+      "tag": "LAMP-R-BODY",
+      "placement_origin": [
+        3.1,
+        1.15,
+        0.6
+      ],
+      "world_bbox": {
+        "xmin": 0.00305,
+        "ymin": 0.0011,
+        "zmin": 0.0006,
+        "xmax": 0.0031500000000000005,
+        "ymax": 0.0012,
+        "zmax": 0.00085,
+        "xext": 0.00010000000000000026,
+        "yext": 9.999999999999983e-05,
+        "zext": 0.00025
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DRESSER",
+      "tag": "DRESSER",
+      "placement_origin": [
+        0.5,
+        3.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.00025,
+        "ymin": 0.0032500000000000003,
+        "zmin": 5e-05,
+        "xmax": 0.00125,
+        "ymax": 0.00375,
+        "zmax": 0.0009500000000000001,
+        "xext": 0.0015,
+        "yext": 0.0004999999999999996,
+        "zext": 0.0009000000000000001
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "WARDROBE",
+      "tag": "WARDROBE",
+      "placement_origin": [
+        1.0,
+        4.3,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.004,
+        "zmin": 5e-05,
+        "xmax": 0.002,
+        "ymax": 0.0046,
+        "zmax": 0.00245,
+        "xext": 0.002,
+        "yext": 0.0005999999999999998,
+        "zext": 0.0024
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "PLANTER-01",
+      "tag": "PLANTER-01",
+      "placement_origin": [
+        0.3,
+        4.4,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 9.999999999999996e-05,
+        "ymin": 0.004200000000000001,
+        "zmin": 5e-05,
+        "xmax": 0.0005,
+        "ymax": 0.0046,
+        "zmax": 0.00045000000000000004,
+        "xext": 0.0004000000000000001,
+        "yext": 0.0003999999999999993,
+        "zext": 0.0004
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "PLANTER-02",
+      "tag": "PLANTER-02",
+      "placement_origin": [
+        3.3,
+        0.6,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.0031,
+        "ymin": 0.00039999999999999996,
+        "zmin": 5e-05,
+        "xmax": 0.0035,
+        "ymax": 0.0007999999999999999,
+        "zmax": 0.00045000000000000004,
+        "xext": 0.0004000000000000002,
+        "yext": 0.00039999999999999996,
+        "zext": 0.0004
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MATTRESS",
+      "tag": "MATTRESS",
+      "placement_origin": [
+        1.25,
+        0.5,
+        0.45
+      ],
+      "world_bbox": {
+        "xmin": 0.0005,
+        "ymin": -0.0005,
+        "zmin": 0.00045000000000000004,
+        "xmax": 0.002,
+        "ymax": 0.0015,
+        "zmax": 0.0007000000000000001,
+        "xext": 0.0015,
+        "yext": 0.002,
+        "zext": 0.00025000000000000006
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LAMP-L-SHADE",
+      "tag": "LAMP-L-SHADE",
+      "placement_origin": [
+        0.65,
+        1.1,
+        0.85
+      ],
+      "world_bbox": {
+        "xmin": 0.00055,
+        "ymin": 0.001,
+        "zmin": 0.00085,
+        "xmax": 0.0007500000000000001,
+        "ymax": 0.0012000000000000001,
+        "zmax": 0.0010299999999999999,
+        "xext": 0.0002000000000000001,
+        "yext": 0.0002000000000000001,
+        "zext": 0.00017999999999999993
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LAMP-R-SHADE",
+      "tag": "LAMP-R-SHADE",
+      "placement_origin": [
+        3.05,
+        1.1,
+        0.85
+      ],
+      "world_bbox": {
+        "xmin": 0.00295,
+        "ymin": 0.001,
+        "zmin": 0.00085,
+        "xmax": 0.0031499999999999996,
+        "ymax": 0.0012000000000000001,
+        "zmax": 0.0010299999999999999,
+        "xext": 0.00019999999999999966,
+        "yext": 0.0002000000000000001,
+        "zext": 0.00017999999999999993
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "WINDOW-S",
+      "tag": "WINDOW-S",
+      "placement_origin": [
+        1.0,
+        0.05,
+        0.8
+      ],
+      "world_bbox": {
+        "xmin": 0.00025,
+        "ymin": 4e-05,
+        "zmin": 0.0008,
+        "xmax": 0.00175,
+        "ymax": 6e-05,
+        "zmax": 0.0022,
+        "xext": 0.0015,
+        "yext": 1.9999999999999998e-05,
+        "zext": 0.0014000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PENDANT-CEILING",
+      "tag": "PENDANT-CEILING",
+      "placement_origin": [
+        1.95,
+        2.5,
+        2.4
+      ],
+      "world_bbox": {
+        "xmin": 0.0018,
+        "ymin": 0.00235,
+        "zmin": 0.0024,
+        "xmax": 0.0021,
+        "ymax": 0.00265,
+        "zmax": 0.0026999999999999997,
+        "xext": 0.0002999999999999999,
+        "yext": 0.0002999999999999999,
+        "zext": 0.0002999999999999999
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PLANTER-01-FOLIAGE",
+      "tag": "PLANTER-01-FOLIAGE",
+      "placement_origin": [
+        0.3,
+        4.4,
+        0.4
+      ],
+      "world_bbox": {
+        "xmin": 4.999999999999997e-05,
+        "ymin": 0.00415,
+        "zmin": 0.0004,
+        "xmax": 0.0005499999999999999,
+        "ymax": 0.0046500000000000005,
+        "zmax": 0.001,
+        "xext": 0.0005,
+        "yext": 0.0005000000000000004,
+        "zext": 0.0006000000000000001
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PLANTER-02-FOLIAGE",
+      "tag": "PLANTER-02-FOLIAGE",
+      "placement_origin": [
+        3.3,
+        0.6,
+        0.4
+      ],
+      "world_bbox": {
+        "xmin": 0.0030499999999999998,
+        "ymin": 0.00034999999999999994,
+        "zmin": 0.0004,
+        "xmax": 0.00355,
+        "ymax": 0.00085,
+        "zmax": 0.001,
+        "xext": 0.0005000000000000004,
+        "yext": 0.0005,
+        "zext": 0.0006000000000000001
+      }
+    }
+  ],
+  "placement_at_origin_count": 1,
+  "element_total": 21,
+  "aggregate_world_bbox": {
+    "xmin": -0.002,
+    "ymin": -0.0025,
+    "zmin": 0.0,
+    "xmax": 0.0039499999999999995,
+    "ymax": 0.00495,
+    "zmax": 0.0027,
+    "xext": 0.0059499999999999996,
+    "yext": 0.00745,
+    "zext": 0.0027
+  },
+  "top_10_largest": [
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL-E",
+      "name": "WALL-E",
+      "xext": 9.999999999999983e-05,
+      "yext": 0.005,
+      "zext": 0.00265
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL-W",
+      "name": "WALL-W",
+      "xext": 0.0001,
+      "yext": 0.005,
+      "zext": 0.00265
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "FLOOR",
+      "name": "FLOOR",
+      "xext": 0.004,
+      "yext": 0.005,
+      "zext": 5e-05
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL-N",
+      "name": "WALL-N",
+      "xext": 0.004,
+      "yext": 9.99999999999994e-05,
+      "zext": 0.00265
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL-S",
+      "name": "WALL-S",
+      "xext": 0.004,
+      "yext": 0.0001,
+      "zext": 0.00265
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "WARDROBE",
+      "name": "WARDROBE",
+      "xext": 0.002,
+      "yext": 0.0005999999999999998,
+      "zext": 0.0024
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "BED-FRAME",
+      "name": "BED-FRAME",
+      "xext": 0.0015,
+      "yext": 0.002,
+      "zext": 0.0004
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "MATTRESS",
+      "name": "MATTRESS",
+      "xext": 0.0015,
+      "yext": 0.002,
+      "zext": 0.00025000000000000006
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DRESSER",
+      "name": "DRESSER",
+      "xext": 0.0015,
+      "yext": 0.0004999999999999996,
+      "zext": 0.0009000000000000001
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "WINDOW-S",
+      "name": "WINDOW-S",
+      "xext": 0.0015,
+      "yext": 1.9999999999999998e-05,
+      "zext": 0.0014000000000000002
+    }
+  ],
+  "top_10_smallest": [
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LAMP-R-SHADE",
+      "name": "LAMP-R-SHADE",
+      "xext": 0.00019999999999999966,
+      "yext": 0.0002000000000000001,
+      "zext": 0.00017999999999999993
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LAMP-L-SHADE",
+      "name": "LAMP-L-SHADE",
+      "xext": 0.0002000000000000001,
+      "yext": 0.0002000000000000001,
+      "zext": 0.00017999999999999993
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "LAMP-R-BODY",
+      "name": "LAMP-R-BODY",
+      "xext": 0.00010000000000000026,
+      "yext": 9.999999999999983e-05,
+      "zext": 0.00025
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "LAMP-L-BODY",
+      "name": "LAMP-L-BODY",
+      "xext": 0.00010000000000000005,
+      "yext": 9.999999999999983e-05,
+      "zext": 0.00025
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "PENDANT-CEILING",
+      "name": "PENDANT-CEILING",
+      "xext": 0.0002999999999999999,
+      "yext": 0.0002999999999999999,
+      "zext": 0.0002999999999999999
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "PLANTER-01",
+      "name": "PLANTER-01",
+      "xext": 0.0004000000000000001,
+      "yext": 0.0003999999999999993,
+      "zext": 0.0004
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "PLANTER-02",
+      "name": "PLANTER-02",
+      "xext": 0.0004000000000000002,
+      "yext": 0.00039999999999999996,
+      "zext": 0.0004
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "BEDSIDE-R",
+      "name": "BEDSIDE-R",
+      "xext": 0.0005000000000000004,
+      "yext": 0.0004000000000000001,
+      "zext": 0.00055
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "BEDSIDE-L",
+      "name": "BEDSIDE-L",
+      "xext": 0.0005,
+      "yext": 0.0004000000000000001,
+      "zext": 0.00055
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "PLANTER-02-FOLIAGE",
+      "name": "PLANTER-02-FOLIAGE",
+      "xext": 0.0005000000000000004,
+      "yext": 0.0005,
+      "zext": 0.0006000000000000001
+    }
+  ],
+  "material_assignment_counts": {}
+}

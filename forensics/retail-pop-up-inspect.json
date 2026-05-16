@@ -1,0 +1,518 @@
+{
+  "file": "retail-pop-up.ifc",
+  "schema": "IFC2X3",
+  "entity_count_total": 420,
+  "length_unit": {
+    "kind": "SI",
+    "prefix": "MILLI",
+    "name": "METRE",
+    "label": ".MILLI.METRE."
+  },
+  "spatial": {
+    "site_count": 1,
+    "building_count": 1,
+    "storey_count": 1,
+    "space_count": 1
+  },
+  "products_by_class": {
+    "IfcBuildingElementProxy": 6,
+    "IfcSlab": 1,
+    "IfcWall": 3,
+    "IfcFurnishingElement": 4,
+    "IfcBuilding": 1,
+    "IfcBuildingStorey": 1,
+    "IfcSite": 1,
+    "IfcSpace": 1
+  },
+  "spaces": [
+    {
+      "name": "SP-RETAIL",
+      "long_name": "Retail Floor",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 0.006,
+        "ymax": 0.006,
+        "zmax": 0.003,
+        "xext": 0.006,
+        "yext": 0.006,
+        "zext": 0.003
+      }
+    }
+  ],
+  "elements": [
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL-N",
+      "tag": "WALL-N",
+      "placement_origin": [
+        0.0,
+        6.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": -0.003,
+        "ymin": 0.00594,
+        "zmin": 0.0,
+        "xmax": 0.003,
+        "ymax": 0.00606,
+        "zmax": 0.003,
+        "xext": 0.006,
+        "yext": 0.00012000000000000031,
+        "zext": 0.003
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL-E",
+      "tag": "WALL-E",
+      "placement_origin": [
+        5.88,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.00582,
+        "ymin": -0.003,
+        "zmin": 0.0,
+        "xmax": 0.00594,
+        "ymax": 0.003,
+        "zmax": 0.003,
+        "xext": 0.00012000000000000031,
+        "yext": 0.006,
+        "zext": 0.003
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL-W",
+      "tag": "WALL-W",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": -6e-05,
+        "ymin": -0.003,
+        "zmin": 0.0,
+        "xmax": 6e-05,
+        "ymax": 0.003,
+        "zmax": 0.003,
+        "xext": 0.00012,
+        "yext": 0.006,
+        "zext": 0.003
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SLAB-FLOOR",
+      "tag": "SLAB-FLOOR",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": -0.003,
+        "ymin": -0.003,
+        "zmin": 0.0,
+        "xmax": 0.003,
+        "ymax": 0.003,
+        "zmax": 0.0001,
+        "xext": 0.006,
+        "yext": 0.006,
+        "zext": 0.0001
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DISPLAY-CENTRE",
+      "tag": "DISPLAY-CENTRE",
+      "placement_origin": [
+        2.0,
+        2.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.001,
+        "ymin": 0.001,
+        "zmin": 0.0,
+        "xmax": 0.003,
+        "ymax": 0.003,
+        "zmax": 0.0009000000000000001,
+        "xext": 0.002,
+        "yext": 0.002,
+        "zext": 0.0009000000000000001
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DISPLAY-LEFT",
+      "tag": "DISPLAY-LEFT",
+      "placement_origin": [
+        0.3,
+        0.5,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": -0.00025,
+        "zmin": 0.0,
+        "xmax": 0.0006,
+        "ymax": 0.00125,
+        "zmax": 0.0018000000000000002,
+        "xext": 0.0006,
+        "yext": 0.0015,
+        "zext": 0.0018000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DISPLAY-RIGHT",
+      "tag": "DISPLAY-RIGHT",
+      "placement_origin": [
+        5.1,
+        0.5,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0048,
+        "ymin": -0.00025,
+        "zmin": 0.0,
+        "xmax": 0.005399999999999999,
+        "ymax": 0.00125,
+        "zmax": 0.0018000000000000002,
+        "xext": 0.0005999999999999998,
+        "yext": 0.0015,
+        "zext": 0.0018000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "CASH-COUNTER",
+      "tag": "CASH-COUNTER",
+      "placement_origin": [
+        4.5,
+        4.5,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0039000000000000007,
+        "ymin": 0.004200000000000001,
+        "zmin": 0.0,
+        "xmax": 0.0051,
+        "ymax": 0.0048000000000000004,
+        "zmax": 0.0010500000000000002,
+        "xext": 0.0011999999999999997,
+        "yext": 0.0005999999999999998,
+        "zext": 0.0010500000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT-PEND-01",
+      "tag": "LIGHT-PEND-01",
+      "placement_origin": [
+        1.5,
+        1.5,
+        2.5
+      ],
+      "world_bbox": {
+        "xmin": 0.00135,
+        "ymin": 0.00135,
+        "zmin": 0.0025,
+        "xmax": 0.00165,
+        "ymax": 0.00165,
+        "zmax": 0.0029000000000000002,
+        "xext": 0.0002999999999999999,
+        "yext": 0.0002999999999999999,
+        "zext": 0.0004000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT-PEND-02",
+      "tag": "LIGHT-PEND-02",
+      "placement_origin": [
+        4.5,
+        1.5,
+        2.5
+      ],
+      "world_bbox": {
+        "xmin": 0.004350000000000001,
+        "ymin": 0.00135,
+        "zmin": 0.0025,
+        "xmax": 0.0046500000000000005,
+        "ymax": 0.00165,
+        "zmax": 0.0029000000000000002,
+        "xext": 0.0002999999999999999,
+        "yext": 0.0002999999999999999,
+        "zext": 0.0004000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT-PEND-03",
+      "tag": "LIGHT-PEND-03",
+      "placement_origin": [
+        1.5,
+        4.5,
+        2.5
+      ],
+      "world_bbox": {
+        "xmin": 0.00135,
+        "ymin": 0.004350000000000001,
+        "zmin": 0.0025,
+        "xmax": 0.00165,
+        "ymax": 0.0046500000000000005,
+        "zmax": 0.0029000000000000002,
+        "xext": 0.0002999999999999999,
+        "yext": 0.0002999999999999999,
+        "zext": 0.0004000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT-PEND-04",
+      "tag": "LIGHT-PEND-04",
+      "placement_origin": [
+        4.5,
+        4.5,
+        2.5
+      ],
+      "world_bbox": {
+        "xmin": 0.004350000000000001,
+        "ymin": 0.004350000000000001,
+        "zmin": 0.0025,
+        "xmax": 0.0046500000000000005,
+        "ymax": 0.0046500000000000005,
+        "zmax": 0.0029000000000000002,
+        "xext": 0.0002999999999999999,
+        "yext": 0.0002999999999999999,
+        "zext": 0.0004000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PROXY-LOGO",
+      "tag": "PROXY-LOGO",
+      "placement_origin": [
+        2.0,
+        5.96,
+        1.0
+      ],
+      "world_bbox": {
+        "xmin": 0.001,
+        "ymin": 0.00594,
+        "zmin": 0.001,
+        "xmax": 0.003,
+        "ymax": 0.00598,
+        "zmax": 0.0015999999999999999,
+        "xext": 0.002,
+        "yext": 4.0000000000000105e-05,
+        "zext": 0.0005999999999999998
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PROXY-PRICE-BOARD",
+      "tag": "PROXY-PRICE-BOARD",
+      "placement_origin": [
+        4.5,
+        4.4,
+        1.2
+      ],
+      "world_bbox": {
+        "xmin": 0.0041,
+        "ymin": 0.004350000000000001,
+        "zmin": 0.0012,
+        "xmax": 0.004900000000000001,
+        "ymax": 0.00445,
+        "zmax": 0.0017,
+        "xext": 0.0008000000000000004,
+        "yext": 9.99999999999994e-05,
+        "zext": 0.0005
+      }
+    }
+  ],
+  "placement_at_origin_count": 2,
+  "element_total": 14,
+  "aggregate_world_bbox": {
+    "xmin": -0.003,
+    "ymin": -0.003,
+    "zmin": 0.0,
+    "xmax": 0.00594,
+    "ymax": 0.00606,
+    "zmax": 0.003,
+    "xext": 0.00894,
+    "yext": 0.00906,
+    "zext": 0.003
+  },
+  "top_10_largest": [
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL-N",
+      "name": "WALL-N",
+      "xext": 0.006,
+      "yext": 0.00012000000000000031,
+      "zext": 0.003
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL-E",
+      "name": "WALL-E",
+      "xext": 0.00012000000000000031,
+      "yext": 0.006,
+      "zext": 0.003
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL-W",
+      "name": "WALL-W",
+      "xext": 0.00012,
+      "yext": 0.006,
+      "zext": 0.003
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB-FLOOR",
+      "name": "SLAB-FLOOR",
+      "xext": 0.006,
+      "yext": 0.006,
+      "zext": 0.0001
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DISPLAY-CENTRE",
+      "name": "DISPLAY-CENTRE",
+      "xext": 0.002,
+      "yext": 0.002,
+      "zext": 0.0009000000000000001
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "PROXY-LOGO",
+      "name": "PROXY-LOGO",
+      "xext": 0.002,
+      "yext": 4.0000000000000105e-05,
+      "zext": 0.0005999999999999998
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DISPLAY-LEFT",
+      "name": "DISPLAY-LEFT",
+      "xext": 0.0006,
+      "yext": 0.0015,
+      "zext": 0.0018000000000000002
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DISPLAY-RIGHT",
+      "name": "DISPLAY-RIGHT",
+      "xext": 0.0005999999999999998,
+      "yext": 0.0015,
+      "zext": 0.0018000000000000002
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "CASH-COUNTER",
+      "name": "CASH-COUNTER",
+      "xext": 0.0011999999999999997,
+      "yext": 0.0005999999999999998,
+      "zext": 0.0010500000000000002
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "PROXY-PRICE-BOARD",
+      "name": "PROXY-PRICE-BOARD",
+      "xext": 0.0008000000000000004,
+      "yext": 9.99999999999994e-05,
+      "zext": 0.0005
+    }
+  ],
+  "top_10_smallest": [
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT-PEND-04",
+      "name": "LIGHT-PEND-04",
+      "xext": 0.0002999999999999999,
+      "yext": 0.0002999999999999999,
+      "zext": 0.0004000000000000002
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT-PEND-03",
+      "name": "LIGHT-PEND-03",
+      "xext": 0.0002999999999999999,
+      "yext": 0.0002999999999999999,
+      "zext": 0.0004000000000000002
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT-PEND-02",
+      "name": "LIGHT-PEND-02",
+      "xext": 0.0002999999999999999,
+      "yext": 0.0002999999999999999,
+      "zext": 0.0004000000000000002
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT-PEND-01",
+      "name": "LIGHT-PEND-01",
+      "xext": 0.0002999999999999999,
+      "yext": 0.0002999999999999999,
+      "zext": 0.0004000000000000002
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "PROXY-PRICE-BOARD",
+      "name": "PROXY-PRICE-BOARD",
+      "xext": 0.0008000000000000004,
+      "yext": 9.99999999999994e-05,
+      "zext": 0.0005
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "CASH-COUNTER",
+      "name": "CASH-COUNTER",
+      "xext": 0.0011999999999999997,
+      "yext": 0.0005999999999999998,
+      "zext": 0.0010500000000000002
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DISPLAY-RIGHT",
+      "name": "DISPLAY-RIGHT",
+      "xext": 0.0005999999999999998,
+      "yext": 0.0015,
+      "zext": 0.0018000000000000002
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DISPLAY-LEFT",
+      "name": "DISPLAY-LEFT",
+      "xext": 0.0006,
+      "yext": 0.0015,
+      "zext": 0.0018000000000000002
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "PROXY-LOGO",
+      "name": "PROXY-LOGO",
+      "xext": 0.002,
+      "yext": 4.0000000000000105e-05,
+      "zext": 0.0005999999999999998
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DISPLAY-CENTRE",
+      "name": "DISPLAY-CENTRE",
+      "xext": 0.002,
+      "yext": 0.002,
+      "zext": 0.0009000000000000001
+    }
+  ],
+  "material_assignment_counts": {}
+}

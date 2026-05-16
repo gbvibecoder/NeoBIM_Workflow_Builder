@@ -1,0 +1,1970 @@
+{
+  "file": "sol-properties-booth.ifc",
+  "schema": "IFC2X3",
+  "entity_count_total": 2146,
+  "length_unit": {
+    "kind": "SI",
+    "prefix": "MILLI",
+    "name": "METRE",
+    "label": ".MILLI.METRE."
+  },
+  "spatial": {
+    "site_count": 1,
+    "building_count": 1,
+    "storey_count": 1,
+    "space_count": 8
+  },
+  "products_by_class": {
+    "IfcBeam": 1,
+    "IfcBuildingElementProxy": 34,
+    "IfcColumn": 9,
+    "IfcCovering": 13,
+    "IfcSlab": 1,
+    "IfcWall": 9,
+    "IfcFurnishingElement": 11,
+    "IfcBuilding": 1,
+    "IfcBuildingStorey": 1,
+    "IfcSite": 1,
+    "IfcSpace": 8
+  },
+  "spaces": [
+    {
+      "name": "SP-01",
+      "long_name": "Entrance Approach",
+      "world_bbox": {
+        "xmin": 0.005,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 0.01,
+        "ymax": 0.003,
+        "zmax": 0.0045000000000000005,
+        "xext": 0.005,
+        "yext": 0.003,
+        "zext": 0.0045000000000000005
+      }
+    },
+    {
+      "name": "SP-02",
+      "long_name": "Reception Desk Zone",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.012,
+        "zmin": 0.0,
+        "xmax": 0.005,
+        "ymax": 0.015,
+        "zmax": 0.0045000000000000005,
+        "xext": 0.005,
+        "yext": 0.002999999999999999,
+        "zext": 0.0045000000000000005
+      }
+    },
+    {
+      "name": "SP-03",
+      "long_name": "Lounge",
+      "world_bbox": {
+        "xmin": 0.01,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 0.015,
+        "ymax": 0.005,
+        "zmax": 0.0045000000000000005,
+        "xext": 0.004999999999999999,
+        "yext": 0.005,
+        "zext": 0.0045000000000000005
+      }
+    },
+    {
+      "name": "SP-04",
+      "long_name": "Coffee Hub (central disc)",
+      "world_bbox": {
+        "xmin": 0.0045000000000000005,
+        "ymin": 0.0045000000000000005,
+        "zmin": 0.0,
+        "xmax": 0.0105,
+        "ymax": 0.0105,
+        "zmax": 0.0045000000000000005,
+        "xext": 0.006,
+        "yext": 0.006,
+        "zext": 0.0045000000000000005
+      }
+    },
+    {
+      "name": "SP-05",
+      "long_name": "Terra Casa Display",
+      "world_bbox": {
+        "xmin": 0.01,
+        "ymin": 0.01,
+        "zmin": 0.0,
+        "xmax": 0.015,
+        "ymax": 0.015,
+        "zmax": 0.0045000000000000005,
+        "xext": 0.004999999999999999,
+        "yext": 0.004999999999999999,
+        "zext": 0.0045000000000000005
+      }
+    },
+    {
+      "name": "SP-06",
+      "long_name": "Luxe Display",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.005,
+        "zmin": 0.0,
+        "xmax": 0.005,
+        "ymax": 0.01,
+        "zmax": 0.0045000000000000005,
+        "xext": 0.005,
+        "yext": 0.005,
+        "zext": 0.0045000000000000005
+      }
+    },
+    {
+      "name": "SP-07",
+      "long_name": "Fairmont Residences Display",
+      "world_bbox": {
+        "xmin": 0.01,
+        "ymin": 0.005,
+        "zmin": 0.0,
+        "xmax": 0.015,
+        "ymax": 0.01,
+        "zmax": 0.0045000000000000005,
+        "xext": 0.004999999999999999,
+        "yext": 0.005,
+        "zext": 0.0045000000000000005
+      }
+    },
+    {
+      "name": "SP-08",
+      "long_name": "Staff Service Area",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 0.005,
+        "ymax": 0.005,
+        "zmax": 0.0045000000000000005,
+        "xext": 0.005,
+        "yext": 0.005,
+        "zext": 0.0045000000000000005
+      }
+    }
+  ],
+  "elements": [
+    {
+      "ifc_class": "IfcWall",
+      "name": "FN-01",
+      "tag": "FN-01",
+      "placement_origin": [
+        1.5,
+        0.05,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.001425,
+        "ymin": -0.00024999999999999995,
+        "zmin": 5e-05,
+        "xmax": 0.001575,
+        "ymax": 0.00035,
+        "zmax": 0.00355,
+        "xext": 0.00014999999999999996,
+        "yext": 0.0006,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "FN-02",
+      "tag": "FN-02",
+      "placement_origin": [
+        13.0,
+        0.05,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.012925,
+        "ymin": -0.00024999999999999995,
+        "zmin": 5e-05,
+        "xmax": 0.013075000000000002,
+        "ymax": 0.00035,
+        "zmax": 0.00355,
+        "xext": 0.00015000000000000083,
+        "yext": 0.0006,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "FN-03",
+      "tag": "FN-03",
+      "placement_origin": [
+        14.4,
+        1.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.014100000000000001,
+        "ymin": 0.001425,
+        "zmin": 5e-05,
+        "xmax": 0.014700000000000001,
+        "ymax": 0.001575,
+        "zmax": 0.00355,
+        "xext": 0.0005999999999999998,
+        "yext": 0.00014999999999999996,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "FN-04",
+      "tag": "FN-04",
+      "placement_origin": [
+        14.4,
+        13.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.014100000000000001,
+        "ymin": 0.012925,
+        "zmin": 5e-05,
+        "xmax": 0.014700000000000001,
+        "ymax": 0.013075000000000002,
+        "zmax": 0.00355,
+        "xext": 0.0005999999999999998,
+        "yext": 0.00015000000000000083,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "FN-05",
+      "tag": "FN-05",
+      "placement_origin": [
+        13.0,
+        14.8,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.012925,
+        "ymin": 0.0145,
+        "zmin": 5e-05,
+        "xmax": 0.013075000000000002,
+        "ymax": 0.0151,
+        "zmax": 0.00355,
+        "xext": 0.00015000000000000083,
+        "yext": 0.0005999999999999998,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "FN-06",
+      "tag": "FN-06",
+      "placement_origin": [
+        1.5,
+        14.8,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.001425,
+        "ymin": 0.0145,
+        "zmin": 5e-05,
+        "xmax": 0.001575,
+        "ymax": 0.0151,
+        "zmax": 0.00355,
+        "xext": 0.00014999999999999996,
+        "yext": 0.0005999999999999998,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "FN-07",
+      "tag": "FN-07",
+      "placement_origin": [
+        0.05,
+        13.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.00024999999999999995,
+        "ymin": 0.012925,
+        "zmin": 5e-05,
+        "xmax": 0.00035,
+        "ymax": 0.013075000000000002,
+        "zmax": 0.00355,
+        "xext": 0.0006,
+        "yext": 0.00015000000000000083,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "FN-08",
+      "tag": "FN-08",
+      "placement_origin": [
+        0.05,
+        1.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.00024999999999999995,
+        "ymin": 0.001425,
+        "zmin": 5e-05,
+        "xmax": 0.00035,
+        "ymax": 0.001575,
+        "zmax": 0.00355,
+        "xext": 0.0006,
+        "yext": 0.00014999999999999996,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WL-RC-01",
+      "tag": "WL-RC-01",
+      "placement_origin": [
+        0.05,
+        14.65,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.0014500000000000001,
+        "ymin": 0.014575,
+        "zmin": 5e-05,
+        "xmax": 0.00155,
+        "ymax": 0.014725,
+        "zmax": 0.00355,
+        "xext": 0.003,
+        "yext": 0.00015000000000000083,
+        "zext": 0.0035
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SL-01",
+      "tag": "SL-01",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": -0.0075,
+        "ymin": -0.0075,
+        "zmin": 0.0,
+        "xmax": 0.0075,
+        "ymax": 0.0075,
+        "zmax": 5e-05,
+        "xext": 0.015,
+        "yext": 0.015,
+        "zext": 5e-05
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "PT-01-COL-L",
+      "tag": "PT-01-COL-L",
+      "placement_origin": [
+        5.0,
+        0.2,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00485,
+        "ymin": 5.000000000000002e-05,
+        "zmin": 5e-05,
+        "xmax": 0.00515,
+        "ymax": 0.00035,
+        "zmax": 0.00405,
+        "xext": 0.0002999999999999999,
+        "yext": 0.0003,
+        "zext": 0.004
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "PT-01-COL-R",
+      "tag": "PT-01-COL-R",
+      "placement_origin": [
+        9.7,
+        0.2,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00955,
+        "ymin": 5.000000000000002e-05,
+        "zmin": 5e-05,
+        "xmax": 0.009850000000000001,
+        "ymax": 0.00035,
+        "zmax": 0.00405,
+        "xext": 0.00030000000000000165,
+        "yext": 0.0003,
+        "zext": 0.004
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "CC-01-BASE",
+      "tag": "CC-01-BASE",
+      "placement_origin": [
+        7.5,
+        7.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.004699999999999999,
+        "ymin": 0.0047204151525254475,
+        "zmin": 5e-05,
+        "xmax": 0.0103,
+        "ymax": 0.01027958484747455,
+        "zmax": 0.0009500000000000001,
+        "xext": 0.005600000000000001,
+        "yext": 0.005559169694949103,
+        "zext": 0.0009000000000000001
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "CN-01-SUPPORT-L",
+      "tag": "CN-01-SUPPORT-L",
+      "placement_origin": [
+        5.6,
+        5.6,
+        0.95
+      ],
+      "world_bbox": {
+        "xmin": 0.00555,
+        "ymin": 0.00555,
+        "zmin": 0.00095,
+        "xmax": 0.00565,
+        "ymax": 0.00565,
+        "zmax": 0.0034999999999999996,
+        "xext": 9.99999999999994e-05,
+        "yext": 9.99999999999994e-05,
+        "zext": 0.0025499999999999997
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "CN-01-SUPPORT-R",
+      "tag": "CN-01-SUPPORT-R",
+      "placement_origin": [
+        9.3,
+        9.3,
+        0.95
+      ],
+      "world_bbox": {
+        "xmin": 0.009250000000000001,
+        "ymin": 0.009250000000000001,
+        "zmin": 0.00095,
+        "xmax": 0.00935,
+        "ymax": 0.00935,
+        "zmax": 0.0034999999999999996,
+        "xext": 9.99999999999994e-05,
+        "yext": 9.99999999999994e-05,
+        "zext": 0.0025499999999999997
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "LP-01-BODY",
+      "tag": "LP-01-BODY",
+      "placement_origin": [
+        11.0,
+        11.2,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.01096,
+        "ymin": 0.01116,
+        "zmin": 5e-05,
+        "xmax": 0.01104,
+        "ymax": 0.01124,
+        "zmax": 0.0026500000000000004,
+        "xext": 8.000000000000021e-05,
+        "yext": 8.000000000000021e-05,
+        "zext": 0.0026000000000000003
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "LP-02-BODY",
+      "tag": "LP-02-BODY",
+      "placement_origin": [
+        1.25,
+        6.35,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00121,
+        "ymin": 0.00631,
+        "zmin": 5e-05,
+        "xmax": 0.0012900000000000001,
+        "ymax": 0.00639,
+        "zmax": 0.0026500000000000004,
+        "xext": 8.000000000000021e-05,
+        "yext": 8.000000000000021e-05,
+        "zext": 0.0026000000000000003
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "LP-03-BODY",
+      "tag": "LP-03-BODY",
+      "placement_origin": [
+        11.9,
+        7.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.01186,
+        "ymin": 0.00696,
+        "zmin": 5e-05,
+        "xmax": 0.011940000000000001,
+        "ymax": 0.00704,
+        "zmax": 0.0026500000000000004,
+        "xext": 8.000000000000021e-05,
+        "yext": 8.000000000000021e-05,
+        "zext": 0.0026000000000000003
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "LP-04-BODY",
+      "tag": "LP-04-BODY",
+      "placement_origin": [
+        3.0,
+        12.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00296,
+        "ymin": 0.01246,
+        "zmin": 5e-05,
+        "xmax": 0.00304,
+        "ymax": 0.01254,
+        "zmax": 0.0026500000000000004,
+        "xext": 8.000000000000021e-05,
+        "yext": 8.000000000000021e-05,
+        "zext": 0.0026000000000000003
+      }
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "name": "PT-01-LINTEL",
+      "tag": "PT-01-LINTEL",
+      "placement_origin": [
+        5.0,
+        0.2,
+        4.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0025,
+        "ymin": 5.000000000000002e-05,
+        "zmin": 0.004,
+        "xmax": 0.0075,
+        "ymax": 0.00035,
+        "zmax": 0.0044,
+        "xext": 0.004999999999999999,
+        "yext": 0.0003,
+        "zext": 0.0004000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "SL-01-EDGE-N",
+      "tag": "SL-01-EDGE-N",
+      "placement_origin": [
+        0.0,
+        14.92,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.0075,
+        "ymin": 0.01488,
+        "zmin": 5e-05,
+        "xmax": 0.0075,
+        "ymax": 0.014960000000000001,
+        "zmax": 0.0001,
+        "xext": 0.015,
+        "yext": 8.000000000000021e-05,
+        "zext": 5e-05
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "SL-01-EDGE-E",
+      "tag": "SL-01-EDGE-E",
+      "placement_origin": [
+        14.92,
+        0.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.01488,
+        "ymin": -0.0075,
+        "zmin": 5e-05,
+        "xmax": 0.014960000000000001,
+        "ymax": 0.0075,
+        "zmax": 0.0001,
+        "xext": 8.000000000000021e-05,
+        "yext": 0.015,
+        "zext": 5e-05
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "SL-01-EDGE-S",
+      "tag": "SL-01-EDGE-S",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.0075,
+        "ymin": -4e-05,
+        "zmin": 5e-05,
+        "xmax": 0.0075,
+        "ymax": 4e-05,
+        "zmax": 0.0001,
+        "xext": 0.015,
+        "yext": 8e-05,
+        "zext": 5e-05
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "SL-01-EDGE-W",
+      "tag": "SL-01-EDGE-W",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -4e-05,
+        "ymin": -0.0075,
+        "zmin": 5e-05,
+        "xmax": 4e-05,
+        "ymax": 0.0075,
+        "zmax": 0.0001,
+        "xext": 8e-05,
+        "yext": 0.015,
+        "zext": 5e-05
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "RC-01-TOP",
+      "tag": "RC-01-TOP",
+      "placement_origin": [
+        0.2,
+        12.2,
+        1.15
+      ],
+      "world_bbox": {
+        "xmin": -0.00115,
+        "ymin": 0.011749999999999998,
+        "zmin": 0.00115,
+        "xmax": 0.0015500000000000002,
+        "ymax": 0.01265,
+        "zmax": 0.00119,
+        "xext": 0.0027,
+        "yext": 0.0009000000000000015,
+        "zext": 4.0000000000000105e-05
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "RC-01-TOE-N",
+      "tag": "RC-01-TOE-N",
+      "placement_origin": [
+        0.3,
+        12.95,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.0009500000000000001,
+        "ymin": 0.012924999999999999,
+        "zmin": 5e-05,
+        "xmax": 0.00155,
+        "ymax": 0.012975,
+        "zmax": 0.00015000000000000001,
+        "xext": 0.0025,
+        "yext": 5.000000000000143e-05,
+        "zext": 0.00010000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "RC-01-TOE-E",
+      "tag": "RC-01-TOE-E",
+      "placement_origin": [
+        2.75,
+        12.3,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.002725,
+        "ymin": 0.01195,
+        "zmin": 5e-05,
+        "xmax": 0.0027749999999999997,
+        "ymax": 0.01265,
+        "zmax": 0.00015000000000000001,
+        "xext": 4.99999999999997e-05,
+        "yext": 0.0006999999999999992,
+        "zext": 0.00010000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "RC-01-TOE-S",
+      "tag": "RC-01-TOE-S",
+      "placement_origin": [
+        0.3,
+        12.25,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.0009500000000000001,
+        "ymin": 0.012225,
+        "zmin": 5e-05,
+        "xmax": 0.00155,
+        "ymax": 0.012275000000000001,
+        "zmax": 0.00015000000000000001,
+        "xext": 0.0025,
+        "yext": 5.000000000000143e-05,
+        "zext": 0.00010000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "RC-01-TOE-W",
+      "tag": "RC-01-TOE-W",
+      "placement_origin": [
+        0.25,
+        12.3,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.000225,
+        "ymin": 0.01195,
+        "zmin": 5e-05,
+        "xmax": 0.000275,
+        "ymax": 0.01265,
+        "zmax": 0.00015000000000000001,
+        "xext": 5.000000000000002e-05,
+        "yext": 0.0006999999999999992,
+        "zext": 0.00010000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "CC-01-TOP",
+      "tag": "CC-01-TOP",
+      "placement_origin": [
+        4.5,
+        4.5,
+        0.95
+      ],
+      "world_bbox": {
+        "xmin": 0.0015000000000000005,
+        "ymin": 0.0015000000000000005,
+        "zmin": 0.00095,
+        "xmax": 0.007500000000000001,
+        "ymax": 0.007500000000000001,
+        "zmax": 0.00099,
+        "xext": 0.006,
+        "yext": 0.006,
+        "zext": 3.9999999999999996e-05
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "CC-01-TRIM",
+      "tag": "CC-01-TRIM",
+      "placement_origin": [
+        4.5,
+        4.5,
+        0.99
+      ],
+      "world_bbox": {
+        "xmin": 0.0015000000000000005,
+        "ymin": 0.0015000000000000005,
+        "zmin": 0.00099,
+        "xmax": 0.007500000000000001,
+        "ymax": 0.007500000000000001,
+        "zmax": 0.00101,
+        "xext": 0.006,
+        "yext": 0.006,
+        "zext": 2.0000000000000052e-05
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "CC-01-TOE",
+      "tag": "CC-01-TOE",
+      "placement_origin": [
+        4.65,
+        4.65,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.0018000000000000004,
+        "ymin": 0.0018000000000000004,
+        "zmin": 5e-05,
+        "xmax": 0.007500000000000001,
+        "ymax": 0.007500000000000001,
+        "zmax": 0.00015000000000000001,
+        "xext": 0.0057,
+        "yext": 0.0057,
+        "zext": 0.00010000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "CN-01-CANOPY",
+      "tag": "CN-01-CANOPY",
+      "placement_origin": [
+        5.5,
+        5.5,
+        3.5
+      ],
+      "world_bbox": {
+        "xmin": 0.0034999999999999996,
+        "ymin": 0.0034999999999999996,
+        "zmin": 0.0035,
+        "xmax": 0.0075,
+        "ymax": 0.0075,
+        "zmax": 0.00355,
+        "xext": 0.004,
+        "yext": 0.004,
+        "zext": 5.000000000000013e-05
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "RC-01-BODY",
+      "tag": "RC-01-BODY",
+      "placement_origin": [
+        0.3,
+        12.3,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -0.0009500000000000001,
+        "ymin": 0.01195,
+        "zmin": 5e-05,
+        "xmax": 0.00155,
+        "ymax": 0.01265,
+        "zmax": 0.00115,
+        "xext": 0.0025,
+        "yext": 0.0006999999999999992,
+        "zext": 0.0011
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "RC-01-RETURN",
+      "tag": "RC-01-RETURN",
+      "placement_origin": [
+        0.3,
+        12.3,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": -5.000000000000002e-05,
+        "ymin": 0.011300000000000001,
+        "zmin": 5e-05,
+        "xmax": 0.00065,
+        "ymax": 0.0133,
+        "zmax": 0.00115,
+        "xext": 0.0007,
+        "yext": 0.0019999999999999983,
+        "zext": 0.0011
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "CN-01-MACHINE",
+      "tag": "CN-01-MACHINE",
+      "placement_origin": [
+        7.0,
+        7.0,
+        1.0
+      ],
+      "world_bbox": {
+        "xmin": 0.006675,
+        "ymin": 0.006725,
+        "zmin": 0.001,
+        "xmax": 0.007325,
+        "ymax": 0.007275,
+        "zmax": 0.0015500000000000002,
+        "xext": 0.0006499999999999995,
+        "yext": 0.0005500000000000001,
+        "zext": 0.0005500000000000001
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "MT-TC-BODY",
+      "tag": "MT-TC-BODY",
+      "placement_origin": [
+        11.1,
+        11.3,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.0097,
+        "ymin": 0.010100000000000001,
+        "zmin": 5e-05,
+        "xmax": 0.0125,
+        "ymax": 0.0125,
+        "zmax": 0.0009,
+        "xext": 0.0028000000000000004,
+        "yext": 0.0023999999999999994,
+        "zext": 0.00085
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "MT-LX-BODY",
+      "tag": "MT-LX-BODY",
+      "placement_origin": [
+        1.35,
+        6.45,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.0002000000000000001,
+        "ymin": 0.0054,
+        "zmin": 5e-05,
+        "xmax": 0.0025,
+        "ymax": 0.0075,
+        "zmax": 0.0009,
+        "xext": 0.0023,
+        "yext": 0.0020999999999999994,
+        "zext": 0.00085
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "MT-FM-BODY",
+      "tag": "MT-FM-BODY",
+      "placement_origin": [
+        12.0,
+        7.1,
+        1.05
+      ],
+      "world_bbox": {
+        "xmin": 0.011600000000000001,
+        "ymin": 0.006699999999999999,
+        "zmin": 0.0010500000000000002,
+        "xmax": 0.0124,
+        "ymax": 0.0075,
+        "zmax": 0.0011,
+        "xext": 0.0007999999999999986,
+        "yext": 0.0008000000000000004,
+        "zext": 4.9999999999999914e-05
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "PL-01",
+      "tag": "PL-01",
+      "placement_origin": [
+        11.95,
+        7.05,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.011499999999999998,
+        "ymin": 0.0066,
+        "zmin": 5e-05,
+        "xmax": 0.0124,
+        "ymax": 0.0075,
+        "zmax": 0.00105,
+        "xext": 0.0009000000000000015,
+        "yext": 0.0008999999999999998,
+        "zext": 0.001
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "PL-FLR-01",
+      "tag": "PL-FLR-01",
+      "placement_origin": [
+        4.5,
+        4.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00425,
+        "ymin": 0.00425,
+        "zmin": 5e-05,
+        "xmax": 0.004750000000000001,
+        "ymax": 0.004750000000000001,
+        "zmax": 0.0005,
+        "xext": 0.0005000000000000004,
+        "yext": 0.0005000000000000004,
+        "zext": 0.00045
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "PL-FLR-02",
+      "tag": "PL-FLR-02",
+      "placement_origin": [
+        10.0,
+        4.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00975,
+        "ymin": 0.00425,
+        "zmin": 5e-05,
+        "xmax": 0.01025,
+        "ymax": 0.004750000000000001,
+        "zmax": 0.0005,
+        "xext": 0.0005000000000000004,
+        "yext": 0.0005000000000000004,
+        "zext": 0.00045
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "PL-FLR-03",
+      "tag": "PL-FLR-03",
+      "placement_origin": [
+        10.0,
+        10.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00975,
+        "ymin": 0.00975,
+        "zmin": 5e-05,
+        "xmax": 0.01025,
+        "ymax": 0.01025,
+        "zmax": 0.0005,
+        "xext": 0.0005000000000000004,
+        "yext": 0.0005000000000000004,
+        "zext": 0.00045
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "PL-FLR-04",
+      "tag": "PL-FLR-04",
+      "placement_origin": [
+        4.5,
+        10.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.00425,
+        "ymin": 0.00975,
+        "zmin": 5e-05,
+        "xmax": 0.004750000000000001,
+        "ymax": 0.01025,
+        "zmax": 0.0005,
+        "xext": 0.0005000000000000004,
+        "yext": 0.0005000000000000004,
+        "zext": 0.00045
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PT-01-DISC",
+      "tag": "PT-01-DISC",
+      "placement_origin": [
+        7.35,
+        0.18,
+        2.5
+      ],
+      "world_bbox": {
+        "xmin": 0.0072,
+        "ymin": 0.00015999999999999999,
+        "zmin": 0.0025,
+        "xmax": 0.0075,
+        "ymax": 0.00019999999999999998,
+        "zmax": 0.0028,
+        "xext": 0.0002999999999999999,
+        "yext": 3.9999999999999996e-05,
+        "zext": 0.0002999999999999999
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PT-01-LETTER",
+      "tag": "PT-01-LETTER",
+      "placement_origin": [
+        5.3,
+        0.18,
+        3.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0031,
+        "ymin": 0.00016499999999999997,
+        "zmin": 0.003,
+        "xmax": 0.0075,
+        "ymax": 0.000195,
+        "zmax": 0.0035,
+        "xext": 0.004399999999999999,
+        "yext": 3.0000000000000024e-05,
+        "zext": 0.0005
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "FN-01-LETTER",
+      "tag": "FN-01-LETTER",
+      "placement_origin": [
+        1.5,
+        0.6,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.00148,
+        "ymin": 0.000525,
+        "zmin": 0.0015,
+        "xmax": 0.00152,
+        "ymax": 0.0006749999999999999,
+        "zmax": 0.003,
+        "xext": 4.0000000000000105e-05,
+        "yext": 0.00014999999999999996,
+        "zext": 0.0015
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "FN-02-LETTER",
+      "tag": "FN-02-LETTER",
+      "placement_origin": [
+        13.0,
+        0.6,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.012980000000000002,
+        "ymin": 0.000525,
+        "zmin": 0.0015,
+        "xmax": 0.01302,
+        "ymax": 0.0006749999999999999,
+        "zmax": 0.003,
+        "xext": 3.999999999999837e-05,
+        "yext": 0.00014999999999999996,
+        "zext": 0.0015
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "FN-03-LETTER",
+      "tag": "FN-03-LETTER",
+      "placement_origin": [
+        14.35,
+        1.5,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.014275,
+        "ymin": 0.00148,
+        "zmin": 0.0015,
+        "xmax": 0.014425,
+        "ymax": 0.00152,
+        "zmax": 0.003,
+        "xext": 0.00015000000000000083,
+        "yext": 4.0000000000000105e-05,
+        "zext": 0.0015
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "FN-04-LETTER",
+      "tag": "FN-04-LETTER",
+      "placement_origin": [
+        14.35,
+        13.0,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.014275,
+        "ymin": 0.012980000000000002,
+        "zmin": 0.0015,
+        "xmax": 0.014425,
+        "ymax": 0.01302,
+        "zmax": 0.003,
+        "xext": 0.00015000000000000083,
+        "yext": 3.999999999999837e-05,
+        "zext": 0.0015
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "FN-05-LETTER",
+      "tag": "FN-05-LETTER",
+      "placement_origin": [
+        13.0,
+        14.78,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.012980000000000002,
+        "ymin": 0.014705,
+        "zmin": 0.0015,
+        "xmax": 0.01302,
+        "ymax": 0.014855,
+        "zmax": 0.003,
+        "xext": 3.999999999999837e-05,
+        "yext": 0.00015000000000000083,
+        "zext": 0.0015
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "FN-06-LETTER",
+      "tag": "FN-06-LETTER",
+      "placement_origin": [
+        1.5,
+        14.78,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.00148,
+        "ymin": 0.014705,
+        "zmin": 0.0015,
+        "xmax": 0.00152,
+        "ymax": 0.014855,
+        "zmax": 0.003,
+        "xext": 4.0000000000000105e-05,
+        "yext": 0.00015000000000000083,
+        "zext": 0.0015
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "FN-07-LETTER",
+      "tag": "FN-07-LETTER",
+      "placement_origin": [
+        0.07,
+        13.0,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": -4.999999999999986e-06,
+        "ymin": 0.012980000000000002,
+        "zmin": 0.0015,
+        "xmax": 0.000145,
+        "ymax": 0.01302,
+        "zmax": 0.003,
+        "xext": 0.00015,
+        "yext": 3.999999999999837e-05,
+        "zext": 0.0015
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "FN-08-LETTER",
+      "tag": "FN-08-LETTER",
+      "placement_origin": [
+        0.07,
+        1.5,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": -4.999999999999986e-06,
+        "ymin": 0.00148,
+        "zmin": 0.0015,
+        "xmax": 0.000145,
+        "ymax": 0.00152,
+        "zmax": 0.003,
+        "xext": 0.00015,
+        "yext": 4.0000000000000105e-05,
+        "zext": 0.0015
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "WL-RC-01-LETTER",
+      "tag": "WL-RC-01-LETTER",
+      "placement_origin": [
+        0.7,
+        14.6,
+        2.0
+      ],
+      "world_bbox": {
+        "xmin": -0.0002000000000000001,
+        "ymin": 0.014585,
+        "zmin": 0.002,
+        "xmax": 0.0016,
+        "ymax": 0.014615,
+        "zmax": 0.0024000000000000002,
+        "xext": 0.0018000000000000002,
+        "yext": 2.9999999999998778e-05,
+        "zext": 0.0004000000000000002
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "CN-01-GROUP",
+      "tag": "CN-01-GROUP",
+      "placement_origin": [
+        7.15,
+        7.55,
+        0.98
+      ],
+      "world_bbox": {
+        "xmin": 0.006975,
+        "ymin": 0.007520000000000001,
+        "zmin": 0.00098,
+        "xmax": 0.007325,
+        "ymax": 0.00758,
+        "zmax": 0.00104,
+        "xext": 0.0003499999999999996,
+        "yext": 5.999999999999929e-05,
+        "zext": 5.999999999999994e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MT-TC-MODEL",
+      "tag": "MT-TC-MODEL",
+      "placement_origin": [
+        11.2,
+        11.4,
+        0.9
+      ],
+      "world_bbox": {
+        "xmin": 0.009899999999999999,
+        "ymin": 0.0103,
+        "zmin": 0.0009000000000000001,
+        "xmax": 0.0125,
+        "ymax": 0.0125,
+        "zmax": 0.00135,
+        "xext": 0.0026000000000000016,
+        "yext": 0.0022000000000000006,
+        "zext": 0.00045
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MT-TC-LOGO",
+      "tag": "MT-TC-LOGO",
+      "placement_origin": [
+        12.3,
+        11.3,
+        0.92
+      ],
+      "world_bbox": {
+        "xmin": 0.0121,
+        "ymin": 0.011290000000000001,
+        "zmin": 0.00092,
+        "xmax": 0.0125,
+        "ymax": 0.01131,
+        "zmax": 0.001,
+        "xext": 0.00040000000000000105,
+        "yext": 1.9999999999999185e-05,
+        "zext": 7.999999999999999e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MT-LX-MODEL",
+      "tag": "MT-LX-MODEL",
+      "placement_origin": [
+        1.45,
+        6.55,
+        0.9
+      ],
+      "world_bbox": {
+        "xmin": 0.00039999999999999975,
+        "ymin": 0.0056,
+        "zmin": 0.0009000000000000001,
+        "xmax": 0.0025,
+        "ymax": 0.007500000000000001,
+        "zmax": 0.0013000000000000002,
+        "xext": 0.0021000000000000003,
+        "yext": 0.0019000000000000006,
+        "zext": 0.0004000000000000001
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MT-LX-LOGO",
+      "tag": "MT-LX-LOGO",
+      "placement_origin": [
+        2.4,
+        6.45,
+        0.92
+      ],
+      "world_bbox": {
+        "xmin": 0.0021999999999999997,
+        "ymin": 0.00644,
+        "zmin": 0.00092,
+        "xmax": 0.0026,
+        "ymax": 0.00646,
+        "zmax": 0.001,
+        "xext": 0.0004000000000000002,
+        "yext": 1.9999999999999185e-05,
+        "zext": 7.999999999999999e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MT-FM-MODEL",
+      "tag": "MT-FM-MODEL",
+      "placement_origin": [
+        12.05,
+        7.15,
+        1.05
+      ],
+      "world_bbox": {
+        "xmin": 0.011700000000000002,
+        "ymin": 0.0068000000000000005,
+        "zmin": 0.0010500000000000002,
+        "xmax": 0.012400000000000001,
+        "ymax": 0.0075,
+        "zmax": 0.00135,
+        "xext": 0.0006999999999999992,
+        "yext": 0.0006999999999999992,
+        "zext": 0.0002999999999999999
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MT-FM-LOGO",
+      "tag": "MT-FM-LOGO",
+      "placement_origin": [
+        12.2,
+        7.1,
+        1.07
+      ],
+      "world_bbox": {
+        "xmin": 0.011999999999999999,
+        "ymin": 0.00709,
+        "zmin": 0.00107,
+        "xmax": 0.0124,
+        "ymax": 0.007109999999999999,
+        "zmax": 0.00112,
+        "xext": 0.00040000000000000105,
+        "yext": 1.9999999999999185e-05,
+        "zext": 4.9999999999999914e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MT-FM-FAIRMARK",
+      "tag": "MT-FM-FAIRMARK",
+      "placement_origin": [
+        12.2,
+        6.95,
+        1.35
+      ],
+      "world_bbox": {
+        "xmin": 0.011999999999999999,
+        "ymin": 0.006940000000000001,
+        "zmin": 0.00135,
+        "xmax": 0.0124,
+        "ymax": 0.00696,
+        "zmax": 0.0014,
+        "xext": 0.00040000000000000105,
+        "yext": 1.9999999999999185e-05,
+        "zext": 4.9999999999999914e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LP-01-HEAD",
+      "tag": "LP-01-HEAD",
+      "placement_origin": [
+        11.0,
+        11.2,
+        2.65
+      ],
+      "world_bbox": {
+        "xmin": 0.010924999999999999,
+        "ymin": 0.011125,
+        "zmin": 0.00265,
+        "xmax": 0.011075,
+        "ymax": 0.011275,
+        "zmax": 0.00275,
+        "xext": 0.00015000000000000083,
+        "yext": 0.00015000000000000083,
+        "zext": 9.999999999999983e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LP-02-HEAD",
+      "tag": "LP-02-HEAD",
+      "placement_origin": [
+        1.25,
+        6.35,
+        2.65
+      ],
+      "world_bbox": {
+        "xmin": 0.001175,
+        "ymin": 0.006274999999999999,
+        "zmin": 0.00265,
+        "xmax": 0.001325,
+        "ymax": 0.006425,
+        "zmax": 0.00275,
+        "xext": 0.00014999999999999996,
+        "yext": 0.00015000000000000083,
+        "zext": 9.999999999999983e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LP-03-HEAD",
+      "tag": "LP-03-HEAD",
+      "placement_origin": [
+        11.9,
+        7.0,
+        2.65
+      ],
+      "world_bbox": {
+        "xmin": 0.011825,
+        "ymin": 0.006925,
+        "zmin": 0.00265,
+        "xmax": 0.011975000000000001,
+        "ymax": 0.0070750000000000006,
+        "zmax": 0.00275,
+        "xext": 0.00015000000000000083,
+        "yext": 0.00015000000000000083,
+        "zext": 9.999999999999983e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LP-04-HEAD",
+      "tag": "LP-04-HEAD",
+      "placement_origin": [
+        3.0,
+        12.5,
+        2.65
+      ],
+      "world_bbox": {
+        "xmin": 0.002925,
+        "ymin": 0.012425,
+        "zmin": 0.00265,
+        "xmax": 0.003075,
+        "ymax": 0.012575000000000001,
+        "zmax": 0.00275,
+        "xext": 0.00014999999999999996,
+        "yext": 0.00015000000000000083,
+        "zext": 9.999999999999983e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LED-01",
+      "tag": "LED-01",
+      "placement_origin": [
+        5.0,
+        0.25,
+        3.95
+      ],
+      "world_bbox": {
+        "xmin": 0.0025,
+        "ymin": 0.00023,
+        "zmin": 0.00395,
+        "xmax": 0.0075,
+        "ymax": 0.00027,
+        "zmax": 0.0039900000000000005,
+        "xext": 0.004999999999999999,
+        "yext": 3.9999999999999996e-05,
+        "zext": 4.0000000000000105e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LED-02",
+      "tag": "LED-02",
+      "placement_origin": [
+        5.55,
+        5.55,
+        3.45
+      ],
+      "world_bbox": {
+        "xmin": 0.0036000000000000003,
+        "ymin": 0.00553,
+        "zmin": 0.0034500000000000004,
+        "xmax": 0.0075,
+        "ymax": 0.00557,
+        "zmax": 0.0034900000000000005,
+        "xext": 0.0038999999999999994,
+        "yext": 4.0000000000000105e-05,
+        "zext": 4.0000000000000105e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LED-03",
+      "tag": "LED-03",
+      "placement_origin": [
+        5.55,
+        9.41,
+        3.45
+      ],
+      "world_bbox": {
+        "xmin": 0.0036000000000000003,
+        "ymin": 0.00939,
+        "zmin": 0.0034500000000000004,
+        "xmax": 0.0075,
+        "ymax": 0.00943,
+        "zmax": 0.0034900000000000005,
+        "xext": 0.0038999999999999994,
+        "yext": 3.999999999999837e-05,
+        "zext": 4.0000000000000105e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LED-04",
+      "tag": "LED-04",
+      "placement_origin": [
+        0.3,
+        14.6,
+        1.95
+      ],
+      "world_bbox": {
+        "xmin": -0.0009500000000000001,
+        "ymin": 0.014580000000000001,
+        "zmin": 0.00195,
+        "xmax": 0.00155,
+        "ymax": 0.01462,
+        "zmax": 0.00199,
+        "xext": 0.0025,
+        "yext": 3.999999999999837e-05,
+        "zext": 4.0000000000000105e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LED-05",
+      "tag": "LED-05",
+      "placement_origin": [
+        0.3,
+        12.3,
+        1.05
+      ],
+      "world_bbox": {
+        "xmin": -0.0009500000000000001,
+        "ymin": 0.012280000000000001,
+        "zmin": 0.0010500000000000002,
+        "xmax": 0.00155,
+        "ymax": 0.01232,
+        "zmax": 0.0010900000000000003,
+        "xext": 0.0025,
+        "yext": 3.999999999999837e-05,
+        "zext": 4.0000000000000105e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LED-06",
+      "tag": "LED-06",
+      "placement_origin": [
+        11.1,
+        11.3,
+        0.9
+      ],
+      "world_bbox": {
+        "xmin": 0.0097,
+        "ymin": 0.011280000000000002,
+        "zmin": 0.0009000000000000001,
+        "xmax": 0.0125,
+        "ymax": 0.01132,
+        "zmax": 0.0009400000000000001,
+        "xext": 0.0028000000000000004,
+        "yext": 3.999999999999837e-05,
+        "zext": 3.9999999999999996e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LED-07",
+      "tag": "LED-07",
+      "placement_origin": [
+        1.35,
+        6.45,
+        0.9
+      ],
+      "world_bbox": {
+        "xmin": 0.0002000000000000001,
+        "ymin": 0.00643,
+        "zmin": 0.0009000000000000001,
+        "xmax": 0.0025,
+        "ymax": 0.00647,
+        "zmax": 0.0009400000000000001,
+        "xext": 0.0023,
+        "yext": 4.0000000000000105e-05,
+        "zext": 3.9999999999999996e-05
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "BN-01",
+      "tag": "BN-01",
+      "placement_origin": [
+        12.0,
+        0.2,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.011,
+        "ymin": 0.00018,
+        "zmin": 0.0015,
+        "xmax": 0.013000000000000001,
+        "ymax": 0.00022,
+        "zmax": 0.0033,
+        "xext": 0.0020000000000000018,
+        "yext": 3.9999999999999996e-05,
+        "zext": 0.0018
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "BN-02",
+      "tag": "BN-02",
+      "placement_origin": [
+        1.5,
+        14.6,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.0005,
+        "ymin": 0.014580000000000001,
+        "zmin": 0.0015,
+        "xmax": 0.0025,
+        "ymax": 0.01462,
+        "zmax": 0.0033,
+        "xext": 0.002,
+        "yext": 3.999999999999837e-05,
+        "zext": 0.0018
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PL-FLR-FOLIAGE-01",
+      "tag": "PL-FLR-FOLIAGE-01",
+      "placement_origin": [
+        4.5,
+        4.5,
+        0.45
+      ],
+      "world_bbox": {
+        "xmin": 0.004200000000000001,
+        "ymin": 0.004200000000000001,
+        "zmin": 0.00045000000000000004,
+        "xmax": 0.0048000000000000004,
+        "ymax": 0.0048000000000000004,
+        "zmax": 0.00125,
+        "xext": 0.0005999999999999998,
+        "yext": 0.0005999999999999998,
+        "zext": 0.0007999999999999999
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PL-FLR-FOLIAGE-02",
+      "tag": "PL-FLR-FOLIAGE-02",
+      "placement_origin": [
+        10.0,
+        4.5,
+        0.45
+      ],
+      "world_bbox": {
+        "xmin": 0.0097,
+        "ymin": 0.004200000000000001,
+        "zmin": 0.00045000000000000004,
+        "xmax": 0.0103,
+        "ymax": 0.0048000000000000004,
+        "zmax": 0.00125,
+        "xext": 0.0005999999999999998,
+        "yext": 0.0005999999999999998,
+        "zext": 0.0007999999999999999
+      }
+    }
+  ],
+  "placement_at_origin_count": 1,
+  "element_total": 78,
+  "aggregate_world_bbox": {
+    "xmin": -0.0075,
+    "ymin": -0.0075,
+    "zmin": 0.0,
+    "xmax": 0.014960000000000001,
+    "ymax": 0.0151,
+    "zmax": 0.0044,
+    "xext": 0.02246,
+    "yext": 0.022600000000000002,
+    "zext": 0.0044
+  },
+  "top_10_largest": [
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SL-01",
+      "name": "SL-01",
+      "xext": 0.015,
+      "yext": 0.015,
+      "zext": 5e-05
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "tag": "SL-01-EDGE-N",
+      "name": "SL-01-EDGE-N",
+      "xext": 0.015,
+      "yext": 8.000000000000021e-05,
+      "zext": 5e-05
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "tag": "SL-01-EDGE-E",
+      "name": "SL-01-EDGE-E",
+      "xext": 8.000000000000021e-05,
+      "yext": 0.015,
+      "zext": 5e-05
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "tag": "SL-01-EDGE-S",
+      "name": "SL-01-EDGE-S",
+      "xext": 0.015,
+      "yext": 8e-05,
+      "zext": 5e-05
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "tag": "SL-01-EDGE-W",
+      "name": "SL-01-EDGE-W",
+      "xext": 8e-05,
+      "yext": 0.015,
+      "zext": 5e-05
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "tag": "CC-01-TOP",
+      "name": "CC-01-TOP",
+      "xext": 0.006,
+      "yext": 0.006,
+      "zext": 3.9999999999999996e-05
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "tag": "CC-01-TRIM",
+      "name": "CC-01-TRIM",
+      "xext": 0.006,
+      "yext": 0.006,
+      "zext": 2.0000000000000052e-05
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "tag": "CC-01-TOE",
+      "name": "CC-01-TOE",
+      "xext": 0.0057,
+      "yext": 0.0057,
+      "zext": 0.00010000000000000002
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "tag": "CC-01-BASE",
+      "name": "CC-01-BASE",
+      "xext": 0.005600000000000001,
+      "yext": 0.005559169694949103,
+      "zext": 0.0009000000000000001
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "tag": "PT-01-LINTEL",
+      "name": "PT-01-LINTEL",
+      "xext": 0.004999999999999999,
+      "yext": 0.0003,
+      "zext": 0.0004000000000000002
+    }
+  ],
+  "top_10_smallest": [
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LP-04-HEAD",
+      "name": "LP-04-HEAD",
+      "xext": 0.00014999999999999996,
+      "yext": 0.00015000000000000083,
+      "zext": 9.999999999999983e-05
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LP-03-HEAD",
+      "name": "LP-03-HEAD",
+      "xext": 0.00015000000000000083,
+      "yext": 0.00015000000000000083,
+      "zext": 9.999999999999983e-05
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LP-02-HEAD",
+      "name": "LP-02-HEAD",
+      "xext": 0.00014999999999999996,
+      "yext": 0.00015000000000000083,
+      "zext": 9.999999999999983e-05
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LP-01-HEAD",
+      "name": "LP-01-HEAD",
+      "xext": 0.00015000000000000083,
+      "yext": 0.00015000000000000083,
+      "zext": 9.999999999999983e-05
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "PT-01-DISC",
+      "name": "PT-01-DISC",
+      "xext": 0.0002999999999999999,
+      "yext": 3.9999999999999996e-05,
+      "zext": 0.0002999999999999999
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "CN-01-GROUP",
+      "name": "CN-01-GROUP",
+      "xext": 0.0003499999999999996,
+      "yext": 5.999999999999929e-05,
+      "zext": 5.999999999999994e-05
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "MT-LX-LOGO",
+      "name": "MT-LX-LOGO",
+      "xext": 0.0004000000000000002,
+      "yext": 1.9999999999999185e-05,
+      "zext": 7.999999999999999e-05
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "MT-FM-FAIRMARK",
+      "name": "MT-FM-FAIRMARK",
+      "xext": 0.00040000000000000105,
+      "yext": 1.9999999999999185e-05,
+      "zext": 4.9999999999999914e-05
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "MT-FM-LOGO",
+      "name": "MT-FM-LOGO",
+      "xext": 0.00040000000000000105,
+      "yext": 1.9999999999999185e-05,
+      "zext": 4.9999999999999914e-05
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "MT-TC-LOGO",
+      "name": "MT-TC-LOGO",
+      "xext": 0.00040000000000000105,
+      "yext": 1.9999999999999185e-05,
+      "zext": 7.999999999999999e-05
+    }
+  ],
+  "material_assignment_counts": {}
+}
