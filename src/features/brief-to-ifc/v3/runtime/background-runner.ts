@@ -20,10 +20,14 @@
  *     written. NO `Execution` row stays `RUNNING` after this function
  *     returns.
  *
- * The function is intentionally fire-and-forget at the HTTP route:
- * `runBackground(...)` returns a Promise that the route DOES NOT await;
- * the Vercel function exits, the runtime keeps `fn` alive, and the
- * client polls / SSE-streams the DB row for status.
+ * The route does NOT block on the returned Promise — but it MUST
+ * schedule the call via `after()` from `next/server` to keep the
+ * Vercel function alive past the response flush. Plain
+ * `void runBackground(...)` dies at the first `await` because the
+ * runtime suspends the V8 isolate when the response is sent;
+ * `maxDuration` is a CEILING on how long the function CAN run, NOT
+ * a keepalive. The client polls / SSE-streams the DB row for status.
+ * See PHASE_EVAL_RESULTS_REPORT_2026-05-16.md for the post-mortem.
  */
 
 import type { PrismaClient } from "@prisma/client";
@@ -86,15 +90,15 @@ export interface RunBackgroundResult {
 
 /**
  * Run `fn` as a backgrounded task with full lifecycle bookkeeping.
- * Caller should NOT await this in a request/response context — the
- * route should return its 202 response and let `runBackground` resolve
- * after the HTTP cycle.
+ * The route should return its 202 response and let `runBackground`
+ * resolve after the HTTP cycle.
  *
  * In a serverless environment that suspends the function on response,
- * the caller is responsible for keeping the runtime alive (Vercel Fluid
- * Compute, the existing v3 worker maxDuration). Vercel Hobby's
- * fire-and-forget would lose the work — but the v3 routes are pinned
- * to `maxDuration = 800` which spans the agent loop comfortably.
+ * the caller MUST schedule this via `after()` from `next/server` to
+ * keep the runtime alive past the response flush. `maxDuration` is
+ * the UPPER BOUND on how long the function CAN run once kept alive —
+ * it does NOT keep the function alive on its own. Plain
+ * `void runBackground(...)` would die at the first await.
  */
 export async function runBackground<TSuccess>(
   args: RunBackgroundArgs<TSuccess>,

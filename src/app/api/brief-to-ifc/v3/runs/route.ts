@@ -7,8 +7,13 @@
  *   1. Auth + canary + rate-limit gates.
  *   2. Body validation (same shape as /generate — brief OR briefSpec).
  *   3. Create `BriefToIfcV3Run` row in PENDING.
- *   4. Fire `runBackground(...)` WITHOUT awaiting — the HTTP response
- *      returns 202 immediately with the run id.
+ *   4. Schedule `runBackground(...)` via `after()` from `next/server`
+ *      — Vercel keeps the function alive past the response flush so
+ *      the agent loop runs to completion. `maxDuration = 800` is a
+ *      CEILING, not a keepalive; plain `void runBackground(...)` dies
+ *      at the first await. See PHASE_EVAL_RESULTS_REPORT_2026-05-16.md
+ *      for the post-mortem. The HTTP response returns 202 immediately
+ *      with the run id.
  *   5. Background work: enrichBrief (if needed) -> runGenerator ->
  *      transition COMPLETED|FAILED. All progress lands in
  *      ExecutionLog + the run row.
@@ -25,7 +30,7 @@
  * production gets async observability.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
@@ -189,64 +194,75 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     },
   });
 
-  // Fire background work — DO NOT await. Vercel's `maxDuration = 800`
-  // keeps the function alive long enough for `runBackground` to finish
-  // even after the HTTP response is flushed.
-  void runBackground({
-    prisma,
-    runId: run.id,
-    timeoutMs: 700_000, // 700s — leaves Vercel's 800s ceiling with margin
-    fn: async (ctx) => {
-      await ctx.log("INFO", "GENERATE", "Generator agent loop starting.");
-      const result = await runGenerator({
-        brief: briefSpec,
-        maxTurns: body.max_turns,
-        costCapUsd: body.cost_cap_usd,
-        onTurn: (record) => {
-          // Fire-and-forget per-turn logs. `void` keeps the agent loop
-          // moving while appendLog persists in the background.
-          void appendLog(prisma, {
-            executionId: run.id, level: "INFO", source: "TOOL_CALL",
-            message:
-              `Turn ${record.turn}: ${record.toolName ?? "<no tool>"} ` +
-              `(${record.toolDurationMs}ms, ` +
-              `${record.toolOk ? "ok" : "FAIL " + (record.toolErrorType ?? "?")})`,
-            metadata: {
-              turn: record.turn,
-              toolName: record.toolName,
-              toolDurationMs: record.toolDurationMs,
-              toolOk: record.toolOk,
-              toolErrorType: record.toolErrorType,
-            },
-          });
-        },
-      });
-      if (!result.ok) {
-        // Surface the generator's structured error code to the
-        // runBackground error path verbatim — no recoding.
-        throw Object.assign(
-          new Error(result.error?.message ?? "generator failed"),
-          { code: toBriefToIfcV3ErrorCode(result.error?.code) },
-        );
-      }
-      return result;
-    },
-    toCompletedPayload: (result) => ({
-      ifcUrl: result.ifcUrl ?? "",
-      entityCount: result.entityCount,
-      finalValidation: result.finalValidation ?? undefined,
-      generatorCostUsd: result.costUsd,
-      generatorMs: result.durationMs,
-      turns: result.turns,
-      ledger: result.ledger,
-      turnRecords: result.turnRecords,
-    }),
-  }).catch((err) => {
-    // `runBackground` doesn't throw — but defensive: if something does
-    // escape, log it loudly. The row will be left in RUNNING for the
-    // stuck-sweep cron to clean up.
-    // eslint-disable-next-line no-console
-    console.error(`[bf-v3 /runs] runBackground escaped throw for ${run.id}:`, err);
+  // Schedule background work via `after()` — tells Vercel to keep the
+  // function alive past the response flush so the agent loop can run
+  // to completion. Plain `void runBackground(...)` does NOT work:
+  // `maxDuration = 800` is the CEILING on how long the function CAN
+  // run, NOT a keepalive. The runtime suspends the V8 isolate when
+  // the response flushes; the first `await` inside runBackground
+  // becomes a death trap. Verified empirically — see
+  // PHASE_EVAL_RESULTS_REPORT_2026-05-16.md (run cmp7zv5i2000004juwmdgchau
+  // stuck in RUNNING with zero heartbeat updates for 3+ min). Pattern
+  // mirrors `src/app/api/auth/register/route.ts` + `src/lib/auth.ts`.
+  after(async () => {
+    await runBackground({
+      prisma,
+      runId: run.id,
+      timeoutMs: 700_000, // 700s — leaves Vercel's 800s ceiling with margin
+      fn: async (ctx) => {
+        await ctx.log("INFO", "GENERATE", "Generator agent loop starting.");
+        const result = await runGenerator({
+          brief: briefSpec,
+          maxTurns: body.max_turns,
+          costCapUsd: body.cost_cap_usd,
+          onTurn: (record) => {
+            // Fire-and-forget per-turn logs. `void` keeps the agent loop
+            // moving while appendLog persists in the background. Safe
+            // here because the enclosing `after()` keeps the function
+            // alive for the whole agent-loop duration.
+            void appendLog(prisma, {
+              executionId: run.id, level: "INFO", source: "TOOL_CALL",
+              message:
+                `Turn ${record.turn}: ${record.toolName ?? "<no tool>"} ` +
+                `(${record.toolDurationMs}ms, ` +
+                `${record.toolOk ? "ok" : "FAIL " + (record.toolErrorType ?? "?")})`,
+              metadata: {
+                turn: record.turn,
+                toolName: record.toolName,
+                toolDurationMs: record.toolDurationMs,
+                toolOk: record.toolOk,
+                toolErrorType: record.toolErrorType,
+              },
+            });
+          },
+        });
+        if (!result.ok) {
+          // Surface the generator's structured error code to the
+          // runBackground error path verbatim — no recoding.
+          throw Object.assign(
+            new Error(result.error?.message ?? "generator failed"),
+            { code: toBriefToIfcV3ErrorCode(result.error?.code) },
+          );
+        }
+        return result;
+      },
+      toCompletedPayload: (result) => ({
+        ifcUrl: result.ifcUrl ?? "",
+        entityCount: result.entityCount,
+        finalValidation: result.finalValidation ?? undefined,
+        generatorCostUsd: result.costUsd,
+        generatorMs: result.durationMs,
+        turns: result.turns,
+        ledger: result.ledger,
+        turnRecords: result.turnRecords,
+      }),
+    }).catch((err) => {
+      // `runBackground` doesn't throw — but defensive: if something does
+      // escape, log it loudly. The row will be left in RUNNING for the
+      // stuck-sweep cron to clean up.
+      // eslint-disable-next-line no-console
+      console.error(`[bf-v3 /runs] runBackground escaped throw for ${run.id}:`, err);
+    });
   });
 
   return NextResponse.json(
