@@ -13,7 +13,12 @@
  *
  * Session id is carried as the `bf-session-id` header on every request
  * after the first `exec` (which mints + returns one). The auth model
- * is the same `X-API-Key` shared with the rest of the Railway service.
+ * is `Authorization: Bearer <IFC_SERVICE_API_KEY>` — same as every
+ * other Railway caller in this codebase (`parse-ifc/route.ts`,
+ * `brief-to-ifc-v2/ifc-sandbox-client.ts`, `ifc-service-client.ts`).
+ * The earlier `X-API-Key` claim in this docstring was wrong; the
+ * server middleware (`neobim-ifc-service/app/auth.py:65-73`) only
+ * reads `Authorization` and only accepts the `Bearer ` prefix.
  *
  * Never throws — every call returns a typed result, transport failures
  * inclusive, so the agent driver can decide whether to retry the tool
@@ -69,7 +74,7 @@ async function postJson<T>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (cfg.apiKey) headers["X-API-Key"] = cfg.apiKey;
+  if (cfg.apiKey) headers["Authorization"] = `Bearer ${cfg.apiKey}`;
   if (sessionId) headers["bf-session-id"] = sessionId;
 
   let res: Response;
