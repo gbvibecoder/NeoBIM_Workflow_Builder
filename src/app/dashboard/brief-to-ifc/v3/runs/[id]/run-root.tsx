@@ -164,29 +164,63 @@ function RunningState({ view, runId }: { view: StatusView; runId: string }) {
 }
 
 function CompletedState({ view }: { view: StatusView }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    if (!view.ifcUrl) return;
+    try {
+      await navigator.clipboard.writeText(view.ifcUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2_000);
+    } catch {
+      // Older browsers / non-secure context — fallback: select-friendly anchor.
+    }
+  };
   return (
     <div data-testid="state-completed" style={blockStyle}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ fontSize: 14, color: "#065F46" }}>
           IFC generated. <strong>{view.entityCount ?? 0}</strong> entities,
           {" "}{view.turns} agent turns, ${view.generatorCostUsd.toFixed(4)} spent.
         </div>
-        {view.ifcUrl && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {view.ifcUrl && (
+            <a
+              href={view.ifcUrl}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="ifc-download-link"
+              style={primaryButtonStyle}
+            >
+              Download IFC
+            </a>
+          )}
+          {view.ifcUrl && (
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              data-testid="copy-share-link"
+              style={secondaryButtonStyle}
+            >
+              {copied ? "Link copied ✓" : "Copy share link"}
+            </button>
+          )}
+          {view.ifcUrl && (
+            <a
+              href={`/dashboard/ifc-viewer?url=${encodeURIComponent(view.ifcUrl)}`}
+              data-testid="open-viewer-link"
+              style={secondaryButtonStyle}
+            >
+              Open in viewer
+            </a>
+          )}
           <a
-            href={view.ifcUrl}
-            target="_blank"
-            rel="noreferrer"
-            data-testid="ifc-download-link"
-            style={{
-              padding: "8px 16px",
-              background: "#065F46", color: "#FFFFFF",
-              borderRadius: 6, textDecoration: "none",
-              fontSize: 13, fontWeight: 600, alignSelf: "flex-start",
-            }}
+            href="/dashboard/brief-to-ifc/v3/new"
+            data-testid="try-another-link"
+            style={secondaryButtonStyle}
           >
-            Download IFC
+            Try another brief
           </a>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -194,6 +228,24 @@ function CompletedState({ view }: { view: StatusView }) {
 
 function FailedState({ view, runId }: { view: StatusView; runId: string }) {
   const [logExpanded, setLogExpanded] = useState(false);
+  // Bug-report link pre-fills mail body with runId + errorCode so it's
+  // immediately actionable.
+  const bugBody = encodeURIComponent(
+    [
+      `Run ID: ${view.id}`,
+      `Status: ${view.status}`,
+      `Error code: ${view.errorCode ?? "UNKNOWN"}`,
+      `Error message: ${view.errorMessage ?? "(none)"}`,
+      `Cost incurred: $${view.generatorCostUsd.toFixed(4)}`,
+      `Turns: ${view.turns}`,
+      "",
+      "What happened (please add):",
+      "",
+    ].join("\n"),
+  );
+  const bugSubject = encodeURIComponent(
+    `[AI IFC v3] Run ${view.id} failed: ${view.errorCode ?? "UNKNOWN"}`,
+  );
   return (
     <div data-testid="state-failed" style={blockStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -217,19 +269,30 @@ function FailedState({ view, runId }: { view: StatusView; runId: string }) {
             Cost incurred: ${view.generatorCostUsd.toFixed(4)} · Turns: {view.turns}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setLogExpanded((v) => !v)}
-          data-testid="toggle-log"
-          style={{
-            alignSelf: "flex-start",
-            padding: "6px 12px",
-            border: "1px solid #D1D5DB", background: "#FFFFFF",
-            borderRadius: 6, fontSize: 12, cursor: "pointer",
-          }}
-        >
-          {logExpanded ? "Hide" : "Show"} log
-        </button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <a
+            href="/dashboard/brief-to-ifc/v3/new"
+            data-testid="try-different-brief"
+            style={primaryButtonStyle}
+          >
+            Try a different brief
+          </a>
+          <a
+            href={`mailto:vibecoders786@gmail.com?subject=${bugSubject}&body=${bugBody}`}
+            data-testid="report-bug-link"
+            style={secondaryButtonStyle}
+          >
+            Report this bug
+          </a>
+          <button
+            type="button"
+            onClick={() => setLogExpanded((v) => !v)}
+            data-testid="toggle-log"
+            style={secondaryButtonStyle}
+          >
+            {logExpanded ? "Hide" : "Show"} log
+          </button>
+        </div>
         {logExpanded && <ExecutionLogPane runId={runId} />}
       </div>
     </div>
@@ -251,3 +314,29 @@ const blockStyle = {
   gap: 12,
   marginTop: 16,
 };
+
+const primaryButtonStyle = {
+  padding: "8px 16px",
+  background: "#065F46",
+  color: "#FFFFFF",
+  borderRadius: 6,
+  textDecoration: "none",
+  fontSize: 13,
+  fontWeight: 600,
+  border: "none",
+  cursor: "pointer",
+  display: "inline-block",
+} as const;
+
+const secondaryButtonStyle = {
+  padding: "8px 14px",
+  background: "#FFFFFF",
+  color: "#374151",
+  borderRadius: 6,
+  textDecoration: "none",
+  fontSize: 13,
+  fontWeight: 500,
+  border: "1px solid #D1D5DB",
+  cursor: "pointer",
+  display: "inline-block",
+} as const;

@@ -25,6 +25,7 @@ import {
   MessageSquare,
   Zap,
   ScrollText,
+  Sparkles,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { toast } from "sonner";
@@ -98,9 +99,10 @@ export function Sidebar() {
     ...(briefRendersEnabled
       ? [{ href: "/dashboard/brief-renders", label: "Brief → Renders", icon: ScrollText, badge: "Beta" }]
       : []),
-    // AI IFC v3 — same canary pattern; hidden until BRIEF_TO_IFC_V3_ENABLED.
+    // AI IFC — same canary pattern; hidden until BRIEF_TO_IFC_V3_ENABLED.
+    // "v3" is an internal version label; users see "AI IFC (beta)" only.
     ...(briefToIfcV3Enabled
-      ? [{ href: "/dashboard/brief-to-ifc/v3/new", label: "AI IFC v3", icon: Zap, badge: "Beta" }]
+      ? [{ href: "/dashboard/brief-to-ifc/v3/new", label: "AI IFC", icon: Sparkles, badge: "Beta" }]
       : []),
   ];
 

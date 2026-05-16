@@ -55,17 +55,19 @@ function makePrismaMock(initial?: QuotaRow) {
             row.runsThisMonth = data.runsThisMonth;
           } else if (
             data.runsThisMonth &&
+            typeof data.runsThisMonth === "object" &&
             "increment" in data.runsThisMonth
           ) {
-            row.runsThisMonth += data.runsThisMonth.increment;
+            row.runsThisMonth += (data.runsThisMonth as { increment: number }).increment;
           }
           if (typeof data.costThisMonthUsd === "number") {
             row.costThisMonthUsd = data.costThisMonthUsd;
           } else if (
             data.costThisMonthUsd &&
+            typeof data.costThisMonthUsd === "object" &&
             "increment" in data.costThisMonthUsd
           ) {
-            row.costThisMonthUsd += data.costThisMonthUsd.increment;
+            row.costThisMonthUsd += (data.costThisMonthUsd as { increment: number }).increment;
           }
           return row;
         },

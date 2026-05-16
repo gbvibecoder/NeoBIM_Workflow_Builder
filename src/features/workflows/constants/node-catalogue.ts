@@ -579,6 +579,36 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     tags: ["floor-plan", "cad", "editor", "2d", "interactive", "boq", "vastu", "ifc", "walls", "rooms"],
     executionTime: "Interactive",
   },
+  {
+    // GN-013 — AI IFC Generator (Brief-to-IFC v3, beta).
+    //
+    // Takes a free-text brief (or a pre-enriched BriefSpec JSON) and
+    // produces a viewer-loadable IFC2X3 file via the v3 agent loop
+    // (Opus 4.7 tool-use → BuildFlowIFC sandbox on Railway). Geometric
+    // validators reject any model where the world bbox doesn't match
+    // the brief (see PHASE_BEAST_MODE_CLOSEOUT_REPORT_2026-05-16.md).
+    //
+    // Gated on the `briefToIfcV3Enabled` feature flag for now; surfaces
+    // on the canvas picker only when the flag is on (see UX flag wiring
+    // in BaseNode / NodePicker for the actual filter).
+    id: "GN-013",
+    name: "AI IFC Generator",
+    description:
+      "AI generates a full IFC2X3 building model from a text brief or pre-enriched BriefSpec. Typical run: 30–150 s, $0.13–$0.55. Geometric validators refuse any output where the bbox doesn't match the brief.",
+    category: "generate",
+    icon: "Sparkles",
+    inputs: [
+      { id: "brief-in", label: "Brief (text)", type: "text" },
+      { id: "json-in", label: "BriefSpec (JSON)", type: "json" },
+    ],
+    outputs: [
+      { id: "ifc-out", label: "IFC File", type: "ifc" },
+      { id: "kpi-out", label: "Stats (entities, cost, turns)", type: "json" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 + BuildFlow Sandbox (Railway)",
+    tags: ["ifc", "ai", "agent", "anthropic", "v3", "beta", "ifcopenshell", "generate"],
+    executionTime: "30-150s",
+  },
 
   // ============================================================
   // EXPORT / OUTPUT NODES (Amber)

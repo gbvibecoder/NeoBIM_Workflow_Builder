@@ -19,6 +19,8 @@ import { useState, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 
 import { briefSpecSchema } from "@/features/brief-to-ifc/v3/types";
+import { SampleBriefs } from "./sample-briefs";
+import { CostEstimate } from "./cost-estimate";
 
 type Tab = "text" | "pdf" | "json";
 
@@ -51,6 +53,14 @@ export function SubmitForm(): ReactElement {
   const [costCap, setCostCap] = useState(COST_CAP_DEFAULT);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<RunCreateError | null>(null);
+  // null = quota check still in flight (allow submit optimistically — the
+  // server-side check is authoritative). true/false = gate respected.
+  const [quotaAllowed, setQuotaAllowed] = useState<boolean | null>(null);
+
+  const hasInput =
+    (tab === "text" && text.trim().length >= 40) ||
+    (tab === "pdf" && Boolean(pdfFile)) ||
+    (tab === "json" && json.trim().length > 0);
 
   function validateJson(value: string) {
     if (!value.trim()) {
@@ -247,6 +257,14 @@ export function SubmitForm(): ReactElement {
       </div>
 
       <div className="space-y-5 p-5 sm:p-6">
+        <SampleBriefs
+          onSelect={(json) => {
+            setJson(json);
+            setJsonError(null);
+            setTab("json");
+          }}
+        />
+
         {tab === "text" && (
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-zinc-700">
@@ -353,6 +371,8 @@ export function SubmitForm(): ReactElement {
           </label>
         )}
 
+        <CostEstimate hasInput={hasInput} onQuotaGate={setQuotaAllowed} />
+
         {/* Cost cap slider */}
         <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
           <div className="flex items-center justify-between">
@@ -402,10 +422,14 @@ export function SubmitForm(): ReactElement {
         <button
           type="button"
           onClick={() => void handleSubmit()}
-          disabled={submitting}
+          disabled={submitting || quotaAllowed === false}
           className="w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Submitting…" : "Generate IFC"}
+          {submitting
+            ? "Submitting…"
+            : quotaAllowed === false
+              ? "Monthly quota reached"
+              : "Generate IFC"}
         </button>
       </div>
     </div>

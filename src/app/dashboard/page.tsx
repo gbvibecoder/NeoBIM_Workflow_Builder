@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DashboardHero } from "@/features/dashboard/components/v2/DashboardHero";
 import { ProductTilesSection } from "@/features/dashboard/components/v2/ProductTilesSection";
+import { AiIfcDashboardCard } from "@/features/brief-to-ifc/v3/components/dashboard-card";
 import { FeaturedWorkflowsSection } from "@/features/dashboard/components/v2/FeaturedWorkflowsSection";
 import { RecentWorkflowsSection } from "@/features/dashboard/components/v2/RecentWorkflowsSection";
 import { ActivityFeed } from "@/features/dashboard/components/v2/ActivityFeed";
@@ -117,6 +118,7 @@ export default function DashboardPage() {
           lastWorkflowId={lastWorkflowId}
         />
         <ProductTilesSection />
+        <AiIfcDashboardCard />
         <FeaturedWorkflowsSection />
         <RecentWorkflowsSection
           workflows={data.recentWorkflows}
