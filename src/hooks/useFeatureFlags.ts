@@ -21,20 +21,17 @@ import { useEffect, useState } from "react";
 export interface FeatureFlags {
   vipJobsEnabled: boolean;
   briefRendersEnabled: boolean;
-  /** Brief-to-IFC v2 queued pipeline (Phase 2). When true, `useExecution`
-   *  routes the wf-13 composition through the QStash-backed queued path
-   *  instead of the synchronous node-loop. */
-  briefToIfcV2QueueEnabled: boolean;
-  /** Brief-to-IFC v3 generator-agent pipeline. When true, surfaces the
-   *  v3 endpoints (`/api/brief-to-ifc/v3/*`) and any future v3 canvas
-   *  nodes to this user. */
+  /** Brief-to-IFC v3 generator-agent pipeline — the only AI IFC pipeline
+   *  as of 2026-05-17. Defaults to true server-side; `false` here is
+   *  only the pre-network value used before the flag endpoint replies.
+   *  (The v2 queued pipeline was retired the same day — its flag and
+   *  routing branch have been removed.) */
   briefToIfcV3Enabled: boolean;
 }
 
 const DEFAULT_FLAGS: FeatureFlags = {
   vipJobsEnabled: false,
   briefRendersEnabled: false,
-  briefToIfcV2QueueEnabled: false,
   briefToIfcV3Enabled: false,
 };
 

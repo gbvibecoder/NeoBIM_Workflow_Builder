@@ -1391,10 +1391,10 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
   const isDemoMode = useUIStore(s => s.isDemoMode);
   const [rateLimitHit, setRateLimitHit] = useState<RateLimitInfo | null>(null);
 
-  // Brief-to-IFC v2 queued-pipeline canary flag (Phase 2). When on AND the
-  // canvas is the wf-13 composition, runWorkflow hands the whole run to the
-  // QStash-backed queued pipeline instead of the synchronous node-loop.
-  const { briefToIfcV2QueueEnabled } = useFeatureFlags();
+  // Read feature flags (used elsewhere; the v2 queue branch was retired
+  // 2026-05-17 — `briefToIfcV2QueueEnabled` is no longer in the
+  // FeatureFlags type, and the wf-13 QUEUE dispatch below is dead code).
+  useFeatureFlags();
 
   // AbortController for cancelling background polling on unmount
   const pollAbortRef = useRef<AbortController | null>(null);
@@ -1602,31 +1602,12 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     // artifacts itself. The synchronous node-loop below is the parallel-
     // alive Phase 1 path used whenever the flag is off.
     //
-    // Phase 2.2: log each axis of the dispatch decision so a SYNC-vs-QUEUE
-    // misroute is diagnosable from browser dev tools without a redeploy.
-    const queueEnabled = briefToIfcV2QueueEnabled;
-    const isComposition = isBriefToIfcV2Composition(nodes as WorkflowNode[]);
-    console.log(
-      "[wf-13 dispatch] canary.enabled=", queueEnabled,
-      "composition.matched=", isComposition,
-      "→ path=", queueEnabled && isComposition ? "QUEUE" : "SYNC",
-    );
-    if (queueEnabled && isComposition) {
-      const queuedOk = await runBriefToIfcQueued({
-        nodes: nodes as WorkflowNode[],
-        executionId,
-        log,
-      });
-      setProgress(100);
-      completeExecution(queuedOk ? "success" : "failed");
-      if (queuedOk) {
-        toast.success("AI IFC generated", { duration: 4000 });
-        awardXP("workflow-run");
-      } else {
-        toast.error("AI IFC pipeline failed", { duration: 6000 });
-      }
-      return;
-    }
+    // v2 QUEUE dispatch removed 2026-05-17 — the v2 pipeline (TR-024 →
+    // TR-022 → EX-006) was retired in favour of GN-013, which runs as
+    // a regular single-node handler through the synchronous node-loop
+    // below. The wf-13 composition (when present on legacy workflows)
+    // surfaces a deprecation banner with a one-click upgrade button;
+    // no special-case dispatch needed here.
 
     // ── Initialize universal execution trace ──────────────────────────────
     // Captures every node's attempts, API calls, timings, and the data that
@@ -2335,7 +2316,6 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     currentWorkflow,
     isExecuting,
     isDemoMode,
-    briefToIfcV2QueueEnabled,
     startExecution,
     updateNodeStatus,
     setEdgeFlowing,

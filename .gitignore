@@ -87,6 +87,11 @@ tests/floor-plan/snapshots/snapshot-*.json
 *_AUDIT.md
 *_REQUIREMENTS.md
 PHASE_*.md
+# User-facing closeout reports — these are the artifacts Rutik shares;
+# allowlist them explicitly so they land on origin despite the
+# PHASE_*.md catch-all above.
+!PHASE_V3_SHIPPED_2026-05-17.md
+!PHASE_V2_RETIRED_2026-05-17.md
 docs/white-theme-*.md
 *.pyc
 __pycache__/
@@ -116,3 +121,17 @@ temp/
 # SOL Properties concierge brief — locally generated authoring artefact,
 # not product source. Uploaded through the /brief-renders UI, not committed.
 SOL_Rendering_Brief*.docx
+
+# Local-only operator deploy docs — see forensics/repo-state-audit-2026-05-17.md.
+# These pre-date the v3 deploy-and-smoke session and were never intended
+# to land on main (the author wrote them as terminal-readable runbooks
+# for Rutik and intentionally never committed). Adding here to stop
+# them showing as untracked in every working tree across the team.
+LOCAL_SMOKE_TEST_RESULTS.md
+MIGRATION_SAFETY_REVIEW.md
+PROD_DEPLOY_RUNBOOK.md
+
+# False-green eval outputs from the pre-fix v3 run (prod SHA 38245069 —
+# the MILLI.METRE bug). Corrected post-fix outputs already live at
+# prod-eval-outputs-v2/. See forensics/repo-state-audit-2026-05-17.md.
+prod-eval-outputs/

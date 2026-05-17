@@ -35,6 +35,15 @@ export interface NodeCatalogueItem {
   executionTime?: string; // e.g. "< 2s", "< 30s"
   viewType?: string;     // default view type for image generation nodes
   isLive?: boolean;      // true if node has real API implementation (not mock)
+  // Deprecation surface — added 2026-05-17 for v2 IFC pipeline retirement.
+  // Deprecated nodes stay in the catalogue (so workflows in the DB that
+  // reference them still parse + load), but `hiddenFromPicker` removes
+  // them from the node-library picker, and the canvas shows a banner
+  // with an "Upgrade workflow" button per `replacedBy`.
+  deprecated?: boolean;
+  hiddenFromPicker?: boolean;
+  replacedBy?: string;      // catalogueId of the replacement node, e.g. "GN-013"
+  deprecationNote?: string; // human-readable note shown in tooltips / banner
 }
 
 export interface WorkflowNode {

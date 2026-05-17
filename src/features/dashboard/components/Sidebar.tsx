@@ -99,10 +99,11 @@ export function Sidebar() {
     ...(briefRendersEnabled
       ? [{ href: "/dashboard/brief-renders", label: "Brief → Renders", icon: ScrollText, badge: "Beta" }]
       : []),
-    // AI IFC — same canary pattern; hidden until BRIEF_TO_IFC_V3_ENABLED.
-    // "v3" is an internal version label; users see "AI IFC (beta)" only.
+    // AI IFC — default-on as of 2026-05-17 (v2 retired). Gate kept so
+    // the entry can be force-hidden via BRIEF_TO_IFC_V3_ENABLED=false
+    // during an incident. "Beta" badge dropped — this is THE IFC path.
     ...(briefToIfcV3Enabled
-      ? [{ href: "/dashboard/brief-to-ifc/v3/new", label: "AI IFC", icon: Sparkles, badge: "Beta" }]
+      ? [{ href: "/dashboard/brief-to-ifc/v3/new", label: "AI IFC", icon: Sparkles }]
       : []),
   ];
 

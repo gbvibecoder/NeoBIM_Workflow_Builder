@@ -1,19 +1,21 @@
 /**
  * Brief-to-IFC v3 canary gate.
  *
- * Single master switch (`BRIEF_TO_IFC_V3_ENABLED`) plus an admin-email
- * override list (`BRIEF_TO_IFC_V3_ADMIN_EMAILS`) — same shape as the
- * Phase 2 brief-to-ifc-v2 canary so the rollout discipline is uniform.
- * v3 is OFF by default; the existing Phase 1 sync + Phase 2 queued
- * paths remain the production code path until Rutik flips this.
+ * v3 is the ONLY IFC pipeline as of 2026-05-17 (v2 retired). The flag
+ * defaults to ENABLED — set `BRIEF_TO_IFC_V3_ENABLED=false` to disable.
+ * The admin-email override list (`BRIEF_TO_IFC_V3_ADMIN_EMAILS`) still
+ * exists so we can offer v3 to a specific user even if the master is
+ * explicitly disabled during an incident.
  *
  * Surfaced to the client via `GET /api/config/feature-flags` and gated
  * on every v3 API route (POST /api/brief-to-ifc/v3/*).
  */
 
-/** Master switch — `BRIEF_TO_IFC_V3_ENABLED=true` (strict equality). */
+/** Master switch — defaults to TRUE. Set `BRIEF_TO_IFC_V3_ENABLED=false`
+ *  to take v3 down (the only IFC pipeline; expect everyone to lose IFC
+ *  generation if you do this). */
 export function isBriefToIfcV3MasterEnabled(): boolean {
-  return process.env.BRIEF_TO_IFC_V3_ENABLED === "true";
+  return process.env.BRIEF_TO_IFC_V3_ENABLED !== "false";
 }
 
 /** True when `email` is in the comma-separated `BRIEF_TO_IFC_V3_ADMIN_EMAILS`. */

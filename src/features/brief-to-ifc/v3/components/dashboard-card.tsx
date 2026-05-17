@@ -1,13 +1,11 @@
 /**
- * Dashboard quick-start card for AI IFC (v3).
+ * Dashboard quick-start card for AI IFC.
  *
- * Renders only when the user's session has `briefToIfcV3Enabled === true`
- * (gated client-side via `useFeatureFlags`; defence-in-depth on top of
- * the server check that already redirects /dashboard/brief-to-ifc/v3/*
- * when canary is off).
- *
- * Visual style mirrors the existing product tile cards but is a single
- * full-width strip — beta surface, not the primary product row.
+ * v3 is THE IFC pipeline as of 2026-05-17 (v2 retired). The card
+ * renders unconditionally — no canary gate. If `BRIEF_TO_IFC_V3_ENABLED`
+ * is explicitly disabled the server-side gate on the submit form
+ * returns 403; the card click flow handles that path with the standard
+ * dashboard redirect.
  */
 
 "use client";
@@ -15,12 +13,7 @@
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
 
-import { useFeatureFlags } from "@/hooks/useFeatureFlags";
-
-export function AiIfcDashboardCard(): React.ReactElement | null {
-  const { briefToIfcV3Enabled } = useFeatureFlags();
-  if (!briefToIfcV3Enabled) return null;
-
+export function AiIfcDashboardCard(): React.ReactElement {
   return (
     <section className="my-4 sm:my-6">
       <Link
@@ -32,16 +25,12 @@ export function AiIfcDashboardCard(): React.ReactElement | null {
             <Sparkles className="h-6 w-6 sm:h-7 sm:w-7" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-zinc-900 sm:text-lg">
-                Generate IFC from a brief
-              </h3>
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-amber-700">
-                Beta
-              </span>
-            </div>
+            <h3 className="text-base font-semibold tracking-tight text-zinc-900 sm:text-lg">
+              Generate IFC from a brief
+            </h3>
             <p className="mt-1 text-sm text-zinc-600 sm:text-base">
-              Upload a PDF or paste text. AI builds a BIM model in ~2 min.
+              Upload a PDF or paste text. AI builds a BIM model in ~1 minute
+              for around $0.20.
             </p>
           </div>
           <div className="hidden shrink-0 items-center text-sm font-medium text-amber-700 transition-transform group-hover:translate-x-1 sm:flex">

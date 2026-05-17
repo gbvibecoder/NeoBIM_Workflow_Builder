@@ -112,6 +112,7 @@ import {
   selectCloseSaveModal,
   selectLoadFromTemplate,
 } from "@/features/workflows/stores/workflow-store";
+import { LegacyV2Banner } from "@/features/canvas/components/LegacyV2Banner";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { SaveWorkflowModal } from "@/features/canvas/components/modals/SaveWorkflowModal";
@@ -1054,6 +1055,38 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             >
               Open new workflow
             </button>
+          </div>
+        )}
+
+        {/* v2 IFC pipeline retirement banner — surfaces when the loaded
+         *  workflow references any deprecated v2 node (TR-022 / TR-024 /
+         *  EX-006). Offers one-click upgrade to GN-013. Banner self-hides
+         *  on workflows without v2 nodes; per-workflow dismissal lives in
+         *  localStorage. See PHASE_V2_RETIRED_2026-05-17.md. */}
+        {currentWorkflow?.id && (
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 11,
+              width: "min(900px, calc(100% - 32px))",
+              pointerEvents: "auto",
+            }}
+          >
+            <LegacyV2Banner
+              workflowId={currentWorkflow.id}
+              nodes={storeNodes}
+              edges={storeEdges}
+              onApplyUpgrade={(upgraded) => {
+                const store = useWorkflowStore.getState();
+                store.setNodes(upgraded.nodes);
+                store.setEdges(upgraded.edges);
+                store.markDirty();
+                void store.saveWorkflow();
+              }}
+            />
           </div>
         )}
 

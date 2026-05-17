@@ -10,7 +10,7 @@ import React, { memo, useState, useEffect, useRef, useCallback, useMemo } from "
 import { Search, X } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { useReactFlow } from "@xyflow/react";
-import { NODE_CATALOGUE, CATEGORY_CONFIG } from "@/features/workflows/constants/node-catalogue";
+import { VISIBLE_NODE_CATALOGUE, CATEGORY_CONFIG } from "@/features/workflows/constants/node-catalogue";
 import type { NodeCatalogueItem } from "@/types/nodes";
 import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
@@ -102,14 +102,14 @@ export const QuickSearch = memo(function QuickSearch({ onAICommand }: QuickSearc
 
     // Nodes
     const matchedNodes = q
-      ? NODE_CATALOGUE.filter(
+      ? VISIBLE_NODE_CATALOGUE.filter(
           (n) =>
             fuzzyMatch(q, n.name) ||
             fuzzyMatch(q, n.id) ||
             fuzzyMatch(q, n.category) ||
             n.tags.some((t) => fuzzyMatch(q, t))
         )
-      : NODE_CATALOGUE.slice(0, 8);
+      : VISIBLE_NODE_CATALOGUE.slice(0, 8);
 
     matchedNodes.forEach((n) => {
       items.push({

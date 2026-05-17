@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { Package, ChevronRight, Search, X } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { NODE_CATALOGUE, LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
+import { VISIBLE_NODE_CATALOGUE, LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
 import type { NodeCatalogueItem, NodeCategory } from "@/types/nodes";
 import { useUIStore } from "@/shared/stores/ui-store";
 import { useLocale } from "@/hooks/useLocale";
@@ -215,7 +215,7 @@ export function NodeLibrarySidebar({
   const [focusedSearch, setFocusedSearch] = useState(false);
 
   const displayNodes = useMemo(() => {
-    let result = NODE_CATALOGUE as NodeCatalogueItem[];
+    let result = VISIBLE_NODE_CATALOGUE as NodeCatalogueItem[];
     if (activeFilter !== "all") {
       result = result.filter((n) => n.category === activeFilter);
     }
@@ -308,7 +308,7 @@ export function NodeLibrarySidebar({
                 flexShrink: 0,
               }}
             >
-              {NODE_CATALOGUE.length}
+              {VISIBLE_NODE_CATALOGUE.length}
             </span>
             <ChevronRight
               size={13}

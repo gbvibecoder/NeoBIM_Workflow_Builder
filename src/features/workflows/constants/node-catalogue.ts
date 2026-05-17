@@ -324,6 +324,13 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     apiEngine: "Anthropic Claude Sonnet 4.6",
     tags: ["ai", "brief", "enrich", "spec", "ifc", "v2", "claude"],
     executionTime: "30-90s",
+    // v2 IFC pipeline — retired 2026-05-17. Layer 1 enrichment is now
+    // performed inside GN-013 (the AI IFC Generator) automatically.
+    deprecated: true,
+    hiddenFromPicker: true,
+    replacedBy: "GN-013",
+    deprecationNote:
+      "Replaced by AI IFC Generator (GN-013), which runs brief enrichment internally. v2 pipeline retired 2026-05-17.",
   },
   {
     id: "TR-022",
@@ -337,6 +344,15 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     apiEngine: "Anthropic Claude Opus 4.7",
     tags: ["ai", "ifc", "architect", "ifcopenshell", "opus", "v2", "claude"],
     executionTime: "1-4 min",
+    // v2 IFC pipeline — retired 2026-05-17. v2 produced broken
+    // millimetre-scale IFCs (see PHASE_BEAST_MODE_CLOSEOUT_REPORT_2026-05-16.md).
+    // GN-013 generates a viewer-loadable IFC2X3 in a single node,
+    // running enrichment + script + sandbox + validators internally.
+    deprecated: true,
+    hiddenFromPicker: true,
+    replacedBy: "GN-013",
+    deprecationNote:
+      "Replaced by AI IFC Generator (GN-013). v2 pipeline retired 2026-05-17.",
   },
 
   // ── Control Flow / Branching ──
@@ -686,16 +702,24 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     // replaced here by the AI IFC Generator — see the Phase 1 report's
     // "Ambiguities Resolved" section.
     id: "EX-006",
-    name: "AI IFC Generator",
+    name: "AI IFC Generator (v2 retired)",
     description:
-      "Executes the architect's script in a sandboxed container and returns the IFC file.",
+      "RETIRED — v2 pipeline produced mm-scale broken IFCs. Use GN-013 (AI IFC Generator) instead, which runs enrichment + script + sandbox + validators in one node.",
     category: "export",
     icon: "Boxes",
     inputs: [{ id: "script-in", label: "Builder Script", type: "text" }],
     outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }],
-    apiEngine: "BuildFlow Python Sandbox (Railway)",
-    tags: ["ifc", "sandbox", "python", "generate", "ai", "v2", "ifcopenshell"],
+    apiEngine: "BuildFlow Python Sandbox (Railway) — retired",
+    tags: ["ifc", "sandbox", "python", "generate", "ai", "v2", "ifcopenshell", "retired"],
     executionTime: "30-120s",
+    // v2 IFC pipeline — retired 2026-05-17 after the MILLI.METRE bug
+    // was caught + fixed in v3 (PHASE_BEAST_MODE_CLOSEOUT_REPORT_2026-05-16.md).
+    // Catalogue entry kept so old workflows in the DB still parse on load.
+    deprecated: true,
+    hiddenFromPicker: true,
+    replacedBy: "GN-013",
+    deprecationNote:
+      "Replaced by AI IFC Generator (GN-013). v2 pipeline retired 2026-05-17.",
   },
 ];
 
@@ -703,11 +727,29 @@ export const NODE_CATALOGUE_MAP = new Map(
   NODE_CATALOGUE.map((node) => [node.id, node])
 );
 
+/**
+ * The catalogue subset visible in the canvas node-picker.
+ *
+ * `NODE_CATALOGUE` is the full registry — every node in here can be
+ * referenced by an existing workflow saved in the DB, so we MUST NOT
+ * remove entries (deletion breaks workflow load). To retire a node
+ * from the user-facing surface, set `hiddenFromPicker: true` on its
+ * catalogue entry; this derived export filters those out so the picker
+ * never offers them again.
+ *
+ * Use `NODE_CATALOGUE` (or `NODE_CATALOGUE_MAP`) when looking up an
+ * existing workflow's node definition. Use `VISIBLE_NODE_CATALOGUE`
+ * when rendering the picker.
+ */
+export const VISIBLE_NODE_CATALOGUE: NodeCatalogueItem[] = NODE_CATALOGUE.filter(
+  (n) => !n.hiddenFromPicker,
+);
+
 export const NODES_BY_CATEGORY = {
-  input: NODE_CATALOGUE.filter((n) => n.category === "input"),
-  transform: NODE_CATALOGUE.filter((n) => n.category === "transform"),
-  generate: NODE_CATALOGUE.filter((n) => n.category === "generate"),
-  export: NODE_CATALOGUE.filter((n) => n.category === "export"),
+  input: VISIBLE_NODE_CATALOGUE.filter((n) => n.category === "input"),
+  transform: VISIBLE_NODE_CATALOGUE.filter((n) => n.category === "transform"),
+  generate: VISIBLE_NODE_CATALOGUE.filter((n) => n.category === "generate"),
+  export: VISIBLE_NODE_CATALOGUE.filter((n) => n.category === "export"),
 };
 
 export const CATEGORY_CONFIG = {

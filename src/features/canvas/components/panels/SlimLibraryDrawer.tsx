@@ -20,7 +20,10 @@ import {
   selectCloseSlimDrawer,
 } from "@/shared/stores/ui-store";
 import type { SlimCategory } from "@/shared/stores/ui-store";
-import { NODE_CATALOGUE, LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
+import {
+  VISIBLE_NODE_CATALOGUE,
+  LIVE_NODES,
+} from "@/features/workflows/constants/node-catalogue";
 import type { NodeCatalogueItem } from "@/types/nodes";
 
 // ─── Helpers (from NodeLibrarySidebar) ──────────────────────────────────────
@@ -67,7 +70,7 @@ function getCategoryMeta(category: SlimCategory, tk: ReturnType<typeof useCanvas
       return { label: "Exports & Reports", title: "Deliverables", subtitle: "Generate downloadable files and final outputs.", catKey: "export", solidColor: tk.catExport };
     case "all":
     default:
-      return { label: "All Nodes", title: "Complete library", subtitle: `${NODE_CATALOGUE.length} nodes — drag any to canvas to begin.`, catKey: "all", solidColor: tk.text1 };
+      return { label: "All Nodes", title: "Complete library", subtitle: `${VISIBLE_NODE_CATALOGUE.length} nodes — drag any to canvas to begin.`, catKey: "all", solidColor: tk.text1 };
   }
 }
 
@@ -209,7 +212,9 @@ export const SlimLibraryDrawer = memo(function SlimLibraryDrawer() {
 
   // Filter nodes
   const filteredNodes = useMemo(() => {
-    let nodes = NODE_CATALOGUE as NodeCatalogueItem[];
+    // Use VISIBLE_NODE_CATALOGUE so deprecated/hidden nodes (e.g. v2
+    // IFC pipeline retired 2026-05-17) don't appear in the picker.
+    let nodes = VISIBLE_NODE_CATALOGUE as NodeCatalogueItem[];
     if (category && category !== "all") {
       nodes = nodes.filter((n) => n.category === category);
     }

@@ -783,13 +783,11 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       "IfcOpenShell builder script (authored by AI)",
       "Downloadable IFC file, openable in the BIM viewer",
     ],
-    // Phase 2 — when the `briefToIfcV2QueueEnabled` canary flag is on,
-    // `useExecution` runs this workflow through the QStash-backed queued
-    // pipeline (the three Opus 4.7 stages each get their own worker
-    // invocation). With the flag off it falls back to the synchronous
-    // Phase 1 node-loop. Runtime detection is by node composition, not
-    // this field (loadFromTemplate remaps node ids) — the field is the
-    // declarative marker of intent.
+    // Note (2026-05-17): the QStash-backed v2 queued path that this
+    // template was authored for has been retired (POST /api/brief-to-ifc-job
+    // now returns 410). When this template loads, the deprecation banner
+    // surfaces on the canvas and offers a one-click "Upgrade workflow"
+    // button that swaps the v2 chain for a single GN-013 node.
     executionMode: "queued",
     thumbnail: "https://picsum.photos/seed/wf13/600/400",
     tileGraph: {

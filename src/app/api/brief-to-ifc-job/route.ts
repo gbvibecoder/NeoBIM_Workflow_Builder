@@ -1,20 +1,17 @@
 /**
- * Brief-to-IFC v2 queued-pipeline job collection endpoints.
+ * Brief-to-IFC v2 queued-pipeline job endpoints — retirement-mode (2026-05-17).
  *
- *   POST /api/brief-to-ifc-job  — create a job + dispatch the QStash worker.
- *   GET  /api/brief-to-ifc-job  — list the requesting user's jobs (newest first).
+ *   POST /api/brief-to-ifc-job  — returns HTTP 410 Gone with
+ *                                 `error: "PIPELINE_RETIRED"`. New IFC
+ *                                 generation lives at v3:
+ *                                 POST /api/brief-to-ifc/v3/runs
+ *   GET  /api/brief-to-ifc-job  — still online so users can inspect
+ *                                 their HISTORICAL v2 jobs (read-only,
+ *                                 own-data; canary check removed).
  *
- * Mirrors `POST /api/brief-renders` — same auth → canary → rate-limit →
- * concurrency-cap → SSRF-guard → create → dispatch → 201 shape. It is
- * deliberately LIGHTER than brief-renders: no plan-quota / billing gate
- * (the queued path is canary-gated and concurrency-capped, and the
- * Phase 1 synchronous path already counts against the execution cap), and
- * no `requestId` idempotency column (the ≤2-active concurrency cap plus
- * client-side dedup is the guard).
- *
- * The brief file itself is uploaded separately through the existing
- * `POST /api/upload-brief` endpoint; this route receives the resulting
- * `briefUrl` — exactly the brief-renders two-step shape.
+ * Backstory: v2 produced broken millimetre-scale IFCs (see
+ * PHASE_BEAST_MODE_CLOSEOUT_REPORT_2026-05-16.md). v3 supersedes it
+ * with one node, validators, and a stable visual gate.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -22,214 +19,51 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { scheduleBriefToIfcWorker } from "@/lib/qstash";
-import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
-import { isPlatformAdmin } from "@/lib/platform-admin";
-import { shouldUseBriefToIfcV2Queue } from "@/features/ifc/services/brief-to-ifc-v2/canary";
+
+// Retirement-era surface (2026-05-17). The original v2 POST body
+// validator, rate-limit constants, concurrency-cap constants, and the
+// canary-gate helpers are all gone — POST now returns 410 unconditionally.
+// Only the read path (GET) remains, paginating the user's own historical
+// job rows.
 
 export const maxDuration = 30;
-
-/** Active-job concurrency cap per user — mirrors brief-renders. */
-const MAX_ACTIVE_JOBS_PER_USER = 2;
-/** Per-endpoint rate limit. */
-const RATE_LIMIT_PER_HOUR = 10;
-/** Statuses that count as "in flight" for the concurrency cap. */
-const ACTIVE_STATUSES = [
-  "QUEUED",
-  "RUNNING_ENRICH",
-  "RUNNING_ARCHITECT",
-  "RUNNING_GENERATE",
-  "AWAITING_RETRY",
-] as const;
-
-const POST_BODY_SCHEMA = z
-  .object({
-    briefUrl: z.string().min(1).max(2000),
-    executionId: z.string().min(1).max(64).optional(),
-  })
-  .strict();
 
 const LIST_QUERY_SCHEMA = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   cursor: z.string().optional(),
 });
 
-const NOT_AVAILABLE_ERROR = {
-  title: "Feature not available",
-  message: "The queued AI IFC pipeline is not available for your account.",
-  code: "BRIEF_TO_IFC_NOT_AVAILABLE",
-} as const;
-
-const RATE_LIMITED_ERROR = {
-  title: "Too many requests",
-  message:
-    "You've started too many IFC jobs in the last hour. Please wait and try again.",
-  code: "RATE_001",
-} as const;
-
-const CONCURRENCY_ERROR = {
-  title: "Active job limit reached",
-  message: `You can have at most ${MAX_ACTIVE_JOBS_PER_USER} AI IFC jobs in flight at once. Wait for one to finish or cancel it.`,
-  code: "BRIEF_TO_IFC_CONCURRENCY_LIMIT",
-} as const;
-
-const INVALID_BRIEF_URL = {
-  title: "Invalid brief URL",
-  message:
-    "The supplied brief URL is not from an authorised storage location. Re-upload the brief and try again.",
-  code: "BRIEF_TO_IFC_INVALID_URL",
-} as const;
-
-const QSTASH_FAILED = {
-  title: "Failed to schedule job",
-  message:
-    "We couldn't schedule the background worker. The job is created but not yet running — please retry.",
-  code: "BRIEF_TO_IFC_QSTASH_FAILED",
-} as const;
-
-/**
- * SSRF guard — accepts only URLs whose host matches the configured
- * `R2_PUBLIC_URL` host or `*.r2.cloudflarestorage.com`. Mirrors the
- * brief-renders guard byte-for-byte; the brief file is always one our
- * own `POST /api/upload-brief` produced, so this is defence-in-depth.
- */
-function isAuthorizedBriefUrl(briefUrl: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(briefUrl);
-  } catch {
-    return false;
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
-  const host = parsed.hostname.toLowerCase();
-  if (host.endsWith(".r2.cloudflarestorage.com")) return true;
-  const publicUrl = process.env.R2_PUBLIC_URL ?? "";
-  if (publicUrl) {
-    try {
-      const allowedHost = new URL(publicUrl).hostname.toLowerCase();
-      if (allowedHost && host === allowedHost) return true;
-    } catch {
-      /* R2_PUBLIC_URL malformed → fall through. */
-    }
-  }
-  return false;
-}
-
 // ─── POST /api/brief-to-ifc-job ─────────────────────────────────────
+//
+// RETIRED 2026-05-17. The v2 queued IFC pipeline produced broken
+// millimetre-scale IFCs (see PHASE_BEAST_MODE_CLOSEOUT_REPORT_2026-05-16.md)
+// and was superseded by v3 (POST /api/brief-to-ifc/v3/runs). This
+// endpoint now returns HTTP 410 Gone for all new submissions.
+//
+// The GET endpoints below remain functional so users can still inspect
+// their historical job rows. The QStash worker callback (worker/route.ts)
+// also returns 410 so any in-flight callbacks short-circuit.
 
-export async function POST(req: NextRequest) {
-  // Phase 2.2: one-line "I was reached" beacon. If this line never appears
-  // in Vercel logs for a wf-13 run, the canvas dispatched on the SYNC path
-  // (the `/api/execute-node` node-loop) — i.e. the client never even tried
-  // the queued endpoint. Confirms the canary axis of the dispatch decision.
-  console.log("[brief-to-ifc-job POST] received request — canary check downstream");
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), {
-      status: 401,
-    });
-  }
-  const userId = session.user.id;
-  const userEmail = session.user.email ?? null;
-
-  // Canary gate.
-  if (!shouldUseBriefToIfcV2Queue(userEmail)) {
-    return NextResponse.json(formatErrorResponse(NOT_AVAILABLE_ERROR), {
-      status: 403,
-    });
-  }
-
-  const isAdmin = isPlatformAdmin(userEmail);
-
-  // Rate limit (admin-bypassed).
-  if (!isAdmin) {
-    const rl = await checkEndpointRateLimit(
-      userId,
-      "brief-to-ifc-create",
-      RATE_LIMIT_PER_HOUR,
-      "1 h",
-    );
-    if (!rl.success) {
-      return NextResponse.json(formatErrorResponse(RATE_LIMITED_ERROR), {
-        status: 429,
-      });
-    }
-  }
-
-  // Body validation.
-  let body: z.infer<typeof POST_BODY_SCHEMA>;
-  try {
-    const json = await req.json();
-    const parsed = POST_BODY_SCHEMA.safeParse(json);
-    if (!parsed.success) {
-      return NextResponse.json(
-        formatErrorResponse(UserErrors.MISSING_REQUIRED_FIELD("briefUrl")),
-        { status: 400 },
-      );
-    }
-    body = parsed.data;
-  } catch {
-    return NextResponse.json(formatErrorResponse(UserErrors.INVALID_INPUT), {
-      status: 400,
-    });
-  }
-
-  if (!isAuthorizedBriefUrl(body.briefUrl)) {
-    return NextResponse.json(formatErrorResponse(INVALID_BRIEF_URL), {
-      status: 400,
-    });
-  }
-
-  // Concurrency cap.
-  const activeCount = await prisma.briefToIfcJob.count({
-    where: { userId, status: { in: [...ACTIVE_STATUSES] } },
-  });
-  if (activeCount >= MAX_ACTIVE_JOBS_PER_USER) {
-    return NextResponse.json(formatErrorResponse(CONCURRENCY_ERROR), {
-      status: 429,
-      headers: { "Retry-After": "60" },
-    });
-  }
-
-  // Create the job row.
-  const job = await prisma.briefToIfcJob.create({
-    data: {
-      userId,
-      briefFileR2Key: body.briefUrl,
-      executionId: body.executionId ?? null,
-      status: "QUEUED",
-      progress: 0,
-    },
-  });
-
-  // Dispatch the worker. If QStash fails, the row stays QUEUED — the
-  // cleanup cron will eventually sweep it to FAILED. Surface the failure
-  // to the client so it can retry.
-  try {
-    await scheduleBriefToIfcWorker(job.id);
-  } catch (err) {
-    console.error("[brief-to-ifc] QStash dispatch failed", {
-      jobId: job.id,
-      reason: err instanceof Error ? err.message : String(err),
-    });
-    return NextResponse.json(formatErrorResponse(QSTASH_FAILED), {
-      status: 503,
-    });
-  }
-
+export async function POST(_req: NextRequest) {
   return NextResponse.json(
     {
-      jobId: job.id,
-      status: job.status,
-      createdAt: job.createdAt.toISOString(),
+      error: "PIPELINE_RETIRED",
+      message:
+        "The v2 IFC pipeline was retired on 2026-05-17. Use the v3 pipeline instead.",
+      replacement: "/api/brief-to-ifc/v3/runs",
+      docs: "https://trybuildflow.in/dashboard/brief-to-ifc/v3/new",
     },
-    { status: 201 },
+    { status: 410 },
   );
 }
 
+
 // ─── GET /api/brief-to-ifc-job ──────────────────────────────────────
 
+// GET stays online so users can still inspect their HISTORICAL v2 jobs
+// (rows in the DB) even though new submissions are 410 above. We drop
+// the canary check on read — historical data belongs to the user.
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -238,13 +72,6 @@ export async function GET(req: NextRequest) {
     });
   }
   const userId = session.user.id;
-  const userEmail = session.user.email ?? null;
-
-  if (!shouldUseBriefToIfcV2Queue(userEmail)) {
-    return NextResponse.json(formatErrorResponse(NOT_AVAILABLE_ERROR), {
-      status: 403,
-    });
-  }
 
   const url = new URL(req.url);
   const params = LIST_QUERY_SCHEMA.safeParse({
