@@ -31,13 +31,20 @@ function Splash({ label }: { label: string }) {
 }
 
 /**
- * Phase 1 D7 — when ?executionId=<id> is on the URL, the page fetches the
- * execution, walks tileResults for the latest IFC artifact, hydrates the
- * IFC bytes into the existing IndexedDB cache, then mounts IFCViewerPage.
- * IFCViewerPage's existing mount-restore logic reads the cache and loads
- * automatically — no changes to IFCViewerPage / Viewport / Worker.
+ * The route entry supports three modes:
  *
- * Without ?executionId, the page renders the upload UI as before.
+ *   1. `?executionId=<id>` — walks the execution's tileResults for the
+ *      latest IFC artifact, hydrates the bytes into IndexedDB, mounts
+ *      IFCViewerPage with restoreFromCache.
+ *   2. `?url=<encoded>` — fetches the IFC directly from the URL (R2
+ *      public objects), hydrates into IndexedDB the same way. Used by
+ *      the IFC hero card on the result page so a single click brings
+ *      the file straight into the in-app 3D viewer.
+ *   3. no query — renders the upload UI as before.
+ *
+ * The IFCViewerPage / Viewport / Worker components are NEVER modified
+ * here; this route just adapts the URL input into the IndexedDB cache
+ * that the existing mount-restore code already reads.
  */
 export default function Page() {
   return (
@@ -64,69 +71,121 @@ interface ApiExecutionResponse {
 function IFCViewerEntry() {
   const params = useSearchParams();
   const executionId = params.get("executionId");
-  const [hydrating, setHydrating] = useState<boolean>(!!executionId);
-  const [hydrated, setHydrated] = useState<boolean>(!executionId);
+  const directUrl = params.get("url");
+  const hasInbound = !!executionId || !!directUrl;
+  const [hydrating, setHydrating] = useState<boolean>(hasInbound);
+  const [hydrated, setHydrated] = useState<boolean>(!hasInbound);
 
   useEffect(() => {
-    if (!executionId) return;
-    let cancelled = false;
-    setHydrating(true);
-    const toastId: string | number = toast.loading("Loading IFC artifact from execution…", {
-      id: `ifc-hydrate-${executionId}`,
-    });
+    if (executionId) {
+      // Mode 1 — hydrate from execution.
+      let cancelled = false;
+      setHydrating(true);
+      const toastId: string | number = toast.loading("Loading IFC artifact from execution…", {
+        id: `ifc-hydrate-${executionId}`,
+      });
 
-    (async () => {
-      try {
-        const res = await fetch(`/api/executions/${executionId}`, { cache: "no-store" });
-        if (!res.ok) {
-          throw new Error(`Execution fetch failed (${res.status})`);
+      (async () => {
+        try {
+          const res = await fetch(`/api/executions/${executionId}`, { cache: "no-store" });
+          if (!res.ok) {
+            throw new Error(`Execution fetch failed (${res.status})`);
+          }
+          const json = (await res.json()) as ApiExecutionResponse;
+          const artifacts = json.execution?.artifacts ?? [];
+          // Prefer the LAST IFC artifact in case the workflow produced several
+          // intermediate exports.
+          const ifcArtifact = [...artifacts].reverse().find(a => isIfcArtifact(a));
+          if (!ifcArtifact || !ifcArtifact.data) {
+            throw new Error("No IFC artifact in this execution");
+          }
+
+          const buffer = await materializeIFC(ifcArtifact.data);
+          if (!buffer || buffer.byteLength === 0) {
+            throw new Error("IFC artifact had no usable bytes");
+          }
+
+          const fileName =
+            (typeof ifcArtifact.data.fileName === "string" && ifcArtifact.data.fileName) ||
+            (typeof ifcArtifact.data.name === "string" && ifcArtifact.data.name) ||
+            `execution-${executionId.slice(0, 8)}.ifc`;
+
+          await saveLastIFCFile(buffer, fileName);
+          if (cancelled) return;
+
+          toast.success(`Loaded ${fileName}`, { id: toastId });
+          setHydrated(true);
+        } catch (err) {
+          if (cancelled) return;
+          const msg = err instanceof Error ? err.message : "Couldn't load IFC artifact";
+          toast.error(`No IFC found in this execution`, { id: toastId, description: msg });
+          // Fall through to the upload UI — IFCViewerPage will render its
+          // own UploadZone since the cache is empty for this user.
+          setHydrated(true);
+        } finally {
+          if (!cancelled) setHydrating(false);
         }
-        const json = (await res.json()) as ApiExecutionResponse;
-        const artifacts = json.execution?.artifacts ?? [];
-        // Prefer the LAST IFC artifact in case the workflow produced several
-        // intermediate exports.
-        const ifcArtifact = [...artifacts].reverse().find(a => isIfcArtifact(a));
-        if (!ifcArtifact || !ifcArtifact.data) {
-          throw new Error("No IFC artifact in this execution");
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (directUrl) {
+      // Mode 2 — hydrate from a direct URL. The result page's IFC hero
+      // card uses this so a single click brings the .ifc straight into
+      // the viewer. Reuses materializeIFC's Path 3 (R2 fetch).
+      let cancelled = false;
+      setHydrating(true);
+      const toastId: string | number = toast.loading("Loading IFC from URL…", {
+        id: `ifc-hydrate-url-${directUrl.slice(-12)}`,
+      });
+
+      (async () => {
+        try {
+          const buffer = await materializeIFC({ url: directUrl });
+          if (!buffer || buffer.byteLength === 0) {
+            throw new Error("Fetched IFC was empty");
+          }
+          const trimmed = directUrl.split("?")[0];
+          const tail = trimmed.slice(trimmed.lastIndexOf("/") + 1);
+          const fileName = tail.toLowerCase().endsWith(".ifc")
+            ? decodeURIComponent(tail)
+            : "shared-model.ifc";
+          await saveLastIFCFile(buffer, fileName);
+          if (cancelled) return;
+          toast.success(`Loaded ${fileName}`, { id: toastId });
+          setHydrated(true);
+        } catch (err) {
+          if (cancelled) return;
+          const msg = err instanceof Error ? err.message : "Couldn't load IFC from URL";
+          toast.error("Couldn't load IFC from URL", { id: toastId, description: msg });
+          setHydrated(true);
+        } finally {
+          if (!cancelled) setHydrating(false);
         }
+      })();
 
-        const buffer = await materializeIFC(ifcArtifact.data);
-        if (!buffer || buffer.byteLength === 0) {
-          throw new Error("IFC artifact had no usable bytes");
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [executionId, directUrl]);
+
+  if (hasInbound && hydrating && !hydrated) {
+    return (
+      <Splash
+        label={
+          executionId
+            ? "Hydrating IFC from execution…"
+            : "Loading IFC from URL…"
         }
-
-        const fileName =
-          (typeof ifcArtifact.data.fileName === "string" && ifcArtifact.data.fileName) ||
-          (typeof ifcArtifact.data.name === "string" && ifcArtifact.data.name) ||
-          `execution-${executionId.slice(0, 8)}.ifc`;
-
-        await saveLastIFCFile(buffer, fileName);
-        if (cancelled) return;
-
-        toast.success(`Loaded ${fileName}`, { id: toastId });
-        setHydrated(true);
-      } catch (err) {
-        if (cancelled) return;
-        const msg = err instanceof Error ? err.message : "Couldn't load IFC artifact";
-        toast.error(`No IFC found in this execution`, { id: toastId, description: msg });
-        // Fall through to the upload UI — IFCViewerPage will render its
-        // own UploadZone since the cache is empty for this user.
-        setHydrated(true);
-      } finally {
-        if (!cancelled) setHydrating(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [executionId]);
-
-  if (executionId && hydrating && !hydrated) {
-    return <Splash label="Hydrating IFC from execution…" />;
+      />
+    );
   }
 
-  return <IFCViewerPage autoEnhance={!!executionId} restoreFromCache={!!executionId} />;
+  return <IFCViewerPage autoEnhance={hasInbound} restoreFromCache={hasInbound} />;
 }
 
 function isIfcArtifact(art: ApiArtifact): boolean {

@@ -173,6 +173,33 @@ export interface BoqSummary {
   currencySymbol: string;
 }
 
+/** Hero-card payload for IFC export workflows (EX-007).
+ *
+ *  Surfaced as a top-level field on ResultPageData when a `file`
+ *  artifact carries an `ifcUrl` (and, optionally, `ifcViewerUrl` +
+ *  preview PNGs). Used by `selectHero` to pick the "ifc" hero and by
+ *  the IFCHeroCard component to render the Download + Open-in-Viewer
+ *  CTAs above the fold. Independent of `fileDownloads` so the badge
+ *  + exports section keep working unchanged. */
+export interface IfcExportSummary {
+  ifcUrl: string;
+  /** Pre-built deep link into the in-app viewer. Falls back to
+   *  `/dashboard/ifc-viewer?executionId=<id>` if the artifact didn't
+   *  set one explicitly. */
+  ifcViewerUrl: string;
+  /** Browser-friendly download URL (usually identical to ifcUrl, but
+   *  kept distinct so a future signed-URL flow can vary it). */
+  downloadUrl: string;
+  fileName: string;
+  /** Optional KPIs the hero card displays as a one-liner. */
+  entityCount: number | null;
+  worldBbox: [number, number, number] | null;
+  lengthUnit: string | null;
+  verdict: "OK" | "FAILED" | null;
+  topPngUrl: string | null;
+  isoPngUrl: string | null;
+}
+
 export interface ResultPageData {
   // Identity
   executionId: string;
@@ -209,6 +236,10 @@ export interface ResultPageData {
   complianceItems: ComplianceItem[] | null;
   boqSummary: BoqSummary | null;
   clashSummary: ClashSummary | null;
+  /** Populated when a `file` artifact carries an `ifcUrl` (EX-007).
+   *  When set, the result page renders the IFC hero card instead of
+   *  the image hero, and the page tag becomes "IFC Export". */
+  ifcExport: IfcExportSummary | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -501,6 +532,21 @@ export function useResultPageData(executionId: string): ResultPageData {
     const allImageUrls = imageArtifacts
       .map(a => asStr(asRecord(a.data).url) ?? "")
       .filter(Boolean);
+
+    // EX-007 emits `type: "file"` for the IFC export. Its data carries
+    // preview PNG URLs (topPngUrl / isoPngUrl) that the existing image
+    // grid would otherwise miss — file artifacts aren't scanned for
+    // `url`. Lift them in here so the GeneratedAssetsSection thumbnail
+    // grid still renders the renders, even though the primary artifact
+    // is now classified as a file download.
+    for (const a of findAllByType(artifacts, "file")) {
+      const d = asRecord(a.data);
+      const top = asStr(d.topPngUrl);
+      const iso = asStr(d.isoPngUrl);
+      if (top) allImageUrls.push(top);
+      if (iso) allImageUrls.push(iso);
+    }
+
     const heroImageUrl = allImageUrls[0] ?? null;
 
     // ── Video (single primary) ──
@@ -764,6 +810,68 @@ export function useResultPageData(executionId: string): ResultPageData {
       }
     }
 
+    // ── IFC export summary (EX-007 → IFC hero card) ─────────
+    //
+    // Pick the most recent `file` artifact whose data carries an
+    // `ifcUrl`. Pair it with upstream KPIs from any sibling artifact
+    // (TR-027's verdict + bbox, TR-026's entityCount) so the hero
+    // card has the full one-liner. Falls back to null when no IFC
+    // export is in the pipeline; the page then renders the normal
+    // image hero.
+    let ifcExport: IfcExportSummary | null = null;
+    {
+      const fileArts = findAllByType(artifacts, "file");
+      const ifcArt = [...fileArts].reverse().find(a => {
+        const d = asRecord(a.data);
+        return typeof d.ifcUrl === "string" && d.ifcUrl.length > 8;
+      });
+      if (ifcArt) {
+        const d = asRecord(ifcArt.data);
+        const ifcUrl = asStr(d.ifcUrl) ?? asStr(d.url) ?? "";
+        const explicitViewer = asStr(d.ifcViewerUrl);
+        const ifcViewerUrl =
+          explicitViewer ?? `/dashboard/ifc-viewer?executionId=${executionId}`;
+        // Hunt sibling JSON artifacts for the validator + agent KPIs.
+        // The order EX-007 ships them is TR-026 (file ifc) → TR-027
+        // (json verdict) → EX-007 (file ifc-export); both upstream
+        // shapes are stable, so a flat scan is safe.
+        let entityCount: number | null = null;
+        let worldBbox: [number, number, number] | null = null;
+        let lengthUnit: string | null = null;
+        let verdict: "OK" | "FAILED" | null = null;
+        for (const a of artifacts.values()) {
+          const dd = asRecord(a.data);
+          if (typeof dd.entityCount === "number" && entityCount === null) {
+            entityCount = dd.entityCount;
+          }
+          if (Array.isArray(dd.worldBbox) && dd.worldBbox.length === 3 && worldBbox === null) {
+            const wb = dd.worldBbox as unknown[];
+            if (wb.every(v => typeof v === "number")) {
+              worldBbox = [wb[0] as number, wb[1] as number, wb[2] as number];
+            }
+          }
+          if (typeof dd.lengthUnit === "string" && lengthUnit === null) {
+            lengthUnit = dd.lengthUnit;
+          }
+          if ((dd.verdict === "OK" || dd.verdict === "FAILED") && verdict === null) {
+            verdict = dd.verdict;
+          }
+        }
+        ifcExport = {
+          ifcUrl,
+          ifcViewerUrl,
+          downloadUrl: asStr(d.downloadUrl) ?? ifcUrl,
+          fileName: asStr(d.fileName) ?? asStr(d.name) ?? "building.ifc",
+          entityCount,
+          worldBbox,
+          lengthUnit,
+          verdict,
+          topPngUrl: asStr(d.topPngUrl) ?? null,
+          isoPngUrl: asStr(d.isoPngUrl) ?? null,
+        };
+      }
+    }
+
     // ── JSON ─────────
     const jsonData = findAllByType(artifacts, "json").map(a => {
       const d = asRecord(a.data);
@@ -839,6 +947,7 @@ export function useResultPageData(executionId: string): ResultPageData {
       complianceItems,
       boqSummary,
       clashSummary,
+      ifcExport,
     };
   }, [
     rawArtifacts,

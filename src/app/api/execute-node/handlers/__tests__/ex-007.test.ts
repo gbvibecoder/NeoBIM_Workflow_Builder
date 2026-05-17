@@ -65,19 +65,27 @@ describe("EX-007 handler — IFC Export + Preview", () => {
       type: string;
       dataUri?: string;
       data: Record<string, unknown>;
+      metadata: Record<string, unknown>;
     };
-    expect(artifact.type).toBe("image");
-    expect(artifact.dataUri).toBe("https://r2.example/top.png");
-    expect(artifact.data.topPngUrl).toBe("https://r2.example/top.png");
-    expect(artifact.data.isoPngUrl).toBe("https://r2.example/iso.png");
+    // `file` (not `image`) so the result page categorises this as
+    // an IFC export and the WorkflowTypeBadge says "IFC Export".
+    expect(artifact.type).toBe("file");
+    expect(artifact.dataUri).toBe("https://r2.example/x.ifc");
+    expect(artifact.data.url).toBe("https://r2.example/x.ifc");
+    expect(artifact.data.downloadUrl).toBe("https://r2.example/x.ifc");
+    expect(artifact.data.fileName).toMatch(/\.ifc$/);
+    expect(artifact.data.type).toBe("application/x-step");
     expect(artifact.data.ifcUrl).toBe("https://r2.example/x.ifc");
     expect(artifact.data.ifcViewerUrl).toBe(
       "/dashboard/ifc-viewer?url=https%3A%2F%2Fr2.example%2Fx.ifc",
     );
+    expect(artifact.data.topPngUrl).toBe("https://r2.example/top.png");
+    expect(artifact.data.isoPngUrl).toBe("https://r2.example/iso.png");
     const images = artifact.data.images as Array<{ label: string; url: string }>;
     expect(images).toHaveLength(2);
     expect(images[0].label).toBe("Top view");
     expect(images[1].label).toBe("Isometric view");
+    expect(artifact.metadata.mimeType).toBe("application/x-step");
   });
 
   it("throws when ifcUrl is missing", async () => {

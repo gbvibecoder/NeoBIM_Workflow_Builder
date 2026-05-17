@@ -3,8 +3,17 @@
  *
  * Canvas-visible export stage. Calls `/api/brief-to-ifc/v3/render-previews`
  * to produce top + iso PNG renders (via the Railway sandbox), uploads
- * them to R2, and surfaces them as inline image artifacts on canvas
- * along with the IFC download link + viewer deep link.
+ * them to R2, and emits a `file` artifact whose `data` carries the
+ * IFC download link + viewer deep link + both preview PNGs.
+ *
+ * Why `type: "file"` (not `"image"`)? The result page categorises
+ * artifacts by type when picking the workflow badge ("IFC Export" vs
+ * "Concept Renders") and the hero kind. Before this change, EX-007
+ * emitted `image`, so the page reported the workflow as a render and
+ * hid the IFC file entirely. The PNG previews are surfaced through
+ * `data.topPngUrl` / `data.isoPngUrl` and lifted into the image grid
+ * by `useResultPageData` — they remain visible as thumbnails, but
+ * the IFC file is now the primary artifact.
  *
  * Inputs (from TR-027 upstream):
  *   • `ifcUrl: string`  — required
@@ -64,7 +73,14 @@ export const handleEX007: NodeHandler = async (ctx) => {
   }
   const result = (await res.json()) as RenderResponse;
 
+  // Deep-link into the in-app IFC viewer. `?executionId=` is the
+  // ownership-checked path the existing viewer route already handles —
+  // it reads the execution, finds the IFC artifact, and hydrates the
+  // bytes into IndexedDB before mounting IFCViewerPage. `?url=` is
+  // available too (added in the same canvas-IFC-overhaul) as a direct
+  // fallback when an executionId isn't on hand.
   const ifcViewerUrl = `/dashboard/ifc-viewer?url=${encodeURIComponent(ifcUrl)}`;
+  const fileName = `ai-ifc-${tileInstanceId}.ifc`;
 
   const summary =
     `IFC ready — top + iso previews rendered ` +
@@ -74,27 +90,34 @@ export const handleEX007: NodeHandler = async (ctx) => {
     id: `art_${tileInstanceId}_${Date.now()}`,
     executionId,
     tileInstanceId,
-    type: "image",
-    dataUri: result.topPngUrl,
+    type: "file",
+    dataUri: ifcUrl,
     data: {
-      // `url` is the convention every other image artifact uses (see
-      // GN-003); the canvas InlineResult reads `data.url` to render the
-      // inline thumbnail. Without it the node card shows "No preview"
-      // even though the PNGs uploaded successfully.
-      url: result.topPngUrl,
+      // Canonical FileDownload fields read by `useResultPageData` so
+      // this artifact lands in `data.fileDownloads`, which in turn
+      // makes the WorkflowTypeBadge say "IFC Export" and the hero
+      // card become the IFC download/viewer CTA pair.
+      url: ifcUrl,
+      downloadUrl: ifcUrl,
+      fileName,
+      name: fileName,
+      type: "application/x-step",
+      // Carry the originating IFC URL + viewer link so the hero card
+      // can wire both CTAs without re-deriving them.
       ifcUrl,
-      runId: result.runId,
-      topPngUrl: result.topPngUrl,
-      isoPngUrl: result.isoPngUrl,
       ifcViewerUrl,
+      runId: result.runId,
       runUrl: typeof inputData?.runId === "string"
         ? `/dashboard/brief-to-ifc/v3/runs/${inputData.runId}`
         : null,
+      // Preview images — `useResultPageData` lifts these into
+      // `allImageUrls` so the existing GeneratedAssetsSection renders
+      // them as thumbnails below the hero.
+      topPngUrl: result.topPngUrl,
+      isoPngUrl: result.isoPngUrl,
       meshCount: result.meshCount,
       durationMs: result.durationMs,
       summary,
-      // Conventionally `images` is read by canvas artifact cards that
-      // render multiple thumbnails.
       images: [
         { label: "Top view", url: result.topPngUrl },
         { label: "Isometric view", url: result.isoPngUrl },
@@ -102,7 +125,7 @@ export const handleEX007: NodeHandler = async (ctx) => {
     },
     metadata: {
       stage: "ifc-export-preview",
-      filename: `ai-ifc-${tileInstanceId}.ifc`,
+      filename: fileName,
       mimeType: "application/x-step",
       ifcUrl,
       topPngUrl: result.topPngUrl,

@@ -28,6 +28,7 @@ export type HeroKind =
   | "3d-model"
   | "floor-plan-svg"
   | "boq"
+  | "ifc"
   | "image"
   | "clash"
   | "table"
@@ -59,7 +60,15 @@ export function selectHero(data: ResultPageData): HeroKind {
   // 8. Clash report — NEW per D3
   if (data.clashSummary) return "clash";
 
-  // 9. Image-only workflows
+  // 9. IFC export — EX-007 produces a `file` artifact with an
+  //    `ifcUrl`. Must rank BEFORE "image" because EX-007 also lifts
+  //    its preview PNGs into allImageUrls so the thumbnails survive
+  //    in the GeneratedAssetsSection. Without this branch the page
+  //    would still pick "image" and bury the .ifc download below the
+  //    PNG renders (the original "Concept Renders" failure mode).
+  if (data.ifcExport) return "ifc";
+
+  // 10. Image-only workflows
   if (data.allImageUrls.length > 0) return "image";
 
   // 10. Table data

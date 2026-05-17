@@ -71,6 +71,13 @@ const ACCENTS: Record<HeroKind, WorkflowAccent> = {
     stripe: "linear-gradient(90deg, #0D9488, #0D948840, transparent)",
     halo: "rgba(13,148,136,0.10)",
   },
+  ifc: {
+    base: "#D97706",
+    tint: "#FEF3C7",
+    ring: "rgba(217,119,6,0.22)",
+    stripe: "linear-gradient(90deg, #D97706, #D9770640, transparent)",
+    halo: "rgba(217,119,6,0.08)",
+  },
   image: {
     base: "#0D9488",
     tint: "#F0FDFA",

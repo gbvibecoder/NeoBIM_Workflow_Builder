@@ -12,6 +12,7 @@ import { PageHeader } from "@/features/result-page/components/PageHeader";
 import { ScrollReveal } from "@/features/result-page/components/ScrollReveal";
 import { PageBackground } from "@/features/result-page/components/aec/PageBackground";
 import { HeroSection } from "@/features/result-page/components/sections/HeroSection";
+import { IfcHeroSection } from "@/features/result-page/components/sections/IfcHeroSection";
 import { PartialBanner } from "@/features/result-page/components/sections/PartialBanner";
 import { FailureSection } from "@/features/result-page/components/sections/FailureSection";
 import { PendingSection } from "@/features/result-page/components/sections/PendingSection";
@@ -210,6 +211,10 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
               {heroKind === "pending" ? (
                 <ErrorBoundary>
                   <PendingSection progress={data.primaryVideoProgress} previewImageUrls={data.allImageUrls} />
+                </ErrorBoundary>
+              ) : heroKind === "ifc" ? (
+                <ErrorBoundary>
+                  <IfcHeroSection data={data} />
                 </ErrorBoundary>
               ) : (
                 <ErrorBoundary>
