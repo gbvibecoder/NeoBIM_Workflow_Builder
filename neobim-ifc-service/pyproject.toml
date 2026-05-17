@@ -24,6 +24,12 @@ dependencies = [
     # extraction). >=0.40 lands tool_use + ephemeral prompt caching
     # support that the cache layer relies on.
     "anthropic>=0.40",
+    # Canvas Unification (2026-05-17) — needed by app/routers/v3_previews.py
+    # to render top + isometric PNG previews of generated IFCs (canvas
+    # EX-007 stage). matplotlib brings numpy as a transitive dep; we
+    # don't pin numpy explicitly so ifcopenshell's compatible-numpy
+    # resolution stays the source of truth.
+    "matplotlib>=3.7",
 ]
 
 [project.optional-dependencies]
