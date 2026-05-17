@@ -76,6 +76,194 @@ export const TextPromptInput = memo(function TextPromptInput({ nodeId, data }: {
   );
 });
 
+// ─── Brief input (IN-009) ────────────────────────────────────────────────────
+//
+// Tabbed brief entry for the v3 AI-IFC canvas pipeline (Canvas Unification
+// 2026-05-17). Replaces the deleted /dashboard/brief-to-ifc/v3/new form's
+// text/PDF/JSON tabs as a canvas-native input. SHIPS WITH THE TEXT TAB
+// IMPLEMENTED — PDF/DOCX tabs surface "Coming soon" and route the user to
+// the IN-002 (PDF/DOCX Upload) + TR-001 (Brief Parser) chain for now.
+
+type BriefTab = "text" | "pdf" | "docx";
+
+export const BriefInput = memo(function BriefInput({
+  nodeId,
+  data,
+}: {
+  nodeId: string;
+  data: WorkflowNodeData;
+}) {
+  const updateNode = useWorkflowStore((s) => s.updateNode);
+  const { theme } = useCanvasTheme();
+  const isLight = theme === "light";
+  const tab: BriefTab =
+    ((data.briefTab as string | undefined) as BriefTab | undefined) ?? "text";
+  const briefText = (data.briefText as string | undefined) ??
+    (data.inputValue as string | undefined) ??
+    "";
+
+  const setTab = useCallback(
+    (nextTab: BriefTab) => {
+      const node = useWorkflowStore.getState().nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      updateNode(nodeId, { data: { ...node.data, briefTab: nextTab } });
+    },
+    [nodeId, updateNode],
+  );
+
+  const onTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const node = useWorkflowStore.getState().nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      // Mirror into both inputValue (legacy downstream readers) and
+      // briefText (the canonical key TR-025 reads).
+      updateNode(nodeId, {
+        data: {
+          ...node.data,
+          inputValue: e.target.value,
+          briefText: e.target.value,
+        },
+      });
+    },
+    [nodeId, updateNode],
+  );
+
+  const isEmpty = !briefText.trim();
+  const nt = isLight ? nodeTextLight : nodeText;
+
+  const tabBtn = (key: BriefTab, label: string, enabled: boolean) => {
+    const active = tab === key && enabled;
+    return (
+      <button
+        key={key}
+        type="button"
+        onClick={() => enabled && setTab(key)}
+        disabled={!enabled}
+        style={{
+          flex: 1,
+          padding: "6px 8px",
+          fontSize: 11,
+          fontWeight: active ? 700 : 500,
+          letterSpacing: "0.02em",
+          border: "none",
+          background: active
+            ? (isLight ? "rgba(30, 64, 175, 0.08)" : "rgba(0,245,255,0.10)")
+            : "transparent",
+          color: !enabled
+            ? (isLight ? "rgba(15,20,25,0.30)" : "rgba(255,255,255,0.30)")
+            : active
+              ? (isLight ? "#1E40AF" : "#4FE8F5")
+              : (isLight ? "#4A5360" : "rgba(255,255,255,0.65)"),
+          borderBottom: active
+            ? `2px solid ${isLight ? "#1E40AF" : "#4FE8F5"}`
+            : "2px solid transparent",
+          cursor: enabled ? "pointer" : "not-allowed",
+          transition: "all 150ms ease",
+          textAlign: "center" as const,
+        }}
+        title={enabled ? label : `${label} — coming soon. Use IN-002 + TR-001 for now.`}
+      >
+        {label}
+      </button>
+    );
+  };
+
+  return (
+    <div
+      className="nodrag nowheel nopan"
+      onMouseDown={stopAll}
+      onClick={stopAll}
+      onKeyDown={stopAll}
+      style={{ marginTop: 8 }}
+    >
+      {/* Tabs */}
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          borderBottom: isLight
+            ? "1px solid rgba(15,20,25,0.08)"
+            : "1px solid rgba(255,255,255,0.08)",
+          marginBottom: 8,
+        }}
+      >
+        {tabBtn("text", "Text", true)}
+        {tabBtn("pdf", "PDF", false)}
+        {tabBtn("docx", "DOCX", false)}
+      </div>
+
+      {tab === "text" ? (
+        <>
+          <textarea
+            value={briefText}
+            onChange={onTextChange}
+            placeholder="Paste your building brief here. Size, height, spaces, branding, materials — anything the AI should know about the building."
+            rows={6}
+            style={{
+              width: "100%",
+              resize: "vertical",
+              boxSizing: "border-box",
+              padding: "12px",
+              background: isLight
+                ? isEmpty
+                  ? "rgba(30, 64, 175, 0.03)"
+                  : "#FFFFFF"
+                : isEmpty
+                  ? "rgba(0,245,255,0.04)"
+                  : "rgba(0,0,0,0.3)",
+              borderRadius: isLight ? 6 : 4,
+              border: isLight
+                ? isEmpty
+                  ? "1px solid rgba(30, 64, 175, 0.20)"
+                  : "1px solid rgba(15, 20, 25, 0.10)"
+                : isEmpty
+                  ? "1px solid rgba(0,245,255,0.3)"
+                  : "1px solid rgba(255,255,255,0.08)",
+              color: isLight ? "#0F1419" : "#F0F0F5",
+              fontSize: 13,
+              lineHeight: 1.5,
+              fontFamily: "inherit",
+              outline: "none",
+              animation:
+                !isLight && isEmpty ? "pulseInputBorder 2s ease-in-out infinite" : "none",
+              transition: "all 150ms ease",
+            }}
+          />
+          <div
+            style={{
+              ...nt.meta,
+              textAlign: "right",
+              marginTop: 4,
+            }}
+          >
+            {briefText.length.toLocaleString()} chars
+            {briefText.trim().length < 40 ? " (min 40 to run)" : ""}
+          </div>
+        </>
+      ) : (
+        <div
+          style={{
+            padding: "12px",
+            borderRadius: isLight ? 6 : 4,
+            background: isLight ? "rgba(217,119,6,0.05)" : "rgba(255,191,0,0.05)",
+            border: isLight
+              ? "1px solid rgba(217,119,6,0.15)"
+              : "1px solid rgba(255,191,0,0.15)",
+            fontSize: 12,
+            lineHeight: 1.4,
+            color: isLight ? "#92400E" : "#FFD24D",
+          }}
+        >
+          {tab === "pdf" ? "PDF" : "DOCX"} tab is coming soon. For now: drop a {tab === "pdf" ? "PDF" : "DOCX"}
+          {" "}into an <strong>IN-002 (PDF/DOCX Upload)</strong> node and chain it through
+          {" "}<strong>TR-001 (Brief Parser)</strong> into this node&apos;s downstream
+          {" "}Brief Enricher.
+        </div>
+      )}
+    </div>
+  );
+});
+
 // ─── File Upload (PDF, IFC, Image, DXF) ─────────────────────────────────────
 
 interface FileUploadProps {
@@ -1250,6 +1438,8 @@ export const InputNodeContent = memo(function InputNodeContent({ nodeId, data }:
       return <FileUploadInput nodeId={nodeId} data={data} accept=".dxf,.dwg" label="a DXF/DWG file" maxMB={30} />;
     case "IN-008":
       return <MultiImageUploadInput nodeId={nodeId} data={data} />;
+    case "IN-009":
+      return <BriefInput nodeId={nodeId} data={data} />;
     default:
       return null;
   }

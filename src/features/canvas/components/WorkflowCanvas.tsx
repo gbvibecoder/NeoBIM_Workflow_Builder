@@ -1060,7 +1060,8 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
 
         {/* v2 IFC pipeline retirement banner — surfaces when the loaded
          *  workflow references any deprecated v2 node (TR-022 / TR-024 /
-         *  EX-006). Offers one-click upgrade to GN-013. Banner self-hides
+         *  EX-006). Offers one-click upgrade to the 4-node v3 chain
+         *  (TR-025 → TR-026 → TR-027 → EX-007). Banner self-hides
          *  on workflows without v2 nodes; per-workflow dismissal lives in
          *  localStorage. See PHASE_V2_RETIRED_2026-05-17.md. */}
         {currentWorkflow?.id && (

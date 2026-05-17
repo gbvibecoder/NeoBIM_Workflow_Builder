@@ -17,10 +17,13 @@ import { nodeHandlers } from "./handlers";
 import type { NodeHandlerContext } from "./handlers";
 
 // Node IDs that have real implementations
-// GN-013 (AI IFC Generator, v3) added per the v3-shipping phase, see
-// PHASE_V3_SHIPPED_2026-05-17.md — handler at handlers/gn-013-ai-ifc.ts,
-// gated client-side by the briefToIfcV3Enabled feature flag.
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "GN-012", "GN-013", "TR-007", "TR-008", "TR-013", "TR-014", "TR-015", "TR-016", "TR-022", "TR-024", "EX-001", "EX-002", "EX-003", "EX-006"]);
+// Canvas Unification (2026-05-17): GN-013 removed, replaced by the
+// 4-node decomposition TR-025 → TR-026 → TR-027 → EX-007 (see
+// PHASE_CANVAS_UNIFICATION_2026-05-17.md). v2 nodes TR-022/TR-024/
+// EX-006 retained — their handlers return 410, but the dispatcher
+// still routes there so the user gets a clean error instead of a
+// generic NODE_NOT_IMPLEMENTED.
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "TR-013", "TR-014", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
 
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);

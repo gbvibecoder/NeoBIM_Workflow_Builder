@@ -1603,11 +1603,12 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     // alive Phase 1 path used whenever the flag is off.
     //
     // v2 QUEUE dispatch removed 2026-05-17 — the v2 pipeline (TR-024 →
-    // TR-022 → EX-006) was retired in favour of GN-013, which runs as
-    // a regular single-node handler through the synchronous node-loop
-    // below. The wf-13 composition (when present on legacy workflows)
-    // surfaces a deprecation banner with a one-click upgrade button;
-    // no special-case dispatch needed here.
+    // TR-022 → EX-006) was retired in favour of the v3 canvas chain
+    // (TR-025 → TR-026 → TR-027 → EX-007), which runs as regular
+    // single-node handlers through the synchronous node-loop below.
+    // The wf-13 composition (when present on legacy workflows) surfaces
+    // a deprecation banner with a one-click upgrade button; no
+    // special-case dispatch needed here.
 
     // ── Initialize universal execution trace ──────────────────────────────
     // Captures every node's attempts, API calls, timings, and the data that

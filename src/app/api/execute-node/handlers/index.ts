@@ -39,7 +39,12 @@ import { handleEX001 } from "./ex-001";
 import { handleEX002 } from "./ex-002";
 import { handleEX003 } from "./ex-003";
 import { handleEX006 } from "./ex-006";
-import { handleGN013 } from "./gn-013-ai-ifc";
+// Canvas Unification (2026-05-17): GN-013 mega-node deleted, replaced
+// by the 4-node decomposition TR-025 → TR-026 → TR-027 → EX-007.
+import { handleTR025 } from "./tr-025";
+import { handleTR026 } from "./tr-026";
+import { handleTR027 } from "./tr-027";
+import { handleEX007 } from "./ex-007";
 
 export const nodeHandlers: Record<string, NodeHandler> = {
   "TR-001": handleTR001,
@@ -55,6 +60,9 @@ export const nodeHandlers: Record<string, NodeHandler> = {
   "TR-016": handleTR016,
   "TR-022": handleTR022,
   "TR-024": handleTR024,
+  "TR-025": handleTR025,
+  "TR-026": handleTR026,
+  "TR-027": handleTR027,
   "GN-001": handleGN001,
   "GN-003": handleGN003,
   "GN-004": handleGN004,
@@ -64,15 +72,11 @@ export const nodeHandlers: Record<string, NodeHandler> = {
   "GN-010": handleGN010,
   "GN-011": handleGN011,
   "GN-012": handleGN012,
-  // GN-013 — AI IFC Generator (Brief-to-IFC v3). Catalogue + handler
-  // are wired; the route.ts REAL_NODE_IDS set still needs the literal
-  // "GN-013" added (forbidden file in the current phase — surfaced as a
-  // one-line follow-up in PHASE_SHIPPABLE_CLOSEOUT_REPORT_2026-05-16.md).
-  "GN-013": handleGN013,
   "EX-001": handleEX001,
   "EX-002": handleEX002,
   "EX-003": handleEX003,
   "EX-006": handleEX006,
+  "EX-007": handleEX007,
 };
 
 export type { NodeHandler, NodeHandlerContext, NodeHandlerResult } from "./types";

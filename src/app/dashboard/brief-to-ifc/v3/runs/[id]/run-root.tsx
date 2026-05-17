@@ -214,7 +214,7 @@ function CompletedState({ view }: { view: StatusView }) {
             </a>
           )}
           <a
-            href="/dashboard/brief-to-ifc/v3/new"
+            href="/dashboard/templates"
             data-testid="try-another-link"
             style={secondaryButtonStyle}
           >
@@ -271,7 +271,7 @@ function FailedState({ view, runId }: { view: StatusView; runId: string }) {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <a
-            href="/dashboard/brief-to-ifc/v3/new"
+            href="/dashboard/templates"
             data-testid="try-different-brief"
             style={primaryButtonStyle}
           >

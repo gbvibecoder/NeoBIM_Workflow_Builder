@@ -42,7 +42,7 @@ export interface NodeCatalogueItem {
   // with an "Upgrade workflow" button per `replacedBy`.
   deprecated?: boolean;
   hiddenFromPicker?: boolean;
-  replacedBy?: string;      // catalogueId of the replacement node, e.g. "GN-013"
+  replacedBy?: string;      // catalogueId of the replacement node, e.g. "TR-025"
   deprecationNote?: string; // human-readable note shown in tooltips / banner
 }
 

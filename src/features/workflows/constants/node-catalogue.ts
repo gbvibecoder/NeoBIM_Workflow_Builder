@@ -103,6 +103,30 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     tags: ["images", "multi", "photo", "building", "upload", "batch"],
     executionTime: "< 3s",
   },
+  {
+    // IN-009 — Brief input.
+    //
+    // Canvas-native brief entry: tabbed text / PDF / DOCX upload. Outputs
+    // raw `briefText` for the downstream Brief Enricher (TR-025). Replaces
+    // the deleted /dashboard/brief-to-ifc/v3/new form's tabbed input on
+    // canvas (Canvas Unification, 2026-05-17). Today this ships with the
+    // Text tab implemented; PDF/DOCX tabs surface "Coming soon" — those
+    // formats are still supported via IN-002 (PDF/DOCX Upload) chained
+    // through TR-001 (Brief Parser).
+    id: "IN-009",
+    name: "Brief",
+    description:
+      "Paste a building brief, or upload a PDF/DOCX project document. Outputs raw text for the Brief Enricher (TR-025).",
+    category: "input",
+    icon: "FileText",
+    inputs: [],
+    outputs: [
+      { id: "brief-out", label: "Brief Text", type: "text" },
+    ],
+    apiEngine: "Native",
+    tags: ["brief", "text", "pdf", "docx", "ai", "ifc", "v3"],
+    executionTime: "< 1s",
+  },
 
   // ============================================================
   // TRANSFORM / AI NODES (Purple)
@@ -311,6 +335,66 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "< 60s",
   },
 
+  // ── Brief-to-IFC v3 (Canvas Unification, 2026-05-17) ──
+  // The v3 pipeline as 4 transparent canvas stages. Replaces the
+  // deleted GN-013 mega-node and the deleted /dashboard/brief-to-ifc/v3/new
+  // form. Each node calls a dedicated v3 backend endpoint and surfaces
+  // its own artifacts on canvas (BriefSpec, agent KPIs, validator
+  // verdict, top/iso PNG previews).
+  {
+    id: "TR-025",
+    name: "Brief Enricher",
+    description:
+      "Layer 1 — converts raw brief text into a tender-grade BriefSpec via Anthropic forced tool_use. ~15-30s, ~$0.03-0.07.",
+    category: "transform",
+    icon: "Wand2",
+    inputs: [
+      { id: "brief-in", label: "Brief Text", type: "text" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec", type: "json" },
+    ],
+    apiEngine: "Anthropic Claude (forced tool_use)",
+    tags: ["ai", "brief", "enrich", "spec", "ifc", "v3", "anthropic"],
+    executionTime: "15-30s",
+  },
+  {
+    id: "TR-026",
+    name: "IFC Agent Builder",
+    description:
+      "Layer 2 — agent loop authors an IFC2X3 model from the BriefSpec via tool-using Opus 4.7 + Python sandbox. Geometric validators reject any output that doesn't match the brief.",
+    category: "transform",
+    icon: "Bot",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "ifc-out", label: "IFC File", type: "ifc" },
+      { id: "kpi-out", label: "Stats (entities, turns, cost)", type: "json" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 + BuildFlow Sandbox (Railway)",
+    tags: ["ai", "ifc", "agent", "opus", "v3", "anthropic", "ifcopenshell"],
+    executionTime: "30-150s",
+  },
+  {
+    id: "TR-027",
+    name: "Geometric Validator",
+    description:
+      "Runs the 4 brief-aware visual validators (world bbox, space polygons, origin collapse, element coverage) against the generated IFC. Surfaces verdict + dimensions on canvas.",
+    category: "transform",
+    icon: "ShieldCheck",
+    inputs: [
+      { id: "ifc-in", label: "IFC File", type: "ifc" },
+    ],
+    outputs: [
+      { id: "verdict-out", label: "Verdict + Bbox", type: "json" },
+      { id: "ifc-out", label: "IFC File (passthrough)", type: "ifc" },
+    ],
+    apiEngine: "BuildFlow Visual Validators (Python)",
+    tags: ["validate", "geometry", "bbox", "ifc", "v3", "qa"],
+    executionTime: "< 3s",
+  },
+
   // ── Brief-to-IFC v2 (Phase 1) — AI-powered faithful IFC creation ──
   {
     id: "TR-024",
@@ -325,12 +409,12 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     tags: ["ai", "brief", "enrich", "spec", "ifc", "v2", "claude"],
     executionTime: "30-90s",
     // v2 IFC pipeline — retired 2026-05-17. Layer 1 enrichment is now
-    // performed inside GN-013 (the AI IFC Generator) automatically.
+    // a dedicated canvas stage (TR-025 Brief Enricher).
     deprecated: true,
     hiddenFromPicker: true,
-    replacedBy: "GN-013",
+    replacedBy: "TR-025",
     deprecationNote:
-      "Replaced by AI IFC Generator (GN-013), which runs brief enrichment internally. v2 pipeline retired 2026-05-17.",
+      "Replaced by Brief Enricher (TR-025) in the v3 canvas chain. v2 pipeline retired 2026-05-17.",
   },
   {
     id: "TR-022",
@@ -346,13 +430,12 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "1-4 min",
     // v2 IFC pipeline — retired 2026-05-17. v2 produced broken
     // millimetre-scale IFCs (see PHASE_BEAST_MODE_CLOSEOUT_REPORT_2026-05-16.md).
-    // GN-013 generates a viewer-loadable IFC2X3 in a single node,
-    // running enrichment + script + sandbox + validators internally.
+    // The v3 canvas chain (TR-025 → TR-026 → TR-027 → EX-007) replaces it.
     deprecated: true,
     hiddenFromPicker: true,
-    replacedBy: "GN-013",
+    replacedBy: "TR-026",
     deprecationNote:
-      "Replaced by AI IFC Generator (GN-013). v2 pipeline retired 2026-05-17.",
+      "Replaced by IFC Agent Builder (TR-026) in the v3 canvas chain. v2 pipeline retired 2026-05-17.",
   },
 
   // ── Control Flow / Branching ──
@@ -595,36 +678,6 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     tags: ["floor-plan", "cad", "editor", "2d", "interactive", "boq", "vastu", "ifc", "walls", "rooms"],
     executionTime: "Interactive",
   },
-  {
-    // GN-013 — AI IFC Generator (Brief-to-IFC v3, beta).
-    //
-    // Takes a free-text brief (or a pre-enriched BriefSpec JSON) and
-    // produces a viewer-loadable IFC2X3 file via the v3 agent loop
-    // (Opus 4.7 tool-use → BuildFlowIFC sandbox on Railway). Geometric
-    // validators reject any model where the world bbox doesn't match
-    // the brief (see PHASE_BEAST_MODE_CLOSEOUT_REPORT_2026-05-16.md).
-    //
-    // Gated on the `briefToIfcV3Enabled` feature flag for now; surfaces
-    // on the canvas picker only when the flag is on (see UX flag wiring
-    // in BaseNode / NodePicker for the actual filter).
-    id: "GN-013",
-    name: "AI IFC Generator",
-    description:
-      "AI generates a full IFC2X3 building model from a text brief or pre-enriched BriefSpec. Typical run: 30–150 s, $0.13–$0.55. Geometric validators refuse any output where the bbox doesn't match the brief.",
-    category: "generate",
-    icon: "Sparkles",
-    inputs: [
-      { id: "brief-in", label: "Brief (text)", type: "text" },
-      { id: "json-in", label: "BriefSpec (JSON)", type: "json" },
-    ],
-    outputs: [
-      { id: "ifc-out", label: "IFC File", type: "ifc" },
-      { id: "kpi-out", label: "Stats (entities, cost, turns)", type: "json" },
-    ],
-    apiEngine: "Anthropic Opus 4.7 + BuildFlow Sandbox (Railway)",
-    tags: ["ifc", "ai", "agent", "anthropic", "v3", "beta", "ifcopenshell", "generate"],
-    executionTime: "30-150s",
-  },
 
   // ============================================================
   // EXPORT / OUTPUT NODES (Amber)
@@ -704,7 +757,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     id: "EX-006",
     name: "AI IFC Generator (v2 retired)",
     description:
-      "RETIRED — v2 pipeline produced mm-scale broken IFCs. Use GN-013 (AI IFC Generator) instead, which runs enrichment + script + sandbox + validators in one node.",
+      "RETIRED — v2 pipeline produced mm-scale broken IFCs. Use the 4-node v3 chain (TR-025 → TR-026 → TR-027 → EX-007) via the AI-Powered IFC template instead.",
     category: "export",
     icon: "Boxes",
     inputs: [{ id: "script-in", label: "Builder Script", type: "text" }],
@@ -717,9 +770,27 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     // Catalogue entry kept so old workflows in the DB still parse on load.
     deprecated: true,
     hiddenFromPicker: true,
-    replacedBy: "GN-013",
+    replacedBy: "EX-007",
     deprecationNote:
-      "Replaced by AI IFC Generator (GN-013). v2 pipeline retired 2026-05-17.",
+      "Replaced by IFC Export + Preview (EX-007). v2 pipeline retired 2026-05-17.",
+  },
+  {
+    id: "EX-007",
+    name: "IFC Export + Preview",
+    description:
+      "Final stage of the AI IFC pipeline — exposes the IFC R2 URL, deep link to the BIM viewer, and renders top + isometric PNG previews so users see the building right on canvas.",
+    category: "export",
+    icon: "FileBox",
+    inputs: [
+      { id: "ifc-in", label: "Validated IFC", type: "ifc" },
+    ],
+    outputs: [
+      { id: "ifc-out", label: "IFC File", type: "ifc" },
+      { id: "previews-out", label: "Top + Iso PNGs", type: "image" },
+    ],
+    apiEngine: "BuildFlow Preview Sandbox (Railway, matplotlib + ifcopenshell.geom)",
+    tags: ["ifc", "preview", "matplotlib", "v3", "render", "export"],
+    executionTime: "5-15s",
   },
 ];
 
@@ -786,8 +857,9 @@ export const CATEGORY_CONFIG = {
 /** Nodes that use real API calls (not mock/sample data).
  *  TR-001 added — it has had a real handler all along; its absence here
  *  was the source of the "DEMO" badge bug (Phase 0 §1.2). TR-024/TR-022/
- *  EX-006 are the Brief-to-IFC v2 (Phase 1) nodes. */
-export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006']);
+ *  EX-006 are the Brief-to-IFC v2 (Phase 1) nodes (retired). TR-025/26/27
+ *  and EX-007 are the v3 Canvas Unification nodes (2026-05-17). */
+export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {

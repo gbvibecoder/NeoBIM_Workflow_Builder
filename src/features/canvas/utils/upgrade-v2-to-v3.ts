@@ -1,6 +1,7 @@
 /**
  * Upgrade a workflow that uses the retired v2 IFC pipeline
- * (TR-024 + TR-022 + EX-006) into the single-node v3 path (GN-013).
+ * (TR-024 + TR-022 + EX-006) into the transparent 4-node v3 canvas
+ * chain (TR-025 + TR-026 + TR-027 + EX-007).
  *
  * The v2 chain was:
  *
@@ -18,9 +19,24 @@
  *           ▼
  *      (IFC artifact)
  *
- * The v3 equivalent collapses everything between the brief source and
- * the IFC artifact into one node — GN-013 runs enrichment + agent loop
- * + sandbox + geometric validators internally.
+ * The v3 equivalent (Canvas Unification, 2026-05-17) is:
+ *
+ *   [upstream brief source — preserved]
+ *           │
+ *           ▼
+ *   [TR-025 Brief Enricher]       ← Layer 1 (free text → BriefSpec)
+ *           │
+ *           ▼
+ *   [TR-026 IFC Agent Builder]    ← Layer 2 (agent loop → IFC)
+ *           │
+ *           ▼
+ *   [TR-027 Geometric Validator]  ← bbox + polygon + origin + element coverage
+ *           │
+ *           ▼
+ *   [EX-007 IFC Export + Preview] ← R2 download + top/iso PNG previews
+ *           │
+ *           ▼
+ *      (downstream consumers)
  *
  * Upgrade strategy:
  *   1. Find any node whose `data.catalogueId` is in the deprecated v2
@@ -28,11 +44,11 @@
  *   2. For each v2 chain, identify the upstream "brief source" (the
  *      node whose output feeds the FIRST v2 node in the chain) and the
  *      downstream "ifc consumer" (any node fed by EX-006's output).
- *   3. Insert a new GN-013 node at the position of the FIRST v2 node
- *      in the chain (keeps the layout coherent).
+ *   3. Insert the new 4-node chain centered on the average position
+ *      of the v2 nodes it replaces.
  *   4. Re-route edges:
- *        upstream-source → GN-013.brief-in
- *        GN-013.ifc-out  → downstream-consumer
+ *        upstream-source → TR-025.brief-in
+ *        EX-007.ifc-out  → downstream-consumer
  *   5. Drop the v2 nodes and the edges between them.
  *
  * Returns a fresh `{ nodes, edges }` pair — never mutates input.
@@ -42,8 +58,11 @@ import type { WorkflowNode, WorkflowEdge } from "@/types/nodes";
 
 const V2_NODE_IDS = new Set(["TR-024", "TR-022", "EX-006"]);
 
-/** Catalogue id of the v3 replacement node. */
-export const V3_AI_IFC_CATALOGUE_ID = "GN-013";
+/** Catalogue ids of the v3 replacement chain. */
+export const V3_BRIEF_ENRICHER_ID = "TR-025";
+export const V3_AGENT_BUILDER_ID = "TR-026";
+export const V3_VALIDATOR_ID = "TR-027";
+export const V3_EXPORT_PREVIEW_ID = "EX-007";
 
 /** Did this graph use any retired v2 IFC pipeline node? */
 export function workflowUsesDeprecatedV2(nodes: WorkflowNode[]): boolean {
@@ -60,9 +79,12 @@ interface UpgradeResult {
   edges: WorkflowEdge[];
   /** Catalogue ids of the v2 nodes that were removed. Empty if no upgrade happened. */
   removedV2NodeIds: string[];
-  /** Newly added GN-013 tile-instance ids. */
+  /** Newly added v3 tile-instance ids (in execution order). */
   addedV3NodeIds: string[];
 }
+
+/** Horizontal spacing between the 4 new v3 nodes when inserted. */
+const V3_X_STRIDE = 220;
 
 export function upgradeWorkflowToV3(
   nodes: WorkflowNode[],
@@ -101,7 +123,6 @@ export function upgradeWorkflowToV3(
   const downstreamTargets: WorkflowEdge[] = []; // edges from the v2 chain INTO non-v2
   for (const id of v2NodeIds) {
     if (seenChain.has(id)) continue;
-    // BFS through v2 neighbours
     const queue = [id];
     while (queue.length > 0) {
       const cur = queue.shift()!;
@@ -124,37 +145,94 @@ export function upgradeWorkflowToV3(
     }
   }
 
-  // Position the replacement node at the average position of the v2
-  // nodes it replaces, so the canvas layout stays roughly intact.
+  // Position the replacement chain centered on the average position of
+  // the v2 nodes it replaces, so the canvas layout stays roughly intact.
   const v2NodesArr = Array.from(v2NodeIds).map((id) => nodesById.get(id)!);
   const avgX =
     v2NodesArr.reduce((s, n) => s + n.position.x, 0) / v2NodesArr.length;
   const avgY =
     v2NodesArr.reduce((s, n) => s + n.position.y, 0) / v2NodesArr.length;
 
-  // Build the new GN-013 node. The data shape matches what the canvas
-  // executor expects (catalogueId + label + category + inputs/outputs
-  // are read by BaseNode + the run dispatcher).
-  const newNodeId = genId("gn013");
-  const newNode: WorkflowNode = {
-    id: newNodeId,
+  // The 4 new nodes laid out horizontally, centered on (avgX, avgY).
+  // Chain x positions: -1.5, -0.5, +0.5, +1.5 strides from the centre.
+  const baseY = Math.round(avgY);
+  const enricherX = Math.round(avgX - 1.5 * V3_X_STRIDE);
+  const agentX = Math.round(avgX - 0.5 * V3_X_STRIDE);
+  const validatorX = Math.round(avgX + 0.5 * V3_X_STRIDE);
+  const exportX = Math.round(avgX + 1.5 * V3_X_STRIDE);
+
+  const enricherId = genId("tr025");
+  const agentId = genId("tr026");
+  const validatorId = genId("tr027");
+  const exportId = genId("ex007");
+
+  const enricherNode: WorkflowNode = {
+    id: enricherId,
     type: "default",
-    position: { x: Math.round(avgX), y: Math.round(avgY) },
+    position: { x: enricherX, y: baseY },
     data: {
-      catalogueId: V3_AI_IFC_CATALOGUE_ID,
-      label: "AI IFC Generator",
-      category: "generate",
+      catalogueId: V3_BRIEF_ENRICHER_ID,
+      label: "Brief Enricher",
+      category: "transform",
       status: "idle",
-      icon: "Sparkles",
-      inputs: [
-        { id: "brief-in", label: "Brief (text)", type: "text" },
-        { id: "json-in", label: "BriefSpec (JSON)", type: "json" },
-      ],
+      icon: "Wand2",
+      inputs: [{ id: "brief-in", label: "Brief Text", type: "text" }],
+      outputs: [{ id: "spec-out", label: "BriefSpec", type: "json" }],
+      executionTime: "15-30s",
+    },
+  };
+  const agentNode: WorkflowNode = {
+    id: agentId,
+    type: "default",
+    position: { x: agentX, y: baseY },
+    data: {
+      catalogueId: V3_AGENT_BUILDER_ID,
+      label: "IFC Agent Builder",
+      category: "transform",
+      status: "idle",
+      icon: "Bot",
+      inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }],
       outputs: [
         { id: "ifc-out", label: "IFC File", type: "ifc" },
         { id: "kpi-out", label: "Stats", type: "json" },
       ],
       executionTime: "30-150s",
+    },
+  };
+  const validatorNode: WorkflowNode = {
+    id: validatorId,
+    type: "default",
+    position: { x: validatorX, y: baseY },
+    data: {
+      catalogueId: V3_VALIDATOR_ID,
+      label: "Geometric Validator",
+      category: "transform",
+      status: "idle",
+      icon: "ShieldCheck",
+      inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }],
+      outputs: [
+        { id: "verdict-out", label: "Verdict + Bbox", type: "json" },
+        { id: "ifc-out", label: "IFC File (passthrough)", type: "ifc" },
+      ],
+      executionTime: "< 3s",
+    },
+  };
+  const exportNode: WorkflowNode = {
+    id: exportId,
+    type: "default",
+    position: { x: exportX, y: baseY },
+    data: {
+      catalogueId: V3_EXPORT_PREVIEW_ID,
+      label: "IFC Export + Preview",
+      category: "export",
+      status: "idle",
+      icon: "FileBox",
+      inputs: [{ id: "ifc-in", label: "Validated IFC", type: "ifc" }],
+      outputs: [
+        { id: "ifc-out", label: "IFC File", type: "ifc" },
+        { id: "previews-out", label: "Top + Iso PNGs", type: "image" },
+      ],
+      executionTime: "5-15s",
     },
   };
 
@@ -164,25 +242,53 @@ export function upgradeWorkflowToV3(
     (e) => !v2NodeIds.has(e.source) && !v2NodeIds.has(e.target),
   );
 
-  // Re-wire: upstream brief sources go to GN-013.brief-in; downstream
-  // consumers come from GN-013.ifc-out.
   const newEdges: WorkflowEdge[] = [];
+
+  // Upstream brief sources → TR-025.brief-in
   for (const e of upstreamSources) {
     newEdges.push({
       id: genId("e"),
       source: e.source,
       sourceHandle: e.sourceHandle,
-      target: newNodeId,
+      target: enricherId,
       targetHandle: "brief-in",
       type: e.type,
       animated: e.animated,
       data: e.data,
     });
   }
+
+  // Internal chain edges
+  newEdges.push({
+    id: genId("e"),
+    source: enricherId,
+    sourceHandle: "spec-out",
+    target: agentId,
+    targetHandle: "spec-in",
+    type: "animatedEdge",
+  });
+  newEdges.push({
+    id: genId("e"),
+    source: agentId,
+    sourceHandle: "ifc-out",
+    target: validatorId,
+    targetHandle: "ifc-in",
+    type: "animatedEdge",
+  });
+  newEdges.push({
+    id: genId("e"),
+    source: validatorId,
+    sourceHandle: "ifc-out",
+    target: exportId,
+    targetHandle: "ifc-in",
+    type: "animatedEdge",
+  });
+
+  // EX-007.ifc-out → downstream consumers
   for (const e of downstreamTargets) {
     newEdges.push({
       id: genId("e"),
-      source: newNodeId,
+      source: exportId,
       sourceHandle: "ifc-out",
       target: e.target,
       targetHandle: e.targetHandle,
@@ -193,9 +299,9 @@ export function upgradeWorkflowToV3(
   }
 
   return {
-    nodes: [...survivingNodes, newNode],
+    nodes: [...survivingNodes, enricherNode, agentNode, validatorNode, exportNode],
     edges: [...survivingEdges, ...newEdges],
     removedV2NodeIds: Array.from(v2NodeIds),
-    addedV3NodeIds: [newNodeId],
+    addedV3NodeIds: [enricherId, agentId, validatorId, exportId],
   };
 }

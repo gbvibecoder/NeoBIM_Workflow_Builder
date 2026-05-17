@@ -25,7 +25,6 @@ import {
   MessageSquare,
   Zap,
   ScrollText,
-  Sparkles,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { toast } from "sonner";
@@ -46,7 +45,7 @@ export function Sidebar() {
   const userRank = PLAN_RANK[userRole] ?? 0;
   const isFreeUser = userRole === "FREE";
   const isAdminBypass = userRole === "PLATFORM_ADMIN" || userRole === "TEAM_ADMIN";
-  const { briefRendersEnabled, briefToIfcV3Enabled } = useFeatureFlags();
+  const { briefRendersEnabled } = useFeatureFlags();
 
   // §P UX polish: detect at-workflow-cap so the "+ New Workflow" CTA
   // surfaces the cap proactively instead of letting the user navigate to
@@ -99,12 +98,10 @@ export function Sidebar() {
     ...(briefRendersEnabled
       ? [{ href: "/dashboard/brief-renders", label: "Brief → Renders", icon: ScrollText, badge: "Beta" }]
       : []),
-    // AI IFC — default-on as of 2026-05-17 (v2 retired). Gate kept so
-    // the entry can be force-hidden via BRIEF_TO_IFC_V3_ENABLED=false
-    // during an incident. "Beta" badge dropped — this is THE IFC path.
-    ...(briefToIfcV3Enabled
-      ? [{ href: "/dashboard/brief-to-ifc/v3/new", label: "AI IFC", icon: Sparkles }]
-      : []),
+    // AI IFC sidebar entry removed 2026-05-17 (Canvas Unification). The
+    // canvas Templates page is now the only entry point — the
+    // "AI-Powered IFC Generation" template (wf-ai-ifc-v3) is the #1
+    // featured template there.
   ];
 
   const isAdmin = isPlatformAdmin(session?.user?.email);

@@ -4,7 +4,8 @@
  * The execute-node handlers for TR-024 / TR-022 / EX-006 used to drive
  * the broken millimetre-scale v2 pipeline. After retirement they each
  * return HTTP 410 Gone with a structured `PIPELINE_RETIRED` error code,
- * pointing the caller at GN-013 (the v3 replacement).
+ * pointing the caller at the v3 canvas chain
+ * (TR-025 → TR-026 → TR-027 → EX-007).
  *
  * These tests pin the retirement behaviour so a future refactor that
  * accidentally re-enables the v2 handlers fails CI loudly.

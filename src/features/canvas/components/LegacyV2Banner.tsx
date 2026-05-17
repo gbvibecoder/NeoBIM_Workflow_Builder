@@ -2,17 +2,18 @@
  * LegacyV2Banner
  *
  * Renders at the top of the canvas when the loaded workflow uses any
- * retired v2 IFC pipeline node (TR-022 / TR-024 / EX-006). Gives the
- * user three actions:
+ * retired v2 IFC pipeline node (TR-022 / TR-024 / EX-006). Two actions:
  *
  *   1. **Upgrade workflow** (primary) — runs `upgradeWorkflowToV3` on
  *      the current graph, sets the workflow store's nodes/edges to the
- *      upgraded pair, and forces a save (the store's existing dirty
- *      flag + autosave triggers the persistence). Reloads the page so
- *      every store + selection bookkeeping starts fresh.
- *   2. **Open form instead** — navigate to /dashboard/brief-to-ifc/v3/new.
- *   3. **Dismiss** — hide the banner THIS session for THIS workflow
+ *      upgraded 5-node chain (IN-009 → TR-025 → TR-026 → TR-027 → EX-007),
+ *      and forces a save. Reloads the page so every store + selection
+ *      bookkeeping starts fresh.
+ *   2. **Dismiss** — hide the banner THIS session for THIS workflow
  *      (localStorage key keyed on workflow id; user-clearable).
+ *
+ * The "Open form instead" CTA was removed on 2026-05-17 (Canvas
+ * Unification) — the form was deleted; the canvas IS the only path.
  *
  * The banner intentionally avoids jargon — uses "old pipeline" /
  * "retired" instead of "TR-022" / "v2".
@@ -21,7 +22,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Sparkles, X } from "lucide-react";
 
 import type { WorkflowNode, WorkflowEdge } from "@/types/nodes";
@@ -102,9 +102,9 @@ export function LegacyV2Banner({
             This workflow uses an old IFC pipeline that produced broken files.
           </p>
           <p className="mt-0.5 text-xs text-amber-800">
-            We replaced it on 2026-05-17 with a single AI IFC Generator node
-            that runs the brief enricher + script + sandbox + geometric
-            validators in one step. Upgrade in one click — your upstream
+            We replaced it with a transparent 4-stage canvas pipeline
+            (Brief Enricher → IFC Agent Builder → Geometric Validator →
+            IFC Export + Preview). Upgrade in one click — your upstream
             input node is preserved.
           </p>
         </div>
@@ -119,13 +119,6 @@ export function LegacyV2Banner({
         >
           {busy ? "Upgrading…" : "Upgrade workflow"}
         </button>
-        <Link
-          href="/dashboard/brief-to-ifc/v3/new"
-          data-testid="legacy-v2-open-form"
-          className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100"
-        >
-          Open form instead
-        </Link>
         <button
           type="button"
           onClick={handleDismiss}

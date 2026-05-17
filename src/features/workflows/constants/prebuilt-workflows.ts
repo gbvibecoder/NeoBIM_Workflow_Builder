@@ -20,6 +20,120 @@ const Y = 200; // default vertical position
 
 export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
   {
+    // ▲ FEATURED #1 — AI-Powered IFC Generation (Canvas Unification, 2026-05-17)
+    //
+    // The transparent 5-node v3 pipeline that replaced the deleted form
+    // (/dashboard/brief-to-ifc/v3/new) and the deleted GN-013 mega-node.
+    // Each stage of the v3 backend (Brief Enricher → Agent Builder →
+    // Geometric Validator → IFC Export + Preview) is now a visible
+    // canvas node that surfaces its own artifacts.
+    id: "wf-ai-ifc-v3",
+    name: "AI-Powered IFC Generation",
+    description:
+      "Paste a building brief (or upload PDF/DOCX). AI enriches it into a structured spec, builds an IFC2X3 model via agent loop, validates geometry, and renders top + iso PNG previews — all visible per stage on canvas.",
+    tags: ["ai", "ifc", "bim", "agent", "v3", "concept", "featured"],
+    category: "AI BIM",
+    complexity: "advanced",
+    estimatedRunTime: "~1-3 minutes (~$0.20–$0.50)",
+    requiredInputs: ["Architectural brief (text, PDF, or DOCX)"],
+    expectedOutputs: [
+      "Tender-grade BriefSpec (JSON)",
+      "Validated IFC2X3 file (R2 download)",
+      "Top-down PNG preview",
+      "Isometric PNG preview",
+    ],
+    thumbnail: "https://picsum.photos/seed/wf-ai-ifc-v3/600/400",
+    tileGraph: {
+      nodes: [
+        {
+          id: "n1",
+          type: "workflowNode",
+          position: { x: X1, y: Y },
+          data: {
+            catalogueId: "IN-009",
+            label: "Brief",
+            category: "input",
+            status: "idle",
+            inputs: [],
+            outputs: [{ id: "brief-out", label: "Brief Text", type: "text" }],
+            icon: "FileText",
+          },
+        },
+        {
+          id: "n2",
+          type: "workflowNode",
+          position: { x: X2, y: Y },
+          data: {
+            catalogueId: "TR-025",
+            label: "Brief Enricher",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "brief-in", label: "Brief Text", type: "text" }],
+            outputs: [{ id: "spec-out", label: "BriefSpec", type: "json" }],
+            icon: "Wand2",
+          },
+        },
+        {
+          id: "n3",
+          type: "workflowNode",
+          position: { x: X3, y: Y },
+          data: {
+            catalogueId: "TR-026",
+            label: "IFC Agent Builder",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }],
+            outputs: [
+              { id: "ifc-out", label: "IFC File", type: "ifc" },
+              { id: "kpi-out", label: "Stats", type: "json" },
+            ],
+            icon: "Bot",
+          },
+        },
+        {
+          id: "n4",
+          type: "workflowNode",
+          position: { x: X4, y: Y },
+          data: {
+            catalogueId: "TR-027",
+            label: "Geometric Validator",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }],
+            outputs: [
+              { id: "verdict-out", label: "Verdict + Bbox", type: "json" },
+              { id: "ifc-out", label: "IFC File (passthrough)", type: "ifc" },
+            ],
+            icon: "ShieldCheck",
+          },
+        },
+        {
+          id: "n5",
+          type: "workflowNode",
+          position: { x: X5, y: Y },
+          data: {
+            catalogueId: "EX-007",
+            label: "IFC Export + Preview",
+            category: "export",
+            status: "idle",
+            inputs: [{ id: "ifc-in", label: "Validated IFC", type: "ifc" }],
+            outputs: [
+              { id: "ifc-out", label: "IFC File", type: "ifc" },
+              { id: "previews-out", label: "Top + Iso PNGs", type: "image" },
+            ],
+            icon: "FileBox",
+          },
+        },
+      ],
+      edges: [
+        { id: "e1-2", source: "n1", sourceHandle: "brief-out", target: "n2", targetHandle: "brief-in", type: "animatedEdge" },
+        { id: "e2-3", source: "n2", sourceHandle: "spec-out", target: "n3", targetHandle: "spec-in", type: "animatedEdge" },
+        { id: "e3-4", source: "n3", sourceHandle: "ifc-out", target: "n4", targetHandle: "ifc-in", type: "animatedEdge" },
+        { id: "e4-5", source: "n4", sourceHandle: "ifc-out", target: "n5", targetHandle: "ifc-in", type: "animatedEdge" },
+      ],
+    },
+  },
+  {
     id: "wf-08",
     name: "PDF Brief → IFC + Video Walkthrough",
     description:
@@ -768,94 +882,10 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       ],
     },
   },
-  {
-    id: "wf-13",
-    name: "Brief → AI-Powered IFC (faithful)",
-    description:
-      "Upload any architectural brief — surgical, sparse, or somewhere in between. AI enriches it into a tender-grade spec, then authors the IFC element-by-element. Renderable directly in the BIM viewer.",
-    tags: ["ai-powered", "ifc", "v2", "concierge-grade", "brief", "bim"],
-    category: "Concept Design",
-    complexity: "advanced",
-    estimatedRunTime: "~3-6 minutes",
-    requiredInputs: ["Architectural brief (PDF or DOCX — surgical or sparse)"],
-    expectedOutputs: [
-      "Enriched tender-grade IFC specification",
-      "IfcOpenShell builder script (authored by AI)",
-      "Downloadable IFC file, openable in the BIM viewer",
-    ],
-    // Note (2026-05-17): the QStash-backed v2 queued path that this
-    // template was authored for has been retired (POST /api/brief-to-ifc-job
-    // now returns 410). When this template loads, the deprecation banner
-    // surfaces on the canvas and offers a one-click "Upgrade workflow"
-    // button that swaps the v2 chain for a single GN-013 node.
-    executionMode: "queued",
-    thumbnail: "https://picsum.photos/seed/wf13/600/400",
-    tileGraph: {
-      nodes: [
-        {
-          id: "n1",
-          type: "workflowNode",
-          position: { x: X1, y: Y },
-          data: {
-            catalogueId: "IN-002",
-            label: "Brief Upload",
-            category: "input",
-            status: "idle",
-            inputs: [],
-            outputs: [{ id: "pdf-out", label: "PDF", type: "pdf" }],
-            icon: "FileText",
-          },
-        },
-        {
-          id: "n2",
-          type: "workflowNode",
-          position: { x: X2, y: Y },
-          data: {
-            catalogueId: "TR-024",
-            label: "Brief Enricher",
-            category: "transform",
-            status: "idle",
-            inputs: [{ id: "brief-in", label: "Brief", type: "text" }],
-            outputs: [{ id: "enriched-out", label: "Enriched Spec", type: "text" }],
-            icon: "Wand2",
-          },
-        },
-        {
-          id: "n3",
-          type: "workflowNode",
-          position: { x: X3, y: Y },
-          data: {
-            catalogueId: "TR-022",
-            label: "IFC Architect",
-            category: "transform",
-            status: "idle",
-            inputs: [{ id: "brief-in", label: "Enriched Spec", type: "text" }],
-            outputs: [{ id: "script-out", label: "Builder Script", type: "text" }],
-            icon: "DraftingCompass",
-          },
-        },
-        {
-          id: "n4",
-          type: "workflowNode",
-          position: { x: X4, y: Y },
-          data: {
-            catalogueId: "EX-006",
-            label: "AI IFC Generator",
-            category: "export",
-            status: "idle",
-            inputs: [{ id: "script-in", label: "Builder Script", type: "text" }],
-            outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }],
-            icon: "Boxes",
-          },
-        },
-      ],
-      edges: [
-        { id: "e1-2", source: "n1", sourceHandle: "pdf-out", target: "n2", targetHandle: "brief-in", type: "animatedEdge" },
-        { id: "e2-3", source: "n2", sourceHandle: "enriched-out", target: "n3", targetHandle: "brief-in", type: "animatedEdge" },
-        { id: "e3-4", source: "n3", sourceHandle: "script-out", target: "n4", targetHandle: "script-in", type: "animatedEdge" },
-      ],
-    },
-  },
+  // wf-13 ("Brief → AI-Powered IFC (faithful)") was deleted on 2026-05-17
+  // as part of the Canvas Unification phase. It used the retired v2
+  // pipeline (TR-024 → TR-022 → EX-006). The replacement is the
+  // featured wf-ai-ifc-v3 template at the top of this array.
 ];
 
 export const PREBUILT_WORKFLOWS_MAP = new Map(

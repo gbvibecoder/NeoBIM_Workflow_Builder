@@ -52,7 +52,7 @@ export async function POST(_req: NextRequest) {
       message:
         "The v2 IFC pipeline was retired on 2026-05-17. Use the v3 pipeline instead.",
       replacement: "/api/brief-to-ifc/v3/runs",
-      docs: "https://trybuildflow.in/dashboard/brief-to-ifc/v3/new",
+      docs: "https://trybuildflow.in/dashboard/templates",
     },
     { status: 410 },
   );

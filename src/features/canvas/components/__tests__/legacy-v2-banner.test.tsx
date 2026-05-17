@@ -77,7 +77,9 @@ describe("LegacyV2Banner", () => {
     );
     expect(screen.queryByTestId("legacy-v2-banner")).toBeTruthy();
     expect(screen.queryByTestId("legacy-v2-upgrade")).toBeTruthy();
-    expect(screen.queryByTestId("legacy-v2-open-form")).toBeTruthy();
+    // "Open form instead" CTA removed in Canvas Unification (2026-05-17) —
+    // the form was deleted; Upgrade is the only primary action.
+    expect(screen.queryByTestId("legacy-v2-open-form")).toBeNull();
   });
 
   it("does NOT render when the workflow has no v2 nodes", () => {
@@ -90,13 +92,13 @@ describe("LegacyV2Banner", () => {
             type: "default",
             position: { x: 0, y: 0 },
             data: {
-              catalogueId: "GN-013",
-              label: "AI IFC",
-              category: "generate",
+              catalogueId: "TR-026",
+              label: "IFC Agent Builder",
+              category: "transform",
               status: "idle",
               inputs: [],
               outputs: [],
-              icon: "Sparkles",
+              icon: "Bot",
             },
           },
         ]}
@@ -125,8 +127,18 @@ describe("LegacyV2Banner", () => {
       edges: WorkflowEdge[];
     };
     expect(upgraded.nodes.find((n) => n.id === "v2")).toBeUndefined();
+    // The v3 chain replaces the single v2 node with 4 transparent nodes.
     expect(
-      upgraded.nodes.find((n) => n.data.catalogueId === "GN-013"),
+      upgraded.nodes.find((n) => n.data.catalogueId === "TR-025"),
+    ).toBeDefined();
+    expect(
+      upgraded.nodes.find((n) => n.data.catalogueId === "TR-026"),
+    ).toBeDefined();
+    expect(
+      upgraded.nodes.find((n) => n.data.catalogueId === "TR-027"),
+    ).toBeDefined();
+    expect(
+      upgraded.nodes.find((n) => n.data.catalogueId === "EX-007"),
     ).toBeDefined();
   });
 
