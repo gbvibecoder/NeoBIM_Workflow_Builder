@@ -1,0 +1,10 @@
+{
+  "http": 202,
+  "response": {
+    "runId": "cmpa13t5q000004kyaduz5lxg",
+    "status": "PENDING",
+    "createdAt": "2026-05-17T17:08:07.646Z",
+    "statusUrl": "/api/brief-to-ifc/v3/runs/cmpa13t5q000004kyaduz5lxg/status",
+    "logsUrl": "/api/brief-to-ifc/v3/runs/cmpa13t5q000004kyaduz5lxg/logs"
+  }
+}

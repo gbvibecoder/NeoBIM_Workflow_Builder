@@ -1,0 +1,786 @@
+{
+  "file": "l-shape-office.ifc",
+  "schema": "IFC2X3",
+  "entity_count_total": 728,
+  "length_unit": {
+    "kind": "SI",
+    "prefix": null,
+    "name": "METRE",
+    "label": ".METRE."
+  },
+  "spatial": {
+    "site_count": 1,
+    "building_count": 1,
+    "storey_count": 1,
+    "space_count": 2
+  },
+  "products_by_class": {
+    "IfcBuildingElementProxy": 5,
+    "IfcCovering": 2,
+    "IfcSlab": 2,
+    "IfcWall": 7,
+    "IfcFurnishingElement": 10,
+    "IfcBuilding": 1,
+    "IfcBuildingStorey": 1,
+    "IfcSite": 1,
+    "IfcSpace": 2
+  },
+  "spaces": [
+    {
+      "name": "SP_LONGARM",
+      "long_name": "Open Workstation Area",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 10.0,
+        "ymax": 4.0,
+        "zmax": 3.2,
+        "xext": 10.0,
+        "yext": 4.0,
+        "zext": 3.2
+      }
+    },
+    {
+      "name": "SP_EXTENSION",
+      "long_name": "Meeting Area Extension",
+      "world_bbox": {
+        "xmin": 10.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 14.0,
+        "ymax": 4.0,
+        "zmax": 3.2,
+        "xext": 4.0,
+        "yext": 4.0,
+        "zext": 3.2
+      }
+    }
+  ],
+  "elements": [
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_S_LONG",
+      "tag": "WALL_S_LONG",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 10.0,
+        "ymax": 0.15,
+        "zmax": 3.2,
+        "xext": 10.0,
+        "yext": 0.15,
+        "zext": 3.2
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_N_LONG",
+      "tag": "WALL_N_LONG",
+      "placement_origin": [
+        0.0,
+        3.85,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 3.85,
+        "zmin": 0.0,
+        "xmax": 10.0,
+        "ymax": 4.0,
+        "zmax": 3.2,
+        "xext": 10.0,
+        "yext": 0.1499999999999999,
+        "zext": 3.2
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_W_LONG",
+      "tag": "WALL_W_LONG",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 0.15,
+        "ymax": 4.0,
+        "zmax": 3.2,
+        "xext": 0.15,
+        "yext": 4.0,
+        "zext": 3.2
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_S_EXT",
+      "tag": "WALL_S_EXT",
+      "placement_origin": [
+        10.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 10.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 14.0,
+        "ymax": 0.15,
+        "zmax": 3.2,
+        "xext": 4.0,
+        "yext": 0.15,
+        "zext": 3.2
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_E_EXT",
+      "tag": "WALL_E_EXT",
+      "placement_origin": [
+        13.85,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 13.85,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 14.0,
+        "ymax": 4.0,
+        "zmax": 3.2,
+        "xext": 0.15000000000000036,
+        "yext": 4.0,
+        "zext": 3.2
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_N_EXT",
+      "tag": "WALL_N_EXT",
+      "placement_origin": [
+        10.0,
+        3.85,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 10.0,
+        "ymin": 3.85,
+        "zmin": 0.0,
+        "xmax": 14.0,
+        "ymax": 4.0,
+        "zmax": 3.2,
+        "xext": 4.0,
+        "yext": 0.1499999999999999,
+        "zext": 3.2
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "GLASS_PART_W",
+      "tag": "GLASS_PART_W",
+      "placement_origin": [
+        10.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 10.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 10.05,
+        "ymax": 4.0,
+        "zmax": 3.2,
+        "xext": 0.05000000000000071,
+        "yext": 4.0,
+        "zext": 3.2
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SLAB_FLOOR_LONG",
+      "tag": "SLAB_FLOOR_LONG",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 10.0,
+        "ymax": 4.0,
+        "zmax": 0.15,
+        "xext": 10.0,
+        "yext": 4.0,
+        "zext": 0.15
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SLAB_FLOOR_EXT",
+      "tag": "SLAB_FLOOR_EXT",
+      "placement_origin": [
+        10.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 10.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 14.0,
+        "ymax": 4.0,
+        "zmax": 0.15,
+        "xext": 4.0,
+        "yext": 4.0,
+        "zext": 0.15
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "CEILING_EXPOSED_LONG",
+      "tag": "CEILING_EXPOSED_LONG",
+      "placement_origin": [
+        0.0,
+        0.0,
+        3.2
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 3.2,
+        "xmax": 10.0,
+        "ymax": 4.0,
+        "zmax": 3.25,
+        "xext": 10.0,
+        "yext": 4.0,
+        "zext": 0.04999999999999982
+      }
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "name": "CEILING_EXPOSED_EXT",
+      "tag": "CEILING_EXPOSED_EXT",
+      "placement_origin": [
+        10.0,
+        0.0,
+        3.2
+      ],
+      "world_bbox": {
+        "xmin": 10.0,
+        "ymin": 0.0,
+        "zmin": 3.2,
+        "xmax": 14.0,
+        "ymax": 4.0,
+        "zmax": 3.25,
+        "xext": 4.0,
+        "yext": 4.0,
+        "zext": 0.04999999999999982
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DESK_L_01",
+      "tag": "DESK_L_01",
+      "placement_origin": [
+        1.0,
+        0.6,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 1.0,
+        "ymin": 0.6,
+        "zmin": 0.0,
+        "xmax": 2.4,
+        "ymax": 1.2999999999999998,
+        "zmax": 0.75,
+        "xext": 1.4,
+        "yext": 0.6999999999999998,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DESK_L_02",
+      "tag": "DESK_L_02",
+      "placement_origin": [
+        3.0,
+        0.6,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 3.0,
+        "ymin": 0.6,
+        "zmin": 0.0,
+        "xmax": 4.4,
+        "ymax": 1.2999999999999998,
+        "zmax": 0.75,
+        "xext": 1.4000000000000004,
+        "yext": 0.6999999999999998,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DESK_L_03",
+      "tag": "DESK_L_03",
+      "placement_origin": [
+        5.0,
+        0.6,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 5.0,
+        "ymin": 0.6,
+        "zmin": 0.0,
+        "xmax": 6.4,
+        "ymax": 1.2999999999999998,
+        "zmax": 0.75,
+        "xext": 1.4000000000000004,
+        "yext": 0.6999999999999998,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DESK_L_04",
+      "tag": "DESK_L_04",
+      "placement_origin": [
+        7.0,
+        0.6,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 7.0,
+        "ymin": 0.6,
+        "zmin": 0.0,
+        "xmax": 8.4,
+        "ymax": 1.2999999999999998,
+        "zmax": 0.75,
+        "xext": 1.4000000000000004,
+        "yext": 0.6999999999999998,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DESK_L_05",
+      "tag": "DESK_L_05",
+      "placement_origin": [
+        1.0,
+        2.7,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 1.0,
+        "ymin": 2.7,
+        "zmin": 0.0,
+        "xmax": 2.4,
+        "ymax": 3.4000000000000004,
+        "zmax": 0.75,
+        "xext": 1.4,
+        "yext": 0.7000000000000002,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DESK_L_06",
+      "tag": "DESK_L_06",
+      "placement_origin": [
+        3.0,
+        2.7,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 3.0,
+        "ymin": 2.7,
+        "zmin": 0.0,
+        "xmax": 4.4,
+        "ymax": 3.4000000000000004,
+        "zmax": 0.75,
+        "xext": 1.4000000000000004,
+        "yext": 0.7000000000000002,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DESK_L_07",
+      "tag": "DESK_L_07",
+      "placement_origin": [
+        5.0,
+        2.7,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 5.0,
+        "ymin": 2.7,
+        "zmin": 0.0,
+        "xmax": 6.4,
+        "ymax": 3.4000000000000004,
+        "zmax": 0.75,
+        "xext": 1.4000000000000004,
+        "yext": 0.7000000000000002,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "DESK_L_08",
+      "tag": "DESK_L_08",
+      "placement_origin": [
+        7.0,
+        2.7,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 7.0,
+        "ymin": 2.7,
+        "zmin": 0.0,
+        "xmax": 8.4,
+        "ymax": 3.4000000000000004,
+        "zmax": 0.75,
+        "xext": 1.4000000000000004,
+        "yext": 0.7000000000000002,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "MEETING_TABLE",
+      "tag": "MEETING_TABLE",
+      "placement_origin": [
+        11.25,
+        1.25,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 11.25,
+        "ymin": 1.25,
+        "zmin": 0.0,
+        "xmax": 12.75,
+        "ymax": 2.75,
+        "zmax": 0.75,
+        "xext": 1.5,
+        "yext": 1.5,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "KITCHEN_COUNTER",
+      "tag": "KITCHEN_COUNTER",
+      "placement_origin": [
+        8.4,
+        2.8,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 8.4,
+        "ymin": 2.8,
+        "zmin": 0.0,
+        "xmax": 10.0,
+        "ymax": 3.4,
+        "zmax": 0.9,
+        "xext": 1.5999999999999996,
+        "yext": 0.6000000000000001,
+        "zext": 0.9
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "KITCHEN_SINK",
+      "tag": "KITCHEN_SINK",
+      "placement_origin": [
+        9.0,
+        3.0,
+        0.9
+      ],
+      "world_bbox": {
+        "xmin": 9.0,
+        "ymin": 3.0,
+        "zmin": 0.9,
+        "xmax": 9.5,
+        "ymax": 3.4,
+        "zmax": 1.1,
+        "xext": 0.5,
+        "yext": 0.3999999999999999,
+        "zext": 0.20000000000000007
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT_L_01",
+      "tag": "LIGHT_L_01",
+      "placement_origin": [
+        2.5,
+        2.0,
+        3.1
+      ],
+      "world_bbox": {
+        "xmin": 2.5,
+        "ymin": 2.0,
+        "zmin": 3.1,
+        "xmax": 2.8,
+        "ymax": 2.3,
+        "zmax": 3.2,
+        "xext": 0.2999999999999998,
+        "yext": 0.2999999999999998,
+        "zext": 0.10000000000000009
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT_L_02",
+      "tag": "LIGHT_L_02",
+      "placement_origin": [
+        5.0,
+        2.0,
+        3.1
+      ],
+      "world_bbox": {
+        "xmin": 5.0,
+        "ymin": 2.0,
+        "zmin": 3.1,
+        "xmax": 5.3,
+        "ymax": 2.3,
+        "zmax": 3.2,
+        "xext": 0.2999999999999998,
+        "yext": 0.2999999999999998,
+        "zext": 0.10000000000000009
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT_L_03",
+      "tag": "LIGHT_L_03",
+      "placement_origin": [
+        7.5,
+        2.0,
+        3.1
+      ],
+      "world_bbox": {
+        "xmin": 7.5,
+        "ymin": 2.0,
+        "zmin": 3.1,
+        "xmax": 7.8,
+        "ymax": 2.3,
+        "zmax": 3.2,
+        "xext": 0.2999999999999998,
+        "yext": 0.2999999999999998,
+        "zext": 0.10000000000000009
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT_EXT_01",
+      "tag": "LIGHT_EXT_01",
+      "placement_origin": [
+        12.0,
+        2.0,
+        3.1
+      ],
+      "world_bbox": {
+        "xmin": 12.0,
+        "ymin": 2.0,
+        "zmin": 3.1,
+        "xmax": 12.3,
+        "ymax": 2.3,
+        "zmax": 3.2,
+        "xext": 0.3000000000000007,
+        "yext": 0.2999999999999998,
+        "zext": 0.10000000000000009
+      }
+    }
+  ],
+  "placement_at_origin_count": 3,
+  "element_total": 26,
+  "aggregate_world_bbox": {
+    "xmin": 0.0,
+    "ymin": 0.0,
+    "zmin": 0.0,
+    "xmax": 14.0,
+    "ymax": 4.0,
+    "zmax": 3.25,
+    "xext": 14.0,
+    "yext": 4.0,
+    "zext": 3.25
+  },
+  "top_10_largest": [
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_S_LONG",
+      "name": "WALL_S_LONG",
+      "xext": 10.0,
+      "yext": 0.15,
+      "zext": 3.2
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_N_LONG",
+      "name": "WALL_N_LONG",
+      "xext": 10.0,
+      "yext": 0.1499999999999999,
+      "zext": 3.2
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB_FLOOR_LONG",
+      "name": "SLAB_FLOOR_LONG",
+      "xext": 10.0,
+      "yext": 4.0,
+      "zext": 0.15
+    },
+    {
+      "ifc_class": "IfcCovering",
+      "tag": "CEILING_EXPOSED_LONG",
+      "name": "CEILING_EXPOSED_LONG",
+      "xext": 10.0,
+      "yext": 4.0,
+      "zext": 0.04999999999999982
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_W_LONG",
+      "name": "WALL_W_LONG",
+      "xext": 0.15,
+      "yext": 4.0,
+      "zext": 3.2
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_S_EXT",
+      "name": "WALL_S_EXT",
+      "xext": 4.0,
+      "yext": 0.15,
+      "zext": 3.2
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_E_EXT",
+      "name": "WALL_E_EXT",
+      "xext": 0.15000000000000036,
+      "yext": 4.0,
+      "zext": 3.2
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_N_EXT",
+      "name": "WALL_N_EXT",
+      "xext": 4.0,
+      "yext": 0.1499999999999999,
+      "zext": 3.2
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "GLASS_PART_W",
+      "name": "GLASS_PART_W",
+      "xext": 0.05000000000000071,
+      "yext": 4.0,
+      "zext": 3.2
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB_FLOOR_EXT",
+      "name": "SLAB_FLOOR_EXT",
+      "xext": 4.0,
+      "yext": 4.0,
+      "zext": 0.15
+    }
+  ],
+  "top_10_smallest": [
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT_L_03",
+      "name": "LIGHT_L_03",
+      "xext": 0.2999999999999998,
+      "yext": 0.2999999999999998,
+      "zext": 0.10000000000000009
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT_L_02",
+      "name": "LIGHT_L_02",
+      "xext": 0.2999999999999998,
+      "yext": 0.2999999999999998,
+      "zext": 0.10000000000000009
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT_L_01",
+      "name": "LIGHT_L_01",
+      "xext": 0.2999999999999998,
+      "yext": 0.2999999999999998,
+      "zext": 0.10000000000000009
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT_EXT_01",
+      "name": "LIGHT_EXT_01",
+      "xext": 0.3000000000000007,
+      "yext": 0.2999999999999998,
+      "zext": 0.10000000000000009
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "KITCHEN_SINK",
+      "name": "KITCHEN_SINK",
+      "xext": 0.5,
+      "yext": 0.3999999999999999,
+      "zext": 0.20000000000000007
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DESK_L_05",
+      "name": "DESK_L_05",
+      "xext": 1.4,
+      "yext": 0.7000000000000002,
+      "zext": 0.75
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DESK_L_01",
+      "name": "DESK_L_01",
+      "xext": 1.4,
+      "yext": 0.6999999999999998,
+      "zext": 0.75
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DESK_L_08",
+      "name": "DESK_L_08",
+      "xext": 1.4000000000000004,
+      "yext": 0.7000000000000002,
+      "zext": 0.75
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DESK_L_07",
+      "name": "DESK_L_07",
+      "xext": 1.4000000000000004,
+      "yext": 0.7000000000000002,
+      "zext": 0.75
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "DESK_L_06",
+      "name": "DESK_L_06",
+      "xext": 1.4000000000000004,
+      "yext": 0.7000000000000002,
+      "zext": 0.75
+    }
+  ],
+  "material_assignment_counts": {}
+}

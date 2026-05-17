@@ -1,0 +1,203 @@
+{
+  "http": 200,
+  "logs": {
+    "logs": [
+      {
+        "id": "cmpa17tz5000104l5mvu4gh0d",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "LIFECYCLE",
+        "message": "Run created (briefSpec snapshot persisted). Background work dispatching.",
+        "metadata": {
+          "maxTurns": null,
+          "costCapUsd": 2.5,
+          "hasEnrichment": true,
+          "enrichmentCostUsd": 0.227325,
+          "enrichmentDurationMs": 76789
+        },
+        "timestamp": "2026-05-17T17:11:15.329Z"
+      },
+      {
+        "id": "cmpa17upf000204l5dar9jn61",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "LIFECYCLE",
+        "message": "Run entered RUNNING state (timeout 700000 ms).",
+        "metadata": null,
+        "timestamp": "2026-05-17T17:11:16.275Z"
+      },
+      {
+        "id": "cmpa17uvw000304l5gcxl2sbs",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "GENERATE",
+        "message": "Generator agent loop starting.",
+        "metadata": null,
+        "timestamp": "2026-05-17T17:11:16.508Z"
+      },
+      {
+        "id": "cmpa17x4z000404l5tc2vopy0",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 1: run_python (259ms, ok)",
+        "metadata": {
+          "turn": 1,
+          "toolOk": true,
+          "toolName": "run_python",
+          "toolErrorType": null,
+          "toolDurationMs": 259
+        },
+        "timestamp": "2026-05-17T17:11:19.427Z"
+      },
+      {
+        "id": "cmpa17yqx000504l5jkiwy8qn",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 2: read_ifc_summary (80ms, ok)",
+        "metadata": {
+          "turn": 2,
+          "toolOk": true,
+          "toolName": "read_ifc_summary",
+          "toolErrorType": null,
+          "toolDurationMs": 80
+        },
+        "timestamp": "2026-05-17T17:11:21.513Z"
+      },
+      {
+        "id": "cmpa18107000604l5rt7fh6ot",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 3: run_python (86ms, FAIL AttributeError)",
+        "metadata": {
+          "turn": 3,
+          "toolOk": false,
+          "toolName": "run_python",
+          "toolErrorType": "AttributeError",
+          "toolDurationMs": 86
+        },
+        "timestamp": "2026-05-17T17:11:24.439Z"
+      },
+      {
+        "id": "cmpa18gwf000704l5esa0aezz",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 4: run_python (247ms, ok)",
+        "metadata": {
+          "turn": 4,
+          "toolOk": true,
+          "toolName": "run_python",
+          "toolErrorType": null,
+          "toolDurationMs": 247
+        },
+        "timestamp": "2026-05-17T17:11:45.039Z"
+      },
+      {
+        "id": "cmpa18ssd000804l5xi6qsv8d",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 5: run_python (223ms, FAIL RuntimeError)",
+        "metadata": {
+          "turn": 5,
+          "toolOk": false,
+          "toolName": "run_python",
+          "toolErrorType": "RuntimeError",
+          "toolDurationMs": 223
+        },
+        "timestamp": "2026-05-17T17:12:00.445Z"
+      },
+      {
+        "id": "cmpa18uls000904l5jnx9dt2e",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 6: read_ifc_summary (85ms, ok)",
+        "metadata": {
+          "turn": 6,
+          "toolOk": true,
+          "toolName": "read_ifc_summary",
+          "toolErrorType": null,
+          "toolDurationMs": 85
+        },
+        "timestamp": "2026-05-17T17:12:02.800Z"
+      },
+      {
+        "id": "cmpa191q9000a04l5ejttzeun",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 7: run_python (193ms, ok)",
+        "metadata": {
+          "turn": 7,
+          "toolOk": true,
+          "toolName": "run_python",
+          "toolErrorType": null,
+          "toolDurationMs": 193
+        },
+        "timestamp": "2026-05-17T17:12:12.033Z"
+      },
+      {
+        "id": "cmpa19jfs000b04l50ij5cdw5",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 8: run_python (210ms, ok)",
+        "metadata": {
+          "turn": 8,
+          "toolOk": true,
+          "toolName": "run_python",
+          "toolErrorType": null,
+          "toolDurationMs": 210
+        },
+        "timestamp": "2026-05-17T17:12:34.984Z"
+      },
+      {
+        "id": "cmpa19l84000c04l545idgseg",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 9: validate_ifc (196ms, ok)",
+        "metadata": {
+          "turn": 9,
+          "toolOk": true,
+          "toolName": "validate_ifc",
+          "toolErrorType": null,
+          "toolDurationMs": 196
+        },
+        "timestamp": "2026-05-17T17:12:37.300Z"
+      },
+      {
+        "id": "cmpa19ohr000d04l5w0qiuiqo",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "TOOL_CALL",
+        "message": "Turn 10: finalize_ifc (1601ms, ok)",
+        "metadata": {
+          "turn": 10,
+          "toolOk": true,
+          "toolName": "finalize_ifc",
+          "toolErrorType": null,
+          "toolDurationMs": 1601
+        },
+        "timestamp": "2026-05-17T17:12:41.535Z"
+      },
+      {
+        "id": "cmpa19oio000e04l5faslvc7u",
+        "executionId": "cmpa17txz000004l5iyl0aso6",
+        "level": "INFO",
+        "source": "LIFECYCLE",
+        "message": "Run COMPLETED in 85314 ms. entityCount=1510 ifcUrl=https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-a4f69ad4908b.ifc",
+        "metadata": null,
+        "timestamp": "2026-05-17T17:12:41.568Z"
+      }
+    ],
+    "pusher": {
+      "channel": "private-bf-v3-cmpa17txz000004l5iyl0aso6",
+      "event": "execution-log:appended"
+    }
+  }
+}

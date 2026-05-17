@@ -1,0 +1,16 @@
+{
+  "id": "cmpa14h8v000904ky304squ0s",
+  "status": "COMPLETED",
+  "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-6c66077a2f3f.ifc",
+  "entityCount": 462,
+  "errorCode": null,
+  "errorMessage": null,
+  "generatorCostUsd": 0.125545,
+  "generatorMs": 42401,
+  "turns": 8,
+  "lastHeartbeatAt": "2026-05-17T17:09:22.626Z",
+  "startedAt": "2026-05-17T17:08:39.759Z",
+  "completedAt": "2026-05-17T17:09:22.626Z",
+  "createdAt": "2026-05-17T17:08:38.863Z",
+  "updatedAt": "2026-05-17T17:09:22.627Z"
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "stem": "bathroom",
+    "runId": "cmpa13t5q000004kyaduz5lxg",
+    "briefLen": 212,
+    "status": "PENDING",
+    "submitted_at": 1779037688.714596
+  },
+  {
+    "stem": "home-office",
+    "runId": "cmpa14h8v000904ky304squ0s",
+    "briefLen": 232,
+    "status": "PENDING",
+    "submitted_at": 1779037719.9206011
+  },
+  {
+    "stem": "clinic-reception",
+    "runId": "cmpa156qv000t04ky0q26sdwf",
+    "briefLen": 301,
+    "status": "PENDING",
+    "submitted_at": 1779037752.259903
+  },
+  {
+    "stem": "l-shape-office",
+    "runId": "cmpa165k0001i04kywqxvfp0v",
+    "briefLen": 373,
+    "status": "PENDING",
+    "submitted_at": 1779037797.382383
+  },
+  {
+    "stem": "coworking-space",
+    "runId": "cmpa17txz000004l5iyl0aso6",
+    "briefLen": 471,
+    "status": "PENDING",
+    "submitted_at": 1779037876.3622751
+  }
+]

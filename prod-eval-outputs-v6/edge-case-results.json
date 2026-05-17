@@ -1,0 +1,117 @@
+{
+  "ranAt": "2026-05-17 22:38:59",
+  "baseUrl": "https://trybuildflow.in",
+  "results": [
+    {
+      "name": "short-brief",
+      "expected_status": 400,
+      "actual_status": 400,
+      "expected_keywords": [
+        "brief",
+        "min",
+        "40"
+      ],
+      "keywords_found": [
+        "brief",
+        "40"
+      ],
+      "ok": true,
+      "response": {
+        "error": {
+          "title": "Invalid request",
+          "message": "brief: Too small: expected string to have >=40 characters",
+          "code": "INVALID_INPUT"
+        }
+      },
+      "notes": "Schema z.string().min(40) should reject this before any AI spend."
+    },
+    {
+      "name": "empty-body",
+      "expected_status": 400,
+      "actual_status": 400,
+      "expected_keywords": [
+        "brief",
+        "briefSpec",
+        "required"
+      ],
+      "keywords_found": [
+        "brief",
+        "briefSpec",
+        "required"
+      ],
+      "ok": true,
+      "response": {
+        "error": {
+          "title": "Invalid request",
+          "message": "body: Either `brief` (free text) or `briefSpec` (pre-enriched) is required.",
+          "code": "INVALID_INPUT"
+        }
+      },
+      "notes": "Schema .refine() requires either `brief` or `briefSpec` to be set."
+    },
+    {
+      "name": "empty-brief-string",
+      "expected_status": 400,
+      "actual_status": 400,
+      "expected_keywords": [
+        "brief",
+        "min",
+        "40"
+      ],
+      "keywords_found": [
+        "brief",
+        "40"
+      ],
+      "ok": true,
+      "response": {
+        "error": {
+          "title": "Invalid request",
+          "message": "brief: Too small: expected string to have >=40 characters; body: Either `brief` (free text) or `briefSpec` (pre-enriched) is required.",
+          "code": "INVALID_INPUT"
+        }
+      },
+      "notes": "Empty string fails min(40) \u2014 also fails refine() because Boolean('') is false."
+    },
+    {
+      "name": "very-long-brief",
+      "expected_status": 400,
+      "actual_status": 400,
+      "expected_keywords": [
+        "max",
+        "20000"
+      ],
+      "keywords_found": [
+        "20000"
+      ],
+      "ok": true,
+      "response": {
+        "error": {
+          "title": "Invalid request",
+          "message": "brief: Too big: expected string to have <=20000 characters",
+          "code": "INVALID_INPUT"
+        }
+      },
+      "notes": "Schema z.string().max(20000) caps brief length to prevent runaway costs."
+    },
+    {
+      "name": "malformed-gibberish",
+      "expected_status": 202,
+      "actual_status": 202,
+      "expected_keywords": [
+        "runId"
+      ],
+      "keywords_found": [
+        "runId"
+      ],
+      "ok": true,
+      "response": {
+        "runId": "cmpa14vo6000j04ky6b1ta1bn",
+        "status": "PENDING",
+        "createdAt": "2026-05-17T17:08:57.558Z",
+        "statusUrl": "/api/brief-to-ifc/v3/runs/cmpa14vo6000j04ky6b1ta1bn/status",
+        "logsUrl": "/api/brief-to-ifc/v3/runs/cmpa14vo6000j04ky6b1ta1bn/logs"
+      },
+      "notes": "Passes schema (>40 chars). The enrichment layer may still produce a BriefSpec (faithful to input \u2014 so likely a near-empty spec). The agent then either succeeds with a degenerate room or fails. Documents the 'no-compromise' floor: what happens when the user types junk."
+    }
+  ]
+}
