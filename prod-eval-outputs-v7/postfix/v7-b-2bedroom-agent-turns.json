@@ -1,0 +1,449 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "toolName": "read_ifc_summary",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 0,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 2,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"import json\\nsummary = bf.summary() if hasattr(bf, 'summary') else None\\nprint(json.dumps(summary, indent=2, default=str)[:3000] if summary else \\\"no summary method\\\")\\n\"}",
+      "toolDurationMs": 721,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 3,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"\\n# Slabs\\nbf.add_slab(\\\"SLAB_FLOOR\\\", origin=(0.0, 0.0, 0.0), dims=(8.0, 10.0), depth=0.2, material=\\\"MAT_CONCRETE\\\", predefined_type=\\\"FLOOR\\\")\\nbf.add_slab(\\\"SLAB_ROOF\\\", origin=(0.0, 0.0,",
+      "toolDurationMs": 684,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 4,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"\\n# Attach Psets per category\\nslabs = [\\\"SLAB_FLOOR\\\", \\\"SLAB_ROOF\\\"]\\nwalls = [\\\"W_EXT_S\\\",\\\"W_EXT_N\\\",\\\"W_EXT_W\\\",\\\"W_EXT_E\\\",\\\"W_INT_BED12\\\",\\\"W_INT_BEDS_N\\\",\\\"W_INT_BATH_HALL\\\",\\\"W_INT_H",
+      "toolDurationMs": 602,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 5,
+      "toolName": "validate_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 315,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 6,
+      "toolName": "finalize_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 968,
+      "toolOk": true,
+      "toolErrorType": null
+    }
+  ],
+  "ledger": [
+    {
+      "turn": 1,
+      "inputTokens": 5551,
+      "outputTokens": 65,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 0,
+      "costUsd": 0.02938,
+      "durationMs": 2821
+    },
+    {
+      "turn": 2,
+      "inputTokens": 85,
+      "outputTokens": 127,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 5568,
+      "costUsd": 0.0036,
+      "durationMs": 3293
+    },
+    {
+      "turn": 3,
+      "inputTokens": 950,
+      "outputTokens": 1510,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 5568,
+      "costUsd": 0.0425,
+      "durationMs": 15972
+    },
+    {
+      "turn": 4,
+      "inputTokens": 2365,
+      "outputTokens": 617,
+      "cacheReadTokens": 12383,
+      "cacheCreationTokens": 164,
+      "costUsd": 0.02725,
+      "durationMs": 7699
+    },
+    {
+      "turn": 5,
+      "inputTokens": 2315,
+      "outputTokens": 45,
+      "cacheReadTokens": 12419,
+      "cacheCreationTokens": 895,
+      "costUsd": 0.0127,
+      "durationMs": 2957
+    },
+    {
+      "turn": 6,
+      "inputTokens": 1278,
+      "outputTokens": 59,
+      "cacheReadTokens": 14795,
+      "cacheCreationTokens": 734,
+      "costUsd": 0.007865,
+      "durationMs": 3176
+    }
+  ],
+  "finalValidation": {
+    "schema": "IFC2X3",
+    "entity_count": 676,
+    "refs_resolve": true,
+    "spaces_present": [
+      "SP_BED1",
+      "SP_BED2",
+      "SP_BATH",
+      "SP_HALL",
+      "SP_KLR",
+      "SP_ENTRY"
+    ],
+    "spaces_missing": [],
+    "errors": [],
+    "web_ifc_load_test": "PASS",
+    "ascii_only": true,
+    "ascii_first_bad_offset": null,
+    "world_bbox": {
+      "verdict": "OK",
+      "expected_extent": [
+        8,
+        10,
+        3.2
+      ],
+      "actual_bbox": {
+        "xmin": 0,
+        "ymin": 0,
+        "zmin": 0,
+        "xmax": 8,
+        "ymax": 10,
+        "zmax": 3.2
+      },
+      "actual_extent": [
+        8,
+        10,
+        3.2
+      ],
+      "extent_ratio": [
+        1,
+        1,
+        1
+      ],
+      "suggested_unit_fix": null
+    },
+    "space_polygons": [
+      {
+        "space_id": "SP_BED1",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            0,
+            4
+          ]
+        ],
+        "actual_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      },
+      {
+        "space_id": "SP_BED2",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            4,
+            0
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            4,
+            4
+          ]
+        ],
+        "actual_polygon": [
+          [
+            4,
+            0
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            4,
+            0
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      },
+      {
+        "space_id": "SP_BATH",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            0,
+            4
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2,
+            7
+          ],
+          [
+            0,
+            7
+          ]
+        ],
+        "actual_polygon": [
+          [
+            0,
+            4
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            2,
+            7
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            0,
+            4
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      },
+      {
+        "space_id": "SP_HALL",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            2,
+            4
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            4,
+            7
+          ],
+          [
+            2,
+            7
+          ]
+        ],
+        "actual_polygon": [
+          [
+            2,
+            4
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            4,
+            7
+          ],
+          [
+            2,
+            7
+          ],
+          [
+            2,
+            4
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      },
+      {
+        "space_id": "SP_KLR",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            4,
+            4
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            8,
+            10
+          ],
+          [
+            4,
+            10
+          ]
+        ],
+        "actual_polygon": [
+          [
+            4,
+            4
+          ],
+          [
+            8,
+            4
+          ],
+          [
+            8,
+            10
+          ],
+          [
+            4,
+            10
+          ],
+          [
+            4,
+            4
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      },
+      {
+        "space_id": "SP_ENTRY",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            0,
+            7
+          ],
+          [
+            4,
+            7
+          ],
+          [
+            4,
+            10
+          ],
+          [
+            0,
+            10
+          ]
+        ],
+        "actual_polygon": [
+          [
+            0,
+            7
+          ],
+          [
+            4,
+            7
+          ],
+          [
+            4,
+            10
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            0,
+            7
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      }
+    ],
+    "element_coverage": {
+      "verdict": "OK",
+      "total_expected": 21,
+      "total_actual_in_expected_classes": 11,
+      "by_class_expected": {
+        "IfcSlab": 2,
+        "IfcWall": 9,
+        "IfcBuildingElementProxy": 10
+      },
+      "by_class_actual": {
+        "IfcSlab": 2,
+        "IfcWall": 9,
+        "IfcBuildingElementProxy": 0
+      },
+      "missing_ids": [],
+      "missing_id_count": 0
+    },
+    "origin_collapse": {
+      "verdict": "OK",
+      "total_elements": 21,
+      "at_origin_count": 3,
+      "fraction_at_origin": 0.14285714285714285,
+      "collapsed": false
+    }
+  }
+}

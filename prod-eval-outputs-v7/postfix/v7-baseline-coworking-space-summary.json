@@ -1,0 +1,37 @@
+{
+  "label": "v7-baseline-coworking-space",
+  "ok": true,
+  "layer1Ms": 55738,
+  "layer2Ms": 63977,
+  "totalDurationMs": 119715,
+  "enrichmentCostUsd": 0.15925,
+  "generatorCostUsd": 0.19865499999999997,
+  "totalCostUsd": 0.357905,
+  "turns": 9,
+  "entityCount": 1001,
+  "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-500ea9e9538f.ifc",
+  "ifcPath": "prod-eval-outputs-v7/postfix/v7-baseline-coworking-space.ifc",
+  "ifcSizeBytes": 58387,
+  "siteBoundsM": [
+    20,
+    15
+  ],
+  "spaceCount": 1,
+  "elementCount": 39,
+  "irregularPolygons": [],
+  "doorElementCount": 4,
+  "windowElementCount": 3,
+  "finalValidation": {
+    "refsResolve": true,
+    "asciiOnly": true,
+    "worldBboxVerdict": "OK",
+    "worldBboxExtent": [
+      20,
+      15,
+      4.15
+    ],
+    "spacesPresent": 1,
+    "spacesMissing": 0,
+    "originCollapsed": false
+  }
+}

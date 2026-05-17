@@ -1,0 +1,345 @@
+{
+  "project": {
+    "name": "Small Bathroom",
+    "type": "residential",
+    "location": "Unspecified",
+    "description": "Compact 2m x 2.5m bathroom with shower, sink, toilet, and small window above the sink. Light tile walls and concrete floor."
+  },
+  "site": {
+    "bounds_m": [
+      2,
+      2.5
+    ],
+    "height_limit_m": 2.4,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SP_BATH",
+      "name": "Bathroom",
+      "long_name": "Small Bathroom",
+      "polygon_world_m": [
+        [
+          0,
+          0
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          2.5
+        ],
+        [
+          0,
+          2.5
+        ]
+      ],
+      "height_m": 2.4,
+      "occupancy_type": "residential_bathroom"
+    }
+  ],
+  "elements": [
+    {
+      "id": "SLAB_FLOOR",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        2,
+        2.5,
+        0.15
+      ],
+      "material_id": "MAT_CONCRETE",
+      "description": "Concrete floor slab",
+      "object_type": "FLOOR",
+      "tag": "S-01",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "SLAB_CEIL",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        2.4
+      ],
+      "dims_m": [
+        2,
+        2.5,
+        0.1
+      ],
+      "material_id": "MAT_PAINT",
+      "description": "Ceiling slab",
+      "object_type": "ROOF",
+      "tag": "S-02",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "WALL_S",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        2,
+        0.1,
+        2.4
+      ],
+      "material_id": "MAT_TILE",
+      "description": "South wall, light tile finish",
+      "object_type": "INTERIOR",
+      "tag": "W-S",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "WALL_N",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        2.4,
+        0
+      ],
+      "dims_m": [
+        2,
+        0.1,
+        2.4
+      ],
+      "material_id": "MAT_TILE",
+      "description": "North wall, light tile finish, hosts small window above sink",
+      "object_type": "INTERIOR",
+      "tag": "W-N",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "WALL_W",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.1,
+        2.5,
+        2.4
+      ],
+      "material_id": "MAT_TILE",
+      "description": "West wall, light tile finish",
+      "object_type": "INTERIOR",
+      "tag": "W-W",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "WALL_E",
+      "type": "wall",
+      "origin_world_m": [
+        1.9,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.1,
+        2.5,
+        2.4
+      ],
+      "material_id": "MAT_TILE",
+      "description": "East wall, light tile finish",
+      "object_type": "INTERIOR",
+      "tag": "W-E",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "WIN_SINK",
+      "type": "window",
+      "origin_world_m": [
+        0.7,
+        2.4,
+        1.5
+      ],
+      "dims_m": [
+        0.6,
+        0.1,
+        0.5
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Small window above the sink on the north wall",
+      "object_type": "WINDOW",
+      "tag": "WIN-01",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "DOOR_MAIN",
+      "type": "door",
+      "origin_world_m": [
+        0.6,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.8,
+        0.1,
+        2.1
+      ],
+      "material_id": "MAT_PAINT",
+      "description": "Bathroom entrance door on south wall",
+      "object_type": "DOOR",
+      "tag": "D-01",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "FURN_SHOWER",
+      "type": "furniture",
+      "origin_world_m": [
+        1.1,
+        1.6,
+        0
+      ],
+      "dims_m": [
+        0.8,
+        0.8,
+        2
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Corner shower enclosure in the north-east corner",
+      "object_type": "SHOWER",
+      "tag": "F-SHOWER",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "FURN_SINK",
+      "type": "furniture",
+      "origin_world_m": [
+        0.6,
+        2.05,
+        0
+      ],
+      "dims_m": [
+        0.6,
+        0.35,
+        0.85
+      ],
+      "material_id": "MAT_PORCELAIN",
+      "description": "Wall-mounted sink along the north wall, below window",
+      "object_type": "SINK",
+      "tag": "F-SINK",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "FURN_TOILET",
+      "type": "furniture",
+      "origin_world_m": [
+        0.35,
+        0.15,
+        0
+      ],
+      "dims_m": [
+        0.4,
+        0.7,
+        0.8
+      ],
+      "material_id": "MAT_PORCELAIN",
+      "description": "Toilet against the south wall, opposite the sink",
+      "object_type": "TOILET",
+      "tag": "F-WC",
+      "contained_in_space_id": "SP_BATH"
+    },
+    {
+      "id": "LIGHT_CEIL",
+      "type": "lighting",
+      "origin_world_m": [
+        1,
+        1.25,
+        2.35
+      ],
+      "dims_m": [
+        0.2,
+        0.2,
+        0.05
+      ],
+      "material_id": "MAT_PAINT",
+      "description": "Ceiling light fixture",
+      "object_type": "CEILING_LIGHT",
+      "tag": "L-01",
+      "contained_in_space_id": "SP_BATH"
+    }
+  ],
+  "materials": [
+    {
+      "id": "MAT_CONCRETE",
+      "name": "Concrete Floor",
+      "rgb": [
+        0.65,
+        0.65,
+        0.62
+      ],
+      "roughness": 0.8,
+      "method": "MATT",
+      "category": "structural"
+    },
+    {
+      "id": "MAT_TILE",
+      "name": "Light Wall Tile",
+      "rgb": [
+        0.92,
+        0.92,
+        0.9
+      ],
+      "roughness": 0.2,
+      "method": "PHONG",
+      "category": "finish"
+    },
+    {
+      "id": "MAT_PAINT",
+      "name": "White Paint",
+      "rgb": [
+        0.96,
+        0.96,
+        0.94
+      ],
+      "roughness": 0.7,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "MAT_GLASS",
+      "name": "Clear Glass",
+      "rgb": [
+        0.85,
+        0.92,
+        0.95
+      ],
+      "roughness": 0.05,
+      "method": "PHONG",
+      "category": "glazing"
+    },
+    {
+      "id": "MAT_PORCELAIN",
+      "name": "White Porcelain",
+      "rgb": [
+        0.98,
+        0.98,
+        0.97
+      ],
+      "roughness": 0.1,
+      "method": "PHONG",
+      "category": "fixture"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "Small Bathroom",
+    "approved_terms": [
+      "Bathroom",
+      "Shower",
+      "Sink",
+      "Toilet"
+    ],
+    "forbidden_terms": []
+  }
+}

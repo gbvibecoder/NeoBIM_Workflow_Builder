@@ -1,0 +1,658 @@
+{
+  "project": {
+    "name": "L-Shaped Open Office",
+    "type": "office",
+    "location": "Unspecified",
+    "description": "L-shaped open office with a 10m x 4m long arm and a 4m x 4m perpendicular extension. Houses 8 workstations, a meeting table, and a kitchenette at the inner corner."
+  },
+  "site": {
+    "bounds_m": [
+      10,
+      8
+    ],
+    "height_limit_m": 3.2,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SP_OFFICE",
+      "name": "Open Office",
+      "long_name": "L-Shaped Open Office",
+      "polygon_world_m": [
+        [
+          0,
+          0
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          10,
+          4
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          8
+        ],
+        [
+          0,
+          8
+        ]
+      ],
+      "height_m": 3.2,
+      "occupancy_type": "open_office"
+    }
+  ],
+  "elements": [
+    {
+      "id": "SLAB_FLOOR",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        10,
+        8,
+        0.2
+      ],
+      "material_id": "MAT_CONCRETE",
+      "description": "Floor slab following the L-shaped footprint.",
+      "object_type": "FLOOR",
+      "tag": "FLOOR-01",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "SLAB_CEILING",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        3.2
+      ],
+      "dims_m": [
+        10,
+        8,
+        0.15
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "Ceiling slab at 3.2m.",
+      "object_type": "ROOF",
+      "tag": "CEIL-01",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WALL_S",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        10,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": 0,
+      "material_id": "MAT_PARTITION",
+      "description": "South wall of long arm, 10m long, contains three windows and the entry door.",
+      "object_type": "EXTERIOR",
+      "tag": "W-S",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WALL_E_LONG",
+      "type": "wall",
+      "origin_world_m": [
+        10,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.15,
+        4,
+        3.2
+      ],
+      "rotation_z_rad": 0,
+      "material_id": "MAT_PARTITION",
+      "description": "East wall of long arm, 4m long.",
+      "object_type": "EXTERIOR",
+      "tag": "W-E1",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WALL_INNER_HORIZ",
+      "type": "wall",
+      "origin_world_m": [
+        4,
+        4,
+        0
+      ],
+      "dims_m": [
+        6,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": 0,
+      "material_id": "MAT_PARTITION",
+      "description": "Inner horizontal wall segment of the L, from x=4 to x=10 at y=4.",
+      "object_type": "EXTERIOR",
+      "tag": "W-INH",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WALL_INNER_VERT",
+      "type": "wall",
+      "origin_world_m": [
+        4,
+        4,
+        0
+      ],
+      "dims_m": [
+        0.15,
+        4,
+        3.2
+      ],
+      "rotation_z_rad": 0,
+      "material_id": "MAT_PARTITION",
+      "description": "Inner vertical wall segment of the L, from y=4 to y=8 at x=4. Contains door connecting to the extension.",
+      "object_type": "EXTERIOR",
+      "tag": "W-INV",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WALL_N_EXT",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        8,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": 0,
+      "material_id": "MAT_PARTITION",
+      "description": "North wall of the extension, 4m long.",
+      "object_type": "EXTERIOR",
+      "tag": "W-N",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WALL_W",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.15,
+        8,
+        3.2
+      ],
+      "rotation_z_rad": 0,
+      "material_id": "MAT_PARTITION",
+      "description": "West wall, full height of the L from y=0 to y=8. Contains the entry door at the long arm end.",
+      "object_type": "EXTERIOR",
+      "tag": "W-W",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "DOOR_ENTRY",
+      "type": "door",
+      "origin_world_m": [
+        0,
+        1.5,
+        0
+      ],
+      "dims_m": [
+        0.15,
+        1,
+        2.1
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Entry door at the west end of the long arm.",
+      "object_type": "ENTRY_DOOR",
+      "tag": "D-01",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "DOOR_EXT",
+      "type": "door",
+      "origin_world_m": [
+        4,
+        6,
+        0
+      ],
+      "dims_m": [
+        0.15,
+        1,
+        2.1
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Door connecting the long arm to the extension, on the inner vertical wall.",
+      "object_type": "INTERIOR_DOOR",
+      "tag": "D-02",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WIN_S1",
+      "type": "window",
+      "origin_world_m": [
+        1.2,
+        0,
+        1
+      ],
+      "dims_m": [
+        1.6,
+        0.15,
+        1.4
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "South wall window 1 of 3 along the long arm.",
+      "object_type": "FIXED_WINDOW",
+      "tag": "WIN-01",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WIN_S2",
+      "type": "window",
+      "origin_world_m": [
+        4.2,
+        0,
+        1
+      ],
+      "dims_m": [
+        1.6,
+        0.15,
+        1.4
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "South wall window 2 of 3 along the long arm.",
+      "object_type": "FIXED_WINDOW",
+      "tag": "WIN-02",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WIN_S3",
+      "type": "window",
+      "origin_world_m": [
+        7.2,
+        0,
+        1
+      ],
+      "dims_m": [
+        1.6,
+        0.15,
+        1.4
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "South wall window 3 of 3 along the long arm.",
+      "object_type": "FIXED_WINDOW",
+      "tag": "WIN-03",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WS_01",
+      "type": "furniture",
+      "origin_world_m": [
+        5,
+        1,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation 1 of 8 in the long arm.",
+      "object_type": "DESK",
+      "tag": "WS-01",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WS_02",
+      "type": "furniture",
+      "origin_world_m": [
+        6.8,
+        1,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation 2 of 8 in the long arm.",
+      "object_type": "DESK",
+      "tag": "WS-02",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WS_03",
+      "type": "furniture",
+      "origin_world_m": [
+        8.6,
+        1,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation 3 of 8 in the long arm.",
+      "object_type": "DESK",
+      "tag": "WS-03",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WS_04",
+      "type": "furniture",
+      "origin_world_m": [
+        5,
+        2.6,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation 4 of 8 in the long arm.",
+      "object_type": "DESK",
+      "tag": "WS-04",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WS_05",
+      "type": "furniture",
+      "origin_world_m": [
+        6.8,
+        2.6,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation 5 of 8 in the long arm.",
+      "object_type": "DESK",
+      "tag": "WS-05",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WS_06",
+      "type": "furniture",
+      "origin_world_m": [
+        8.6,
+        2.6,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation 6 of 8 in the long arm.",
+      "object_type": "DESK",
+      "tag": "WS-06",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WS_07",
+      "type": "furniture",
+      "origin_world_m": [
+        1.5,
+        1.5,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation 7 of 8 in the long arm.",
+      "object_type": "DESK",
+      "tag": "WS-07",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "WS_08",
+      "type": "furniture",
+      "origin_world_m": [
+        1.5,
+        2.8,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation 8 of 8 in the long arm.",
+      "object_type": "DESK",
+      "tag": "WS-08",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "MEETING_TABLE",
+      "type": "furniture",
+      "origin_world_m": [
+        1,
+        5.5,
+        0
+      ],
+      "dims_m": [
+        2,
+        1,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Meeting table in the extension.",
+      "object_type": "TABLE",
+      "tag": "MT-01",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "KITCHEN_COUNTER",
+      "type": "furniture",
+      "origin_world_m": [
+        3,
+        3,
+        0
+      ],
+      "dims_m": [
+        0.9,
+        0.6,
+        0.9
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Kitchenette counter at the inner corner where the L joins.",
+      "object_type": "COUNTER",
+      "tag": "KIT-01",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "LIGHT_01",
+      "type": "lighting",
+      "origin_world_m": [
+        2.5,
+        2,
+        3.1
+      ],
+      "dims_m": [
+        0.6,
+        0.6,
+        0.05
+      ],
+      "material_id": "MAT_METAL",
+      "description": "Ceiling light fixture over long arm west zone.",
+      "object_type": "CEILING_LIGHT",
+      "tag": "L-01",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "LIGHT_02",
+      "type": "lighting",
+      "origin_world_m": [
+        6,
+        2,
+        3.1
+      ],
+      "dims_m": [
+        0.6,
+        0.6,
+        0.05
+      ],
+      "material_id": "MAT_METAL",
+      "description": "Ceiling light fixture over long arm middle zone.",
+      "object_type": "CEILING_LIGHT",
+      "tag": "L-02",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "LIGHT_03",
+      "type": "lighting",
+      "origin_world_m": [
+        8.5,
+        2,
+        3.1
+      ],
+      "dims_m": [
+        0.6,
+        0.6,
+        0.05
+      ],
+      "material_id": "MAT_METAL",
+      "description": "Ceiling light fixture over long arm east zone.",
+      "object_type": "CEILING_LIGHT",
+      "tag": "L-03",
+      "contained_in_space_id": "SP_OFFICE"
+    },
+    {
+      "id": "LIGHT_04",
+      "type": "lighting",
+      "origin_world_m": [
+        2,
+        6,
+        3.1
+      ],
+      "dims_m": [
+        0.6,
+        0.6,
+        0.05
+      ],
+      "material_id": "MAT_METAL",
+      "description": "Ceiling light fixture over the extension meeting area.",
+      "object_type": "CEILING_LIGHT",
+      "tag": "L-04",
+      "contained_in_space_id": "SP_OFFICE"
+    }
+  ],
+  "materials": [
+    {
+      "id": "MAT_CONCRETE",
+      "name": "Polished Concrete",
+      "rgb": [
+        0.72,
+        0.72,
+        0.7
+      ],
+      "roughness": 0.4,
+      "method": "MATT",
+      "category": "structural"
+    },
+    {
+      "id": "MAT_PLASTER",
+      "name": "White Plaster",
+      "rgb": [
+        0.95,
+        0.95,
+        0.93
+      ],
+      "roughness": 0.9,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "MAT_PARTITION",
+      "name": "Painted Gypsum Partition",
+      "rgb": [
+        0.92,
+        0.92,
+        0.9
+      ],
+      "roughness": 0.85,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "MAT_GLASS",
+      "name": "Clear Glass",
+      "rgb": [
+        0.7,
+        0.85,
+        0.9
+      ],
+      "roughness": 0.05,
+      "method": "PHONG",
+      "category": "glass"
+    },
+    {
+      "id": "MAT_WOOD",
+      "name": "Oak Veneer",
+      "rgb": [
+        0.6,
+        0.45,
+        0.3
+      ],
+      "roughness": 0.5,
+      "method": "MATT",
+      "category": "furniture"
+    },
+    {
+      "id": "MAT_METAL",
+      "name": "Brushed Aluminium",
+      "rgb": [
+        0.75,
+        0.75,
+        0.78
+      ],
+      "roughness": 0.3,
+      "method": "METAL",
+      "category": "accent"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "L-Shaped Open Office",
+    "approved_terms": [
+      "Open Office",
+      "Workstation",
+      "Meeting Table",
+      "Kitchenette",
+      "Extension",
+      "Long Arm"
+    ],
+    "forbidden_terms": []
+  }
+}

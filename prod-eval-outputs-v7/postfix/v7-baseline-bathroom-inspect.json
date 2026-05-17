@@ -1,0 +1,491 @@
+{
+  "file": "v7-baseline-bathroom.ifc",
+  "schema": "IFC2X3",
+  "entity_count_total": 380,
+  "length_unit": {
+    "kind": "SI",
+    "prefix": null,
+    "name": "METRE",
+    "label": ".METRE."
+  },
+  "spatial": {
+    "site_count": 1,
+    "building_count": 1,
+    "storey_count": 1,
+    "space_count": 1
+  },
+  "products_by_class": {
+    "IfcBuildingElementProxy": 1,
+    "IfcDoor": 1,
+    "IfcSlab": 2,
+    "IfcWall": 4,
+    "IfcWindow": 1,
+    "IfcFurnishingElement": 3,
+    "IfcBuilding": 1,
+    "IfcBuildingStorey": 1,
+    "IfcSite": 1,
+    "IfcSpace": 1
+  },
+  "spaces": [
+    {
+      "name": "SP_BATH",
+      "long_name": "Small Bathroom",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 2.0,
+        "ymax": 2.5,
+        "zmax": 2.4,
+        "xext": 2.0,
+        "yext": 2.5,
+        "zext": 2.4
+      }
+    }
+  ],
+  "elements": [
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_S",
+      "tag": "WALL_S",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 2.0,
+        "ymax": 0.1,
+        "zmax": 2.4,
+        "xext": 2.0,
+        "yext": 0.1,
+        "zext": 2.4
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_N",
+      "tag": "WALL_N",
+      "placement_origin": [
+        0.0,
+        2.4,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 2.4,
+        "zmin": 0.0,
+        "xmax": 2.0,
+        "ymax": 2.5,
+        "zmax": 2.4,
+        "xext": 2.0,
+        "yext": 0.10000000000000009,
+        "zext": 2.4
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_W",
+      "tag": "WALL_W",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 0.1,
+        "ymax": 2.5,
+        "zmax": 2.4,
+        "xext": 0.1,
+        "yext": 2.5,
+        "zext": 2.4
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_E",
+      "tag": "WALL_E",
+      "placement_origin": [
+        1.9,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 1.9,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 2.0,
+        "ymax": 2.5,
+        "zmax": 2.4,
+        "xext": 0.10000000000000009,
+        "yext": 2.5,
+        "zext": 2.4
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SLAB_FLOOR",
+      "tag": "SLAB_FLOOR",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 2.0,
+        "ymax": 2.5,
+        "zmax": 0.15,
+        "xext": 2.0,
+        "yext": 2.5,
+        "zext": 0.15
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SLAB_CEIL",
+      "tag": "SLAB_CEIL",
+      "placement_origin": [
+        0.0,
+        0.0,
+        2.4
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 2.4,
+        "xmax": 2.0,
+        "ymax": 2.5,
+        "zmax": 2.5,
+        "xext": 2.0,
+        "yext": 2.5,
+        "zext": 0.10000000000000009
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "FURN_SHOWER",
+      "tag": "FURN_SHOWER",
+      "placement_origin": [
+        1.1,
+        1.6,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 1.1,
+        "ymin": 1.6,
+        "zmin": 0.0,
+        "xmax": 1.9000000000000001,
+        "ymax": 2.4000000000000004,
+        "zmax": 2.0,
+        "xext": 0.8,
+        "yext": 0.8000000000000003,
+        "zext": 2.0
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "FURN_SINK",
+      "tag": "FURN_SINK",
+      "placement_origin": [
+        0.6,
+        2.05,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.6,
+        "ymin": 2.05,
+        "zmin": 0.0,
+        "xmax": 1.2,
+        "ymax": 2.4,
+        "zmax": 0.85,
+        "xext": 0.6,
+        "yext": 0.3500000000000001,
+        "zext": 0.85
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "FURN_TOILET",
+      "tag": "FURN_TOILET",
+      "placement_origin": [
+        0.35,
+        0.15,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.35,
+        "ymin": 0.15,
+        "zmin": 0.0,
+        "xmax": 0.75,
+        "ymax": 0.85,
+        "zmax": 0.8,
+        "xext": 0.4,
+        "yext": 0.7,
+        "zext": 0.8
+      }
+    },
+    {
+      "ifc_class": "IfcDoor",
+      "name": "DOOR_MAIN",
+      "tag": "DOOR_MAIN",
+      "placement_origin": [
+        0.6,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.6,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 1.4,
+        "ymax": 0.1,
+        "zmax": 2.1,
+        "xext": 0.7999999999999999,
+        "yext": 0.1,
+        "zext": 2.1
+      }
+    },
+    {
+      "ifc_class": "IfcWindow",
+      "name": "WIN_SINK",
+      "tag": "WIN_SINK",
+      "placement_origin": [
+        0.7,
+        2.4,
+        1.5
+      ],
+      "world_bbox": {
+        "xmin": 0.7,
+        "ymin": 2.4,
+        "zmin": 1.5,
+        "xmax": 1.2999999999999998,
+        "ymax": 2.5,
+        "zmax": 2.0,
+        "xext": 0.5999999999999999,
+        "yext": 0.10000000000000009,
+        "zext": 0.5
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT_CEIL",
+      "tag": "LIGHT_CEIL",
+      "placement_origin": [
+        1.0,
+        1.25,
+        2.35
+      ],
+      "world_bbox": {
+        "xmin": 1.0,
+        "ymin": 1.25,
+        "zmin": 2.35,
+        "xmax": 1.2,
+        "ymax": 1.45,
+        "zmax": 2.4,
+        "xext": 0.19999999999999996,
+        "yext": 0.19999999999999996,
+        "zext": 0.04999999999999982
+      }
+    }
+  ],
+  "placement_at_origin_count": 3,
+  "element_total": 12,
+  "aggregate_world_bbox": {
+    "xmin": 0.0,
+    "ymin": 0.0,
+    "zmin": 0.0,
+    "xmax": 2.0,
+    "ymax": 2.5,
+    "zmax": 2.5,
+    "xext": 2.0,
+    "yext": 2.5,
+    "zext": 2.5
+  },
+  "top_10_largest": [
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_W",
+      "name": "WALL_W",
+      "xext": 0.1,
+      "yext": 2.5,
+      "zext": 2.4
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_E",
+      "name": "WALL_E",
+      "xext": 0.10000000000000009,
+      "yext": 2.5,
+      "zext": 2.4
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB_FLOOR",
+      "name": "SLAB_FLOOR",
+      "xext": 2.0,
+      "yext": 2.5,
+      "zext": 0.15
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB_CEIL",
+      "name": "SLAB_CEIL",
+      "xext": 2.0,
+      "yext": 2.5,
+      "zext": 0.10000000000000009
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_S",
+      "name": "WALL_S",
+      "xext": 2.0,
+      "yext": 0.1,
+      "zext": 2.4
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_N",
+      "name": "WALL_N",
+      "xext": 2.0,
+      "yext": 0.10000000000000009,
+      "zext": 2.4
+    },
+    {
+      "ifc_class": "IfcDoor",
+      "tag": "DOOR_MAIN",
+      "name": "DOOR_MAIN",
+      "xext": 0.7999999999999999,
+      "yext": 0.1,
+      "zext": 2.1
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_SHOWER",
+      "name": "FURN_SHOWER",
+      "xext": 0.8,
+      "yext": 0.8000000000000003,
+      "zext": 2.0
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_SINK",
+      "name": "FURN_SINK",
+      "xext": 0.6,
+      "yext": 0.3500000000000001,
+      "zext": 0.85
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_TOILET",
+      "name": "FURN_TOILET",
+      "xext": 0.4,
+      "yext": 0.7,
+      "zext": 0.8
+    }
+  ],
+  "top_10_smallest": [
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT_CEIL",
+      "name": "LIGHT_CEIL",
+      "xext": 0.19999999999999996,
+      "yext": 0.19999999999999996,
+      "zext": 0.04999999999999982
+    },
+    {
+      "ifc_class": "IfcWindow",
+      "tag": "WIN_SINK",
+      "name": "WIN_SINK",
+      "xext": 0.5999999999999999,
+      "yext": 0.10000000000000009,
+      "zext": 0.5
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_TOILET",
+      "name": "FURN_TOILET",
+      "xext": 0.4,
+      "yext": 0.7,
+      "zext": 0.8
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_SINK",
+      "name": "FURN_SINK",
+      "xext": 0.6,
+      "yext": 0.3500000000000001,
+      "zext": 0.85
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_SHOWER",
+      "name": "FURN_SHOWER",
+      "xext": 0.8,
+      "yext": 0.8000000000000003,
+      "zext": 2.0
+    },
+    {
+      "ifc_class": "IfcDoor",
+      "tag": "DOOR_MAIN",
+      "name": "DOOR_MAIN",
+      "xext": 0.7999999999999999,
+      "yext": 0.1,
+      "zext": 2.1
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_N",
+      "name": "WALL_N",
+      "xext": 2.0,
+      "yext": 0.10000000000000009,
+      "zext": 2.4
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_S",
+      "name": "WALL_S",
+      "xext": 2.0,
+      "yext": 0.1,
+      "zext": 2.4
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB_CEIL",
+      "name": "SLAB_CEIL",
+      "xext": 2.0,
+      "yext": 2.5,
+      "zext": 0.10000000000000009
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB_FLOOR",
+      "name": "SLAB_FLOOR",
+      "xext": 2.0,
+      "yext": 2.5,
+      "zext": 0.15
+    }
+  ],
+  "material_assignment_counts": {},
+  "ifc_door_count": 1,
+  "ifc_window_count": 1,
+  "ifc_building_element_proxy_count": 1,
+  "ifc_wall_count": 4,
+  "perimeter_wall_count": 4,
+  "polygon_check": {
+    "status": "rectangular",
+    "rectangular_spaces": 1,
+    "irregular_spaces": 0,
+    "polygon_total_edges": 4,
+    "perimeter_walls": 4,
+    "verdict": "OK"
+  }
+}

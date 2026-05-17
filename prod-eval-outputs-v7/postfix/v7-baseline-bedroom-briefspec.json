@@ -1,0 +1,327 @@
+{
+  "project": {
+    "name": "Small Bedroom",
+    "type": "residential",
+    "location": "Unspecified",
+    "description": "A small rectangular bedroom, 4m x 5m, with 2.7m ceiling height. Contains a double bed, wardrobe, bedside table, and a south-facing window. Wood floor and painted walls."
+  },
+  "site": {
+    "bounds_m": [
+      4,
+      5
+    ],
+    "height_limit_m": 2.7,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "space_bedroom",
+      "name": "Bedroom",
+      "long_name": "Small Bedroom",
+      "polygon_world_m": [
+        [
+          0,
+          0
+        ],
+        [
+          4,
+          0
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "height_m": 2.7,
+      "occupancy_type": "residential_bedroom"
+    }
+  ],
+  "elements": [
+    {
+      "id": "slab_floor",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        4,
+        5,
+        0.15
+      ],
+      "material_id": "mat_wood_floor",
+      "description": "Wood floor slab of the bedroom.",
+      "object_type": "FLOOR",
+      "tag": "FLR-01",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "slab_ceiling",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        2.7
+      ],
+      "dims_m": [
+        4,
+        5,
+        0.15
+      ],
+      "material_id": "mat_paint_white",
+      "description": "Ceiling slab of the bedroom.",
+      "object_type": "ROOF",
+      "tag": "CLG-01",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "wall_south",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.1,
+        2.7
+      ],
+      "material_id": "mat_paint_warm",
+      "description": "South wall of bedroom, contains the window.",
+      "object_type": "EXTERIOR",
+      "tag": "WAL-S",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "wall_north",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        4.9,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.1,
+        2.7
+      ],
+      "material_id": "mat_paint_warm",
+      "description": "North wall of bedroom.",
+      "object_type": "EXTERIOR",
+      "tag": "WAL-N",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "wall_east",
+      "type": "wall",
+      "origin_world_m": [
+        3.9,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.1,
+        5,
+        2.7
+      ],
+      "material_id": "mat_paint_warm",
+      "description": "East wall of bedroom.",
+      "object_type": "EXTERIOR",
+      "tag": "WAL-E",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "wall_west",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.1,
+        5,
+        2.7
+      ],
+      "material_id": "mat_paint_warm",
+      "description": "West wall of bedroom.",
+      "object_type": "EXTERIOR",
+      "tag": "WAL-W",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "window_south",
+      "type": "window",
+      "origin_world_m": [
+        1.25,
+        0,
+        0.9
+      ],
+      "dims_m": [
+        1.5,
+        0.1,
+        1.2
+      ],
+      "material_id": "mat_glass",
+      "description": "Window on the south wall.",
+      "object_type": "WINDOW",
+      "tag": "WIN-01",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "furn_double_bed",
+      "type": "furniture",
+      "origin_world_m": [
+        1,
+        2.5,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        2,
+        0.5
+      ],
+      "material_id": "mat_fabric",
+      "description": "Double bed centered against the east area of the room.",
+      "object_type": "BED",
+      "tag": "FUR-BED",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "furn_wardrobe",
+      "type": "furniture",
+      "origin_world_m": [
+        0.1,
+        4,
+        0
+      ],
+      "dims_m": [
+        1.2,
+        0.6,
+        2.1
+      ],
+      "material_id": "mat_wood_floor",
+      "description": "Wardrobe against the north-west wall.",
+      "object_type": "WARDROBE",
+      "tag": "FUR-WRD",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "furn_bedside",
+      "type": "furniture",
+      "origin_world_m": [
+        2.5,
+        2.5,
+        0
+      ],
+      "dims_m": [
+        0.5,
+        0.4,
+        0.55
+      ],
+      "material_id": "mat_wood_floor",
+      "description": "Bedside table next to the double bed.",
+      "object_type": "BEDSIDE_TABLE",
+      "tag": "FUR-BST",
+      "contained_in_space_id": "space_bedroom"
+    },
+    {
+      "id": "lt_ceiling",
+      "type": "lighting",
+      "origin_world_m": [
+        2,
+        2.5,
+        2.65
+      ],
+      "dims_m": [
+        0.4,
+        0.4,
+        0.05
+      ],
+      "material_id": "mat_paint_white",
+      "description": "Ceiling light fixture.",
+      "object_type": "CEILING_LIGHT",
+      "tag": "LGT-01",
+      "contained_in_space_id": "space_bedroom"
+    }
+  ],
+  "materials": [
+    {
+      "id": "mat_wood_floor",
+      "name": "Oak Wood Flooring",
+      "rgb": [
+        0.55,
+        0.36,
+        0.22
+      ],
+      "roughness": 0.55,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "mat_paint_warm",
+      "name": "Warm White Wall Paint",
+      "rgb": [
+        0.94,
+        0.92,
+        0.86
+      ],
+      "roughness": 0.85,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "mat_paint_white",
+      "name": "Ceiling White Paint",
+      "rgb": [
+        0.97,
+        0.97,
+        0.96
+      ],
+      "roughness": 0.9,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "mat_glass",
+      "name": "Clear Window Glass",
+      "rgb": [
+        0.75,
+        0.85,
+        0.9
+      ],
+      "roughness": 0.05,
+      "method": "PHONG",
+      "category": "glazing"
+    },
+    {
+      "id": "mat_fabric",
+      "name": "Bed Linen Fabric",
+      "rgb": [
+        0.88,
+        0.84,
+        0.78
+      ],
+      "roughness": 0.8,
+      "method": "MATT",
+      "category": "soft_furnishing"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "Small Bedroom",
+    "approved_terms": [
+      "Bedroom",
+      "Double Bed",
+      "Wardrobe",
+      "Bedside Table",
+      "Window"
+    ],
+    "forbidden_terms": []
+  }
+}

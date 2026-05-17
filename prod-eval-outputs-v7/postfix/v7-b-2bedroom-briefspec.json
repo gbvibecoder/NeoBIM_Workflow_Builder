@@ -1,0 +1,622 @@
+{
+  "project": {
+    "name": "Standard 2-Bedroom Apartment",
+    "type": "residential",
+    "location": "Unspecified",
+    "description": "Standard 2-bedroom apartment, 8m x 10m footprint, 3m ceiling. Two bedrooms (4x4m), open-plan kitchen-living (4x6m), one bathroom (2x3m). Main entry door, internal doors to bedrooms and bathroom. Windows per brief."
+  },
+  "site": {
+    "bounds_m": [
+      8,
+      10
+    ],
+    "height_limit_m": 3,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SP_BED1",
+      "name": "Bedroom 1",
+      "long_name": "Bedroom 1",
+      "polygon_world_m": [
+        [
+          0,
+          0
+        ],
+        [
+          4,
+          0
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          0,
+          4
+        ]
+      ],
+      "height_m": 3,
+      "occupancy_type": "residential"
+    },
+    {
+      "id": "SP_BED2",
+      "name": "Bedroom 2",
+      "long_name": "Bedroom 2",
+      "polygon_world_m": [
+        [
+          4,
+          0
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          4,
+          4
+        ]
+      ],
+      "height_m": 3,
+      "occupancy_type": "residential"
+    },
+    {
+      "id": "SP_BATH",
+      "name": "Bathroom",
+      "long_name": "Bathroom",
+      "polygon_world_m": [
+        [
+          0,
+          4
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          0,
+          7
+        ]
+      ],
+      "height_m": 3,
+      "occupancy_type": "residential"
+    },
+    {
+      "id": "SP_HALL",
+      "name": "Hall",
+      "long_name": "Circulation Hall",
+      "polygon_world_m": [
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          7
+        ],
+        [
+          2,
+          7
+        ]
+      ],
+      "height_m": 3,
+      "occupancy_type": "residential"
+    },
+    {
+      "id": "SP_KLR",
+      "name": "Kitchen-Living",
+      "long_name": "Open Plan Kitchen and Living",
+      "polygon_world_m": [
+        [
+          4,
+          4
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          8,
+          10
+        ],
+        [
+          4,
+          10
+        ]
+      ],
+      "height_m": 3,
+      "occupancy_type": "residential"
+    },
+    {
+      "id": "SP_ENTRY",
+      "name": "Entry",
+      "long_name": "Entry Vestibule",
+      "polygon_world_m": [
+        [
+          0,
+          7
+        ],
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          0,
+          10
+        ]
+      ],
+      "height_m": 3,
+      "occupancy_type": "residential"
+    }
+  ],
+  "elements": [
+    {
+      "id": "SLAB_FLOOR",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        8,
+        10,
+        0.2
+      ],
+      "material_id": "MAT_CONCRETE",
+      "description": "Ground floor slab",
+      "object_type": "FLOOR",
+      "tag": "S-FLR-01"
+    },
+    {
+      "id": "SLAB_ROOF",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        3
+      ],
+      "dims_m": [
+        8,
+        10,
+        0.2
+      ],
+      "material_id": "MAT_CONCRETE",
+      "description": "Roof slab",
+      "object_type": "ROOF",
+      "tag": "S-ROOF-01"
+    },
+    {
+      "id": "W_EXT_S",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        8,
+        0.2,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "South exterior wall",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-EXT-S"
+    },
+    {
+      "id": "W_EXT_N",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        9.8,
+        0
+      ],
+      "dims_m": [
+        8,
+        0.2,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "North exterior wall",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-EXT-N"
+    },
+    {
+      "id": "W_EXT_W",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.2,
+        10,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "West exterior wall",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-EXT-W"
+    },
+    {
+      "id": "W_EXT_E",
+      "type": "wall",
+      "origin_world_m": [
+        7.8,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.2,
+        10,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "East exterior wall",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-EXT-E"
+    },
+    {
+      "id": "W_INT_BED12",
+      "type": "wall",
+      "origin_world_m": [
+        3.9,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.2,
+        4,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "Partition between Bedroom 1 and Bedroom 2",
+      "object_type": "INTERIOR_WALL",
+      "tag": "W-INT-01"
+    },
+    {
+      "id": "W_INT_BEDS_N",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        3.9,
+        0
+      ],
+      "dims_m": [
+        8,
+        0.2,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "Partition between bedrooms and bathroom/hall/kitchen-living",
+      "object_type": "INTERIOR_WALL",
+      "tag": "W-INT-02"
+    },
+    {
+      "id": "W_INT_BATH_HALL",
+      "type": "wall",
+      "origin_world_m": [
+        1.9,
+        4,
+        0
+      ],
+      "dims_m": [
+        0.2,
+        3,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "Partition between Bathroom and Hall",
+      "object_type": "INTERIOR_WALL",
+      "tag": "W-INT-03"
+    },
+    {
+      "id": "W_INT_HALL_KLR",
+      "type": "wall",
+      "origin_world_m": [
+        3.9,
+        4,
+        0
+      ],
+      "dims_m": [
+        0.2,
+        6,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "Partition between Hall/Entry and Kitchen-Living",
+      "object_type": "INTERIOR_WALL",
+      "tag": "W-INT-04"
+    },
+    {
+      "id": "W_INT_BATH_ENTRY",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        6.9,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.2,
+        3
+      ],
+      "material_id": "MAT_PLASTER",
+      "description": "Partition between Bathroom/Hall and Entry",
+      "object_type": "INTERIOR_WALL",
+      "tag": "W-INT-05"
+    },
+    {
+      "id": "DOOR_ENTRY",
+      "type": "door",
+      "origin_world_m": [
+        1.5,
+        9.8,
+        0
+      ],
+      "dims_m": [
+        1,
+        0.2,
+        2.1
+      ],
+      "material_id": "MAT_TIMBER",
+      "description": "Main entry door",
+      "object_type": "EXTERIOR_DOOR",
+      "tag": "D-ENT-01"
+    },
+    {
+      "id": "DOOR_BED1",
+      "type": "door",
+      "origin_world_m": [
+        1,
+        3.9,
+        0
+      ],
+      "dims_m": [
+        0.9,
+        0.2,
+        2.1
+      ],
+      "material_id": "MAT_TIMBER",
+      "description": "Internal door to Bedroom 1",
+      "object_type": "INTERIOR_DOOR",
+      "tag": "D-BED1"
+    },
+    {
+      "id": "DOOR_BED2",
+      "type": "door",
+      "origin_world_m": [
+        5.5,
+        3.9,
+        0
+      ],
+      "dims_m": [
+        0.9,
+        0.2,
+        2.1
+      ],
+      "material_id": "MAT_TIMBER",
+      "description": "Internal door to Bedroom 2",
+      "object_type": "INTERIOR_DOOR",
+      "tag": "D-BED2"
+    },
+    {
+      "id": "DOOR_BATH",
+      "type": "door",
+      "origin_world_m": [
+        1.9,
+        5,
+        0
+      ],
+      "dims_m": [
+        0.2,
+        0.8,
+        2.1
+      ],
+      "material_id": "MAT_TIMBER",
+      "description": "Internal door to Bathroom",
+      "object_type": "INTERIOR_DOOR",
+      "tag": "D-BATH"
+    },
+    {
+      "id": "DOOR_KLR",
+      "type": "door",
+      "origin_world_m": [
+        3.9,
+        7.5,
+        0
+      ],
+      "dims_m": [
+        0.2,
+        1,
+        2.1
+      ],
+      "material_id": "MAT_TIMBER",
+      "description": "Internal door from Entry to Kitchen-Living",
+      "object_type": "INTERIOR_DOOR",
+      "tag": "D-KLR"
+    },
+    {
+      "id": "WIN_BED1",
+      "type": "window",
+      "origin_world_m": [
+        1.5,
+        0,
+        0.9
+      ],
+      "dims_m": [
+        1.2,
+        0.2,
+        1.2
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Bedroom 1 window on south facade",
+      "object_type": "WINDOW",
+      "tag": "WIN-BED1"
+    },
+    {
+      "id": "WIN_BED2",
+      "type": "window",
+      "origin_world_m": [
+        5.3,
+        0,
+        0.9
+      ],
+      "dims_m": [
+        1.2,
+        0.2,
+        1.2
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Bedroom 2 window on south facade",
+      "object_type": "WINDOW",
+      "tag": "WIN-BED2"
+    },
+    {
+      "id": "WIN_KLR_1",
+      "type": "window",
+      "origin_world_m": [
+        7.8,
+        5,
+        0.9
+      ],
+      "dims_m": [
+        0.2,
+        1.5,
+        1.5
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Kitchen-Living window 1 on east facade",
+      "object_type": "WINDOW",
+      "tag": "WIN-KLR-1"
+    },
+    {
+      "id": "WIN_KLR_2",
+      "type": "window",
+      "origin_world_m": [
+        7.8,
+        7.5,
+        0.9
+      ],
+      "dims_m": [
+        0.2,
+        1.5,
+        1.5
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Kitchen-Living window 2 on east facade",
+      "object_type": "WINDOW",
+      "tag": "WIN-KLR-2"
+    },
+    {
+      "id": "WIN_BATH",
+      "type": "window",
+      "origin_world_m": [
+        0,
+        5.5,
+        1.5
+      ],
+      "dims_m": [
+        0.2,
+        0.6,
+        0.6
+      ],
+      "material_id": "MAT_GLASS_FROSTED",
+      "description": "Small frosted bathroom window on west facade",
+      "object_type": "WINDOW",
+      "tag": "WIN-BATH"
+    }
+  ],
+  "materials": [
+    {
+      "id": "MAT_CONCRETE",
+      "name": "Reinforced Concrete",
+      "rgb": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "roughness": 0.8,
+      "method": "MATT",
+      "category": "structural"
+    },
+    {
+      "id": "MAT_PLASTER",
+      "name": "Painted Plaster",
+      "rgb": [
+        0.95,
+        0.95,
+        0.92
+      ],
+      "roughness": 0.7,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "MAT_TIMBER",
+      "name": "Timber Door Panel",
+      "rgb": [
+        0.55,
+        0.38,
+        0.25
+      ],
+      "roughness": 0.5,
+      "method": "MATT",
+      "category": "finish"
+    },
+    {
+      "id": "MAT_GLASS",
+      "name": "Clear Glazing",
+      "rgb": [
+        0.75,
+        0.85,
+        0.9
+      ],
+      "roughness": 0.05,
+      "method": "PHONG",
+      "category": "glass"
+    },
+    {
+      "id": "MAT_GLASS_FROSTED",
+      "name": "Frosted Glazing",
+      "rgb": [
+        0.85,
+        0.9,
+        0.92
+      ],
+      "roughness": 0.35,
+      "method": "PHONG",
+      "category": "glass"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "Standard 2-Bedroom Apartment",
+    "approved_terms": [
+      "Bedroom 1",
+      "Bedroom 2",
+      "Kitchen-Living",
+      "Bathroom",
+      "Entry",
+      "Hall"
+    ],
+    "forbidden_terms": []
+  }
+}

@@ -1,0 +1,274 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "toolName": "read_ifc_summary",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 0,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 2,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"s = bf.summary()\\nprint(s)\\n\"}",
+      "toolDurationMs": 577,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 3,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"# Slabs\\nbf.add_slab(\\\"SLAB_FLOOR\\\", origin=(0.0, 0.0, 0.0), dims=(20.0, 15.0), depth=0.15, material=\\\"MAT_CONCRETE\\\", predefined_type=\\\"FLOOR\\\")\\nbf.add_slab(\\\"SLAB_CEILING\\\", origin=(0.0, 0",
+      "toolDurationMs": 708,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 4,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"# Phone booths (proxies)\\nbf.add_proxy(\\\"PHONE_BOOTH_1\\\", origin=(18.2, 5.0, 0.0), dims=(1.5, 1.5), depth=2.4, material=\\\"MAT_WOOD\\\", object_type=\\\"PHONE_BOOTH\\\", composition=\\\"ELEMENT\\\")\\nbf",
+      "toolDurationMs": 627,
+      "toolOk": false,
+      "toolErrorType": "RuntimeError"
+    },
+    {
+      "turn": 5,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"s = bf.summary()\\nprint(s)\\n\"}",
+      "toolDurationMs": 245,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 6,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"# Lights via proxy (IFC2X3 has no IfcLightFixture)\\nbf.add_proxy(\\\"LIGHT_1\\\", origin=(5.0, 5.0, 3.9), dims=(0.3, 0.3), depth=0.1, material=\\\"MAT_METAL\\\", object_type=\\\"PENDANT_LIGHT\\\", compos",
+      "toolDurationMs": 593,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 7,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"ids = bf.summary()[\\\"tracked_element_ids\\\"]\\n# Attach a common pset to all\\nbf.attach_pset(ids, \\\"Pset_BuildFlowExhibitionElement\\\", {\\n    \\\"Project\\\": \\\"Co-working Space\\\",\\n    \\\"IsExhibit",
+      "toolDurationMs": 576,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 8,
+      "toolName": "validate_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 308,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 9,
+      "toolName": "finalize_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 1371,
+      "toolOk": true,
+      "toolErrorType": null
+    }
+  ],
+  "ledger": [
+    {
+      "turn": 1,
+      "inputTokens": 8313,
+      "outputTokens": 65,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 0,
+      "costUsd": 0.04319,
+      "durationMs": 3478
+    },
+    {
+      "turn": 2,
+      "inputTokens": 85,
+      "outputTokens": 76,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 8330,
+      "costUsd": 0.002325,
+      "durationMs": 2334
+    },
+    {
+      "turn": 3,
+      "inputTokens": 471,
+      "outputTokens": 891,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 8330,
+      "costUsd": 0.02463,
+      "durationMs": 10331
+    },
+    {
+      "turn": 4,
+      "inputTokens": 1309,
+      "outputTokens": 1882,
+      "cacheReadTokens": 15145,
+      "cacheCreationTokens": 113,
+      "costUsd": 0.053595,
+      "durationMs": 18594
+    },
+    {
+      "turn": 5,
+      "inputTokens": 4284,
+      "outputTokens": 129,
+      "cacheReadTokens": 15181,
+      "cacheCreationTokens": 408,
+      "costUsd": 0.024645,
+      "durationMs": 4074
+    },
+    {
+      "turn": 6,
+      "inputTokens": 2388,
+      "outputTokens": 500,
+      "cacheReadTokens": 16459,
+      "cacheCreationTokens": 1990,
+      "costUsd": 0.02444,
+      "durationMs": 12170
+    },
+    {
+      "turn": 7,
+      "inputTokens": 1646,
+      "outputTokens": 210,
+      "cacheReadTokens": 16566,
+      "cacheCreationTokens": 3359,
+      "costUsd": 0.01348,
+      "durationMs": 4740
+    },
+    {
+      "turn": 8,
+      "inputTokens": 964,
+      "outputTokens": 45,
+      "cacheReadTokens": 20002,
+      "cacheCreationTokens": 921,
+      "costUsd": 0.005945,
+      "durationMs": 4163
+    },
+    {
+      "turn": 9,
+      "inputTokens": 991,
+      "outputTokens": 58,
+      "cacheReadTokens": 21337,
+      "cacheCreationTokens": 253,
+      "costUsd": 0.006405,
+      "durationMs": 2720
+    }
+  ],
+  "finalValidation": {
+    "schema": "IFC2X3",
+    "entity_count": 1001,
+    "refs_resolve": true,
+    "spaces_present": [
+      "SP_MAIN"
+    ],
+    "spaces_missing": [],
+    "errors": [],
+    "web_ifc_load_test": "PASS",
+    "ascii_only": true,
+    "ascii_first_bad_offset": null,
+    "world_bbox": {
+      "verdict": "OK",
+      "expected_extent": [
+        20,
+        15,
+        4.15
+      ],
+      "actual_bbox": {
+        "xmin": 0,
+        "ymin": 0,
+        "zmin": 0,
+        "xmax": 20,
+        "ymax": 15,
+        "zmax": 4.15
+      },
+      "actual_extent": [
+        20,
+        15,
+        4.15
+      ],
+      "extent_ratio": [
+        1,
+        1,
+        1
+      ],
+      "suggested_unit_fix": null
+    },
+    "space_polygons": [
+      {
+        "space_id": "SP_MAIN",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            20,
+            0
+          ],
+          [
+            20,
+            15
+          ],
+          [
+            0,
+            15
+          ]
+        ],
+        "actual_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            20,
+            0
+          ],
+          [
+            20,
+            15
+          ],
+          [
+            0,
+            15
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      }
+    ],
+    "element_coverage": {
+      "verdict": "OK",
+      "total_expected": 39,
+      "total_actual_in_expected_classes": 32,
+      "by_class_expected": {
+        "IfcSlab": 2,
+        "IfcWall": 10,
+        "IfcBuildingElementProxy": 10,
+        "IfcFurnishingElement": 14,
+        "IfcLightFixture": 3
+      },
+      "by_class_actual": {
+        "IfcSlab": 2,
+        "IfcWall": 10,
+        "IfcBuildingElementProxy": 6,
+        "IfcFurnishingElement": 14,
+        "IfcLightFixture": 0
+      },
+      "missing_ids": [],
+      "missing_id_count": 0
+    },
+    "origin_collapse": {
+      "verdict": "OK",
+      "total_elements": 39,
+      "at_origin_count": 3,
+      "fraction_at_origin": 0.07692307692307693,
+      "collapsed": false
+    }
+  }
+}

@@ -227,7 +227,125 @@ def inspect(path: Path) -> Dict[str, Any]:
             mat_assignments[cls] = mat_assignments.get(cls, 0) + 1
     out["material_assignment_counts"] = mat_assignments
 
+    # ── v7 acceptance-criteria fields (added 2026-05-17) ────────────────
+    #
+    # Named counts for the three classes the v7 backend surgery (commit
+    # a4c980df) targeted. Surfaced as top-level fields so the multi-brief
+    # accuracy report can read them with one .get() per class — no more
+    # regex over names or digging into products_by_class.
+    out["ifc_door_count"] = by_class.get("IfcDoor", 0)
+    out["ifc_window_count"] = by_class.get("IfcWindow", 0)
+    out["ifc_building_element_proxy_count"] = by_class.get(
+        "IfcBuildingElementProxy", 0,
+    )
+    out["ifc_wall_count"] = (
+        by_class.get("IfcWall", 0) + by_class.get("IfcWallStandardCase", 0)
+    )
+
+    # Perimeter wall count — walls that lie along the AABB perimeter
+    # (within 0.5 m of an outer edge). Distinguishes interior partitions
+    # from the building shell. For a rectangular brief this should be 4;
+    # for an L-shape this should be 6.
+    perimeter_walls = 0
+    agg = out.get("aggregate_world_bbox")
+    if agg and isinstance(agg, dict):
+        xmin, xmax = agg["xmin"], agg["xmax"]
+        ymin, ymax = agg["ymin"], agg["ymax"]
+        tol = 0.5  # 50 cm tolerance from the AABB edge
+        for e in elements:
+            if e["ifc_class"] not in ("IfcWall", "IfcWallStandardCase"):
+                continue
+            b = e.get("world_bbox")
+            if not isinstance(b, dict) or "xmin" not in b:
+                continue
+            cx = (b["xmin"] + b["xmax"]) / 2.0
+            cy = (b["ymin"] + b["ymax"]) / 2.0
+            if (
+                abs(cx - xmin) < tol
+                or abs(cx - xmax) < tol
+                or abs(cy - ymin) < tol
+                or abs(cy - ymax) < tol
+            ):
+                perimeter_walls += 1
+    out["perimeter_wall_count"] = perimeter_walls
+
+    # Polygon-vs-AABB detection: if a sibling `<stem>-briefspec.json`
+    # exists next to the IFC file (the convention from
+    # `scripts/forensics/run-brief-direct.ts`), read its
+    # `spaces[*].polygon_world_m`, classify each as rectangular vs
+    # irregular, and report whether the IFC's wall count is consistent
+    # with the polygon's edge count.
+    out["polygon_check"] = _polygon_check_from_sibling_briefspec(path, perimeter_walls)
+
     return out
+
+
+def _polygon_check_from_sibling_briefspec(
+    ifc_path: Path, perimeter_walls: int,
+) -> Dict[str, Any]:
+    """Read `<stem>-briefspec.json` if present and compare polygon edges
+    to perimeter-wall count. Returns a structured verdict.
+
+    The convention: `run-brief-direct.ts` writes `<label>.ifc` and
+    `<label>-briefspec.json` to the same directory, where the label
+    matches `ifc_path.stem`.
+    """
+    sibling = ifc_path.parent / f"{ifc_path.stem}-briefspec.json"
+    if not sibling.exists():
+        return {"status": "no_briefspec_sibling"}
+    try:
+        spec = json.loads(sibling.read_text())
+    except Exception as e:
+        return {"status": "briefspec_parse_error", "error": str(e)}
+
+    spaces = spec.get("spaces") or []
+    polygon_total_edges = 0
+    irregular_count = 0
+    rect_count = 0
+    for sp in spaces:
+        poly = sp.get("polygon_world_m")
+        if not isinstance(poly, list) or len(poly) < 3:
+            continue
+        # Detect axis-aligned 4-vertex rectangle
+        is_rect = len(poly) == 4 and all(
+            abs(poly[i][0] - poly[(i + 1) % 4][0]) < 1e-3
+            or abs(poly[i][1] - poly[(i + 1) % 4][1]) < 1e-3
+            for i in range(4)
+        )
+        if is_rect:
+            rect_count += 1
+            polygon_total_edges += 4
+        else:
+            irregular_count += 1
+            polygon_total_edges += len(poly)
+
+    if irregular_count == 0:
+        # Rectangular brief — perimeter wall count should be at least 4.
+        return {
+            "status": "rectangular",
+            "rectangular_spaces": rect_count,
+            "irregular_spaces": 0,
+            "polygon_total_edges": polygon_total_edges,
+            "perimeter_walls": perimeter_walls,
+            "verdict": "OK" if perimeter_walls >= 4 else "FEW_PERIMETER_WALLS",
+        }
+
+    # Irregular brief — perimeter walls should be >= polygon's edge count.
+    verdict = "OK" if perimeter_walls >= polygon_total_edges else "AABB_UNFOLDING"
+    return {
+        "status": "irregular",
+        "rectangular_spaces": rect_count,
+        "irregular_spaces": irregular_count,
+        "polygon_total_edges": polygon_total_edges,
+        "perimeter_walls": perimeter_walls,
+        "verdict": verdict,
+        "failure_explanation": (
+            f"polygon has {polygon_total_edges} edges but IFC has only "
+            f"{perimeter_walls} perimeter walls — likely AABB unfolding"
+            if verdict == "AABB_UNFOLDING"
+            else None
+        ),
+    }
 
 
 def print_report(d: Dict[str, Any]) -> None:
@@ -287,19 +405,65 @@ def print_report(d: Dict[str, Any]) -> None:
         else:
             print(f"  {s['name']!r} long={s['long_name']!r} bbox=ERROR {b}")
 
+    # v7 acceptance-criteria summary
+    print("\nv7 acceptance:")
+    print(
+        f"  IfcDoor={d.get('ifc_door_count', 0)} "
+        f"IfcWindow={d.get('ifc_window_count', 0)} "
+        f"IfcBuildingElementProxy={d.get('ifc_building_element_proxy_count', 0)} "
+        f"IfcWall={d.get('ifc_wall_count', 0)} "
+        f"perimeter_walls={d.get('perimeter_wall_count', 0)}"
+    )
+    pc = d.get("polygon_check") or {}
+    if pc.get("status") == "irregular":
+        verdict = pc.get("verdict", "?")
+        marker = "✓" if verdict == "OK" else "✗"
+        print(
+            f"  {marker} polygon_check: {verdict} — "
+            f"irregular_spaces={pc.get('irregular_spaces', 0)}, "
+            f"polygon_edges={pc.get('polygon_total_edges', 0)}, "
+            f"perimeter_walls={pc.get('perimeter_walls', 0)}"
+        )
+        if pc.get("failure_explanation"):
+            print(f"    {pc['failure_explanation']}")
+    elif pc.get("status") == "rectangular":
+        print(
+            f"  polygon_check: rectangular (all {pc.get('rectangular_spaces', 0)} "
+            f"spaces are 4-vertex axis-aligned)"
+        )
+    elif pc.get("status") == "no_briefspec_sibling":
+        print(f"  polygon_check: no sibling briefspec.json — skipping")
+    else:
+        print(f"  polygon_check: {pc}")
+
 
 def main(argv: List[str]) -> int:
     if len(argv) < 2:
-        print("usage: ifc-inspect.py <file.ifc> [more.ifc ...]", file=sys.stderr)
+        print(
+            "usage: ifc-inspect.py [--out-dir <dir>] <file.ifc> [more.ifc ...]",
+            file=sys.stderr,
+        )
         return 2
-    out_dir = Path("forensics")
-    out_dir.mkdir(parents=True, exist_ok=True)
 
-    for path_str in argv[1:]:
+    args = list(argv[1:])
+    out_dir: Optional[Path] = None
+    if args and args[0] == "--out-dir":
+        if len(args) < 2:
+            print("--out-dir requires a path", file=sys.stderr)
+            return 2
+        out_dir = Path(args[1])
+        out_dir.mkdir(parents=True, exist_ok=True)
+        args = args[2:]
+
+    for path_str in args:
         path = Path(path_str)
         d = inspect(path)
         print_report(d)
-        out_file = out_dir / f"{path.stem}-inspect.json"
+        # Default: write inspect.json next to the source IFC. Falls back
+        # to --out-dir if explicitly passed.
+        target_dir = out_dir if out_dir is not None else path.parent
+        target_dir.mkdir(parents=True, exist_ok=True)
+        out_file = target_dir / f"{path.stem}-inspect.json"
         out_file.write_text(json.dumps(d, indent=2))
         print(f"  -> wrote {out_file}")
     return 0

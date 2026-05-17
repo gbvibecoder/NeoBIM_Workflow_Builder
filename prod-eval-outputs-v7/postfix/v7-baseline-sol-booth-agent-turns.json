@@ -1,0 +1,276 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"summary = bf.read_summary() if hasattr(bf, 'read_summary') else None\\nprint(summary)\\n\"}",
+      "toolDurationMs": 1012,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 2,
+      "toolName": "read_ifc_summary",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 353,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 3,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"\\n# Material name mapping\\nMAT = {\\n    \\\"MAT_WALNUT\\\": \\\"Smoked Walnut Oak\\\",\\n    \\\"MAT_TRAVERTINE\\\": \\\"Travertine Stone\\\",\\n    \\\"MAT_BRONZE\\\": \\\"Brushed Bronze\\\",\\n    \\\"MAT_BLACK\\\": \\\"Ma",
+      "toolDurationMs": 608,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 4,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"\\nMAT = {\\n    \\\"MAT_WALNUT\\\": \\\"Smoked Walnut Oak\\\",\\n    \\\"MAT_TRAVERTINE\\\": \\\"Travertine Stone\\\",\\n    \\\"MAT_BRONZE\\\": \\\"Brushed Bronze\\\",\\n    \\\"MAT_BLACK\\\": \\\"Matte Black Lacquer\\\",\\n   ",
+      "toolDurationMs": 635,
+      "toolOk": false,
+      "toolErrorType": "RuntimeError"
+    },
+    {
+      "turn": 5,
+      "toolName": "read_ifc_summary",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 251,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 6,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"\\nMAT_BRONZE = \\\"Brushed Bronze\\\"\\nlights = [\\n    (\\\"LGT_TERRA\\\", (4.4, 4.2, 4.0), (0.15, 0.15), 0.15, \\\"Accent Spotlight - Sol Terra\\\"),\\n    (\\\"LGT_LUXE\\\", (10.85, 4.05, 4.0), (0.15, 0.15)",
+      "toolDurationMs": 562,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 7,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"\\n# Attach Psets to all elements\\nall_ids = [\\n    \\\"SLAB1\\\",\\n    \\\"COL_SW\\\",\\\"COL_SE\\\",\\\"COL_NE\\\",\\\"COL_NW\\\",\\n    \\\"BEAM_S\\\",\\\"BEAM_N\\\",\\\"BEAM_E\\\",\\\"BEAM_W\\\",\\n    \\\"SIGN_S\\\",\\\"SIGN_N\\\",\\\"",
+      "toolDurationMs": 608,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 8,
+      "toolName": "validate_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 291,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 9,
+      "toolName": "finalize_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 1022,
+      "toolOk": true,
+      "toolErrorType": null
+    }
+  ],
+  "ledger": [
+    {
+      "turn": 1,
+      "inputTokens": 7066,
+      "outputTokens": 98,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 0,
+      "costUsd": 0.03778,
+      "durationMs": 2883
+    },
+    {
+      "turn": 2,
+      "inputTokens": 92,
+      "outputTokens": 47,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 7165,
+      "costUsd": 0.001635,
+      "durationMs": 3643
+    },
+    {
+      "turn": 3,
+      "inputTokens": 380,
+      "outputTokens": 718,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 7165,
+      "costUsd": 0.01985,
+      "durationMs": 8215
+    },
+    {
+      "turn": 4,
+      "inputTokens": 1053,
+      "outputTokens": 1752,
+      "cacheReadTokens": 13827,
+      "cacheCreationTokens": 244,
+      "costUsd": 0.049065,
+      "durationMs": 17567
+    },
+    {
+      "turn": 5,
+      "inputTokens": 3265,
+      "outputTokens": 97,
+      "cacheReadTokens": 14023,
+      "cacheCreationTokens": 1007,
+      "costUsd": 0.01875,
+      "durationMs": 3403
+    },
+    {
+      "turn": 6,
+      "inputTokens": 1990,
+      "outputTokens": 564,
+      "cacheReadTokens": 14311,
+      "cacheCreationTokens": 2565,
+      "costUsd": 0.02405,
+      "durationMs": 10288
+    },
+    {
+      "turn": 7,
+      "inputTokens": 1184,
+      "outputTokens": 1432,
+      "cacheReadTokens": 15123,
+      "cacheCreationTokens": 3221,
+      "costUsd": 0.04172,
+      "durationMs": 15101
+    },
+    {
+      "turn": 8,
+      "inputTokens": 2108,
+      "outputTokens": 45,
+      "cacheReadTokens": 18392,
+      "cacheCreationTokens": 555,
+      "costUsd": 0.011665,
+      "durationMs": 2566
+    },
+    {
+      "turn": 9,
+      "inputTokens": 807,
+      "outputTokens": 59,
+      "cacheReadTokens": 19430,
+      "cacheCreationTokens": 1530,
+      "costUsd": 0.00551,
+      "durationMs": 2456
+    }
+  ],
+  "finalValidation": {
+    "schema": "IFC2X3",
+    "entity_count": 895,
+    "refs_resolve": true,
+    "spaces_present": [
+      "S1"
+    ],
+    "spaces_missing": [],
+    "errors": [],
+    "web_ifc_load_test": "PASS",
+    "ascii_only": true,
+    "ascii_first_bad_offset": null,
+    "world_bbox": {
+      "verdict": "OK",
+      "expected_extent": [
+        15,
+        15,
+        4.949999999999999
+      ],
+      "actual_bbox": {
+        "xmin": 0,
+        "ymin": 0,
+        "zmin": 0,
+        "xmax": 15,
+        "ymax": 15,
+        "zmax": 4.949999999999999
+      },
+      "actual_extent": [
+        15,
+        15,
+        4.949999999999999
+      ],
+      "extent_ratio": [
+        1,
+        1,
+        1
+      ],
+      "suggested_unit_fix": null
+    },
+    "space_polygons": [
+      {
+        "space_id": "S1",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            15,
+            0
+          ],
+          [
+            15,
+            15
+          ],
+          [
+            0,
+            15
+          ]
+        ],
+        "actual_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            15,
+            0
+          ],
+          [
+            15,
+            15
+          ],
+          [
+            0,
+            15
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      }
+    ],
+    "element_coverage": {
+      "verdict": "OK",
+      "total_expected": 27,
+      "total_actual_in_expected_classes": 27,
+      "by_class_expected": {
+        "IfcSlab": 1,
+        "IfcColumn": 4,
+        "IfcBeam": 4,
+        "IfcBuildingElementProxy": 8,
+        "IfcFurnishingElement": 5,
+        "IfcLightFixture": 5
+      },
+      "by_class_actual": {
+        "IfcSlab": 1,
+        "IfcColumn": 4,
+        "IfcBeam": 4,
+        "IfcBuildingElementProxy": 13,
+        "IfcFurnishingElement": 5,
+        "IfcLightFixture": 0
+      },
+      "missing_ids": [],
+      "missing_id_count": 0
+    },
+    "origin_collapse": {
+      "verdict": "OK",
+      "total_elements": 27,
+      "at_origin_count": 1,
+      "fraction_at_origin": 0.037037037037037035,
+      "collapsed": false
+    }
+  }
+}

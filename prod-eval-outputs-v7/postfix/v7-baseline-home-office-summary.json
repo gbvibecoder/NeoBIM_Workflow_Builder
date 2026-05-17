@@ -1,0 +1,37 @@
+{
+  "label": "v7-baseline-home-office",
+  "ok": true,
+  "layer1Ms": 28589,
+  "layer2Ms": 49662,
+  "totalDurationMs": 78251,
+  "enrichmentCostUsd": 0.078355,
+  "generatorCostUsd": 0.13326999999999997,
+  "totalCostUsd": 0.21162499999999995,
+  "turns": 9,
+  "entityCount": 434,
+  "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-7e6d555741b8.ifc",
+  "ifcPath": "prod-eval-outputs-v7/postfix/v7-baseline-home-office.ifc",
+  "ifcSizeBytes": 25104,
+  "siteBoundsM": [
+    3.5,
+    4
+  ],
+  "spaceCount": 1,
+  "elementCount": 14,
+  "irregularPolygons": [],
+  "doorElementCount": 0,
+  "windowElementCount": 1,
+  "finalValidation": {
+    "refsResolve": true,
+    "asciiOnly": true,
+    "worldBboxVerdict": "OK",
+    "worldBboxExtent": [
+      3.5,
+      4.1,
+      2.9499999999999997
+    ],
+    "spacesPresent": 1,
+    "spacesMissing": 0,
+    "originCollapsed": false
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "label": "v7-baseline-clinic-reception",
+  "ok": true,
+  "layer1Ms": 32778,
+  "layer2Ms": 50261,
+  "totalDurationMs": 83039,
+  "enrichmentCostUsd": 0.090595,
+  "generatorCostUsd": 0.15284999999999999,
+  "totalCostUsd": 0.24344499999999997,
+  "turns": 9,
+  "entityCount": 542,
+  "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-450df557ee4f.ifc",
+  "ifcPath": "prod-eval-outputs-v7/postfix/v7-baseline-clinic-reception.ifc",
+  "ifcSizeBytes": 31742,
+  "siteBoundsM": [
+    8,
+    6
+  ],
+  "spaceCount": 1,
+  "elementCount": 18,
+  "irregularPolygons": [],
+  "doorElementCount": 2,
+  "windowElementCount": 2,
+  "finalValidation": {
+    "refsResolve": true,
+    "asciiOnly": true,
+    "worldBboxVerdict": "OK",
+    "worldBboxExtent": [
+      8,
+      6,
+      3.1
+    ],
+    "spacesPresent": 1,
+    "spacesMissing": 0,
+    "originCollapsed": false
+  }
+}

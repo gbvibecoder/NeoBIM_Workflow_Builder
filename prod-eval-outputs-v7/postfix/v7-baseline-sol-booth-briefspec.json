@@ -1,0 +1,650 @@
+{
+  "project": {
+    "name": "SOL Properties Exhibition Stand",
+    "type": "exhibition_booth",
+    "location": "International Property Show, in front of main entrance",
+    "description": "15m x 15m premium exhibition stand for SOL Properties, a luxury developer with 20+ years in market and 50-year legacy, partnered with Marriott, Fairmont, and Radisson. Showcases three model projects (Sol Terra Casa, Sol Luxe, Fairmont Residences) on black tables, a central coffee counter, a corner reception, and floor-supported SOL branding crowning the stand. Finishes: smoked walnut oak, travertine, bronze. Designed for maximum visibility from all four sides."
+  },
+  "site": {
+    "bounds_m": [
+      15,
+      15
+    ],
+    "height_limit_m": 4.5,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "S1",
+      "name": "Stand",
+      "long_name": "SOL Properties Exhibition Stand",
+      "polygon_world_m": [
+        [
+          0,
+          0
+        ],
+        [
+          15,
+          0
+        ],
+        [
+          15,
+          15
+        ],
+        [
+          0,
+          15
+        ]
+      ],
+      "height_m": 4.5,
+      "occupancy_type": "exhibition_booth"
+    }
+  ],
+  "elements": [
+    {
+      "id": "SLAB1",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        15,
+        15,
+        0.05
+      ],
+      "material_id": "MAT_TRAVERTINE",
+      "description": "Travertine floor platform covering the full stand footprint, raised slightly to define the premium boundary.",
+      "object_type": "Floor Platform",
+      "tag": "FLR-01",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "COL_SW",
+      "type": "column",
+      "origin_world_m": [
+        0.3,
+        0.3,
+        0.05
+      ],
+      "dims_m": [
+        0.3,
+        0.3,
+        4
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Smoked walnut oak corner support column (SW) carrying the rooftop SOL branding frame.",
+      "object_type": "Branding Support Column",
+      "tag": "COL-SW",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "COL_SE",
+      "type": "column",
+      "origin_world_m": [
+        14.4,
+        0.3,
+        0.05
+      ],
+      "dims_m": [
+        0.3,
+        0.3,
+        4
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Smoked walnut oak corner support column (SE) carrying the rooftop SOL branding frame.",
+      "object_type": "Branding Support Column",
+      "tag": "COL-SE",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "COL_NE",
+      "type": "column",
+      "origin_world_m": [
+        14.4,
+        14.4,
+        0.05
+      ],
+      "dims_m": [
+        0.3,
+        0.3,
+        4
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Smoked walnut oak corner support column (NE) carrying the rooftop SOL branding frame.",
+      "object_type": "Branding Support Column",
+      "tag": "COL-NE",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "COL_NW",
+      "type": "column",
+      "origin_world_m": [
+        0.3,
+        14.4,
+        0.05
+      ],
+      "dims_m": [
+        0.3,
+        0.3,
+        4
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Smoked walnut oak corner support column (NW) carrying the rooftop SOL branding frame.",
+      "object_type": "Branding Support Column",
+      "tag": "COL-NW",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "BEAM_S",
+      "type": "beam",
+      "origin_world_m": [
+        0.3,
+        0.3,
+        4.05
+      ],
+      "dims_m": [
+        14.4,
+        0.3,
+        0.3
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze perimeter beam (south) framing the rooftop SOL branding ring.",
+      "object_type": "Branding Frame Beam",
+      "tag": "BM-S",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "BEAM_N",
+      "type": "beam",
+      "origin_world_m": [
+        0.3,
+        14.4,
+        4.05
+      ],
+      "dims_m": [
+        14.4,
+        0.3,
+        0.3
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze perimeter beam (north) framing the rooftop SOL branding ring.",
+      "object_type": "Branding Frame Beam",
+      "tag": "BM-N",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "BEAM_E",
+      "type": "beam",
+      "origin_world_m": [
+        14.4,
+        0.3,
+        4.05
+      ],
+      "dims_m": [
+        0.3,
+        14.4,
+        0.3
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze perimeter beam (east) framing the rooftop SOL branding ring.",
+      "object_type": "Branding Frame Beam",
+      "tag": "BM-E",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "BEAM_W",
+      "type": "beam",
+      "origin_world_m": [
+        0.3,
+        0.3,
+        4.05
+      ],
+      "dims_m": [
+        0.3,
+        14.4,
+        0.3
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze perimeter beam (west) framing the rooftop SOL branding ring.",
+      "object_type": "Branding Frame Beam",
+      "tag": "BM-W",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "SIGN_S",
+      "type": "proxy",
+      "origin_world_m": [
+        4.5,
+        0.3,
+        4.35
+      ],
+      "dims_m": [
+        6,
+        0.1,
+        0.6
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "SOL Properties illuminated bronze signage on the south face, facing the main entrance. Floor-supported via corner columns; not rigged from ceiling.",
+      "object_type": "SOL Rooftop Signage",
+      "tag": "SGN-S",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "SIGN_N",
+      "type": "proxy",
+      "origin_world_m": [
+        4.5,
+        14.6,
+        4.35
+      ],
+      "dims_m": [
+        6,
+        0.1,
+        0.6
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "SOL Properties bronze signage on the north face for visibility from the back aisle.",
+      "object_type": "SOL Rooftop Signage",
+      "tag": "SGN-N",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "SIGN_E",
+      "type": "proxy",
+      "origin_world_m": [
+        14.6,
+        4.5,
+        4.35
+      ],
+      "dims_m": [
+        0.1,
+        6,
+        0.6
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "SOL Properties bronze signage on the east face (toward neighbouring companies side).",
+      "object_type": "SOL Rooftop Signage",
+      "tag": "SGN-E",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "SIGN_W",
+      "type": "proxy",
+      "origin_world_m": [
+        4.5,
+        4.5,
+        4.35
+      ],
+      "dims_m": [
+        6,
+        0.1,
+        0.6
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "SOL Properties bronze signage on the west face.",
+      "object_type": "SOL Rooftop Signage",
+      "tag": "SGN-W",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "TBL_TERRA",
+      "type": "furniture",
+      "origin_world_m": [
+        3,
+        3,
+        0.05
+      ],
+      "dims_m": [
+        2.8,
+        2.4,
+        0.9
+      ],
+      "material_id": "MAT_BLACK",
+      "description": "Black display table for Sol Terra Casa model (2.8m x 2.4m). Engraved SOL logo on side panel.",
+      "object_type": "Model Display Table",
+      "tag": "TBL-TERRA",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "MDL_TERRA",
+      "type": "proxy",
+      "origin_world_m": [
+        3,
+        3,
+        0.95
+      ],
+      "dims_m": [
+        2.8,
+        2.4,
+        0.6
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Sol Terra Casa architectural scale model on top of black table.",
+      "object_type": "Scale Model - Sol Terra Casa",
+      "tag": "MDL-TERRA",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "TBL_LUXE",
+      "type": "furniture",
+      "origin_world_m": [
+        9.7,
+        3,
+        0.05
+      ],
+      "dims_m": [
+        2.3,
+        2.1,
+        0.9
+      ],
+      "material_id": "MAT_BLACK",
+      "description": "Black display table for Sol Luxe model (2.3m x 2.1m). Engraved SOL logo on side panel.",
+      "object_type": "Model Display Table",
+      "tag": "TBL-LUXE",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "MDL_LUXE",
+      "type": "proxy",
+      "origin_world_m": [
+        9.7,
+        3,
+        0.95
+      ],
+      "dims_m": [
+        2.3,
+        2.1,
+        0.6
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Sol Luxe architectural scale model on top of black table.",
+      "object_type": "Scale Model - Sol Luxe",
+      "tag": "MDL-LUXE",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "TBL_FAIRMONT",
+      "type": "furniture",
+      "origin_world_m": [
+        11.2,
+        10,
+        0.05
+      ],
+      "dims_m": [
+        0.8,
+        0.8,
+        0.9
+      ],
+      "material_id": "MAT_BLACK",
+      "description": "Black display pedestal for Fairmont Residences model (0.8m x 0.8m). Engraved SOL logo.",
+      "object_type": "Model Display Pedestal",
+      "tag": "TBL-FAIRMONT",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "MDL_FAIRMONT",
+      "type": "proxy",
+      "origin_world_m": [
+        11.2,
+        10,
+        0.95
+      ],
+      "dims_m": [
+        0.8,
+        0.8,
+        0.4
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Fairmont Residences architectural scale model on top of black pedestal.",
+      "object_type": "Scale Model - Fairmont Residences",
+      "tag": "MDL-FAIRMONT",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "COFFEE_CTR",
+      "type": "furniture",
+      "origin_world_m": [
+        6.5,
+        6.5,
+        0.05
+      ],
+      "dims_m": [
+        2,
+        2,
+        1.1
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Central coffee counter in smoked walnut oak with bronze trim and travertine top. Serves all visitors.",
+      "object_type": "Coffee Counter",
+      "tag": "BAR-01",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "RECEPTION",
+      "type": "furniture",
+      "origin_world_m": [
+        0.6,
+        11.5,
+        0.05
+      ],
+      "dims_m": [
+        3,
+        1,
+        1.1
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Reception desk in NW corner, smoked walnut oak with bronze inlay SOL logo and travertine top.",
+      "object_type": "Reception Desk",
+      "tag": "RCP-01",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "LGT_TERRA",
+      "type": "lighting",
+      "origin_world_m": [
+        4.4,
+        4.2,
+        4
+      ],
+      "dims_m": [
+        0.15,
+        0.15,
+        0.15
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze spotlight aimed at Sol Terra Casa model, mounted to underside of bronze frame.",
+      "object_type": "Accent Spotlight",
+      "tag": "LGT-01",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "LGT_LUXE",
+      "type": "lighting",
+      "origin_world_m": [
+        10.85,
+        4.05,
+        4
+      ],
+      "dims_m": [
+        0.15,
+        0.15,
+        0.15
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze spotlight aimed at Sol Luxe model.",
+      "object_type": "Accent Spotlight",
+      "tag": "LGT-02",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "LGT_FAIRMONT",
+      "type": "lighting",
+      "origin_world_m": [
+        11.6,
+        10.4,
+        4
+      ],
+      "dims_m": [
+        0.15,
+        0.15,
+        0.15
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze spotlight aimed at Fairmont Residences model.",
+      "object_type": "Accent Spotlight",
+      "tag": "LGT-03",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "LGT_BAR",
+      "type": "lighting",
+      "origin_world_m": [
+        7.5,
+        7.5,
+        4
+      ],
+      "dims_m": [
+        0.3,
+        0.3,
+        0.3
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze pendant-style downlight cluster over central coffee counter.",
+      "object_type": "Pendant Downlight",
+      "tag": "LGT-04",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "LGT_RCP",
+      "type": "lighting",
+      "origin_world_m": [
+        2.1,
+        12,
+        4
+      ],
+      "dims_m": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "material_id": "MAT_BRONZE",
+      "description": "Bronze spotlight over reception desk.",
+      "object_type": "Accent Spotlight",
+      "tag": "LGT-05",
+      "contained_in_space_id": "S1"
+    },
+    {
+      "id": "PARTNER_WALL",
+      "type": "proxy",
+      "origin_world_m": [
+        6,
+        13.5,
+        0.05
+      ],
+      "dims_m": [
+        4,
+        0.1,
+        2.4
+      ],
+      "material_id": "MAT_WALNUT",
+      "description": "Smoked walnut oak partner wall displaying Marriott, Fairmont, and Radisson partnerships and the 50-year legacy story. Free-standing, supported from floor.",
+      "object_type": "Partner Brand Wall",
+      "tag": "WAL-PRT",
+      "contained_in_space_id": "S1"
+    }
+  ],
+  "materials": [
+    {
+      "id": "MAT_WALNUT",
+      "name": "Smoked Walnut Oak",
+      "rgb": [
+        0.25,
+        0.16,
+        0.1
+      ],
+      "roughness": 0.45,
+      "method": "MATT",
+      "category": "wood_finish"
+    },
+    {
+      "id": "MAT_TRAVERTINE",
+      "name": "Travertine Stone",
+      "rgb": [
+        0.86,
+        0.8,
+        0.7
+      ],
+      "roughness": 0.55,
+      "method": "MATT",
+      "category": "stone_finish"
+    },
+    {
+      "id": "MAT_BRONZE",
+      "name": "Brushed Bronze",
+      "rgb": [
+        0.55,
+        0.38,
+        0.2
+      ],
+      "roughness": 0.3,
+      "method": "METAL",
+      "category": "metal_accent"
+    },
+    {
+      "id": "MAT_BLACK",
+      "name": "Matte Black Lacquer",
+      "rgb": [
+        0.05,
+        0.05,
+        0.05
+      ],
+      "roughness": 0.25,
+      "method": "PHONG",
+      "category": "furniture_finish"
+    },
+    {
+      "id": "MAT_GLASS",
+      "name": "Clear Glass",
+      "rgb": [
+        0.85,
+        0.9,
+        0.92
+      ],
+      "roughness": 0.05,
+      "method": "PHONG",
+      "category": "glazing"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "SOL Properties - a luxury developer with 20+ years in market and a 50-year legacy. Partnered with Marriott, Fairmont, and Radisson. Premium materials: smoked walnut oak, travertine, bronze. Maximum visibility, premium feel.",
+    "approved_terms": [
+      "SOL Properties",
+      "Sol Terra Casa",
+      "Sol Luxe",
+      "Fairmont Residences",
+      "luxury developer",
+      "50-year legacy",
+      "20+ years in market",
+      "Marriott",
+      "Fairmont",
+      "Radisson",
+      "smoked walnut oak",
+      "travertine",
+      "bronze",
+      "premium",
+      "Coffee Counter",
+      "Reception"
+    ],
+    "forbidden_terms": [
+      "budget",
+      "cheap",
+      "discount",
+      "low-cost",
+      "economy",
+      "temporary",
+      "plastic"
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "label": "v7-baseline-l-shape-office",
+  "ok": true,
+  "layer1Ms": 52897,
+  "layer2Ms": 87391,
+  "totalDurationMs": 140288,
+  "enrichmentCostUsd": 0.14861,
+  "generatorCostUsd": 0.24649499999999996,
+  "totalCostUsd": 0.39510499999999993,
+  "turns": 12,
+  "entityCount": 950,
+  "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-6e0f212b07ef.ifc",
+  "ifcPath": "prod-eval-outputs-v7/postfix/v7-baseline-l-shape-office.ifc",
+  "ifcSizeBytes": 55777,
+  "siteBoundsM": [
+    10,
+    8
+  ],
+  "spaceCount": 1,
+  "elementCount": 32,
+  "irregularPolygons": [
+    {
+      "id": "SPC-OFFICE",
+      "vertexCount": 6
+    }
+  ],
+  "doorElementCount": 0,
+  "windowElementCount": 0,
+  "finalValidation": {
+    "refsResolve": true,
+    "asciiOnly": true,
+    "worldBboxVerdict": "OK",
+    "worldBboxExtent": [
+      10.000000107179586,
+      8.000000004019235,
+      3.4000000000000004
+    ],
+    "spacesPresent": 1,
+    "spacesMissing": 0,
+    "originCollapsed": false
+  }
+}

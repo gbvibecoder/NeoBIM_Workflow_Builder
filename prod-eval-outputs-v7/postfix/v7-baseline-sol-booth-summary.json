@@ -1,0 +1,37 @@
+{
+  "label": "v7-baseline-sol-booth",
+  "ok": true,
+  "layer1Ms": 53724,
+  "layer2Ms": 67145,
+  "totalDurationMs": 120869,
+  "enrichmentCostUsd": 0.142385,
+  "generatorCostUsd": 0.210025,
+  "totalCostUsd": 0.35241,
+  "turns": 9,
+  "entityCount": 895,
+  "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-6fe8060e20a6.ifc",
+  "ifcPath": "prod-eval-outputs-v7/postfix/v7-baseline-sol-booth.ifc",
+  "ifcSizeBytes": 58357,
+  "siteBoundsM": [
+    15,
+    15
+  ],
+  "spaceCount": 1,
+  "elementCount": 27,
+  "irregularPolygons": [],
+  "doorElementCount": 0,
+  "windowElementCount": 0,
+  "finalValidation": {
+    "refsResolve": true,
+    "asciiOnly": true,
+    "worldBboxVerdict": "OK",
+    "worldBboxExtent": [
+      15,
+      15,
+      4.949999999999999
+    ],
+    "spacesPresent": 1,
+    "spacesMissing": 0,
+    "originCollapsed": false
+  }
+}

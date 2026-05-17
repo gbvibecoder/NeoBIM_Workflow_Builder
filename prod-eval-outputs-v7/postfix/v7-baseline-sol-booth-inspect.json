@@ -1,0 +1,811 @@
+{
+  "file": "v7-baseline-sol-booth.ifc",
+  "schema": "IFC2X3",
+  "entity_count_total": 895,
+  "length_unit": {
+    "kind": "SI",
+    "prefix": null,
+    "name": "METRE",
+    "label": ".METRE."
+  },
+  "spatial": {
+    "site_count": 1,
+    "building_count": 1,
+    "storey_count": 1,
+    "space_count": 1
+  },
+  "products_by_class": {
+    "IfcBeam": 4,
+    "IfcBuildingElementProxy": 13,
+    "IfcColumn": 4,
+    "IfcSlab": 1,
+    "IfcFurnishingElement": 5,
+    "IfcBuilding": 1,
+    "IfcBuildingStorey": 1,
+    "IfcSite": 1,
+    "IfcSpace": 1
+  },
+  "spaces": [
+    {
+      "name": "S1",
+      "long_name": "SOL Properties Exhibition Stand",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 15.0,
+        "ymax": 15.0,
+        "zmax": 4.5,
+        "xext": 15.0,
+        "yext": 15.0,
+        "zext": 4.5
+      }
+    }
+  ],
+  "elements": [
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SLAB1",
+      "tag": "SLAB1",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 15.0,
+        "ymax": 15.0,
+        "zmax": 0.05,
+        "xext": 15.0,
+        "yext": 15.0,
+        "zext": 0.05
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "COL_SW",
+      "tag": "COL_SW",
+      "placement_origin": [
+        0.3,
+        0.3,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.3,
+        "ymin": 0.3,
+        "zmin": 0.05,
+        "xmax": 0.6,
+        "ymax": 0.6,
+        "zmax": 4.05,
+        "xext": 0.3,
+        "yext": 0.3,
+        "zext": 4.0
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "COL_SE",
+      "tag": "COL_SE",
+      "placement_origin": [
+        14.4,
+        0.3,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 14.4,
+        "ymin": 0.3,
+        "zmin": 0.05,
+        "xmax": 14.700000000000001,
+        "ymax": 0.6,
+        "zmax": 4.05,
+        "xext": 0.3000000000000007,
+        "yext": 0.3,
+        "zext": 4.0
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "COL_NE",
+      "tag": "COL_NE",
+      "placement_origin": [
+        14.4,
+        14.4,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 14.4,
+        "ymin": 14.4,
+        "zmin": 0.05,
+        "xmax": 14.700000000000001,
+        "ymax": 14.700000000000001,
+        "zmax": 4.05,
+        "xext": 0.3000000000000007,
+        "yext": 0.3000000000000007,
+        "zext": 4.0
+      }
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "name": "COL_NW",
+      "tag": "COL_NW",
+      "placement_origin": [
+        0.3,
+        14.4,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.3,
+        "ymin": 14.4,
+        "zmin": 0.05,
+        "xmax": 0.6,
+        "ymax": 14.700000000000001,
+        "zmax": 4.05,
+        "xext": 0.3,
+        "yext": 0.3000000000000007,
+        "zext": 4.0
+      }
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "name": "BEAM_S",
+      "tag": "BEAM_S",
+      "placement_origin": [
+        0.3,
+        0.3,
+        4.05
+      ],
+      "world_bbox": {
+        "xmin": 0.3,
+        "ymin": 0.3,
+        "zmin": 4.05,
+        "xmax": 14.700000000000001,
+        "ymax": 0.6,
+        "zmax": 4.35,
+        "xext": 14.4,
+        "yext": 0.3,
+        "zext": 0.2999999999999998
+      }
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "name": "BEAM_N",
+      "tag": "BEAM_N",
+      "placement_origin": [
+        0.3,
+        14.4,
+        4.05
+      ],
+      "world_bbox": {
+        "xmin": 0.3,
+        "ymin": 14.4,
+        "zmin": 4.05,
+        "xmax": 14.700000000000001,
+        "ymax": 14.700000000000001,
+        "zmax": 4.35,
+        "xext": 14.4,
+        "yext": 0.3000000000000007,
+        "zext": 0.2999999999999998
+      }
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "name": "BEAM_E",
+      "tag": "BEAM_E",
+      "placement_origin": [
+        14.4,
+        0.3,
+        4.05
+      ],
+      "world_bbox": {
+        "xmin": 14.4,
+        "ymin": 0.3,
+        "zmin": 4.05,
+        "xmax": 14.700000000000001,
+        "ymax": 14.700000000000001,
+        "zmax": 4.35,
+        "xext": 0.3000000000000007,
+        "yext": 14.4,
+        "zext": 0.2999999999999998
+      }
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "name": "BEAM_W",
+      "tag": "BEAM_W",
+      "placement_origin": [
+        0.3,
+        0.3,
+        4.05
+      ],
+      "world_bbox": {
+        "xmin": 0.3,
+        "ymin": 0.3,
+        "zmin": 4.05,
+        "xmax": 0.6,
+        "ymax": 14.700000000000001,
+        "zmax": 4.35,
+        "xext": 0.3,
+        "yext": 14.4,
+        "zext": 0.2999999999999998
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "TBL_TERRA",
+      "tag": "TBL_TERRA",
+      "placement_origin": [
+        3.0,
+        3.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 3.0,
+        "ymin": 3.0,
+        "zmin": 0.05,
+        "xmax": 5.8,
+        "ymax": 5.4,
+        "zmax": 0.9500000000000001,
+        "xext": 2.8,
+        "yext": 2.4000000000000004,
+        "zext": 0.9
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "TBL_LUXE",
+      "tag": "TBL_LUXE",
+      "placement_origin": [
+        9.7,
+        3.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 9.7,
+        "ymin": 3.0,
+        "zmin": 0.05,
+        "xmax": 12.0,
+        "ymax": 5.1,
+        "zmax": 0.9500000000000001,
+        "xext": 2.3000000000000007,
+        "yext": 2.0999999999999996,
+        "zext": 0.9
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "TBL_FAIRMONT",
+      "tag": "TBL_FAIRMONT",
+      "placement_origin": [
+        11.2,
+        10.0,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 11.2,
+        "ymin": 10.0,
+        "zmin": 0.05,
+        "xmax": 12.0,
+        "ymax": 10.8,
+        "zmax": 0.9500000000000001,
+        "xext": 0.8000000000000007,
+        "yext": 0.8000000000000007,
+        "zext": 0.9
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "COFFEE_CTR",
+      "tag": "COFFEE_CTR",
+      "placement_origin": [
+        6.5,
+        6.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 6.5,
+        "ymin": 6.5,
+        "zmin": 0.05,
+        "xmax": 8.5,
+        "ymax": 8.5,
+        "zmax": 1.1500000000000001,
+        "xext": 2.0,
+        "yext": 2.0,
+        "zext": 1.1
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "RECEPTION",
+      "tag": "RECEPTION",
+      "placement_origin": [
+        0.6,
+        11.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 0.6,
+        "ymin": 11.5,
+        "zmin": 0.05,
+        "xmax": 3.6,
+        "ymax": 12.5,
+        "zmax": 1.1500000000000001,
+        "xext": 3.0,
+        "yext": 1.0,
+        "zext": 1.1
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "SIGN_S",
+      "tag": "SIGN_S",
+      "placement_origin": [
+        4.5,
+        0.3,
+        4.35
+      ],
+      "world_bbox": {
+        "xmin": 4.5,
+        "ymin": 0.3,
+        "zmin": 4.35,
+        "xmax": 10.5,
+        "ymax": 0.4,
+        "zmax": 4.949999999999999,
+        "xext": 6.0,
+        "yext": 0.10000000000000003,
+        "zext": 0.5999999999999996
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "SIGN_N",
+      "tag": "SIGN_N",
+      "placement_origin": [
+        4.5,
+        14.6,
+        4.35
+      ],
+      "world_bbox": {
+        "xmin": 4.5,
+        "ymin": 14.6,
+        "zmin": 4.35,
+        "xmax": 10.5,
+        "ymax": 14.7,
+        "zmax": 4.949999999999999,
+        "xext": 6.0,
+        "yext": 0.09999999999999964,
+        "zext": 0.5999999999999996
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "SIGN_E",
+      "tag": "SIGN_E",
+      "placement_origin": [
+        14.6,
+        4.5,
+        4.35
+      ],
+      "world_bbox": {
+        "xmin": 14.6,
+        "ymin": 4.5,
+        "zmin": 4.35,
+        "xmax": 14.7,
+        "ymax": 10.5,
+        "zmax": 4.949999999999999,
+        "xext": 0.09999999999999964,
+        "yext": 6.0,
+        "zext": 0.5999999999999996
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "SIGN_W",
+      "tag": "SIGN_W",
+      "placement_origin": [
+        4.5,
+        4.5,
+        4.35
+      ],
+      "world_bbox": {
+        "xmin": 4.5,
+        "ymin": 4.5,
+        "zmin": 4.35,
+        "xmax": 10.5,
+        "ymax": 4.6,
+        "zmax": 4.949999999999999,
+        "xext": 6.0,
+        "yext": 0.09999999999999964,
+        "zext": 0.5999999999999996
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MDL_TERRA",
+      "tag": "MDL_TERRA",
+      "placement_origin": [
+        3.0,
+        3.0,
+        0.95
+      ],
+      "world_bbox": {
+        "xmin": 3.0,
+        "ymin": 3.0,
+        "zmin": 0.95,
+        "xmax": 5.8,
+        "ymax": 5.4,
+        "zmax": 1.5499999999999998,
+        "xext": 2.8,
+        "yext": 2.4000000000000004,
+        "zext": 0.5999999999999999
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MDL_LUXE",
+      "tag": "MDL_LUXE",
+      "placement_origin": [
+        9.7,
+        3.0,
+        0.95
+      ],
+      "world_bbox": {
+        "xmin": 9.7,
+        "ymin": 3.0,
+        "zmin": 0.95,
+        "xmax": 12.0,
+        "ymax": 5.1,
+        "zmax": 1.5499999999999998,
+        "xext": 2.3000000000000007,
+        "yext": 2.0999999999999996,
+        "zext": 0.5999999999999999
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "MDL_FAIRMONT",
+      "tag": "MDL_FAIRMONT",
+      "placement_origin": [
+        11.2,
+        10.0,
+        0.95
+      ],
+      "world_bbox": {
+        "xmin": 11.2,
+        "ymin": 10.0,
+        "zmin": 0.95,
+        "xmax": 12.0,
+        "ymax": 10.8,
+        "zmax": 1.35,
+        "xext": 0.8000000000000007,
+        "yext": 0.8000000000000007,
+        "zext": 0.40000000000000013
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PARTNER_WALL",
+      "tag": "PARTNER_WALL",
+      "placement_origin": [
+        6.0,
+        13.5,
+        0.05
+      ],
+      "world_bbox": {
+        "xmin": 6.0,
+        "ymin": 13.5,
+        "zmin": 0.05,
+        "xmax": 10.0,
+        "ymax": 13.6,
+        "zmax": 2.4499999999999997,
+        "xext": 4.0,
+        "yext": 0.09999999999999964,
+        "zext": 2.4
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LGT_TERRA",
+      "tag": "LGT_TERRA",
+      "placement_origin": [
+        4.4,
+        4.2,
+        4.0
+      ],
+      "world_bbox": {
+        "xmin": 4.4,
+        "ymin": 4.2,
+        "zmin": 4.0,
+        "xmax": 4.550000000000001,
+        "ymax": 4.3500000000000005,
+        "zmax": 4.15,
+        "xext": 0.15000000000000036,
+        "yext": 0.15000000000000036,
+        "zext": 0.15000000000000036
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LGT_LUXE",
+      "tag": "LGT_LUXE",
+      "placement_origin": [
+        10.85,
+        4.05,
+        4.0
+      ],
+      "world_bbox": {
+        "xmin": 10.85,
+        "ymin": 4.05,
+        "zmin": 4.0,
+        "xmax": 11.0,
+        "ymax": 4.2,
+        "zmax": 4.15,
+        "xext": 0.15000000000000036,
+        "yext": 0.15000000000000036,
+        "zext": 0.15000000000000036
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LGT_FAIRMONT",
+      "tag": "LGT_FAIRMONT",
+      "placement_origin": [
+        11.6,
+        10.4,
+        4.0
+      ],
+      "world_bbox": {
+        "xmin": 11.6,
+        "ymin": 10.4,
+        "zmin": 4.0,
+        "xmax": 11.75,
+        "ymax": 10.55,
+        "zmax": 4.15,
+        "xext": 0.15000000000000036,
+        "yext": 0.15000000000000036,
+        "zext": 0.15000000000000036
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LGT_BAR",
+      "tag": "LGT_BAR",
+      "placement_origin": [
+        7.5,
+        7.5,
+        4.0
+      ],
+      "world_bbox": {
+        "xmin": 7.5,
+        "ymin": 7.5,
+        "zmin": 4.0,
+        "xmax": 7.8,
+        "ymax": 7.8,
+        "zmax": 4.3,
+        "xext": 0.2999999999999998,
+        "yext": 0.2999999999999998,
+        "zext": 0.2999999999999998
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LGT_RCP",
+      "tag": "LGT_RCP",
+      "placement_origin": [
+        2.1,
+        12.0,
+        4.0
+      ],
+      "world_bbox": {
+        "xmin": 2.1,
+        "ymin": 12.0,
+        "zmin": 4.0,
+        "xmax": 2.3000000000000003,
+        "ymax": 12.2,
+        "zmax": 4.2,
+        "xext": 0.20000000000000018,
+        "yext": 0.1999999999999993,
+        "zext": 0.20000000000000018
+      }
+    }
+  ],
+  "placement_at_origin_count": 1,
+  "element_total": 27,
+  "aggregate_world_bbox": {
+    "xmin": 0.0,
+    "ymin": 0.0,
+    "zmin": 0.0,
+    "xmax": 15.0,
+    "ymax": 15.0,
+    "zmax": 4.949999999999999,
+    "xext": 15.0,
+    "yext": 15.0,
+    "zext": 4.949999999999999
+  },
+  "top_10_largest": [
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB1",
+      "name": "SLAB1",
+      "xext": 15.0,
+      "yext": 15.0,
+      "zext": 0.05
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "tag": "BEAM_S",
+      "name": "BEAM_S",
+      "xext": 14.4,
+      "yext": 0.3,
+      "zext": 0.2999999999999998
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "tag": "BEAM_N",
+      "name": "BEAM_N",
+      "xext": 14.4,
+      "yext": 0.3000000000000007,
+      "zext": 0.2999999999999998
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "tag": "BEAM_E",
+      "name": "BEAM_E",
+      "xext": 0.3000000000000007,
+      "yext": 14.4,
+      "zext": 0.2999999999999998
+    },
+    {
+      "ifc_class": "IfcBeam",
+      "tag": "BEAM_W",
+      "name": "BEAM_W",
+      "xext": 0.3,
+      "yext": 14.4,
+      "zext": 0.2999999999999998
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "SIGN_S",
+      "name": "SIGN_S",
+      "xext": 6.0,
+      "yext": 0.10000000000000003,
+      "zext": 0.5999999999999996
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "SIGN_N",
+      "name": "SIGN_N",
+      "xext": 6.0,
+      "yext": 0.09999999999999964,
+      "zext": 0.5999999999999996
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "SIGN_E",
+      "name": "SIGN_E",
+      "xext": 0.09999999999999964,
+      "yext": 6.0,
+      "zext": 0.5999999999999996
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "SIGN_W",
+      "name": "SIGN_W",
+      "xext": 6.0,
+      "yext": 0.09999999999999964,
+      "zext": 0.5999999999999996
+    },
+    {
+      "ifc_class": "IfcColumn",
+      "tag": "COL_SW",
+      "name": "COL_SW",
+      "xext": 0.3,
+      "yext": 0.3,
+      "zext": 4.0
+    }
+  ],
+  "top_10_smallest": [
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LGT_FAIRMONT",
+      "name": "LGT_FAIRMONT",
+      "xext": 0.15000000000000036,
+      "yext": 0.15000000000000036,
+      "zext": 0.15000000000000036
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LGT_LUXE",
+      "name": "LGT_LUXE",
+      "xext": 0.15000000000000036,
+      "yext": 0.15000000000000036,
+      "zext": 0.15000000000000036
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LGT_TERRA",
+      "name": "LGT_TERRA",
+      "xext": 0.15000000000000036,
+      "yext": 0.15000000000000036,
+      "zext": 0.15000000000000036
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LGT_RCP",
+      "name": "LGT_RCP",
+      "xext": 0.20000000000000018,
+      "yext": 0.1999999999999993,
+      "zext": 0.20000000000000018
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LGT_BAR",
+      "name": "LGT_BAR",
+      "xext": 0.2999999999999998,
+      "yext": 0.2999999999999998,
+      "zext": 0.2999999999999998
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "MDL_FAIRMONT",
+      "name": "MDL_FAIRMONT",
+      "xext": 0.8000000000000007,
+      "yext": 0.8000000000000007,
+      "zext": 0.40000000000000013
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "TBL_FAIRMONT",
+      "name": "TBL_FAIRMONT",
+      "xext": 0.8000000000000007,
+      "yext": 0.8000000000000007,
+      "zext": 0.9
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "COFFEE_CTR",
+      "name": "COFFEE_CTR",
+      "xext": 2.0,
+      "yext": 2.0,
+      "zext": 1.1
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "MDL_LUXE",
+      "name": "MDL_LUXE",
+      "xext": 2.3000000000000007,
+      "yext": 2.0999999999999996,
+      "zext": 0.5999999999999999
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "TBL_LUXE",
+      "name": "TBL_LUXE",
+      "xext": 2.3000000000000007,
+      "yext": 2.0999999999999996,
+      "zext": 0.9
+    }
+  ],
+  "material_assignment_counts": {
+    "IfcSlab": 1,
+    "IfcBuildingElementProxy": 13,
+    "IfcFurnishingElement": 5,
+    "IfcColumn": 4,
+    "IfcBeam": 4
+  },
+  "ifc_door_count": 0,
+  "ifc_window_count": 0,
+  "ifc_building_element_proxy_count": 13,
+  "ifc_wall_count": 0,
+  "perimeter_wall_count": 0,
+  "polygon_check": {
+    "status": "rectangular",
+    "rectangular_spaces": 1,
+    "irregular_spaces": 0,
+    "polygon_total_edges": 4,
+    "perimeter_walls": 0,
+    "verdict": "FEW_PERIMETER_WALLS"
+  }
+}

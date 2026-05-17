@@ -1,0 +1,730 @@
+{
+  "project": {
+    "name": "L-Shaped Open Office",
+    "type": "office",
+    "location": "Unspecified",
+    "description": "L-shaped open office with a 10m x 4m long arm and a 4m x 4m perpendicular extension. 3.2m ceiling. Houses 8 workstations in two rows, a 6-person meeting table in the extension, and a kitchenette at the inner corner. Polished concrete floor, exposed ceiling, glass partitions around the meeting area."
+  },
+  "site": {
+    "bounds_m": [
+      10,
+      8
+    ],
+    "height_limit_m": 3.2,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SPC-OFFICE",
+      "name": "Open Office",
+      "long_name": "L-Shaped Open Office",
+      "polygon_world_m": [
+        [
+          0,
+          0
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          10,
+          4
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          8
+        ],
+        [
+          0,
+          8
+        ]
+      ],
+      "height_m": 3.2,
+      "occupancy_type": "office"
+    }
+  ],
+  "elements": [
+    {
+      "id": "SLAB-FLOOR",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "material_id": "MAT-CONCRETE-POLISHED",
+      "description": "Polished concrete floor slab following the L-shaped footprint.",
+      "object_type": "FLOOR",
+      "tag": "FLR-01",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "SLAB-CEILING",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        3.2
+      ],
+      "material_id": "MAT-EXPOSED-CEILING",
+      "description": "Exposed structural ceiling following the L-shaped footprint.",
+      "object_type": "CEILING",
+      "tag": "CLG-01",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "WALL-S",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        10,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": 0,
+      "material_id": "MAT-DRYWALL",
+      "description": "South perimeter wall along the long arm, 10m long.",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-S",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "WALL-E",
+      "type": "wall",
+      "origin_world_m": [
+        10,
+        0,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": 1.5707963,
+      "material_id": "MAT-DRYWALL",
+      "description": "East perimeter wall of the long arm, 4m tall in plan.",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-E",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "WALL-N1",
+      "type": "wall",
+      "origin_world_m": [
+        10,
+        4,
+        0
+      ],
+      "dims_m": [
+        6,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": 3.1415927,
+      "material_id": "MAT-DRYWALL",
+      "description": "North wall of the long arm running from x=10 back to x=4.",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-N1",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "WALL-EXT-E",
+      "type": "wall",
+      "origin_world_m": [
+        4,
+        4,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": 1.5707963,
+      "material_id": "MAT-DRYWALL",
+      "description": "East wall of the perpendicular extension, from y=4 to y=8.",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-EXT-E",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "WALL-N2",
+      "type": "wall",
+      "origin_world_m": [
+        4,
+        8,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": 3.1415927,
+      "material_id": "MAT-DRYWALL",
+      "description": "North wall of the extension, 4m long.",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-N2",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "WALL-W",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        8,
+        0
+      ],
+      "dims_m": [
+        8,
+        0.15,
+        3.2
+      ],
+      "rotation_z_rad": -1.5707963,
+      "material_id": "MAT-DRYWALL",
+      "description": "West perimeter wall, 8m long running south.",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "W-W",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "PART-GLASS-1",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        4,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.05,
+        2.4
+      ],
+      "rotation_z_rad": 0,
+      "material_id": "MAT-GLASS",
+      "description": "Glass partition separating meeting area from the open office along y=4, west of the kitchenette.",
+      "object_type": "INTERIOR_PARTITION_GLASS",
+      "tag": "GP-01",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "PART-GLASS-2",
+      "type": "wall",
+      "origin_world_m": [
+        4,
+        4,
+        0
+      ],
+      "dims_m": [
+        4,
+        0.05,
+        2.4
+      ],
+      "rotation_z_rad": 1.5707963,
+      "material_id": "MAT-GLASS",
+      "description": "Glass partition along x=4 enclosing the meeting area on its east side.",
+      "object_type": "INTERIOR_PARTITION_GLASS",
+      "tag": "GP-02",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "DESK-1",
+      "type": "furniture",
+      "origin_world_m": [
+        1,
+        0.6,
+        0
+      ],
+      "dims_m": [
+        1.6,
+        0.8,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Workstation desk, south row, position 1.",
+      "object_type": "DESK",
+      "tag": "WS-1",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "DESK-2",
+      "type": "furniture",
+      "origin_world_m": [
+        3.2,
+        0.6,
+        0
+      ],
+      "dims_m": [
+        1.6,
+        0.8,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Workstation desk, south row, position 2.",
+      "object_type": "DESK",
+      "tag": "WS-2",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "DESK-3",
+      "type": "furniture",
+      "origin_world_m": [
+        5.4,
+        0.6,
+        0
+      ],
+      "dims_m": [
+        1.6,
+        0.8,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Workstation desk, south row, position 3.",
+      "object_type": "DESK",
+      "tag": "WS-3",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "DESK-4",
+      "type": "furniture",
+      "origin_world_m": [
+        7.6,
+        0.6,
+        0
+      ],
+      "dims_m": [
+        1.6,
+        0.8,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Workstation desk, south row, position 4.",
+      "object_type": "DESK",
+      "tag": "WS-4",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "DESK-5",
+      "type": "furniture",
+      "origin_world_m": [
+        1,
+        2.6,
+        0
+      ],
+      "dims_m": [
+        1.6,
+        0.8,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Workstation desk, north row, position 1.",
+      "object_type": "DESK",
+      "tag": "WS-5",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "DESK-6",
+      "type": "furniture",
+      "origin_world_m": [
+        3.2,
+        2.6,
+        0
+      ],
+      "dims_m": [
+        1.6,
+        0.8,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Workstation desk, north row, position 2.",
+      "object_type": "DESK",
+      "tag": "WS-6",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "DESK-7",
+      "type": "furniture",
+      "origin_world_m": [
+        5.4,
+        2.6,
+        0
+      ],
+      "dims_m": [
+        1.6,
+        0.8,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Workstation desk, north row, position 3.",
+      "object_type": "DESK",
+      "tag": "WS-7",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "DESK-8",
+      "type": "furniture",
+      "origin_world_m": [
+        7.6,
+        2.6,
+        0
+      ],
+      "dims_m": [
+        1.6,
+        0.8,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Workstation desk, north row, position 4.",
+      "object_type": "DESK",
+      "tag": "WS-8",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "MEETING-TABLE",
+      "type": "furniture",
+      "origin_world_m": [
+        1.25,
+        5.25,
+        0
+      ],
+      "dims_m": [
+        1.5,
+        2.5,
+        0.75
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Meeting table seating 6 in the perpendicular extension.",
+      "object_type": "MEETING_TABLE",
+      "tag": "MT-01",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "MEETING-CHAIR-1",
+      "type": "furniture",
+      "origin_world_m": [
+        0.7,
+        5.6,
+        0
+      ],
+      "dims_m": [
+        0.5,
+        0.5,
+        0.85
+      ],
+      "material_id": "MAT-ACCENT",
+      "description": "Meeting chair, west side, seat 1.",
+      "object_type": "CHAIR",
+      "tag": "MC-1",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "MEETING-CHAIR-2",
+      "type": "furniture",
+      "origin_world_m": [
+        0.7,
+        6.25,
+        0
+      ],
+      "dims_m": [
+        0.5,
+        0.5,
+        0.85
+      ],
+      "material_id": "MAT-ACCENT",
+      "description": "Meeting chair, west side, seat 2.",
+      "object_type": "CHAIR",
+      "tag": "MC-2",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "MEETING-CHAIR-3",
+      "type": "furniture",
+      "origin_world_m": [
+        0.7,
+        6.9,
+        0
+      ],
+      "dims_m": [
+        0.5,
+        0.5,
+        0.85
+      ],
+      "material_id": "MAT-ACCENT",
+      "description": "Meeting chair, west side, seat 3.",
+      "object_type": "CHAIR",
+      "tag": "MC-3",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "MEETING-CHAIR-4",
+      "type": "furniture",
+      "origin_world_m": [
+        2.8,
+        5.6,
+        0
+      ],
+      "dims_m": [
+        0.5,
+        0.5,
+        0.85
+      ],
+      "material_id": "MAT-ACCENT",
+      "description": "Meeting chair, east side, seat 4.",
+      "object_type": "CHAIR",
+      "tag": "MC-4",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "MEETING-CHAIR-5",
+      "type": "furniture",
+      "origin_world_m": [
+        2.8,
+        6.25,
+        0
+      ],
+      "dims_m": [
+        0.5,
+        0.5,
+        0.85
+      ],
+      "material_id": "MAT-ACCENT",
+      "description": "Meeting chair, east side, seat 5.",
+      "object_type": "CHAIR",
+      "tag": "MC-5",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "MEETING-CHAIR-6",
+      "type": "furniture",
+      "origin_world_m": [
+        2.8,
+        6.9,
+        0
+      ],
+      "dims_m": [
+        0.5,
+        0.5,
+        0.85
+      ],
+      "material_id": "MAT-ACCENT",
+      "description": "Meeting chair, east side, seat 6.",
+      "object_type": "CHAIR",
+      "tag": "MC-6",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "KITCHEN-COUNTER",
+      "type": "furniture",
+      "origin_world_m": [
+        0,
+        4,
+        0
+      ],
+      "dims_m": [
+        3.6,
+        0.6,
+        0.9
+      ],
+      "material_id": "MAT-WOOD",
+      "description": "Kitchenette counter with integrated sink at the inner corner where the L joins.",
+      "object_type": "KITCHEN_COUNTER",
+      "tag": "KC-01",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "KITCHEN-SINK",
+      "type": "furniture",
+      "origin_world_m": [
+        1.2,
+        4.1,
+        0.9
+      ],
+      "dims_m": [
+        0.6,
+        0.4,
+        0.2
+      ],
+      "material_id": "MAT-METAL",
+      "description": "Stainless steel sink mounted in the kitchenette counter.",
+      "object_type": "SINK",
+      "tag": "SNK-01",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "LIGHT-1",
+      "type": "lighting",
+      "origin_world_m": [
+        2.5,
+        1.5,
+        3
+      ],
+      "material_id": "MAT-METAL",
+      "description": "Suspended LED luminaire over south desk row, west.",
+      "object_type": "PENDANT_LIGHT",
+      "tag": "LT-1",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "LIGHT-2",
+      "type": "lighting",
+      "origin_world_m": [
+        7.5,
+        1.5,
+        3
+      ],
+      "material_id": "MAT-METAL",
+      "description": "Suspended LED luminaire over south desk row, east.",
+      "object_type": "PENDANT_LIGHT",
+      "tag": "LT-2",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "LIGHT-3",
+      "type": "lighting",
+      "origin_world_m": [
+        2.5,
+        3,
+        3
+      ],
+      "material_id": "MAT-METAL",
+      "description": "Suspended LED luminaire over north desk row, west.",
+      "object_type": "PENDANT_LIGHT",
+      "tag": "LT-3",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "LIGHT-4",
+      "type": "lighting",
+      "origin_world_m": [
+        7.5,
+        3,
+        3
+      ],
+      "material_id": "MAT-METAL",
+      "description": "Suspended LED luminaire over north desk row, east.",
+      "object_type": "PENDANT_LIGHT",
+      "tag": "LT-4",
+      "contained_in_space_id": "SPC-OFFICE"
+    },
+    {
+      "id": "LIGHT-5",
+      "type": "lighting",
+      "origin_world_m": [
+        2,
+        6.25,
+        3
+      ],
+      "material_id": "MAT-METAL",
+      "description": "Suspended LED luminaire over the meeting table.",
+      "object_type": "PENDANT_LIGHT",
+      "tag": "LT-5",
+      "contained_in_space_id": "SPC-OFFICE"
+    }
+  ],
+  "materials": [
+    {
+      "id": "MAT-CONCRETE-POLISHED",
+      "name": "Polished Concrete",
+      "rgb": [
+        0.72,
+        0.72,
+        0.7
+      ],
+      "roughness": 0.25,
+      "method": "MATT",
+      "category": "floor_finish"
+    },
+    {
+      "id": "MAT-EXPOSED-CEILING",
+      "name": "Exposed Ceiling Structure",
+      "rgb": [
+        0.55,
+        0.55,
+        0.55
+      ],
+      "roughness": 0.85,
+      "method": "MATT",
+      "category": "ceiling"
+    },
+    {
+      "id": "MAT-DRYWALL",
+      "name": "Painted Drywall",
+      "rgb": [
+        0.94,
+        0.94,
+        0.92
+      ],
+      "roughness": 0.8,
+      "method": "MATT",
+      "category": "wall_finish"
+    },
+    {
+      "id": "MAT-GLASS",
+      "name": "Clear Glass Partition",
+      "rgb": [
+        0.78,
+        0.86,
+        0.88
+      ],
+      "roughness": 0.05,
+      "method": "PHONG",
+      "category": "glazing"
+    },
+    {
+      "id": "MAT-WOOD",
+      "name": "Light Oak",
+      "rgb": [
+        0.78,
+        0.62,
+        0.42
+      ],
+      "roughness": 0.5,
+      "method": "MATT",
+      "category": "furniture_finish"
+    },
+    {
+      "id": "MAT-METAL",
+      "name": "Brushed Stainless Steel",
+      "rgb": [
+        0.78,
+        0.78,
+        0.8
+      ],
+      "roughness": 0.3,
+      "method": "METAL",
+      "category": "metal"
+    },
+    {
+      "id": "MAT-ACCENT",
+      "name": "Charcoal Upholstery",
+      "rgb": [
+        0.22,
+        0.24,
+        0.26
+      ],
+      "roughness": 0.7,
+      "method": "MATT",
+      "category": "accent"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "L-Shaped Open Office",
+    "approved_terms": [
+      "Open Office",
+      "Workstations",
+      "Meeting Area",
+      "Kitchenette"
+    ],
+    "forbidden_terms": []
+  }
+}

@@ -1,0 +1,845 @@
+{
+  "project": {
+    "name": "Co-working Space",
+    "type": "office",
+    "location": "Unspecified",
+    "description": "A 20m x 15m co-working space with 4m ceiling. Central open desks area with 12 workstations (3 rows of 4), two phone booths on the east wall, coffee/snack area in NW corner, three meeting rooms along south wall, reception in SE corner, large windows on north wall. Polished concrete floor, white walls."
+  },
+  "site": {
+    "bounds_m": [
+      20,
+      15
+    ],
+    "height_limit_m": 4,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SP_MAIN",
+      "name": "Co-working Floor",
+      "long_name": "Co-working Space Main Floor",
+      "polygon_world_m": [
+        [
+          0,
+          0
+        ],
+        [
+          20,
+          0
+        ],
+        [
+          20,
+          15
+        ],
+        [
+          0,
+          15
+        ]
+      ],
+      "height_m": 4,
+      "occupancy_type": "office"
+    }
+  ],
+  "elements": [
+    {
+      "id": "SLAB_FLOOR",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        20,
+        15,
+        0.15
+      ],
+      "material_id": "MAT_CONCRETE",
+      "description": "Polished concrete floor slab covering full footprint",
+      "object_type": "FLOOR",
+      "tag": "FLOOR-01",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "SLAB_CEILING",
+      "type": "slab",
+      "origin_world_m": [
+        0,
+        0,
+        4
+      ],
+      "dims_m": [
+        20,
+        15,
+        0.15
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "Ceiling slab at 4m",
+      "object_type": "ROOF",
+      "tag": "CEIL-01",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "WALL_S",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        20,
+        0.15,
+        4
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "South perimeter wall",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "WALL-S",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "WALL_N",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        14.85,
+        0
+      ],
+      "dims_m": [
+        20,
+        0.15,
+        4
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "North perimeter wall with large windows",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "WALL-N",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "WALL_W",
+      "type": "wall",
+      "origin_world_m": [
+        0,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.15,
+        15,
+        4
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "West perimeter wall",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "WALL-W",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "WALL_E",
+      "type": "wall",
+      "origin_world_m": [
+        19.85,
+        0,
+        0
+      ],
+      "dims_m": [
+        0.15,
+        15,
+        4
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "East perimeter wall",
+      "object_type": "EXTERIOR_WALL",
+      "tag": "WALL-E",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "WIN_N1",
+      "type": "window",
+      "origin_world_m": [
+        2,
+        14.85,
+        1
+      ],
+      "dims_m": [
+        4,
+        0.15,
+        2.5
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Large north-facing window for natural light",
+      "object_type": "FIXED_WINDOW",
+      "tag": "WIN-N1",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "WIN_N2",
+      "type": "window",
+      "origin_world_m": [
+        8,
+        14.85,
+        1
+      ],
+      "dims_m": [
+        4,
+        0.15,
+        2.5
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Large north-facing window for natural light",
+      "object_type": "FIXED_WINDOW",
+      "tag": "WIN-N2",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "WIN_N3",
+      "type": "window",
+      "origin_world_m": [
+        14,
+        14.85,
+        1
+      ],
+      "dims_m": [
+        4,
+        0.15,
+        2.5
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Large north-facing window for natural light",
+      "object_type": "FIXED_WINDOW",
+      "tag": "WIN-N3",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DOOR_ENTRY",
+      "type": "door",
+      "origin_world_m": [
+        17,
+        0,
+        0
+      ],
+      "dims_m": [
+        1.8,
+        0.15,
+        2.2
+      ],
+      "material_id": "MAT_GLASS",
+      "description": "Main entrance door in SE corner",
+      "object_type": "ENTRANCE_DOOR",
+      "tag": "DOOR-ENTRY",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "PHONE_BOOTH_1",
+      "type": "proxy",
+      "origin_world_m": [
+        18.2,
+        5,
+        0
+      ],
+      "dims_m": [
+        1.5,
+        1.5,
+        2.4
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Phone booth 1 along east wall, 1.5m x 1.5m",
+      "object_type": "PHONE_BOOTH",
+      "tag": "BOOTH-01",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "PHONE_BOOTH_2",
+      "type": "proxy",
+      "origin_world_m": [
+        18.2,
+        8,
+        0
+      ],
+      "dims_m": [
+        1.5,
+        1.5,
+        2.4
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Phone booth 2 along east wall, 1.5m x 1.5m",
+      "object_type": "PHONE_BOOTH",
+      "tag": "BOOTH-02",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "COFFEE_AREA",
+      "type": "proxy",
+      "origin_world_m": [
+        0.15,
+        12,
+        0
+      ],
+      "dims_m": [
+        4,
+        3,
+        0.9
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Coffee and snack area enclosure in NW corner, 4m x 3m",
+      "object_type": "PANTRY",
+      "tag": "COFFEE-01",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "COFFEE_COUNTER",
+      "type": "furniture",
+      "origin_world_m": [
+        0.5,
+        12.5,
+        0
+      ],
+      "dims_m": [
+        3,
+        0.6,
+        0.9
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Coffee counter with snack station",
+      "object_type": "COUNTER",
+      "tag": "COUNTER-01",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_1_WALL_N",
+      "type": "wall",
+      "origin_world_m": [
+        1,
+        3,
+        0
+      ],
+      "dims_m": [
+        3,
+        0.1,
+        3
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "North wall of meeting room 1",
+      "object_type": "INTERIOR_WALL",
+      "tag": "MR1-WN",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_1_WALL_E",
+      "type": "wall",
+      "origin_world_m": [
+        4,
+        0.15,
+        0
+      ],
+      "dims_m": [
+        0.1,
+        3,
+        3
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "East wall of meeting room 1",
+      "object_type": "INTERIOR_WALL",
+      "tag": "MR1-WE",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_1_DOOR",
+      "type": "door",
+      "origin_world_m": [
+        1.5,
+        3,
+        0
+      ],
+      "dims_m": [
+        0.9,
+        0.1,
+        2.1
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Meeting room 1 door",
+      "object_type": "INTERIOR_DOOR",
+      "tag": "MR1-DR",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_2_WALL_N",
+      "type": "wall",
+      "origin_world_m": [
+        5,
+        3,
+        0
+      ],
+      "dims_m": [
+        3,
+        0.1,
+        3
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "North wall of meeting room 2",
+      "object_type": "INTERIOR_WALL",
+      "tag": "MR2-WN",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_2_WALL_E",
+      "type": "wall",
+      "origin_world_m": [
+        8,
+        0.15,
+        0
+      ],
+      "dims_m": [
+        0.1,
+        3,
+        3
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "East wall of meeting room 2",
+      "object_type": "INTERIOR_WALL",
+      "tag": "MR2-WE",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_2_DOOR",
+      "type": "door",
+      "origin_world_m": [
+        5.5,
+        3,
+        0
+      ],
+      "dims_m": [
+        0.9,
+        0.1,
+        2.1
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Meeting room 2 door",
+      "object_type": "INTERIOR_DOOR",
+      "tag": "MR2-DR",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_3_WALL_N",
+      "type": "wall",
+      "origin_world_m": [
+        9,
+        3,
+        0
+      ],
+      "dims_m": [
+        3,
+        0.1,
+        3
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "North wall of meeting room 3",
+      "object_type": "INTERIOR_WALL",
+      "tag": "MR3-WN",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_3_WALL_E",
+      "type": "wall",
+      "origin_world_m": [
+        12,
+        0.15,
+        0
+      ],
+      "dims_m": [
+        0.1,
+        3,
+        3
+      ],
+      "material_id": "MAT_WHITE_PAINT",
+      "description": "East wall of meeting room 3",
+      "object_type": "INTERIOR_WALL",
+      "tag": "MR3-WE",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "MEETING_RM_3_DOOR",
+      "type": "door",
+      "origin_world_m": [
+        9.5,
+        3,
+        0
+      ],
+      "dims_m": [
+        0.9,
+        0.1,
+        2.1
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Meeting room 3 door",
+      "object_type": "INTERIOR_DOOR",
+      "tag": "MR3-DR",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "RECEPTION_DESK",
+      "type": "furniture",
+      "origin_world_m": [
+        15,
+        1,
+        0
+      ],
+      "dims_m": [
+        3,
+        0.8,
+        1.1
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Reception desk in SE corner",
+      "object_type": "RECEPTION_DESK",
+      "tag": "RECEPT-01",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_1_1",
+      "type": "furniture",
+      "origin_world_m": [
+        7,
+        6,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 1 desk 1",
+      "object_type": "DESK",
+      "tag": "DESK-1-1",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_1_2",
+      "type": "furniture",
+      "origin_world_m": [
+        9,
+        6,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 1 desk 2",
+      "object_type": "DESK",
+      "tag": "DESK-1-2",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_1_3",
+      "type": "furniture",
+      "origin_world_m": [
+        11,
+        6,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 1 desk 3",
+      "object_type": "DESK",
+      "tag": "DESK-1-3",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_1_4",
+      "type": "furniture",
+      "origin_world_m": [
+        13,
+        6,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 1 desk 4",
+      "object_type": "DESK",
+      "tag": "DESK-1-4",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_2_1",
+      "type": "furniture",
+      "origin_world_m": [
+        7,
+        8.5,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 2 desk 1",
+      "object_type": "DESK",
+      "tag": "DESK-2-1",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_2_2",
+      "type": "furniture",
+      "origin_world_m": [
+        9,
+        8.5,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 2 desk 2",
+      "object_type": "DESK",
+      "tag": "DESK-2-2",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_2_3",
+      "type": "furniture",
+      "origin_world_m": [
+        11,
+        8.5,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 2 desk 3",
+      "object_type": "DESK",
+      "tag": "DESK-2-3",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_2_4",
+      "type": "furniture",
+      "origin_world_m": [
+        13,
+        8.5,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 2 desk 4",
+      "object_type": "DESK",
+      "tag": "DESK-2-4",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_3_1",
+      "type": "furniture",
+      "origin_world_m": [
+        7,
+        11,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 3 desk 1",
+      "object_type": "DESK",
+      "tag": "DESK-3-1",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_3_2",
+      "type": "furniture",
+      "origin_world_m": [
+        9,
+        11,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 3 desk 2",
+      "object_type": "DESK",
+      "tag": "DESK-3-2",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_3_3",
+      "type": "furniture",
+      "origin_world_m": [
+        11,
+        11,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 3 desk 3",
+      "object_type": "DESK",
+      "tag": "DESK-3-3",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "DESK_3_4",
+      "type": "furniture",
+      "origin_world_m": [
+        13,
+        11,
+        0
+      ],
+      "dims_m": [
+        1.4,
+        0.7,
+        0.75
+      ],
+      "material_id": "MAT_WOOD",
+      "description": "Workstation row 3 desk 4",
+      "object_type": "DESK",
+      "tag": "DESK-3-4",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "LIGHT_1",
+      "type": "lighting",
+      "origin_world_m": [
+        5,
+        5,
+        3.9
+      ],
+      "material_id": "MAT_METAL",
+      "description": "Ceiling pendant light",
+      "object_type": "PENDANT_LIGHT",
+      "tag": "LT-01",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "LIGHT_2",
+      "type": "lighting",
+      "origin_world_m": [
+        10,
+        7.5,
+        3.9
+      ],
+      "material_id": "MAT_METAL",
+      "description": "Ceiling pendant light",
+      "object_type": "PENDANT_LIGHT",
+      "tag": "LT-02",
+      "contained_in_space_id": "SP_MAIN"
+    },
+    {
+      "id": "LIGHT_3",
+      "type": "lighting",
+      "origin_world_m": [
+        15,
+        10,
+        3.9
+      ],
+      "material_id": "MAT_METAL",
+      "description": "Ceiling pendant light",
+      "object_type": "PENDANT_LIGHT",
+      "tag": "LT-03",
+      "contained_in_space_id": "SP_MAIN"
+    }
+  ],
+  "materials": [
+    {
+      "id": "MAT_CONCRETE",
+      "name": "Polished Concrete",
+      "rgb": [
+        0.65,
+        0.65,
+        0.63
+      ],
+      "roughness": 0.3,
+      "method": "MATT",
+      "category": "floor_finish"
+    },
+    {
+      "id": "MAT_WHITE_PAINT",
+      "name": "White Paint",
+      "rgb": [
+        0.95,
+        0.95,
+        0.94
+      ],
+      "roughness": 0.8,
+      "method": "MATT",
+      "category": "wall_finish"
+    },
+    {
+      "id": "MAT_GLASS",
+      "name": "Clear Glass",
+      "rgb": [
+        0.8,
+        0.9,
+        0.95
+      ],
+      "roughness": 0.05,
+      "method": "PHONG",
+      "category": "glazing"
+    },
+    {
+      "id": "MAT_WOOD",
+      "name": "Light Oak",
+      "rgb": [
+        0.78,
+        0.62,
+        0.42
+      ],
+      "roughness": 0.5,
+      "method": "MATT",
+      "category": "furniture_finish"
+    },
+    {
+      "id": "MAT_METAL",
+      "name": "Brushed Aluminium",
+      "rgb": [
+        0.7,
+        0.7,
+        0.72
+      ],
+      "roughness": 0.3,
+      "method": "METAL",
+      "category": "accent"
+    }
+  ],
+  "brand_language": {
+    "primary_text": "Co-working Space",
+    "approved_terms": [
+      "Open Desks",
+      "Phone Booth",
+      "Coffee and Snack Area",
+      "Meeting Room",
+      "Reception",
+      "Workstation"
+    ],
+    "forbidden_terms": []
+  }
+}

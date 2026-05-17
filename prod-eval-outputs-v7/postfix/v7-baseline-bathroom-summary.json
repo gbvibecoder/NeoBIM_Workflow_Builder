@@ -1,0 +1,37 @@
+{
+  "label": "v7-baseline-bathroom",
+  "ok": true,
+  "layer1Ms": 24295,
+  "layer2Ms": 44288,
+  "totalDurationMs": 68583,
+  "enrichmentCostUsd": 0.064895,
+  "generatorCostUsd": 0.11648999999999998,
+  "totalCostUsd": 0.18138499999999996,
+  "turns": 6,
+  "entityCount": 380,
+  "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-3d471ba06038.ifc",
+  "ifcPath": "prod-eval-outputs-v7/postfix/v7-baseline-bathroom.ifc",
+  "ifcSizeBytes": 22091,
+  "siteBoundsM": [
+    2,
+    2.5
+  ],
+  "spaceCount": 1,
+  "elementCount": 12,
+  "irregularPolygons": [],
+  "doorElementCount": 1,
+  "windowElementCount": 1,
+  "finalValidation": {
+    "refsResolve": true,
+    "asciiOnly": true,
+    "worldBboxVerdict": "OK",
+    "worldBboxExtent": [
+      2,
+      2.5,
+      2.5
+    ],
+    "spacesPresent": 1,
+    "spacesMissing": 0,
+    "originCollapsed": false
+  }
+}

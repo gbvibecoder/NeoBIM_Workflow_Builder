@@ -1,0 +1,223 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"s = bf  # noqa\\nimport json\\nprint(json.dumps(bf.summary(), indent=2, default=str)[:3000])\"}",
+      "toolDurationMs": 819,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 2,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"# Add all elements per brief\\n# Slabs\\nbf.add_slab(\\\"SLAB_FLOOR\\\", origin=(0.0, 0.0, 0.0), dims=(2.0, 2.5), depth=0.15, material=\\\"MAT_CONCRETE\\\", predefined_type=\\\"FLOOR\\\")\\nbf.add_slab(\\\"SL",
+      "toolDurationMs": 645,
+      "toolOk": false,
+      "toolErrorType": "RuntimeError"
+    },
+    {
+      "turn": 3,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"import json\\nprint(json.dumps(bf.summary(), indent=2, default=str)[:1500])\"}",
+      "toolDurationMs": 254,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 4,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"bf.add_proxy(\\\"LIGHT_CEIL\\\", origin=(1.0, 1.25, 2.35), dims=(0.2, 0.2), depth=0.05,\\n             material=\\\"MAT_PAINT\\\", object_type=\\\"CEILING_LIGHT\\\", composition=\\\"ELEMENT\\\")\\n\\n# Attach P",
+      "toolDurationMs": 675,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 5,
+      "toolName": "validate_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 409,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 6,
+      "toolName": "finalize_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 1465,
+      "toolOk": true,
+      "toolErrorType": null
+    }
+  ],
+  "ledger": [
+    {
+      "turn": 1,
+      "inputTokens": 3486,
+      "outputTokens": 104,
+      "cacheReadTokens": 0,
+      "cacheCreationTokens": 6767,
+      "costUsd": 0.02003,
+      "durationMs": 3164
+    },
+    {
+      "turn": 2,
+      "inputTokens": 406,
+      "outputTokens": 1029,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 3591,
+      "costUsd": 0.027755,
+      "durationMs": 11539
+    },
+    {
+      "turn": 3,
+      "inputTokens": 2852,
+      "outputTokens": 145,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 3591,
+      "costUsd": 0.017885,
+      "durationMs": 3926
+    },
+    {
+      "turn": 4,
+      "inputTokens": 2212,
+      "outputTokens": 832,
+      "cacheReadTokens": 10247,
+      "cacheCreationTokens": 1546,
+      "costUsd": 0.03186,
+      "durationMs": 10484
+    },
+    {
+      "turn": 5,
+      "inputTokens": 1673,
+      "outputTokens": 45,
+      "cacheReadTokens": 10763,
+      "cacheCreationTokens": 2497,
+      "costUsd": 0.00949,
+      "durationMs": 2927
+    },
+    {
+      "turn": 6,
+      "inputTokens": 1599,
+      "outputTokens": 59,
+      "cacheReadTokens": 13355,
+      "cacheCreationTokens": 672,
+      "costUsd": 0.00947,
+      "durationMs": 10782
+    }
+  ],
+  "finalValidation": {
+    "schema": "IFC2X3",
+    "entity_count": 380,
+    "refs_resolve": true,
+    "spaces_present": [
+      "SP_BATH"
+    ],
+    "spaces_missing": [],
+    "errors": [],
+    "web_ifc_load_test": "PASS",
+    "ascii_only": true,
+    "ascii_first_bad_offset": null,
+    "world_bbox": {
+      "verdict": "OK",
+      "expected_extent": [
+        2,
+        2.5,
+        2.5
+      ],
+      "actual_bbox": {
+        "xmin": 0,
+        "ymin": 0,
+        "zmin": 0,
+        "xmax": 2,
+        "ymax": 2.5,
+        "zmax": 2.5
+      },
+      "actual_extent": [
+        2,
+        2.5,
+        2.5
+      ],
+      "extent_ratio": [
+        1,
+        1,
+        1
+      ],
+      "suggested_unit_fix": null
+    },
+    "space_polygons": [
+      {
+        "space_id": "SP_BATH",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            2.5
+          ],
+          [
+            0,
+            2.5
+          ]
+        ],
+        "actual_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            2,
+            2.5
+          ],
+          [
+            0,
+            2.5
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      }
+    ],
+    "element_coverage": {
+      "verdict": "OK",
+      "total_expected": 12,
+      "total_actual_in_expected_classes": 10,
+      "by_class_expected": {
+        "IfcSlab": 2,
+        "IfcWall": 4,
+        "IfcBuildingElementProxy": 2,
+        "IfcFurnishingElement": 3,
+        "IfcLightFixture": 1
+      },
+      "by_class_actual": {
+        "IfcSlab": 2,
+        "IfcWall": 4,
+        "IfcBuildingElementProxy": 1,
+        "IfcFurnishingElement": 3,
+        "IfcLightFixture": 0
+      },
+      "missing_ids": [],
+      "missing_id_count": 0
+    },
+    "origin_collapse": {
+      "verdict": "OK",
+      "total_elements": 12,
+      "at_origin_count": 3,
+      "fraction_at_origin": 0.25,
+      "collapsed": false
+    }
+  }
+}

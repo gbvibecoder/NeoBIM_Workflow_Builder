@@ -1,0 +1,240 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "toolName": "read_ifc_summary",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 0,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 2,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"print(bf.summary())\"}",
+      "toolDurationMs": 629,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 3,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"# Slabs\\nbf.add_slab(\\\"slab_floor\\\", origin=(0.0, 0.0, 0.0), dims=(4.0, 5.0), depth=0.15, material=\\\"mat_wood_floor\\\", predefined_type=\\\"FLOOR\\\")\\nbf.add_slab(\\\"slab_ceiling\\\", origin=(0.0, 0",
+      "toolDurationMs": 688,
+      "toolOk": false,
+      "toolErrorType": "RuntimeError"
+    },
+    {
+      "turn": 4,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"print(bf.summary())\"}",
+      "toolDurationMs": 245,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 5,
+      "toolName": "run_python",
+      "toolArgsPreview": "{\"code\":\"bf.add_proxy(\\\"lt_ceiling\\\", origin=(2.0, 2.5, 2.65), dims=(0.4, 0.4), depth=0.05, material=\\\"mat_paint_white\\\", object_type=\\\"CEILING_LIGHT\\\", composition=\\\"ELEMENT\\\")\\n\\n# Psets\\nbf.attach_",
+      "toolDurationMs": 566,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 6,
+      "toolName": "validate_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 274,
+      "toolOk": true,
+      "toolErrorType": null
+    },
+    {
+      "turn": 7,
+      "toolName": "finalize_ifc",
+      "toolArgsPreview": "{}",
+      "toolDurationMs": 899,
+      "toolOk": true,
+      "toolErrorType": null
+    }
+  ],
+  "ledger": [
+    {
+      "turn": 1,
+      "inputTokens": 3333,
+      "outputTokens": 65,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 0,
+      "costUsd": 0.01829,
+      "durationMs": 2677
+    },
+    {
+      "turn": 2,
+      "inputTokens": 85,
+      "outputTokens": 70,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 3350,
+      "costUsd": 0.002175,
+      "durationMs": 2316
+    },
+    {
+      "turn": 3,
+      "inputTokens": 476,
+      "outputTokens": 916,
+      "cacheReadTokens": 6767,
+      "cacheCreationTokens": 3350,
+      "costUsd": 0.02528,
+      "durationMs": 10075
+    },
+    {
+      "turn": 4,
+      "inputTokens": 2655,
+      "outputTokens": 112,
+      "cacheReadTokens": 10165,
+      "cacheCreationTokens": 107,
+      "costUsd": 0.016075,
+      "durationMs": 3787
+    },
+    {
+      "turn": 5,
+      "inputTokens": 2883,
+      "outputTokens": 893,
+      "cacheReadTokens": 10201,
+      "cacheCreationTokens": 408,
+      "costUsd": 0.03674,
+      "durationMs": 9848
+    },
+    {
+      "turn": 6,
+      "inputTokens": 1917,
+      "outputTokens": 45,
+      "cacheReadTokens": 11509,
+      "cacheCreationTokens": 1459,
+      "costUsd": 0.01071,
+      "durationMs": 2684
+    },
+    {
+      "turn": 7,
+      "inputTokens": 2020,
+      "outputTokens": 57,
+      "cacheReadTokens": 13039,
+      "cacheCreationTokens": 511,
+      "costUsd": 0.011525,
+      "durationMs": 2403
+    }
+  ],
+  "finalValidation": {
+    "schema": "IFC2X3",
+    "entity_count": 357,
+    "refs_resolve": true,
+    "spaces_present": [
+      "space_bedroom"
+    ],
+    "spaces_missing": [],
+    "errors": [],
+    "web_ifc_load_test": "PASS",
+    "ascii_only": true,
+    "ascii_first_bad_offset": null,
+    "world_bbox": {
+      "verdict": "OK",
+      "expected_extent": [
+        4,
+        5,
+        2.85
+      ],
+      "actual_bbox": {
+        "xmin": 0,
+        "ymin": 0,
+        "zmin": 0,
+        "xmax": 4,
+        "ymax": 5,
+        "zmax": 2.85
+      },
+      "actual_extent": [
+        4,
+        5,
+        2.85
+      ],
+      "extent_ratio": [
+        1,
+        1,
+        1
+      ],
+      "suggested_unit_fix": null
+    },
+    "space_polygons": [
+      {
+        "space_id": "space_bedroom",
+        "verdict": "OK",
+        "expected_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            0,
+            5
+          ]
+        ],
+        "actual_polygon": [
+          [
+            0,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "max_vertex_delta_m": 0
+      }
+    ],
+    "element_coverage": {
+      "verdict": "OK",
+      "total_expected": 11,
+      "total_actual_in_expected_classes": 10,
+      "by_class_expected": {
+        "IfcSlab": 2,
+        "IfcWall": 4,
+        "IfcBuildingElementProxy": 1,
+        "IfcFurnishingElement": 3,
+        "IfcLightFixture": 1
+      },
+      "by_class_actual": {
+        "IfcSlab": 2,
+        "IfcWall": 4,
+        "IfcBuildingElementProxy": 1,
+        "IfcFurnishingElement": 3,
+        "IfcLightFixture": 0
+      },
+      "missing_ids": [],
+      "missing_id_count": 0
+    },
+    "origin_collapse": {
+      "verdict": "OK",
+      "total_elements": 11,
+      "at_origin_count": 3,
+      "fraction_at_origin": 0.2727272727272727,
+      "collapsed": false
+    }
+  }
+}

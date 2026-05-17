@@ -1,0 +1,532 @@
+{
+  "file": "v7-baseline-home-office.ifc",
+  "schema": "IFC2X3",
+  "entity_count_total": 434,
+  "length_unit": {
+    "kind": "SI",
+    "prefix": null,
+    "name": "METRE",
+    "label": ".METRE."
+  },
+  "spatial": {
+    "site_count": 1,
+    "building_count": 1,
+    "storey_count": 1,
+    "space_count": 1
+  },
+  "products_by_class": {
+    "IfcBuildingElementProxy": 2,
+    "IfcSlab": 2,
+    "IfcWall": 4,
+    "IfcWindow": 1,
+    "IfcFurnishingElement": 5,
+    "IfcBuilding": 1,
+    "IfcBuildingStorey": 1,
+    "IfcSite": 1,
+    "IfcSpace": 1
+  },
+  "spaces": [
+    {
+      "name": "SPC_OFFICE",
+      "long_name": "Home Office",
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 3.5,
+        "ymax": 4.0,
+        "zmax": 2.8,
+        "xext": 3.5,
+        "yext": 4.0,
+        "zext": 2.8
+      }
+    }
+  ],
+  "elements": [
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_N",
+      "tag": "WALL_N",
+      "placement_origin": [
+        0.0,
+        4.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 4.0,
+        "zmin": 0.0,
+        "xmax": 3.5,
+        "ymax": 4.1,
+        "zmax": 2.8,
+        "xext": 3.5,
+        "yext": 0.09999999999999964,
+        "zext": 2.8
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_S",
+      "tag": "WALL_S",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 3.5,
+        "ymax": 0.1,
+        "zmax": 2.8,
+        "xext": 3.5,
+        "yext": 0.1,
+        "zext": 2.8
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_E",
+      "tag": "WALL_E",
+      "placement_origin": [
+        3.4,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 3.4,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 3.5,
+        "ymax": 4.0,
+        "zmax": 2.8,
+        "xext": 0.10000000000000009,
+        "yext": 4.0,
+        "zext": 2.8
+      }
+    },
+    {
+      "ifc_class": "IfcWall",
+      "name": "WALL_W",
+      "tag": "WALL_W",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 0.1,
+        "ymax": 4.0,
+        "zmax": 2.8,
+        "xext": 0.1,
+        "yext": 4.0,
+        "zext": 2.8
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SLAB_FLOOR",
+      "tag": "SLAB_FLOOR",
+      "placement_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 0.0,
+        "xmax": 3.5,
+        "ymax": 4.0,
+        "zmax": 0.15,
+        "xext": 3.5,
+        "yext": 4.0,
+        "zext": 0.15
+      }
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "name": "SLAB_CEILING",
+      "tag": "SLAB_CEILING",
+      "placement_origin": [
+        0.0,
+        0.0,
+        2.8
+      ],
+      "world_bbox": {
+        "xmin": 0.0,
+        "ymin": 0.0,
+        "zmin": 2.8,
+        "xmax": 3.5,
+        "ymax": 4.0,
+        "zmax": 2.9499999999999997,
+        "xext": 3.5,
+        "yext": 4.0,
+        "zext": 0.1499999999999999
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "FURN_DESK",
+      "tag": "FURN_DESK",
+      "placement_origin": [
+        0.1,
+        2.4,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.1,
+        "ymin": 2.4,
+        "zmin": 0.0,
+        "xmax": 1.7000000000000002,
+        "ymax": 3.0999999999999996,
+        "zmax": 0.75,
+        "xext": 1.6,
+        "yext": 0.6999999999999997,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "FURN_DESK_RETURN",
+      "tag": "FURN_DESK_RETURN",
+      "placement_origin": [
+        0.1,
+        1.7,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 0.1,
+        "ymin": 1.7,
+        "zmin": 0.0,
+        "xmax": 0.7999999999999999,
+        "ymax": 2.4,
+        "zmax": 0.75,
+        "xext": 0.7,
+        "yext": 0.7,
+        "zext": 0.75
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "FURN_CHAIR",
+      "tag": "FURN_CHAIR",
+      "placement_origin": [
+        1.0,
+        2.0,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 1.0,
+        "ymin": 2.0,
+        "zmin": 0.0,
+        "xmax": 1.6,
+        "ymax": 2.6,
+        "zmax": 1.1,
+        "xext": 0.6000000000000001,
+        "yext": 0.6000000000000001,
+        "zext": 1.1
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "FURN_BOOKSHELF_1",
+      "tag": "FURN_BOOKSHELF_1",
+      "placement_origin": [
+        3.0,
+        0.5,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 3.0,
+        "ymin": 0.5,
+        "zmin": 0.0,
+        "xmax": 3.4,
+        "ymax": 1.4,
+        "zmax": 1.8,
+        "xext": 0.3999999999999999,
+        "yext": 0.8999999999999999,
+        "zext": 1.8
+      }
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "name": "FURN_BOOKSHELF_2",
+      "tag": "FURN_BOOKSHELF_2",
+      "placement_origin": [
+        3.0,
+        1.5,
+        0.0
+      ],
+      "world_bbox": {
+        "xmin": 3.0,
+        "ymin": 1.5,
+        "zmin": 0.0,
+        "xmax": 3.4,
+        "ymax": 2.4,
+        "zmax": 1.8,
+        "xext": 0.3999999999999999,
+        "yext": 0.8999999999999999,
+        "zext": 1.8
+      }
+    },
+    {
+      "ifc_class": "IfcWindow",
+      "name": "WIN_SOUTH",
+      "tag": "WIN_SOUTH",
+      "placement_origin": [
+        0.5,
+        0.0,
+        0.9
+      ],
+      "world_bbox": {
+        "xmin": 0.5,
+        "ymin": 0.0,
+        "zmin": 0.9,
+        "xmax": 3.0,
+        "ymax": 0.1,
+        "zmax": 2.4,
+        "xext": 2.5,
+        "yext": 0.1,
+        "zext": 1.5
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "PROXY_WHITEBOARD",
+      "tag": "PROXY_WHITEBOARD",
+      "placement_origin": [
+        0.1,
+        1.5,
+        1.0
+      ],
+      "world_bbox": {
+        "xmin": 0.1,
+        "ymin": 1.5,
+        "zmin": 1.0,
+        "xmax": 0.13,
+        "ymax": 3.0,
+        "zmax": 2.0,
+        "xext": 0.03,
+        "yext": 1.5,
+        "zext": 1.0
+      }
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "name": "LIGHT_CEILING",
+      "tag": "LIGHT_CEILING",
+      "placement_origin": [
+        1.75,
+        2.0,
+        2.75
+      ],
+      "world_bbox": {
+        "xmin": 1.75,
+        "ymin": 2.0,
+        "zmin": 2.75,
+        "xmax": 2.15,
+        "ymax": 2.4,
+        "zmax": 2.8,
+        "xext": 0.3999999999999999,
+        "yext": 0.3999999999999999,
+        "zext": 0.04999999999999982
+      }
+    }
+  ],
+  "placement_at_origin_count": 3,
+  "element_total": 14,
+  "aggregate_world_bbox": {
+    "xmin": 0.0,
+    "ymin": 0.0,
+    "zmin": 0.0,
+    "xmax": 3.5,
+    "ymax": 4.1,
+    "zmax": 2.9499999999999997,
+    "xext": 3.5,
+    "yext": 4.1,
+    "zext": 2.9499999999999997
+  },
+  "top_10_largest": [
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_E",
+      "name": "WALL_E",
+      "xext": 0.10000000000000009,
+      "yext": 4.0,
+      "zext": 2.8
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_W",
+      "name": "WALL_W",
+      "xext": 0.1,
+      "yext": 4.0,
+      "zext": 2.8
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB_FLOOR",
+      "name": "SLAB_FLOOR",
+      "xext": 3.5,
+      "yext": 4.0,
+      "zext": 0.15
+    },
+    {
+      "ifc_class": "IfcSlab",
+      "tag": "SLAB_CEILING",
+      "name": "SLAB_CEILING",
+      "xext": 3.5,
+      "yext": 4.0,
+      "zext": 0.1499999999999999
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_N",
+      "name": "WALL_N",
+      "xext": 3.5,
+      "yext": 0.09999999999999964,
+      "zext": 2.8
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_S",
+      "name": "WALL_S",
+      "xext": 3.5,
+      "yext": 0.1,
+      "zext": 2.8
+    },
+    {
+      "ifc_class": "IfcWindow",
+      "tag": "WIN_SOUTH",
+      "name": "WIN_SOUTH",
+      "xext": 2.5,
+      "yext": 0.1,
+      "zext": 1.5
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_BOOKSHELF_1",
+      "name": "FURN_BOOKSHELF_1",
+      "xext": 0.3999999999999999,
+      "yext": 0.8999999999999999,
+      "zext": 1.8
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_BOOKSHELF_2",
+      "name": "FURN_BOOKSHELF_2",
+      "xext": 0.3999999999999999,
+      "yext": 0.8999999999999999,
+      "zext": 1.8
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_DESK",
+      "name": "FURN_DESK",
+      "xext": 1.6,
+      "yext": 0.6999999999999997,
+      "zext": 0.75
+    }
+  ],
+  "top_10_smallest": [
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "LIGHT_CEILING",
+      "name": "LIGHT_CEILING",
+      "xext": 0.3999999999999999,
+      "yext": 0.3999999999999999,
+      "zext": 0.04999999999999982
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_DESK_RETURN",
+      "name": "FURN_DESK_RETURN",
+      "xext": 0.7,
+      "yext": 0.7,
+      "zext": 0.75
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_CHAIR",
+      "name": "FURN_CHAIR",
+      "xext": 0.6000000000000001,
+      "yext": 0.6000000000000001,
+      "zext": 1.1
+    },
+    {
+      "ifc_class": "IfcBuildingElementProxy",
+      "tag": "PROXY_WHITEBOARD",
+      "name": "PROXY_WHITEBOARD",
+      "xext": 0.03,
+      "yext": 1.5,
+      "zext": 1.0
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_DESK",
+      "name": "FURN_DESK",
+      "xext": 1.6,
+      "yext": 0.6999999999999997,
+      "zext": 0.75
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_BOOKSHELF_2",
+      "name": "FURN_BOOKSHELF_2",
+      "xext": 0.3999999999999999,
+      "yext": 0.8999999999999999,
+      "zext": 1.8
+    },
+    {
+      "ifc_class": "IfcFurnishingElement",
+      "tag": "FURN_BOOKSHELF_1",
+      "name": "FURN_BOOKSHELF_1",
+      "xext": 0.3999999999999999,
+      "yext": 0.8999999999999999,
+      "zext": 1.8
+    },
+    {
+      "ifc_class": "IfcWindow",
+      "tag": "WIN_SOUTH",
+      "name": "WIN_SOUTH",
+      "xext": 2.5,
+      "yext": 0.1,
+      "zext": 1.5
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_S",
+      "name": "WALL_S",
+      "xext": 3.5,
+      "yext": 0.1,
+      "zext": 2.8
+    },
+    {
+      "ifc_class": "IfcWall",
+      "tag": "WALL_N",
+      "name": "WALL_N",
+      "xext": 3.5,
+      "yext": 0.09999999999999964,
+      "zext": 2.8
+    }
+  ],
+  "material_assignment_counts": {},
+  "ifc_door_count": 0,
+  "ifc_window_count": 1,
+  "ifc_building_element_proxy_count": 2,
+  "ifc_wall_count": 4,
+  "perimeter_wall_count": 4,
+  "polygon_check": {
+    "status": "rectangular",
+    "rectangular_spaces": 1,
+    "irregular_spaces": 0,
+    "polygon_total_edges": 4,
+    "perimeter_walls": 4,
+    "verdict": "OK"
+  }
+}

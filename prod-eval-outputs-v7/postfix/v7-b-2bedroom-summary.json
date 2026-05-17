@@ -1,0 +1,37 @@
+{
+  "label": "v7-b-2bedroom",
+  "ok": true,
+  "layer1Ms": 36931,
+  "layer2Ms": 36888,
+  "totalDurationMs": 73819,
+  "enrichmentCostUsd": 0.10138,
+  "generatorCostUsd": 0.123295,
+  "totalCostUsd": 0.224675,
+  "turns": 6,
+  "entityCount": 676,
+  "ifcUrl": "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/ifc/2026/05/17/ai-ifc-v3-7e0605adcc9c.ifc",
+  "ifcPath": "prod-eval-outputs-v7/postfix/v7-b-2bedroom.ifc",
+  "ifcSizeBytes": 37693,
+  "siteBoundsM": [
+    8,
+    10
+  ],
+  "spaceCount": 6,
+  "elementCount": 21,
+  "irregularPolygons": [],
+  "doorElementCount": 5,
+  "windowElementCount": 5,
+  "finalValidation": {
+    "refsResolve": true,
+    "asciiOnly": true,
+    "worldBboxVerdict": "OK",
+    "worldBboxExtent": [
+      8,
+      10,
+      3.2
+    ],
+    "spacesPresent": 6,
+    "spacesMissing": 0,
+    "originCollapsed": false
+  }
+}
