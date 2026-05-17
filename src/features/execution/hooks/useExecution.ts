@@ -63,7 +63,7 @@ import {
 // src/app/api/execute-node/route.ts. The pre-existing divergence flagged
 // in Phase 0 §1.4 (client set missing GN-007/GN-008/TR-013/TR-014) is
 // left untouched here — out of scope for Phase 1.
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "TR-022", "TR-024", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003", "EX-006"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
 
 // Live nodes — ALWAYS use real API execution regardless of NEXT_PUBLIC_ENABLE_MOCK_EXECUTION.
 // These are production-ready and should never fall through to mock when authenticated.
@@ -84,6 +84,13 @@ const LIVE_NODE_IDS = new Set([
   "TR-024",  // Brief Enricher (Anthropic Sonnet 4.6 — no useful mock, must be live)
   "TR-022",  // IFC Architect (Anthropic Opus 4.7 — no useful mock, must be live)
   "EX-006",  // AI IFC Generator (Railway Python sandbox — no useful mock, must be live)
+  // Canvas Unification (2026-05-17): the 4 canvas-visible stages of the
+  // v3 pipeline. Each calls a real backend endpoint (/enrich, /runs,
+  // /validate, /render-previews) — no useful mock, must be live.
+  "TR-025",  // Brief Enricher (v3 Layer 1 — /enrich endpoint)
+  "TR-026",  // IFC Agent Builder (v3 Layer 2 — /runs + /status polling)
+  "TR-027",  // Geometric Validator (v3 visual gates — /validate endpoint)
+  "EX-007",  // IFC Export + Preview (Railway PNG renders — /render-previews endpoint)
 ]);
 
 interface APIErrorResponse {
@@ -102,7 +109,7 @@ interface APIErrorResponse {
 // BaseNode.tsx's INPUT_NODE_IDS — its uploaded file silently fell through
 // to the mock executor. Adding it threads the CAD file through the same
 // `inputFileStore` → base64 path used by every other file input.
-const INPUT_NODE_IDS = new Set(["IN-001", "IN-002", "IN-003", "IN-004", "IN-005", "IN-006", "IN-007", "IN-008"]);
+const INPUT_NODE_IDS = new Set(["IN-001", "IN-002", "IN-003", "IN-004", "IN-005", "IN-006", "IN-007", "IN-008", "IN-009"]);
 
 // Demo-allowed node IDs (routed to /api/demo/execute)
 const DEMO_NODE_IDS = new Set(["TR-003", "GN-003"]);

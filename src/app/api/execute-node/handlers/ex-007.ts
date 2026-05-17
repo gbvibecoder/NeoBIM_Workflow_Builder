@@ -77,6 +77,11 @@ export const handleEX007: NodeHandler = async (ctx) => {
     type: "image",
     dataUri: result.topPngUrl,
     data: {
+      // `url` is the convention every other image artifact uses (see
+      // GN-003); the canvas InlineResult reads `data.url` to render the
+      // inline thumbnail. Without it the node card shows "No preview"
+      // even though the PNGs uploaded successfully.
+      url: result.topPngUrl,
       ifcUrl,
       runId: result.runId,
       topPngUrl: result.topPngUrl,

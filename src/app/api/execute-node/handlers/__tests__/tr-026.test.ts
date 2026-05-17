@@ -121,6 +121,23 @@ describe("TR-026 handler — IFC Agent Builder", () => {
     expect(body.briefSpec).toEqual(BRIEF_SPEC);
     expect(body.cost_cap_usd).toBe(3);
 
+    // The /runs endpoint uses a zod `.strict()` schema — any unknown
+    // key (e.g. analytics-style `source: "canvas"`) would 400 before
+    // the agent starts. Lock in the allow-list of permitted keys so a
+    // future "let's tag every request with metadata" patch can't
+    // silently re-break prod canvas runs the way the original ship did.
+    const ALLOWED_KEYS = new Set([
+      "brief",
+      "briefSpec",
+      "project_type",
+      "max_turns",
+      "cost_cap_usd",
+      "workflow_id",
+    ]);
+    for (const key of Object.keys(body)) {
+      expect(ALLOWED_KEYS.has(key), `unexpected key "${key}" in /runs body`).toBe(true);
+    }
+
     if (!("type" in result) || !("data" in result)) {
       throw new Error("expected an ExecutionArtifact, got a NextResponse");
     }

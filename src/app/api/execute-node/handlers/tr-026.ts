@@ -78,7 +78,11 @@ export const handleTR026: NodeHandler = async (ctx) => {
     );
   }
 
-  const body: Record<string, unknown> = { briefSpec, source: "canvas" };
+  // /api/brief-to-ifc/v3/runs uses a zod `.strict()` schema, so any
+  // extra key (e.g. an analytics-style `source: "canvas"` tag) is
+  // rejected with HTTP 400 before the agent ever starts. Keep this body
+  // strictly aligned with the endpoint's accepted keys.
+  const body: Record<string, unknown> = { briefSpec };
   if (typeof inputData?.cost_cap_usd === "number") {
     body.cost_cap_usd = inputData.cost_cap_usd;
   }
