@@ -44,11 +44,14 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     ],
     thumbnail: "https://picsum.photos/seed/wf-ai-ifc-v3/600/400",
     tileGraph: {
+      // Explicit positions (y=300, 320px between left-edges) so all 5
+      // nodes sit on one horizontal row regardless of the global X/Y
+      // layout constants used by other templates.
       nodes: [
         {
           id: "n1",
           type: "workflowNode",
-          position: { x: X1, y: Y },
+          position: { x: 100, y: 300 },
           data: {
             catalogueId: "IN-009",
             label: "Brief",
@@ -62,7 +65,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n2",
           type: "workflowNode",
-          position: { x: X2, y: Y },
+          position: { x: 420, y: 300 },
           data: {
             catalogueId: "TR-025",
             label: "Brief Enricher",
@@ -76,7 +79,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n3",
           type: "workflowNode",
-          position: { x: X3, y: Y },
+          position: { x: 740, y: 300 },
           data: {
             catalogueId: "TR-026",
             label: "IFC Agent Builder",
@@ -93,7 +96,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n4",
           type: "workflowNode",
-          position: { x: X4, y: Y },
+          position: { x: 1060, y: 300 },
           data: {
             catalogueId: "TR-027",
             label: "Geometric Validator",
@@ -110,7 +113,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n5",
           type: "workflowNode",
-          position: { x: X5, y: Y },
+          position: { x: 1380, y: 300 },
           data: {
             catalogueId: "EX-007",
             label: "IFC Export + Preview",

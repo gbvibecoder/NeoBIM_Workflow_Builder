@@ -14,7 +14,7 @@ import { useUIStore } from "@/shared/stores/ui-store";
 import type { ExecutionArtifact } from "@/types/execution";
 import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
 
-const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007","IN-008"]);
+const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007","IN-008","IN-009"]);
 
 import { CATEGORY_COLORS, hexToRgb } from "@/lib/ui-constants";
 import { LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
@@ -1359,7 +1359,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             </div>
           )}
 
-          {/* Row 2b: interactive input for all 7 input node types */}
+          {/* Row 2b: interactive input for all 9 input node types */}
           {isInput && <InputNodeContent nodeId={id} data={data} />}
 
           {/* Row 2c: viewType select for GN-003 */}
