@@ -620,6 +620,70 @@ class BuildFlowIFC:
             description=description, tag=tag,
         )
 
+    def add_door(
+        self,
+        door_id: str,
+        origin: Tuple[float, float, float],
+        dims: Tuple[float, float],
+        depth: float,
+        material: str,
+        object_type: str = "",
+        description: str = "",
+        tag: str = "",
+    ) -> Any:
+        """`IfcDoor` — typed opening, NOT a proxy.
+
+        Downstream BIM tools (Revit import, Solibri, IDS validators,
+        clash detection, schedule generation) filter by IFC class.
+        Doors emitted as `IfcFurnishingElement` or
+        `IfcBuildingElementProxy` are invisible to those tools — use
+        this method instead so the schedule + clash workflows pick
+        the door up.
+
+        IFC2X3's `IfcDoor` has no `PredefinedType` slot (the v3 trap
+        comment in system-prompt.md notes this); `OverallHeight` and
+        `OverallWidth` are derived from the geometry. Pass dims in
+        METRES (e.g. `dims=(0.9, 0.1)` for a 90 cm wide × 10 cm deep
+        door leaf; `depth=2.1` for a 2.1 m tall door).
+        """
+        return self._add_box_element(
+            ifc_class="IfcDoor",
+            element_id=door_id, origin=origin, dims=dims, depth=depth,
+            material=material, predefined_type=None,
+            object_type=object_type,
+            description=description, tag=tag,
+        )
+
+    def add_window(
+        self,
+        window_id: str,
+        origin: Tuple[float, float, float],
+        dims: Tuple[float, float],
+        depth: float,
+        material: str,
+        object_type: str = "",
+        description: str = "",
+        tag: str = "",
+    ) -> Any:
+        """`IfcWindow` — typed opening, NOT a proxy.
+
+        Same downstream-compatibility argument as `add_door`. Windows
+        emitted as proxies / furniture are invisible to BIM-tool
+        schedules, clash detection and IDS validation. Use this
+        method for any opening that lets light in.
+
+        Pass dims in METRES (e.g. `dims=(1.2, 0.05)` for a 1.2 m wide
+        × 5 cm deep window pane; `depth=1.5` for a 1.5 m tall window).
+        Place the SW corner at the wall's inner face.
+        """
+        return self._add_box_element(
+            ifc_class="IfcWindow",
+            element_id=window_id, origin=origin, dims=dims, depth=depth,
+            material=material, predefined_type=None,
+            object_type=object_type,
+            description=description, tag=tag,
+        )
+
     # ── property sets / quantities ───────────────────────────────────
 
     def attach_pset(

@@ -98,6 +98,91 @@ try to outsmart this** by passing pre-encoded bytes; pass plain English.
 by ifcopenshell automatically. **Don't backslash-escape** them in
 Python source - \`\\'\` will write a literal backslash to the IFC.
 
+## TYPED OPENINGS REQUIREMENT (added 2026-05-17)
+
+The BriefSpec \`elements\` array now supports two new type values, \`door\`
+and \`window\`. They MUST be dispatched to the matching \`bf\` helper:
+
+- \`type: "door"\` -> \`bf.add_door(door_id, origin, dims, depth, material, ...)\`
+  -> emits \`IfcDoor\`.
+- \`type: "window"\` -> \`bf.add_window(window_id, origin, dims, depth, material, ...)\`
+  -> emits \`IfcWindow\`.
+
+DO NOT route doors or windows through \`bf.add_proxy\`, \`bf.add_furniture\`,
+or \`bf.add_element\`. Doors and windows emitted as proxies or furniture
+are INVISIBLE to downstream BIM tools — Revit / Solibri / IDS validators
+filter by IFC class, so a model with zero \`IfcDoor\` entities reads as
+"no doors" even when the brief listed five. This was the v6 forensic
+failure (commit d0b4b7ac forensics/multi-brief-accuracy-2026-05-17.md).
+
+Door / window dimensions are METRES, same convention as every other
+element:
+- A 0.9 m wide x 2.1 m tall door leaf, 10 cm deep:
+  \`bf.add_door("D-01", origin=(2.5, 0.0, 0.0), dims=(0.9, 0.1), depth=2.1, material="mat-wood")\`
+- A 1.2 m wide x 1.5 m tall window pane, 5 cm deep, sill at 1 m:
+  \`bf.add_window("W-01", origin=(1.0, 2.5, 1.0), dims=(1.2, 0.05), depth=1.5, material="mat-glass")\`
+
+After every door / window has been added, \`read_ifc_summary\` must show
+\`IfcDoor\` and \`IfcWindow\` in \`products_by_class\`. If you see those
+elements counted under \`IfcBuildingElementProxy\` or
+\`IfcFurnishingElement\` instead, you used the wrong helper - re-add
+them via the typed methods.
+
+## IRREGULAR FOOTPRINT HANDLING (added 2026-05-17)
+
+When the brief describes a non-rectangular plan (L-shape, T-shape,
+U-shape, or any perimeter with a perpendicular extension), Layer 1
+enrichment will populate the space's \`polygon_world_m\` with the
+ACTUAL polygon vertices (not just the AABB rectangle).
+
+The bootstrap already materialises the IfcSpace from the polygon, so
+the floor matches the brief. BUT — if you add perimeter walls based
+on \`site.bounds_m\` you will trace the AABB rectangle, NOT the L-shape.
+v6 failure case: L-shape brief produced a straight 14x4 strip
+because the agent built four walls along the bbox.
+
+To build perimeter walls along the actual polygon:
+
+1. Read the space's \`polygon_world_m\` from the brief (it's a list of
+   counter-clockwise (x, y) vertices in metres, last vertex implicitly
+   connects to first).
+2. For each consecutive vertex pair \`(v[i], v[i+1])\`, add a wall along
+   that edge. Compute the edge length as \`sqrt(dx*dx + dy*dy)\`, the
+   rotation as \`atan2(dy, dx)\` in radians, and pass \`rotation\` to
+   \`bf.add_wall\` so the wall lies along the polygon edge.
+3. Place the wall's \`origin\` at \`v[i]\` and set \`dims=(edge_length, wall_thickness)\`.
+4. Do this for EVERY consecutive vertex pair, including the closing
+   edge \`(v[-1], v[0])\`. An L-shape has 6 vertices -> 6 perimeter
+   walls. A T-shape has 8 vertices -> 8 perimeter walls.
+
+If \`polygon_world_m\` is just a simple rectangle (4 vertices matching
+\`bounds_m\`), the standard 4-wall pattern still works - this section
+adds capability without changing the rectangular path.
+
+Example for an L-shape with polygon \`[[0,0], [10,0], [10,4], [4,4], [4,8], [0,8]]\`:
+
+\`\`\`python
+import math
+polygon = [(0,0), (10,0), (10,4), (4,4), (4,8), (0,8)]
+wall_height = 3.2
+wall_thickness = 0.1
+for i in range(len(polygon)):
+    a = polygon[i]
+    b = polygon[(i + 1) % len(polygon)]
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length = math.sqrt(dx * dx + dy * dy)
+    rot = math.atan2(dy, dx)
+    bf.add_wall(
+        f"W-perim-{i}", origin=(a[0], a[1], 0.0),
+        dims=(length, wall_thickness), depth=wall_height,
+        material="mat-wall", rotation=rot,
+    )
+\`\`\`
+
+After perimeter walls are placed, validate with \`read_ifc_summary\` -
+\`IfcWall\` count should be at least the number of polygon edges (6
+for an L-shape, 8 for a T-shape).
+
 ## UNITS AND COORDINATES
 
 - ALL dimensions in the BriefSpec are METRES. Never millimetres.

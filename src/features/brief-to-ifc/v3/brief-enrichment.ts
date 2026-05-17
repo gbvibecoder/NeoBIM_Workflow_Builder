@@ -39,11 +39,13 @@ CRITICAL RULES:
 
 5. SPACE POLYGONS ARE COUNTERCLOCKWISE in world-XY coordinates with the site's south-west corner at (0, 0). A 5m x 5m booth has polygon [[0,0], [5,0], [5,5], [0,5]].
 
-6. ELEMENT TYPES. Use the canonical set: slab, wall, column, beam, space, covering, furniture, lighting, proxy. Map exhibition-stand decor / signage / displays to "proxy" with a descriptive object_type. Map booth furniture / tables / counters to "furniture". Map spotlights / lamps to "lighting".
+6. ELEMENT TYPES. Use the canonical set: slab, wall, column, beam, space, covering, furniture, lighting, proxy, door, window. Map exhibition-stand decor / signage / displays to "proxy" with a descriptive object_type. Map booth furniture / tables / counters to "furniture". Map spotlights / lamps to "lighting". Map ANY opening described as a "door", "entrance", "doorway" to type "door". Map ANY opening described as a "window" (fixed, sliding, or otherwise) to type "window". DO NOT route doors or windows to "proxy" or "furniture" — downstream BIM tools filter by IFC class, and only the typed "door" / "window" values yield IfcDoor / IfcWindow entities.
 
 7. DO NOT INVENT GUIDs OR DATES. The generator handles those.
 
 8. STAY FAITHFUL TO THE BRIEF'S BRAND LANGUAGE. If the brief uses approved terms (e.g. "Lounge", "Demo Bay"), use those exact strings. If it forbids terms, never emit them.
+
+9. IRREGULAR FOOTPRINTS. If the brief describes a non-rectangular plan (L-shape, T-shape, U-shape, or any shape with a perpendicular extension), you MUST capture the actual perimeter polygon in the space's polygon_world_m field. Set site.bounds_m to the axis-aligned bounding box of the polygon (so site.bounds_m = [10, 8] for a 10m arm + 4m perpendicular extension that brings the AABB to 10×8). The polygon itself goes in space.polygon_world_m as counter-clockwise (x, y) vertices in metres. Example for the 10m arm + 4×4 right-angle extension: polygon_world_m: [[0,0], [10,0], [10,4], [4,4], [4,8], [0,8]]. DO NOT flatten the L-shape into a single rectangle (e.g. [14,4]) — the downstream generator builds perimeter walls along whichever polygon you give it, so a flattened polygon yields a flattened building. If the footprint is rectangular, keep polygon_world_m as the simple 4-vertex outline matching site.bounds_m.
 
 Produce the spec by calling \`${TOOL_NAME}\` with the structured payload. Do not write prose outside the tool call.`;
 
@@ -125,6 +127,9 @@ function briefSpecJsonSchema(): Record<string, unknown> {
               enum: [
                 "slab", "wall", "column", "beam", "space",
                 "covering", "furniture", "lighting", "proxy",
+                // Gap B fix (2026-05-17): typed openings keep IfcDoor /
+                // IfcWindow visible to downstream BIM tools.
+                "door", "window",
               ],
             },
             origin_world_m: {

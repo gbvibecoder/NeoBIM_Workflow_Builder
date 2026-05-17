@@ -29,7 +29,10 @@ from app.services.ifc_generator_v3 import BuildFlowIFC, BuildFlowIFCError
 from app.services.ifc_generator_v3.buildflow_ifc import _ascii_safe
 from app.services.ifc_generator_v3.validate import (
     _bytes_contain_non_ascii,
+    _polygon_is_rectangular,
+    validate_door_window_typing,
     validate_ifc_file,
+    validate_polygon_footprint,
 )
 
 
@@ -512,3 +515,293 @@ def test_full_residential_bedroom_brief_world_bbox():
         assert 3.6 < xext < 4.4, f"aggregate X {xext} not in [3.6, 4.4]"
         assert 4.5 < yext < 5.5, f"aggregate Y {yext} not in [4.5, 5.5]"
         assert 2.4 < zext < 3.0, f"aggregate Z {zext} not in [2.4, 3.0]"
+
+
+# ── Gap B: Typed openings (IfcDoor / IfcWindow) ──────────────────────────
+#
+# Multi-brief forensic audit (2026-05-17, commit d0b4b7ac) showed that
+# every door + window in every test brief was emitted as
+# IfcFurnishingElement or IfcBuildingElementProxy — never as the typed
+# IfcDoor / IfcWindow classes. Downstream BIM tools (Revit, Solibri,
+# IDS validators) filter by class, so those models showed zero doors
+# and zero windows. These tests pin the typed emission so future
+# refactors can't silently regress to proxy fallbacks.
+
+
+def test_add_door_emits_ifc_door_class():
+    """`add_door` must emit IfcDoor — NOT a proxy or furniture."""
+    bf = BuildFlowIFC(_minimal_brief())
+    door = bf.add_door(
+        "D-001", origin=(2.5, 0.0, 0.0), dims=(0.9, 0.1),
+        depth=2.1, material="mat-concrete", object_type="entrance-door",
+        description="Main entry", tag="D-001",
+    )
+    assert door.is_a("IfcDoor"), f"expected IfcDoor, got {door.is_a()}"
+    # Tag preserved for downstream brief-element correlation.
+    assert door.Tag == "D-001"
+    assert door.Name == "D-001"
+
+
+def test_add_door_appears_in_summary_under_typed_class():
+    """The bf.summary() products_by_class must list IfcDoor, not a proxy."""
+    bf = BuildFlowIFC(_minimal_brief())
+    bf.add_door(
+        "D-001", origin=(2.5, 0.0, 0.0), dims=(0.9, 0.1),
+        depth=2.1, material="mat-concrete",
+    )
+    summary = bf.summary()
+    assert summary["products_by_class"].get("IfcDoor", 0) == 1
+    # And the door is NOT counted under any proxy / furniture fallback.
+    assert summary["products_by_class"].get("IfcBuildingElementProxy", 0) == 0
+    assert summary["products_by_class"].get("IfcFurnishingElement", 0) == 0
+
+
+def test_add_window_emits_ifc_window_class():
+    """`add_window` must emit IfcWindow — NOT a proxy or furniture."""
+    bf = BuildFlowIFC(_minimal_brief())
+    window = bf.add_window(
+        "W-001", origin=(1.0, 2.5, 1.0), dims=(1.2, 0.05),
+        depth=1.5, material="mat-concrete", object_type="fixed-window",
+        description="South-wall window", tag="W-001",
+    )
+    assert window.is_a("IfcWindow"), f"expected IfcWindow, got {window.is_a()}"
+    assert window.Tag == "W-001"
+
+
+def test_add_window_appears_in_summary_under_typed_class():
+    bf = BuildFlowIFC(_minimal_brief())
+    bf.add_window(
+        "W-001", origin=(1.0, 2.5, 1.0), dims=(1.2, 0.05),
+        depth=1.5, material="mat-concrete",
+    )
+    summary = bf.summary()
+    assert summary["products_by_class"].get("IfcWindow", 0) == 1
+    assert summary["products_by_class"].get("IfcBuildingElementProxy", 0) == 0
+    assert summary["products_by_class"].get("IfcFurnishingElement", 0) == 0
+
+
+def test_door_and_window_coexist_with_furniture_without_collision():
+    """Adding doors + windows alongside furniture should produce 3
+    distinct typed classes (the test sentinel for "no proxy fallback")."""
+    bf = BuildFlowIFC(_minimal_brief())
+    bf.add_furniture(
+        "F-bed", origin=(1.0, 1.0, 0.0), dims=(2.0, 1.5),
+        depth=0.5, material="mat-concrete",
+    )
+    bf.add_door(
+        "D-entry", origin=(0.0, 2.5, 0.0), dims=(0.9, 0.1),
+        depth=2.1, material="mat-concrete",
+    )
+    bf.add_window(
+        "W-south", origin=(2.5, 0.0, 1.0), dims=(1.2, 0.05),
+        depth=1.5, material="mat-concrete",
+    )
+    summary = bf.summary()
+    pbc = summary["products_by_class"]
+    assert pbc.get("IfcFurnishingElement", 0) == 1
+    assert pbc.get("IfcDoor", 0) == 1
+    assert pbc.get("IfcWindow", 0) == 1
+    # Zero proxies (the regression sentinel).
+    assert pbc.get("IfcBuildingElementProxy", 0) == 0
+
+
+def test_door_round_trips_through_write_and_open():
+    """End-to-end: write the IFC, reopen via ifcopenshell, IfcDoor still present."""
+    bf = BuildFlowIFC(_minimal_brief())
+    bf.add_door(
+        "D-001", origin=(2.5, 0.0, 0.0), dims=(0.9, 0.1),
+        depth=2.1, material="mat-concrete",
+    )
+    bf.add_window(
+        "W-001", origin=(1.0, 2.5, 1.0), dims=(1.2, 0.05),
+        depth=1.5, material="mat-concrete",
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "doors.ifc")
+        bf.write(path)
+        f = ifcopenshell.open(path)
+        assert len(f.by_type("IfcDoor")) == 1
+        assert len(f.by_type("IfcWindow")) == 1
+        # Re-verify the regression: zero proxies on disk too.
+        assert len(f.by_type("IfcBuildingElementProxy")) == 0
+
+
+# ── Gap-B validator: door/window typing ──────────────────────────────────
+
+
+def _brief_with_door_window_elements() -> dict:
+    """Mock brief with one door + one window element (the canonical
+    Gap-B reproduction case)."""
+    brief = _minimal_brief()
+    brief["elements"] = [
+        {
+            "id": "D-001", "type": "door",
+            "origin_world_m": [2.5, 0.0, 0.0],
+            "dims_m": [0.9, 0.1, 2.1],
+            "material_id": "mat-concrete",
+            "description": "entrance", "object_type": "entrance-door",
+            "tag": "D-001",
+        },
+        {
+            "id": "W-001", "type": "window",
+            "origin_world_m": [1.0, 2.5, 1.0],
+            "dims_m": [1.2, 0.05, 1.5],
+            "material_id": "mat-concrete",
+            "description": "south window", "object_type": "fixed-window",
+            "tag": "W-001",
+        },
+    ]
+    return brief
+
+
+def test_validator_door_window_typing_passes_when_typed_classes_used():
+    """Happy path: agent used bf.add_door + bf.add_window → validator OK."""
+    brief = _brief_with_door_window_elements()
+    bf = BuildFlowIFC(brief)
+    bf.add_door(
+        "D-001", origin=(2.5, 0.0, 0.0), dims=(0.9, 0.1),
+        depth=2.1, material="mat-concrete",
+    )
+    bf.add_window(
+        "W-001", origin=(1.0, 2.5, 1.0), dims=(1.2, 0.05),
+        depth=1.5, material="mat-concrete",
+    )
+    result = validate_door_window_typing(bf._ifc, brief)
+    assert result["verdict"] == "OK"
+    assert result["actual_door_count"] == 1
+    assert result["actual_window_count"] == 1
+
+
+def test_validator_door_window_typing_fails_on_proxy_fallback():
+    """Regression sentinel: agent routes doors through add_proxy →
+    validator catches it (the v6 failure mode)."""
+    brief = _brief_with_door_window_elements()
+    bf = BuildFlowIFC(brief)
+    # SIMULATE the v6 failure: emit door + window as proxies.
+    bf.add_proxy(
+        "D-001", origin=(2.5, 0.0, 0.0), dims=(0.9, 0.1),
+        depth=2.1, material="mat-concrete", composition="ELEMENT",
+    )
+    bf.add_proxy(
+        "W-001", origin=(1.0, 2.5, 1.0), dims=(1.2, 0.05),
+        depth=1.5, material="mat-concrete", composition="ELEMENT",
+    )
+    result = validate_door_window_typing(bf._ifc, brief)
+    assert result["verdict"] == "FAILED"
+    assert result["actual_door_count"] == 0
+    assert result["actual_window_count"] == 0
+    # Failure messages name both classes.
+    failure_blob = " ".join(result["failures"])
+    assert "door" in failure_blob.lower()
+    assert "window" in failure_blob.lower()
+
+
+def test_validator_door_window_typing_skips_when_brief_has_no_openings():
+    """SOL booth and other openingless briefs must not regress."""
+    brief = _minimal_brief()  # no door/window elements
+    bf = BuildFlowIFC(brief)
+    result = validate_door_window_typing(bf._ifc, brief)
+    assert result["verdict"] == "OK"
+    assert result.get("skipped") is True
+
+
+# ── Gap-A validator: polygon footprint ──────────────────────────────────
+
+
+def test_polygon_is_rectangular_recognises_axis_aligned_rect():
+    """Pure helper: rectangle detection."""
+    rect = [(0.0, 0.0), (10.0, 0.0), (10.0, 4.0), (0.0, 4.0)]
+    assert _polygon_is_rectangular(rect) is True
+
+
+def test_polygon_is_rectangular_rejects_l_shape():
+    l_shape = [(0.0, 0.0), (10.0, 0.0), (10.0, 4.0), (4.0, 4.0), (4.0, 8.0), (0.0, 8.0)]
+    assert _polygon_is_rectangular(l_shape) is False
+
+
+def test_polygon_is_rectangular_rejects_rotated_rect():
+    """A 45-degree-rotated rectangle has diagonal edges → not axis-aligned."""
+    rotated = [(0.0, 0.0), (2.0, 2.0), (0.0, 4.0), (-2.0, 2.0)]
+    assert _polygon_is_rectangular(rotated) is False
+
+
+def _brief_with_l_shape_polygon() -> dict:
+    """Mock brief with an L-shape footprint — the canonical Gap-A
+    reproduction case."""
+    brief = _minimal_brief()
+    brief["site"]["bounds_m"] = [10.0, 8.0]
+    brief["spaces"] = [
+        {
+            "id": "SP-L", "name": "L-shape office",
+            "long_name": "L-shape open office", "height_m": 3.2,
+            "occupancy_type": "office",
+            "polygon_world_m": [
+                [0.0, 0.0], [10.0, 0.0], [10.0, 4.0],
+                [4.0, 4.0], [4.0, 8.0], [0.0, 8.0],
+            ],
+        }
+    ]
+    return brief
+
+
+def test_validator_polygon_footprint_passes_when_walls_cover_polygon():
+    """Happy path: agent built 6 perimeter walls along L-shape edges."""
+    brief = _brief_with_l_shape_polygon()
+    bf = BuildFlowIFC(brief)
+    # Six edges of the L-shape → six walls. We can use add_wall directly
+    # since the helper accepts rotation in radians.
+    edges = [
+        ((0.0, 0.0), (10.0, 0.0)),
+        ((10.0, 0.0), (10.0, 4.0)),
+        ((10.0, 4.0), (4.0, 4.0)),
+        ((4.0, 4.0), (4.0, 8.0)),
+        ((4.0, 8.0), (0.0, 8.0)),
+        ((0.0, 8.0), (0.0, 0.0)),
+    ]
+    import math
+    for i, (a, b) in enumerate(edges):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        length = math.sqrt(dx * dx + dy * dy)
+        rot = math.atan2(dy, dx)
+        bf.add_wall(
+            f"W-perim-{i}", origin=(a[0], a[1], 0.0),
+            dims=(length, 0.1), depth=3.2,
+            material="mat-concrete", rotation=rot,
+        )
+    result = validate_polygon_footprint(bf._ifc, brief)
+    assert result["verdict"] == "OK"
+    assert result["irregular_space_count"] == 1
+    assert result["actual_wall_count"] >= 6
+
+
+def test_validator_polygon_footprint_fails_on_aabb_unfolding():
+    """Regression sentinel: agent collapses L-shape to 4-wall AABB → validator catches it."""
+    brief = _brief_with_l_shape_polygon()
+    bf = BuildFlowIFC(brief)
+    # SIMULATE the v6 failure: 4 walls along the AABB, not 6 along the L.
+    bf.add_wall("W-N", origin=(0, 8, 0), dims=(10, 0.1), depth=3.2, material="mat-concrete")
+    bf.add_wall("W-S", origin=(0, 0, 0), dims=(10, 0.1), depth=3.2, material="mat-concrete")
+    bf.add_wall("W-E", origin=(10, 0, 0), dims=(0.1, 8), depth=3.2, material="mat-concrete")
+    bf.add_wall("W-W", origin=(0, 0, 0), dims=(0.1, 8), depth=3.2, material="mat-concrete")
+    result = validate_polygon_footprint(bf._ifc, brief)
+    assert result["verdict"] == "FAILED"
+    assert result["irregular_space_count"] == 1
+    assert result["polygon_edge_total"] == 6
+    assert result["actual_wall_count"] == 4
+    assert any("collapsed" in f.lower() or "rectangular" in f.lower() for f in result["failures"])
+
+
+def test_validator_polygon_footprint_skips_for_rectangular_briefs():
+    """Rectangular briefs (most cases) should be skipped — no regression."""
+    brief = _minimal_brief()
+    brief["spaces"] = [
+        {
+            "id": "SP-R", "name": "Office", "long_name": "Rect office",
+            "height_m": 3.0, "occupancy_type": "office",
+            "polygon_world_m": [[0, 0], [5, 0], [5, 5], [0, 5]],
+        }
+    ]
+    bf = BuildFlowIFC(brief)
+    result = validate_polygon_footprint(bf._ifc, brief)
+    assert result["verdict"] == "OK"
+    assert result.get("skipped") is True

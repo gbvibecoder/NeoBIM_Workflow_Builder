@@ -54,6 +54,12 @@ export const briefElementSchema = z.object({
     "furniture",
     "lighting",
     "proxy",
+    // Typed openings — added 2026-05-17 (Gap B). The agent dispatches
+    // these to `bf.add_door` / `bf.add_window` so the IFC carries
+    // IfcDoor / IfcWindow entities visible to downstream BIM tools.
+    // Emitting them as `proxy` or `furniture` was the v6 failure mode.
+    "door",
+    "window",
   ]),
   origin_world_m: z.tuple([z.number(), z.number(), z.number()]),
   dims_m: z

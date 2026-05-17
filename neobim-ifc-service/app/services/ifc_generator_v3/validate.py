@@ -709,3 +709,169 @@ def summarize_ifc_file(path: str) -> Dict[str, Any]:
         "spaces": spaces_summary,
         "tracked_element_ids": sorted(tracked_ids),
     }
+
+
+# ─── Gap-B validator (typed openings) ────────────────────────────────────
+#
+# The multi-brief forensic audit (commit d0b4b7ac) showed that every
+# door and window mentioned in every test brief was emitted as
+# `IfcFurnishingElement` or `IfcBuildingElementProxy`. Downstream BIM
+# tools (Revit, Solibri, IDS validators, BCF, schedule generators)
+# filter by IFC class, so models with zero `IfcDoor` / `IfcWindow`
+# entities show up as "no doors" / "no windows" in every tool the
+# user might open the file in.
+#
+# This validator pins the typed-emission requirement at the file level:
+# if a brief element with `type: "door"` (or "window") exists, there
+# MUST be a matching IfcDoor (or IfcWindow) entity. The agent's
+# system prompt + the typed `bf.add_door` / `bf.add_window` helpers
+# enforce this at write time; this validator catches any future
+# regression at finalize time.
+
+def validate_door_window_typing(
+    f: ifcopenshell.file, brief: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Pin Gap B (typed openings) from the v6 forensic audit.
+
+    For every BriefSpec element with `type: "door"`, expect an IfcDoor
+    in the IFC. Same for `type: "window"` -> IfcWindow. Skipped (verdict
+    `OK`) when the brief has no door/window elements (most exhibition
+    booths fall in this bucket — SOL booth is the proving case).
+
+    Returns: `{verdict, expected_door_count, expected_window_count,
+    actual_door_count, actual_window_count, proxy_count, failures}`.
+    """
+    elements = brief.get("elements") or []
+    expected_doors = sum(1 for e in elements if e.get("type") == "door")
+    expected_windows = sum(1 for e in elements if e.get("type") == "window")
+
+    if expected_doors == 0 and expected_windows == 0:
+        return {
+            "verdict": "OK",
+            "skipped": True,
+            "reason": "brief has no door/window elements",
+            "expected_door_count": 0,
+            "expected_window_count": 0,
+            "actual_door_count": len(f.by_type("IfcDoor")),
+            "actual_window_count": len(f.by_type("IfcWindow")),
+        }
+
+    actual_doors = len(f.by_type("IfcDoor"))
+    actual_windows = len(f.by_type("IfcWindow"))
+    proxy_count = len(f.by_type("IfcBuildingElementProxy"))
+    furniture_count = len(f.by_type("IfcFurnishingElement"))
+
+    failures: List[str] = []
+    if expected_doors > 0 and actual_doors == 0:
+        failures.append(
+            f"brief lists {expected_doors} door element(s) but IFC has 0 "
+            f"IfcDoor entities (proxies={proxy_count}, furniture={furniture_count}) "
+            "— agent likely routed doors through add_proxy / add_furniture"
+        )
+    if expected_windows > 0 and actual_windows == 0:
+        failures.append(
+            f"brief lists {expected_windows} window element(s) but IFC has 0 "
+            f"IfcWindow entities (proxies={proxy_count}, furniture={furniture_count}) "
+            "— agent likely routed windows through add_proxy / add_furniture"
+        )
+
+    return {
+        "verdict": "FAILED" if failures else "OK",
+        "expected_door_count": expected_doors,
+        "expected_window_count": expected_windows,
+        "actual_door_count": actual_doors,
+        "actual_window_count": actual_windows,
+        "proxy_count": proxy_count,
+        "furniture_count": furniture_count,
+        "failures": failures,
+    }
+
+
+# ─── Gap-A validator (polygon footprint) ─────────────────────────────────
+#
+# Multi-brief forensic audit showed the L-shape office unfolded into a
+# 14x4 straight strip instead of forming the L. The schema already
+# supports polygon footprints (briefSpaceSchema.polygon_world_m), so the
+# fix is on the prompt side: Layer 1 must emit the polygon, and the
+# agent must build perimeter walls along it. This validator pins both
+# halves: if a space has a non-rectangular polygon, the wall count
+# must be at least the polygon's edge count (4 for a rectangle, 6 for
+# an L, 8 for a T, etc.).
+
+def _polygon_is_rectangular(polygon: List[Tuple[float, float]]) -> bool:
+    """True if the polygon is a simple 4-vertex axis-aligned rectangle.
+
+    A rectangle has exactly 4 vertices with all edges parallel to the
+    coordinate axes. Anything else (L/T/U/concave/rotated) is treated
+    as irregular and requires perimeter-wall verification.
+    """
+    if len(polygon) != 4:
+        return False
+    for i in range(4):
+        a = polygon[i]
+        b = polygon[(i + 1) % 4]
+        dx = abs(b[0] - a[0])
+        dy = abs(b[1] - a[1])
+        # Axis-aligned edge: one component must be ~0.
+        if dx > 1e-3 and dy > 1e-3:
+            return False
+    return True
+
+
+def validate_polygon_footprint(
+    f: ifcopenshell.file, brief: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Pin Gap A (irregular footprints) from the v6 forensic audit.
+
+    When a BriefSpec space declares a non-rectangular `polygon_world_m`,
+    the perimeter must be traced by the agent's walls — not collapsed
+    to the AABB. We can't directly check wall-polygon alignment from
+    ifcopenshell without per-edge ray casts, so we use an entity-count
+    proxy: a polygon with N vertices implies at least N perimeter walls.
+    Combined with the system-prompt instruction to use polygon-aware
+    wall placement, this catches the v6 failure mode where the agent
+    built 4 AABB walls for a 6-edge L-shape.
+
+    Returns: `{verdict, irregular_space_count, polygon_edge_total,
+    actual_wall_count, failures}`.
+    """
+    spaces = brief.get("spaces") or []
+    irregular_polygons: List[List[Tuple[float, float]]] = []
+    for sp in spaces:
+        poly = sp.get("polygon_world_m")
+        if not isinstance(poly, list) or len(poly) < 3:
+            continue
+        try:
+            polygon = [(float(v[0]), float(v[1])) for v in poly]
+        except (TypeError, ValueError, IndexError):
+            continue
+        if not _polygon_is_rectangular(polygon):
+            irregular_polygons.append(polygon)
+
+    if not irregular_polygons:
+        return {
+            "verdict": "OK",
+            "skipped": True,
+            "reason": "all space polygons are rectangular (or absent)",
+            "irregular_space_count": 0,
+        }
+
+    polygon_edge_total = sum(len(p) for p in irregular_polygons)
+    actual_walls = len(f.by_type("IfcWall")) + len(f.by_type("IfcWallStandardCase"))
+
+    failures: List[str] = []
+    if actual_walls < polygon_edge_total:
+        failures.append(
+            f"brief has {len(irregular_polygons)} irregular space polygon(s) "
+            f"with {polygon_edge_total} total edges, but IFC has only "
+            f"{actual_walls} IfcWall(StandardCase) entities — agent likely "
+            "collapsed the polygon to a rectangular AABB"
+        )
+
+    return {
+        "verdict": "FAILED" if failures else "OK",
+        "irregular_space_count": len(irregular_polygons),
+        "polygon_edge_total": polygon_edge_total,
+        "actual_wall_count": actual_walls,
+        "failures": failures,
+    }

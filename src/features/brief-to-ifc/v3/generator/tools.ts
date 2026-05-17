@@ -50,6 +50,12 @@ export function v3GeneratorTools(): Anthropic.Tool[] {
         "      — composition MUST be 'COMPLEX' / 'ELEMENT' / 'PARTIAL' (NOT 'NOTDEFINED')\n" +
         "  • bf.add_furniture(id, origin, dims, depth, material, object_type='')\n" +
         "  • bf.add_light_fixture(id, origin, dims, depth, material, object_type='')\n" +
+        "  • bf.add_door(id, origin, dims, depth, material, object_type='')\n" +
+        "      — MUST be used for every brief element with type='door'. Emits IfcDoor.\n" +
+        "  • bf.add_window(id, origin, dims, depth, material, object_type='')\n" +
+        "      — MUST be used for every brief element with type='window'. Emits IfcWindow.\n" +
+        "      — DO NOT route doors/windows to add_proxy or add_furniture (they would\n" +
+        "        disappear from BIM-tool schedules + clash detection).\n" +
         "  • bf.attach_pset([element_ids...], pset_name, {properties...})\n" +
         "  • bf.attach_qto(element_id, {quantities...})\n" +
         "Allowed imports: ifcopenshell, numpy, math, json, dataclasses, " +
