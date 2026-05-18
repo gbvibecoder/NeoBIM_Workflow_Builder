@@ -113,6 +113,20 @@ class Sandbox:
         etc., without any other setup."""
         self._bf = bf_instance
 
+        # Phase Alpha sanity check — crash fast if the BF instance is
+        # missing the parts-decomposition helpers, rather than let the
+        # agent burn 25+ turns on AttributeError.
+        if not callable(getattr(bf_instance, "add_furniture_part", None)):
+            raise RuntimeError(
+                "BuildFlowIFC is missing add_furniture_part() — "
+                "Railway image may be stale. Redeploy neobim-ifc-service."
+            )
+        if not callable(getattr(bf_instance, "aggregate_parts", None)):
+            raise RuntimeError(
+                "BuildFlowIFC is missing aggregate_parts() — "
+                "Railway image may be stale. Redeploy neobim-ifc-service."
+            )
+
     def execute(self, code: str) -> SandboxResult:
         """Execute the agent-authored Python. Returns captured stdout +
         any traceback. Never re-raises — always returns a result."""

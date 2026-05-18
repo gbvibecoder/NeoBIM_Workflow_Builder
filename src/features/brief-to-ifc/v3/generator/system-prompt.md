@@ -105,28 +105,17 @@ These are injected into the sandbox namespace alongside `bf` and `math`:
 - NEVER invent RGB material values when `resolve_material` returns a match.
 - NEVER use millimetres. ALL dimensions are METRES.
 
-## Section 4b: Decomposed Furniture — Parts Handling
+## Section 4b: Furniture Parts — How to Handle
 
-When `spec["furniture"][i]["parts"]` is present and non-empty:
+Each entry in `spec["furniture"]` may or may not have a `parts` array.
 
-1. Create a PARENT `IfcFurnishingElement` for the item using `bf.add_furniture(item_id, item_origin, item_dims, item_depth, item_material, ...)`. Place it at the item's world position.
-2. For each part in `parts[]`, create a CHILD element using `bf.add_furniture(child_id, world_origin, (part.dims_m[0], part.dims_m[1]), part.dims_m[2], part.material_id, ...)`:
-   - `child_id` = `f"{item_id}-{part['id']}"`
-   - `world_origin` = item world origin + part `origin_local_m` (apply item rotation if non-zero)
-   - Dimensions from `part.dims_m` — for `shape: "cylinder"`, first two are radius (equal), third is height
-   - Material from `part.material_id` — resolve via `resolve_material(part['material_id'], archetype, part['ifc_class'])`
-   - Call `bf.attach_canonical_psets(child_id)` and `bf.attach_canonical_qto(child_id)` on each child
-3. Link all children to parent via `IfcRelAggregates`:
-   ```python
-   oh = bf._ifc.by_type("IfcOwnerHistory")[0]
-   bf._ifc.create_entity("IfcRelAggregates",
-       GlobalId=ifcopenshell.guid.new(), OwnerHistory=oh,
-       Name=f"Decomposed {item_id}",
-       RelatingObject=parent_element, RelatedObjects=child_elements)
-   ```
-4. Contain the PARENT in the appropriate `IfcSpace` via `contained_in_space_id`.
+**CASE A** — `parts` is present and non-empty:
+Build the parent IfcFurnishingElement at item position with item type as Name. For EACH part in `parts[]`, build a separate IfcFurnishingElement (or `part["ifc_class"]`) with world position computed as `item_position + part["origin_local_m"]` (rotated by item rotation around Z if non-zero). Use `part["shape"]` ("box" or "cylinder") with `part["dims_m"]`. Resolve material via `resolve_material(part["material_id"], archetype, part["ifc_class"])`. Apply `bf.attach_canonical_psets` and `bf.attach_canonical_qto` on each child. Link ALL parts to parent via ONE `IfcRelAggregates` call.
 
-When `parts[]` is absent or empty: fall back to current single-box `bf.add_furniture(...)` or `compose_furniture(...)` behavior. Do NOT skip the item.
+**CASE B** — `parts` is absent or empty:
+Build a single IfcFurnishingElement at item position with item dims as bounding box. This is the standard fallback. Do NOT search for parts that are not there. Move on immediately.
+
+**CRITICAL:** Build ALL furniture in a SINGLE `run_python` tool call. Do not make one tool call per piece of furniture. Write one Python block that iterates `spec["furniture"]` and creates everything in one execution. Same for walls, slabs, openings — batch them.
 
 ## Section 5: Worked Example
 
@@ -192,5 +181,5 @@ Result: 4 walls + 2 slabs + 1 door + 2 windows + 48 furniture parts + site = ~80
 - Final tool call: `finalize_ifc`.
 - Last message: one paragraph with URL, entity count, space count, validator summary.
 - Be terse in `run_python` blocks — print counts, not prose.
-- If max turns (25) reached, explain what blocked you.
+- If max turns (50) reached, explain what blocked you.
 - If validators fail, fix and retry.

@@ -22,15 +22,14 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
   {
     // ▲ FEATURED #1 — AI-Powered IFC Generation (Canvas Unification, 2026-05-17)
     //
-    // The transparent 5-node v3 pipeline that replaced the deleted form
-    // (/dashboard/brief-to-ifc/v3/new) and the deleted GN-013 mega-node.
-    // Each stage of the v3 backend (Brief Enricher → Agent Builder →
-    // Geometric Validator → IFC Export + Preview) is now a visible
-    // canvas node that surfaces its own artifacts.
+    // The transparent 6-node v3 pipeline. Phase Alpha (2026-05-18) added
+    // TR-028 Item Decomposer between Brief Enricher and Agent Builder so
+    // furniture items get multi-part decomposition before the agent loop.
+    // Chain: IN-009 → TR-025 → TR-028 → TR-026 → TR-027 → EX-007
     id: "wf-ai-ifc-v3",
     name: "AI-Powered IFC Generation",
     description:
-      "Paste a building brief (or upload PDF/DOCX). AI enriches it into a structured spec, builds an IFC2X3 model via agent loop, validates geometry, and renders top + iso PNG previews — all visible per stage on canvas.",
+      "Paste a building brief (or upload PDF/DOCX). AI enriches it into a structured spec, decomposes furniture into physical parts, builds an IFC2X3 model via agent loop, validates geometry, and renders top + iso PNG previews — all visible per stage on canvas.",
     tags: ["ai", "ifc", "bim", "agent", "v3", "concept", "featured"],
     category: "AI BIM",
     complexity: "advanced",
@@ -44,9 +43,8 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     ],
     thumbnail: "https://picsum.photos/seed/wf-ai-ifc-v3/600/400",
     tileGraph: {
-      // Explicit positions (y=300, 320px between left-edges) so all 5
-      // nodes sit on one horizontal row regardless of the global X/Y
-      // layout constants used by other templates.
+      // 6 nodes on one horizontal row, 260px between left-edges.
+      // Phase Alpha added n2b (TR-028) between n2 (TR-025) and n3 (TR-026).
       nodes: [
         {
           id: "n1",
@@ -77,9 +75,23 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           },
         },
         {
+          id: "n2b",
+          type: "workflowNode",
+          position: { x: 680, y: 300 },
+          data: {
+            catalogueId: "TR-028",
+            label: "Item Decomposer",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }],
+            outputs: [{ id: "spec-out", label: "BriefSpec (with parts)", type: "json" }],
+            icon: "Wand2",
+          },
+        },
+        {
           id: "n3",
           type: "workflowNode",
-          position: { x: 740, y: 300 },
+          position: { x: 940, y: 300 },
           data: {
             catalogueId: "TR-026",
             label: "IFC Agent Builder",
@@ -96,7 +108,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n4",
           type: "workflowNode",
-          position: { x: 1060, y: 300 },
+          position: { x: 1200, y: 300 },
           data: {
             catalogueId: "TR-027",
             label: "Geometric Validator",
@@ -113,7 +125,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n5",
           type: "workflowNode",
-          position: { x: 1380, y: 300 },
+          position: { x: 1460, y: 300 },
           data: {
             catalogueId: "EX-007",
             label: "IFC Export + Preview",
@@ -130,7 +142,8 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       ],
       edges: [
         { id: "e1-2", source: "n1", sourceHandle: "brief-out", target: "n2", targetHandle: "brief-in", type: "animatedEdge" },
-        { id: "e2-3", source: "n2", sourceHandle: "spec-out", target: "n3", targetHandle: "spec-in", type: "animatedEdge" },
+        { id: "e2-2b", source: "n2", sourceHandle: "spec-out", target: "n2b", targetHandle: "spec-in", type: "animatedEdge" },
+        { id: "e2b-3", source: "n2b", sourceHandle: "spec-out", target: "n3", targetHandle: "spec-in", type: "animatedEdge" },
         { id: "e3-4", source: "n3", sourceHandle: "ifc-out", target: "n4", targetHandle: "ifc-in", type: "animatedEdge" },
         { id: "e4-5", source: "n4", sourceHandle: "ifc-out", target: "n5", targetHandle: "ifc-in", type: "animatedEdge" },
       ],
