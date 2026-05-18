@@ -65,7 +65,7 @@ import type { BriefSpec } from "@/features/brief-to-ifc/v3/types";
 // src/app/api/execute-node/route.ts. The pre-existing divergence flagged
 // in Phase 0 §1.4 (client set missing GN-007/GN-008/TR-013/TR-014) is
 // left untouched here — out of scope for Phase 1.
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "TR-028", "TR-029", "TR-030", "TR-031", "TR-032", "TR-034", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "TR-028", "TR-029", "TR-030", "TR-031", "TR-032", "TR-033", "TR-034", "TR-035", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
 
 // Live nodes — ALWAYS use real API execution regardless of NEXT_PUBLIC_ENABLE_MOCK_EXECUTION.
 // These are production-ready and should never fall through to mock when authenticated.
@@ -99,7 +99,9 @@ const LIVE_NODE_IDS = new Set([
   "TR-030",  // Trim Specifier (Opus skirting + door hardware)
   "TR-031",  // Material Resolver (deterministic fuzzy match)
   "TR-032",  // Vision Inspector (Opus vision quality scoring)
+  "TR-033",  // Spec Patcher (Opus patch generation for self-correcting pipeline)
   "TR-034",  // Spec Validator (deterministic structural validation)
+  "TR-035",  // Hard Verifier (deterministic IFC vs spec comparison)
 ]);
 
 interface APIErrorResponse {

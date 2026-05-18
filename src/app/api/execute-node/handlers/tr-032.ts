@@ -89,7 +89,7 @@ export const handleTR032: NodeHandler = async (ctx) => {
         visionReport: {
           quality_score: 0,
           pass: false,
-          issues: [{ severity: "high", type: "other", description: "Render failed — cannot inspect" }],
+          issues: [{ severity: "high", type: "other", description: "Render failed — cannot inspect", fixable: false }],
           summary: "Vision inspection skipped: render endpoint unavailable.",
           inspected_at: new Date().toISOString(),
         },

@@ -502,6 +502,45 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     tags: ["ai", "vision", "quality", "inspection", "v3", "anthropic"],
     executionTime: "20-45s",
   },
+  // Phase Beta 3: Self-correcting pipeline nodes
+  {
+    id: "TR-033",
+    name: "Spec Patcher",
+    description:
+      "Combines Hard Verifier mismatches + Vision Inspector issues to decide if a rebuild is needed. Generates MUST_BUILD patches for collapsed or missing items. Part of the self-correcting pipeline.",
+    category: "transform",
+    icon: "Wrench",
+    inputs: [
+      { id: "ifc-in", label: "IFC File", type: "ifc" },
+      { id: "report-in", label: "Reports", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "Patched Spec", type: "json" },
+      { id: "ifc-out", label: "Best IFC", type: "ifc" },
+    ],
+    apiEngine: "Anthropic Opus 4.7",
+    tags: ["ai", "patch", "self-correct", "retry", "v3", "anthropic"],
+    executionTime: "5-15s",
+  },
+  {
+    id: "TR-035",
+    name: "Hard Verifier",
+    description:
+      "Deterministic verification: compares spec.furniture[].parts vs actual IfcRelAggregates in the produced IFC. Reports parts_coverage, trim_coverage, and itemised mismatches.",
+    category: "transform",
+    icon: "ShieldCheck",
+    inputs: [
+      { id: "ifc-in", label: "IFC File", type: "ifc" },
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "report-out", label: "Verifier Report", type: "json" },
+      { id: "ifc-out", label: "IFC File (passthrough)", type: "ifc" },
+    ],
+    apiEngine: "Python ifcopenshell (Railway)",
+    tags: ["verification", "deterministic", "ifc", "parts", "quality", "v3"],
+    executionTime: "5-15s",
+  },
 
   // ── Brief-to-IFC v2 (Phase 1) — AI-powered faithful IFC creation ──
   {
@@ -966,7 +1005,7 @@ export const CATEGORY_CONFIG = {
  *  was the source of the "DEMO" badge bug (Phase 0 §1.2). TR-024/TR-022/
  *  EX-006 are the Brief-to-IFC v2 (Phase 1) nodes (retired). TR-025/26/27
  *  and EX-007 are the v3 Canvas Unification nodes (2026-05-17). */
-export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'TR-028', 'TR-029', 'TR-030', 'TR-031', 'TR-032', 'TR-034', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
+export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'TR-028', 'TR-029', 'TR-030', 'TR-031', 'TR-032', 'TR-033', 'TR-034', 'TR-035', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {

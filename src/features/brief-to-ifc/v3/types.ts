@@ -171,6 +171,9 @@ export const furniturePartSchema = z.object({
     ])
     .default("IfcFurnishingElement"),
   notes: z.string().max(500).optional(),
+  /** Phase Beta 3: when true, this part MUST be built as a separate IFC
+   *  element — the agent cannot collapse it into the parent. */
+  mandatory: z.boolean().default(false).optional(),
 });
 
 export const briefFurnitureSchema = z.object({
@@ -191,6 +194,15 @@ export const briefFurnitureSchema = z.object({
   parts: z.array(furniturePartSchema).optional(),
   material_id: z.string().min(1),
   description: z.string().max(1000).default(""),
+  /** Phase Beta 3: when true, the Hard Verifier will reject builds that
+   *  omit this item. Set by the Spec Patcher on retry iterations. */
+  must_build: z.boolean().default(false).optional(),
+  /** Phase Beta 3: when true, every entry in parts[] MUST be built as a
+   *  separate IFC element. No collapsing tolerated. */
+  force_parts: z.boolean().default(false).optional(),
+  /** Phase Beta 3: hint for Item Decomposer — produce at least this many
+   *  parts on the next decomposition pass. */
+  requested_part_count: z.number().int().positive().optional(),
 });
 
 /** Lighting zone for deterministic fixture placement. */
@@ -255,6 +267,13 @@ export const visionIssueSchema = z.object({
   ]),
   description: z.string().max(500),
   affected_element: z.string().optional(),
+  /** Phase Beta 3: whether this issue can be fixed by spec patching. */
+  fixable: z.boolean().default(true),
+  /** Phase Beta 3: recommended patch type for automated spec patching. */
+  recommended_patch_type: z.enum([
+    "force_parts", "add_position", "fix_size",
+    "add_trim", "increase_decomposition", "manual_review",
+  ]).optional(),
 });
 
 export const visionReportSchema = z.object({
@@ -263,6 +282,75 @@ export const visionReportSchema = z.object({
   issues: z.array(visionIssueSchema),
   summary: z.string().max(500),
   inspected_at: z.string(),
+});
+
+// ─── Phase Beta 3: Hard Verifier (TR-035) ────────────────────────────
+
+export const verifierMismatchSchema = z.object({
+  type: z.enum([
+    "missing_parts",
+    "missing_item",
+    "missing_aggregation",
+    "missing_trim",
+    "size_mismatch",
+    "size_mismatch_minor",
+    "missing_covering",
+    "unexpected_geometry",
+  ]),
+  item_id: z.string(),
+  item_type: z.string().optional(),
+  expected: z.unknown(),
+  actual: z.unknown(),
+  severity: z.enum(["low", "med", "high"]),
+  description: z.string().max(500),
+  suggested_patch: z.string().max(500).optional(),
+});
+
+export const verifierReportSchema = z.object({
+  verified: z.boolean(),
+  parts_coverage: z.number().min(0).max(1),
+  trim_coverage: z.number().min(0).max(1),
+  mismatches: z.array(verifierMismatchSchema),
+  summary: z.string().max(500),
+  verified_at: z.string(),
+});
+
+// ─── Phase Beta 3: Spec Patcher (TR-033) ─────────────────────────────
+
+export const specPatchSchema = z.object({
+  item_id: z.string(),
+  patch_type: z.enum([
+    "force_parts",
+    "add_position",
+    "fix_size",
+    "add_trim",
+    "increase_decomposition",
+  ]),
+  rationale: z.string().max(500),
+  payload: z.unknown(),
+});
+
+export const iterationResultSchema = z.object({
+  iteration: z.number().int().min(1).max(3),
+  ifcUrl: z.string(),
+  qualityScore: z.number().min(0).max(100),
+  parts_coverage: z.number().min(0).max(1),
+  trim_coverage: z.number().min(0).max(1),
+  entityCount: z.number().int(),
+  elapsedMs: z.number(),
+  costUsd: z.number(),
+});
+
+export const patcherResultSchema = z.object({
+  finalIfcUrl: z.string(),
+  finalQualityScore: z.number().min(0).max(100),
+  finalEntityCount: z.number().int(),
+  iterations: z.array(iterationResultSchema),
+  bestIteration: z.number().int(),
+  patches_applied: z.array(specPatchSchema),
+  total_cost_usd: z.number(),
+  total_elapsed_ms: z.number(),
+  summary: z.string().max(500),
 });
 
 // ─── BriefSpec ──────────────────────────────────────────────────────
@@ -301,6 +389,11 @@ export type DesignRationale = z.infer<typeof designRationaleSchema>;
 export type TrimItem = z.infer<typeof trimItemSchema>;
 export type VisionIssue = z.infer<typeof visionIssueSchema>;
 export type VisionReport = z.infer<typeof visionReportSchema>;
+export type VerifierMismatch = z.infer<typeof verifierMismatchSchema>;
+export type VerifierReport = z.infer<typeof verifierReportSchema>;
+export type SpecPatch = z.infer<typeof specPatchSchema>;
+export type IterationResult = z.infer<typeof iterationResultSchema>;
+export type PatcherResult = z.infer<typeof patcherResultSchema>;
 
 // ─── Generator agent loop — tool payloads / outcomes ────────────────
 

@@ -20,32 +20,20 @@
  *   • `workflow_id: string`  — optional correlation id
  */
 
+/**
+ * TR-026 — IFC Agent Builder (v3 Layer 2)
+ *
+ * Canvas-visible node that takes a BriefSpec and produces an IFC2X3 URL
+ * by delegating to `runAgentBuild()` — the shared callable extracted in
+ * Phase Beta 3 so both the canvas handler and the iterative rebuild
+ * orchestrator (TR-033) use the same code path.
+ */
+
 import { headers } from "next/headers";
 
 import type { NodeHandler } from "./types";
-
-interface RunsCreateResponse {
-  runId: string;
-  status: "PENDING" | "RUNNING";
-  statusUrl: string;
-}
-
-interface RunStatusView {
-  id: string;
-  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
-  ifcUrl: string | null;
-  entityCount: number | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  generatorCostUsd: number;
-  generatorMs: number;
-  turns: number;
-}
-
-const POLL_INITIAL_MS = 3_000;
-const POLL_INTERVAL_MS = 5_000;
-const POLL_MAX_INTERVAL_MS = 8_000;
-const POLL_TIMEOUT_MS = 500_000; // 500 s — comfortably covers worst-case agent runs.
+import { briefSpecSchema } from "@/features/brief-to-ifc/v3/types";
+import type { BriefSpec } from "@/features/brief-to-ifc/v3/types";
 
 async function getOriginAndCookie(): Promise<{ origin: string; cookie: string }> {
   const h = await headers();
@@ -57,16 +45,9 @@ async function getOriginAndCookie(): Promise<{ origin: string; cookie: string }>
   return { origin: `${proto}://${host}`, cookie: h.get("cookie") ?? "" };
 }
 
-async function delay(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 export const handleTR026: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId } = ctx;
 
-  // Accept the BriefSpec either as the upstream output's primary object
-  // (`briefSpec`) or as the data envelope (handlers/index passes the
-  // upstream artifact's `data` field as `inputData`).
   const briefSpec =
     inputData?.briefSpec && typeof inputData.briefSpec === "object"
       ? inputData.briefSpec
@@ -78,121 +59,48 @@ export const handleTR026: NodeHandler = async (ctx) => {
     );
   }
 
-  // /api/brief-to-ifc/v3/runs uses a zod `.strict()` schema, so any
-  // extra key (e.g. an analytics-style `source: "canvas"` tag) is
-  // rejected with HTTP 400 before the agent ever starts. Keep this body
-  // strictly aligned with the endpoint's accepted keys.
-  const body: Record<string, unknown> = { briefSpec };
-  if (typeof inputData?.cost_cap_usd === "number") {
-    body.cost_cap_usd = inputData.cost_cap_usd;
-  }
-  if (typeof inputData?.max_turns === "number") {
-    body.max_turns = inputData.max_turns;
-  }
-  if (typeof inputData?.workflow_id === "string") {
-    body.workflow_id = inputData.workflow_id;
-  }
-
   const { origin, cookie } = await getOriginAndCookie();
 
-  // 1. Kick off the run.
-  const createRes = await fetch(`${origin}/api/brief-to-ifc/v3/runs`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify(body),
+  const { runAgentBuild } = await import("@/features/brief-to-ifc/v3/agent-build");
+
+  const result = await runAgentBuild(briefSpec as BriefSpec, {
+    iteration: 1,
+    maxTurns: typeof inputData?.max_turns === "number" ? inputData.max_turns : undefined,
+    costCapUsd: typeof inputData?.cost_cap_usd === "number" ? inputData.cost_cap_usd : undefined,
+    origin,
+    cookie,
   });
-  if (!createRes.ok) {
-    const payload = (await createRes.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(
-      `Agent run submission failed (HTTP ${createRes.status}): ` +
-        `${payload.error?.message ?? "unknown"} (${payload.error?.code ?? "?"})`,
-    );
-  }
-  const created = (await createRes.json()) as RunsCreateResponse;
-
-  // 2. Poll /status until terminal.
-  await delay(POLL_INITIAL_MS);
-
-  const started = Date.now();
-  let interval = POLL_INTERVAL_MS;
-  let last: RunStatusView | null = null;
-  while (Date.now() - started < POLL_TIMEOUT_MS) {
-    const statusRes = await fetch(
-      `${origin}/api/brief-to-ifc/v3/runs/${created.runId}/status`,
-      { headers: { cookie } },
-    );
-    if (!statusRes.ok) {
-      // Transient 5xx — back off; 4xx means we have no chance.
-      if (statusRes.status >= 500) {
-        await delay(interval);
-        interval = Math.min(POLL_MAX_INTERVAL_MS, interval + 1_000);
-        continue;
-      }
-      throw new Error(
-        `Run status polling failed (HTTP ${statusRes.status}) for run ${created.runId}.`,
-      );
-    }
-    last = (await statusRes.json()) as RunStatusView;
-    if (
-      last.status === "COMPLETED" ||
-      last.status === "FAILED" ||
-      last.status === "CANCELLED"
-    ) {
-      break;
-    }
-    await delay(interval);
-    // Gentle backoff — agent runs tend to land in 30-150 s; longer
-    // intervals reduce Vercel cold-start chatter without delaying
-    // perceptible completion much.
-    interval = Math.min(POLL_MAX_INTERVAL_MS, interval + 500);
-  }
-
-  if (!last) {
-    throw new Error(
-      `Agent run ${created.runId} produced no status response within the polling window.`,
-    );
-  }
-
-  if (last.status !== "COMPLETED" || !last.ifcUrl) {
-    throw new Error(
-      `Agent run ${created.runId} ended with status=${last.status}` +
-        (last.errorMessage ? `: ${last.errorMessage}` : "") +
-        (last.errorCode ? ` (${last.errorCode})` : ""),
-    );
-  }
 
   const summary =
-    `IFC generated — ${last.entityCount ?? 0} entities, ` +
-    `${last.turns} turn${last.turns === 1 ? "" : "s"}, ` +
-    `$${last.generatorCostUsd.toFixed(3)}.`;
+    `IFC generated — ${result.entityCount} entities, ` +
+    `${result.turns} turn${result.turns === 1 ? "" : "s"}, ` +
+    `$${result.costUsd.toFixed(3)}.`;
 
   return {
     id: `art_${tileInstanceId}_${Date.now()}`,
     executionId,
     tileInstanceId,
     type: "file",
-    dataUri: last.ifcUrl,
+    dataUri: result.ifcUrl,
     data: {
-      ifcUrl: last.ifcUrl,
-      runId: last.id,
-      entityCount: last.entityCount ?? 0,
-      turns: last.turns,
-      generatorCostUsd: last.generatorCostUsd,
-      generatorMs: last.generatorMs,
-      runUrl: `/dashboard/brief-to-ifc/v3/runs/${last.id}`,
+      ifcUrl: result.ifcUrl,
+      runId: result.runId,
+      entityCount: result.entityCount,
+      turns: result.turns,
+      generatorCostUsd: result.costUsd,
+      generatorMs: result.elapsedMs,
+      runUrl: `/dashboard/brief-to-ifc/v3/runs/${result.runId}`,
       summary,
     },
     metadata: {
       stage: "agent-builder",
       filename: `ai-ifc-${tileInstanceId}.ifc`,
       mimeType: "application/x-step",
-      entityCount: last.entityCount ?? 0,
-      costUsd: last.generatorCostUsd,
-      durationMs: last.generatorMs,
+      entityCount: result.entityCount,
+      costUsd: result.costUsd,
+      durationMs: result.elapsedMs,
       generatorVersion: "v3",
-      runId: last.id,
+      runId: result.runId,
     },
     createdAt: new Date(),
   };

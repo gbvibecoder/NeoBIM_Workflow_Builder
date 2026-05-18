@@ -127,7 +127,7 @@ export function IfcHeroSection({ data }: IfcHeroSectionProps) {
           </div>
         </header>
 
-        <KpiRow ifc={ifc} bboxLabel={bboxLabel} qualityScore={data.qualityScore} />
+        <KpiRow ifc={ifc} bboxLabel={bboxLabel} qualityScore={data.qualityScore} iterationCount={data.iterationCount} />
 
         <div
           style={{
@@ -193,6 +193,7 @@ interface KpiRowProps {
   ifc: NonNullable<ResultPageData["ifcExport"]>;
   bboxLabel: string | null;
   qualityScore: number | null;
+  iterationCount: number | null;
 }
 
 function qualityColor(score: number): string {
@@ -201,7 +202,7 @@ function qualityColor(score: number): string {
   return "#DC2626"; // red
 }
 
-function KpiRow({ ifc, bboxLabel, qualityScore }: KpiRowProps) {
+function KpiRow({ ifc, bboxLabel, qualityScore, iterationCount }: KpiRowProps) {
   const items: Array<{ label: string; value: string; color?: string }> = [];
   if (typeof ifc.entityCount === "number" && ifc.entityCount > 0) {
     items.push({ label: "ENTITIES", value: ifc.entityCount.toLocaleString() });
@@ -223,6 +224,13 @@ function KpiRow({ ifc, bboxLabel, qualityScore }: KpiRowProps) {
     label: "QUALITY",
     value: typeof qualityScore === "number" ? String(qualityScore) : "\u2014",
     color: typeof qualityScore === "number" ? qualityColor(qualityScore) : "#94A3B8",
+  });
+  // Phase Beta 3: Iteration count from TR-033 Spec Patcher
+  const iterCount = iterationCount ?? 1;
+  items.push({
+    label: "ITERATIONS",
+    value: String(iterCount),
+    color: iterCount === 1 ? "#16A34A" : iterCount === 2 ? "#CA8A04" : "#DC2626",
   });
   if (items.length === 0) return null;
 

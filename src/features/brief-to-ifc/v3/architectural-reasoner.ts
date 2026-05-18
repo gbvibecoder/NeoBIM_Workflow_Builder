@@ -232,29 +232,39 @@ export async function applyArchitecturalReasoning(
 
   const furniture = spec.furniture;
   if (!furniture || furniture.length === 0) {
+    // eslint-disable-next-line no-console
+    console.info("[architectural-reasoner] No furniture items — skipping Opus call.");
     metrics.wall_time_ms = Date.now() - startedAt;
     return { spec, metrics };
   }
 
-  // Skip if designRationale already populated
-  if (spec.designRationale && spec.designRationale.length > 0) {
-    metrics.rationale_count = spec.designRationale.length;
-    metrics.wall_time_ms = Date.now() - startedAt;
-    return { spec, metrics };
-  }
+  // NOTE: Prior to Phase Beta 3, this function had an early return when
+  // spec.designRationale was already populated. This caused a 601ms short-
+  // circuit in production — the Brief Enricher occasionally populates a
+  // stub designRationale, and the Reasoner silently skipped Opus. Removed.
+  // TR-029 ALWAYS calls Opus now; it overwrites any upstream designRationale
+  // with domain-specific reasoning.
 
   let client: Anthropic;
   try {
     client = options?.clientFactory
       ? options.clientFactory()
       : createAnthropicClient();
-  } catch {
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[architectural-reasoner] Failed to create Anthropic client:", err);
     metrics.wall_time_ms = Date.now() - startedAt;
-    return { spec, metrics };
+    throw new Error("Architectural Reasoner: Anthropic client creation failed.");
   }
 
   const userMessage = buildUserMessage(spec);
   let runningCost = 0;
+
+  // eslint-disable-next-line no-console
+  console.info(
+    `[architectural-reasoner] Starting — furniture=${furniture.length}, ` +
+    `archetype=${spec.archetype ?? "other"}, maxCost=$${maxCost}`,
+  );
 
   // First attempt
   try {
@@ -307,15 +317,25 @@ export async function applyArchitecturalReasoning(
     );
     metrics.cost_usd = Math.round(runningCost * 1_000_000) / 1_000_000;
     metrics.wall_time_ms = Date.now() - startedAt;
+
+    // Observability: flag suspiciously fast completions
+    if (metrics.wall_time_ms < 2000 && metrics.opus_calls === 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[architectural-reasoner] ANOMALY: wall_time_ms=${metrics.wall_time_ms} ` +
+        `but opus_calls=${metrics.opus_calls}. Possible bypass.`,
+      );
+    }
     return { spec, metrics };
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn(
+    console.error(
       "[architectural-reasoner] Error during reasoning:",
       err instanceof Error ? err.message : err,
     );
     metrics.cost_usd = Math.round(runningCost * 1_000_000) / 1_000_000;
     metrics.wall_time_ms = Date.now() - startedAt;
-    return { spec, metrics };
+    // Re-throw on retry to surface errors to the handler instead of silent stub
+    throw err;
   }
 }

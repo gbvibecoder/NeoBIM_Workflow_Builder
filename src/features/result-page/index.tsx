@@ -46,6 +46,18 @@ import {
   isQualityReportEligible,
 } from "@/features/result-page/components/sections/QualityReportSection";
 import {
+  IterationTraceSection,
+  isIterationTraceEligible,
+} from "@/features/result-page/components/sections/IterationTraceSection";
+import {
+  VerifierMismatchesSection,
+  isVerifierMismatchesEligible,
+} from "@/features/result-page/components/sections/VerifierMismatchesSection";
+import {
+  PatchesAppliedSection,
+  isPatchesAppliedEligible,
+} from "@/features/result-page/components/sections/PatchesAppliedSection";
+import {
   DesignRationaleSection,
   isDesignRationaleEligible,
 } from "@/features/result-page/components/sections/DesignRationaleSection";
@@ -230,10 +242,25 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
                 </ErrorBoundary>
               )}
 
-              {/* Phase Beta 2: Quality Report + Design Rationale collapsibles */}
+              {/* Phase Beta 2+3: Quality Report → Verifier → Iterations → Patches → Design */}
               {isQualityReportEligible(data) ? (
                 <ErrorBoundary>
                   <QualityReportSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {isVerifierMismatchesEligible(data) ? (
+                <ErrorBoundary>
+                  <VerifierMismatchesSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {isIterationTraceEligible(data) ? (
+                <ErrorBoundary>
+                  <IterationTraceSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {isPatchesAppliedEligible(data) ? (
+                <ErrorBoundary>
+                  <PatchesAppliedSection data={data} />
                 </ErrorBoundary>
               ) : null}
               {isDesignRationaleEligible(data) ? (

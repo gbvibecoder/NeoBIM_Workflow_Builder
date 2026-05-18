@@ -259,6 +259,35 @@ export interface ResultPageData {
     position: [number, number, number];
     rationale: string;
   }>;
+
+  // ── Phase Beta 3: Iteration + Verifier + Patches ──────────────────────────
+
+  /** Number of build iterations (from TR-033 PatcherResult). Null if TR-033 didn't run. */
+  iterationCount: number | null;
+  /** Which iteration produced the best IFC (1-indexed). */
+  bestIteration: number | null;
+  /** Per-iteration metrics trace. */
+  iterationTrace: Array<{
+    iteration: number;
+    qualityScore: number;
+    partsCoverage: number;
+    entityCount: number;
+    elapsedMs: number;
+  }>;
+  /** Hard verifier mismatches from TR-035. */
+  verifierMismatches: Array<{
+    type: string;
+    item_id: string;
+    severity: string;
+    description: string;
+    suggested_patch?: string;
+  }>;
+  /** Patches applied by TR-033 Spec Patcher. */
+  patchesApplied: Array<{
+    item_id: string;
+    patch_type: string;
+    rationale: string;
+  }>;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -925,6 +954,49 @@ export function useResultPageData(executionId: string): ResultPageData {
       }
     }
 
+    // ── Phase Beta 3: Iteration trace + Verifier mismatches + Patches ─────────
+    let iterationCount: number | null = null;
+    let bestIteration: number | null = null;
+    let iterationTrace: ResultPageData["iterationTrace"] = [];
+    let verifierMismatches: ResultPageData["verifierMismatches"] = [];
+    let patchesApplied: ResultPageData["patchesApplied"] = [];
+    for (const a of artifacts.values()) {
+      if (a.type !== "json") continue;
+      const dd = asRecord(a.data);
+      // TR-033 Spec Patcher output: iterations[], bestIteration, patches_applied
+      if (Array.isArray(dd.iterations) && typeof dd.bestIteration === "number" && iterationCount === null) {
+        iterationCount = (dd.iterations as unknown[]).length;
+        bestIteration = dd.bestIteration as number;
+        iterationTrace = (dd.iterations as Array<Record<string, unknown>>).map(it => ({
+          iteration: typeof it.iteration === "number" ? it.iteration : 0,
+          qualityScore: typeof it.qualityScore === "number" ? it.qualityScore : 0,
+          partsCoverage: typeof it.parts_coverage === "number" ? it.parts_coverage : 0,
+          entityCount: typeof it.entityCount === "number" ? it.entityCount : 0,
+          elapsedMs: typeof it.elapsedMs === "number" ? it.elapsedMs : 0,
+        }));
+        if (Array.isArray(dd.patches_applied)) {
+          patchesApplied = (dd.patches_applied as Array<Record<string, unknown>>).map(p => ({
+            item_id: asStr(p.item_id) ?? "",
+            patch_type: asStr(p.patch_type) ?? "",
+            rationale: asStr(p.rationale) ?? "",
+          }));
+        }
+      }
+      // TR-035 Hard Verifier output: verifierReport.mismatches
+      if (dd.verifierReport && typeof dd.verifierReport === "object" && verifierMismatches.length === 0) {
+        const vr = dd.verifierReport as Record<string, unknown>;
+        if (Array.isArray(vr.mismatches)) {
+          verifierMismatches = (vr.mismatches as Array<Record<string, unknown>>).map(mm => ({
+            type: asStr(mm.type) ?? "unknown",
+            item_id: asStr(mm.item_id) ?? "",
+            severity: asStr(mm.severity) ?? "low",
+            description: asStr(mm.description) ?? "",
+            suggested_patch: asStr(mm.suggested_patch),
+          }));
+        }
+      }
+    }
+
     // ── JSON ─────────
     const jsonData = findAllByType(artifacts, "json").map(a => {
       const d = asRecord(a.data);
@@ -1004,6 +1076,11 @@ export function useResultPageData(executionId: string): ResultPageData {
       qualityScore,
       visionIssues,
       designRationale,
+      iterationCount,
+      bestIteration,
+      iterationTrace,
+      verifierMismatches,
+      patchesApplied,
     };
   }, [
     rawArtifacts,

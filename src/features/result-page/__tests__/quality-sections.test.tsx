@@ -77,6 +77,11 @@ function makeMinimalData(overrides: Partial<ResultPageData> = {}): ResultPageDat
     qualityScore: null,
     visionIssues: [],
     designRationale: [],
+    iterationCount: null,
+    bestIteration: null,
+    iterationTrace: [],
+    verifierMismatches: [],
+    patchesApplied: [],
     ...overrides,
   };
 }

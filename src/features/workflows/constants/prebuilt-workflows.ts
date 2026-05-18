@@ -20,11 +20,11 @@ const Y = 200; // default vertical position
 
 export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
   {
-    // ▲ FEATURED #1 — AI-Powered IFC Generation (Phase Beta 2, 2026-05-18)
+    // ▲ FEATURED #1 — AI-Powered IFC Generation (Phase Beta 3, 2026-05-18)
     //
-    // 11-node pipeline with 3-way parallel branch:
+    // 13-node self-correcting pipeline with 3-way parallel branch:
     // IN-009 → TR-025 → TR-029 → [TR-028 | TR-030 | TR-031] → TR-034
-    //   → TR-026 → TR-027 → TR-032 → EX-007
+    //   → TR-026 → TR-035 → TR-027 → TR-032 → TR-033 → EX-007
     id: "wf-ai-ifc-v3",
     name: "AI-Powered IFC Generation",
     description:
@@ -41,10 +41,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     ],
     thumbnail: "https://picsum.photos/seed/wf-ai-ifc-v3/600/400",
     tileGraph: {
-      // 11 nodes. The 3 parallel nodes (TR-028, TR-030, TR-031) fan out
-      // from TR-029 and fan back into TR-034. Executor runs them
-      // sequentially in topological order; true Promise.all parallelism
-      // deferred to Beta 3.
+      // 13 nodes. 3-way parallel branch + self-correcting verifier/patcher loop.
       nodes: [
         // Row 1: Input
         { id: "n1", type: "workflowNode", position: { x: 100, y: 300 }, data: { catalogueId: "IN-009", label: "Brief", category: "input", status: "idle", inputs: [], outputs: [{ id: "brief-out", label: "Brief Text", type: "text" }], icon: "FileText" } },
@@ -60,12 +57,16 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         { id: "n5", type: "workflowNode", position: { x: 1240, y: 300 }, data: { catalogueId: "TR-034", label: "Spec Validator", category: "transform", status: "idle", inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }], outputs: [{ id: "spec-out", label: "BriefSpec (validated)", type: "json" }], icon: "ShieldCheck" } },
         // Row 6: Agent Builder
         { id: "n6", type: "workflowNode", position: { x: 1520, y: 300 }, data: { catalogueId: "TR-026", label: "IFC Agent Builder", category: "transform", status: "idle", inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }], outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }, { id: "kpi-out", label: "Stats", type: "json" }], icon: "Bot" } },
+        // Row 6b: Hard Verifier (Phase Beta 3)
+        { id: "n6b", type: "workflowNode", position: { x: 1660, y: 300 }, data: { catalogueId: "TR-035", label: "Hard Verifier", category: "transform", status: "idle", inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }], outputs: [{ id: "report-out", label: "Verifier Report", type: "json" }, { id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "ShieldCheck" } },
         // Row 7: Geometric Validator
         { id: "n7", type: "workflowNode", position: { x: 1800, y: 300 }, data: { catalogueId: "TR-027", label: "Geometric Validator", category: "transform", status: "idle", inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }], outputs: [{ id: "verdict-out", label: "Verdict", type: "json" }, { id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "ShieldCheck" } },
         // Row 8: Vision Inspector
         { id: "n8", type: "workflowNode", position: { x: 2080, y: 300 }, data: { catalogueId: "TR-032", label: "Vision Inspector", category: "transform", status: "idle", inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }], outputs: [{ id: "report-out", label: "Quality Report", type: "json" }, { id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "Eye" } },
+        // Row 8b: Spec Patcher (Phase Beta 3 — iterative rebuild orchestrator)
+        { id: "n8b", type: "workflowNode", position: { x: 2220, y: 300 }, data: { catalogueId: "TR-033", label: "Spec Patcher", category: "transform", status: "idle", inputs: [{ id: "report-in", label: "Reports", type: "json" }], outputs: [{ id: "spec-out", label: "Patched Spec / Best IFC", type: "json" }, { id: "ifc-out", label: "Best IFC", type: "ifc" }], icon: "Wrench" } },
         // Row 9: Export
-        { id: "n9", type: "workflowNode", position: { x: 2360, y: 300 }, data: { catalogueId: "EX-007", label: "IFC Export", category: "export", status: "idle", inputs: [{ id: "ifc-in", label: "Validated IFC", type: "ifc" }], outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "FileBox" } },
+        { id: "n9", type: "workflowNode", position: { x: 2400, y: 300 }, data: { catalogueId: "EX-007", label: "IFC Export", category: "export", status: "idle", inputs: [{ id: "ifc-in", label: "Validated IFC", type: "ifc" }], outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "FileBox" } },
       ],
       edges: [
         // Sequential: IN-009 → TR-025 → TR-029
@@ -79,11 +80,13 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         { id: "e4a-5", source: "n4a", sourceHandle: "spec-out", target: "n5", targetHandle: "spec-in", type: "animatedEdge" },
         { id: "e4b-5", source: "n4b", sourceHandle: "spec-out", target: "n5", targetHandle: "spec-in", type: "animatedEdge" },
         { id: "e4c-5", source: "n4c", sourceHandle: "spec-out", target: "n5", targetHandle: "spec-in", type: "animatedEdge" },
-        // Sequential: TR-034 → TR-026 → TR-027 → TR-032 → EX-007
+        // Sequential: TR-034 → TR-026 → TR-035 → TR-027 → TR-032 → TR-033 → EX-007
         { id: "e5-6", source: "n5", sourceHandle: "spec-out", target: "n6", targetHandle: "spec-in", type: "animatedEdge" },
-        { id: "e6-7", source: "n6", sourceHandle: "ifc-out", target: "n7", targetHandle: "ifc-in", type: "animatedEdge" },
+        { id: "e6-6b", source: "n6", sourceHandle: "ifc-out", target: "n6b", targetHandle: "ifc-in", type: "animatedEdge" },
+        { id: "e6b-7", source: "n6b", sourceHandle: "ifc-out", target: "n7", targetHandle: "ifc-in", type: "animatedEdge" },
         { id: "e7-8", source: "n7", sourceHandle: "ifc-out", target: "n8", targetHandle: "ifc-in", type: "animatedEdge" },
-        { id: "e8-9", source: "n8", sourceHandle: "ifc-out", target: "n9", targetHandle: "ifc-in", type: "animatedEdge" },
+        { id: "e8-8b", source: "n8", sourceHandle: "ifc-out", target: "n8b", targetHandle: "report-in", type: "animatedEdge" },
+        { id: "e8b-9", source: "n8b", sourceHandle: "ifc-out", target: "n9", targetHandle: "ifc-in", type: "animatedEdge" },
       ],
     },
   },

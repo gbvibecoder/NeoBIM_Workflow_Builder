@@ -173,6 +173,31 @@ For each entry in designRationale:
 
 If an item exists in furniture[] but not in designRationale[], use its own position. Do NOT fail — just proceed.
 
+## Section 4f: MUST_BUILD Enforcement — Non-Negotiable
+
+Some briefSpec.furniture[] entries may carry these flags:
+  must_build: true       — this item MUST appear in the final IFC
+  force_parts: true      — every part in item.parts[] MUST be built; zero collapsing tolerated
+  requested_part_count: N — produce at least this many parts for the item
+
+Parts may carry:
+  mandatory: true        — this specific part MUST be built; cannot be collapsed into the parent
+
+RULE 1 — NO COLLAPSE:
+For any item with force_parts=true, you MUST build the parent IfcFurnishingElement, one IFC element per entry in item.parts[] (no skipping), and one IfcRelAggregates linking parent to ALL children. If you produce fewer parts than item.parts.length, the Hard Verifier will reject your build.
+
+RULE 2 — BATCHED PROCESSING:
+Build all flagged items in a SINGLE run_python call. Iterate spec.furniture[] in your Python block. Do not make one tool call per item — that exhausts your turn budget.
+
+RULE 3 — VERIFICATION OUTPUT:
+Before calling finalize_ifc, perform a self-check: for each item with must_build=true, confirm the IFC has a matching IfcFurnishingElement. For each item with force_parts=true, confirm the IFC has item.parts.length children aggregated to the parent. If self-check fails, do NOT finalize — write the missing elements first.
+
+RULE 4 — RETRY CONTEXT:
+The pipeline may invoke you up to 3 times for the same brief. The spec may have additional flags on retry (must_build, force_parts, requested_part_count) reflecting items the previous iteration dropped. Treat these as the highest-priority items in the build.
+
+RULE 5 — TRIM ENFORCEMENT:
+Every item in spec.trim[] MUST be built. Trim is small and easy to drop under cognitive load — resist this. Build trim items inside the same batched run_python block as furniture.
+
 ## Section 5: Worked Example
 
 Brief: "10x4m office, 3m ceiling. 1 door north wall at 2m. 2 windows south wall at 1.5m and 5m. 4 workstations."
