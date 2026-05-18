@@ -14,10 +14,7 @@ import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
 import { Sparkles, PanelRightClose, PanelRightOpen, ArrowLeft } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
 import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/components/IFCEnhancePanel";
-import { AutoEnhanceLoader } from "@/features/ifc/components/AutoEnhanceLoader";
 import { ViewerSkeleton } from "@/features/ifc/components/ViewerSkeleton";
-import { shouldAutoEnhance } from "@/features/ifc/enhance/auto-enhance-orchestrator";
-import type { EnhanceStatus } from "@/features/ifc/enhance/types";
 
 /**
  * Sidebar tab identifiers.
@@ -59,7 +56,10 @@ function useBreakpoint() {
   return bp;
 }
 
-export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = false }: { autoEnhance?: boolean; restoreFromCache?: boolean }) {
+/* `autoEnhance` prop is intentionally accepted-and-ignored (2026-05-18: raw IFC
+   by default, auto-apply removed). Page-level callers still pass it; keeping
+   the signature stable avoids breaking the public contract. */
+export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhance?: boolean; restoreFromCache?: boolean }) {
   /* State */
   const [modelInfo, setModelInfo] = useState<IFCModelInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -81,9 +81,6 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
   const enhancePanelRef = useRef<IFCEnhancePanelHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resizingRef = useRef(false);
-  const autoEnhancedRef = useRef(false);
-  const [autoEnhancing, setAutoEnhancing] = useState(false);
-  const [enhanceStatus, setEnhanceStatus] = useState<EnhanceStatus>({ kind: "idle" });
   const [boqLaunching, setBoqLaunching] = useState(false);
   const bp = useBreakpoint();
   const router = useRouter();
@@ -268,26 +265,15 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
     setBottomPanelOpen(true);
     setBottomTab("editor");
 
-    /* Panorama V2: auto-apply on model load is intentionally removed.
-       Panorama is now part of the Enhance-tab orchestration — applies
-       only when the user clicks Apply Enhancement. */
-
-    // Auto-enhance: apply all tiers when opening a BuildFlow-generated IFC
-    if (shouldAutoEnhance(autoEnhance) && !autoEnhancedRef.current) {
-      autoEnhancedRef.current = true;
-      setAutoEnhancing(true);
-      // Short delay so the viewport renders at least one frame first
-      setTimeout(() => {
-        enhancePanelRef.current?.applyAll()
-          .catch((err) => console.warn("[auto-enhance] failed:", err))
-          .finally(() => {
-            setAutoEnhancing(false);
-            // Re-fit camera after enhance adds ground/roof geometry
-            setTimeout(() => viewportRef.current?.fitToView(), 200);
-          });
-      }, 300);
-    }
-  }, [autoEnhance]);
+    /* Raw IFC by default (2026-05-18): the previous auto-apply block here
+       fired the full enhance pipeline on workflow-originated routes
+       (?executionId=…), which hid the raw gray-box geometry the user needed
+       to verify. Auto-apply is removed across the board — fresh uploads AND
+       executionId routes now land on the raw model. Detection + recipe
+       pre-fill still run inside IFCEnhancePanel; the user clicks the
+       prominent top "✨ Apply Enhancement" CTA when they want the visual
+       skin. */
+  }, []);
 
   const handleError = useCallback((message: string) => {
     setError(message);
@@ -585,9 +571,6 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
             message={loadMessage}
           />
 
-          {/* Auto-enhance progress overlay */}
-          <AutoEnhanceLoader status={enhanceStatus} visible={autoEnhancing} />
-
           {/* Upload zone overlay */}
           {!hasModel && (
             <UploadZone
@@ -835,7 +818,6 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
                         ref={enhancePanelRef}
                         viewportRef={viewportRef}
                         hasModel={hasModel}
-                        onStatusChange={setEnhanceStatus}
                       />
                     </div>
                   )}

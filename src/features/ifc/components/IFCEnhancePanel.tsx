@@ -281,7 +281,8 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     const isLoading = status.kind === "loading";
     const isApplied = status.kind === "applied";
 
-    // Notify parent of status changes (drives AutoEnhanceLoader overlay)
+    // Notify parent of status changes (optional callback — no current consumer
+    // after 2026-05-18 raw-by-default refactor, kept for future subscribers).
     useEffect(() => {
       onStatusChange?.(status);
     }, [status, onStatusChange]);
@@ -663,6 +664,16 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           background: UI.bg.base,
         }}
       >
+        {/* Pulse keyframes for the primary Apply CTA. Embedded inline so the
+            animation works without touching tailwind.config or globals.css —
+            same pattern other panels in this app use for one-off keyframes. */}
+        <style>{`
+          @keyframes ifc-apply-pulse {
+            0%, 100% { box-shadow: 0 2px 12px rgba(0,245,255,0.32), inset 0 1px 0 rgba(255,255,255,0.18); }
+            50%      { box-shadow: 0 2px 22px rgba(0,245,255,0.70), inset 0 1px 0 rgba(255,255,255,0.25); }
+          }
+        `}</style>
+
         {/* Header */}
         <header style={{ padding: "12px 14px 8px", borderBottom: `1px solid ${UI.border.subtle}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -670,15 +681,27 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Enhance with AI</h2>
           </div>
           <p style={{ fontSize: 11, color: UI.text.tertiary, margin: "4px 0 0 0", lineHeight: 1.4 }}>
-            Turn your basic IFC into a photoreal visualisation. Your .ifc file is never modified.
+            Raw IFC by default. Recipe is pre-filled — tap below when you&apos;re ready.
+            Your .ifc file is never modified.
           </p>
         </header>
 
         {/* Status banner */}
         <StatusBanner status={status} summary={classifiedSummary} />
 
+        {/* Primary action row — moved here (was sticky-bottom prior to 2026-05-18).
+            Apply Enhancement is the flagship CTA; user clicks here to trigger
+            the full tier1→2→3→4 pipeline. Pulses subtly when idle + ready. */}
+        <TopActionRow
+          status={status}
+          hasModel={hasModel}
+          onApply={() => handleApply()}
+          onReset={handleReset}
+          onAuto={handleAuto}
+        />
+
         {/* Scrollable toggles */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 0 100px 0" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 0 24px 0" }}>
           {!hasModel ? (
             <div style={{ padding: "24px 16px", color: UI.text.secondary, fontSize: 12.5, lineHeight: 1.5 }}>
               Upload an IFC file to start enhancing.
@@ -1222,14 +1245,6 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           )}
         </div>
 
-        {/* ── Sticky action row ── */}
-        <ActionRow
-          status={status}
-          hasModel={hasModel}
-          onApply={() => handleApply()}
-          onReset={handleReset}
-          onAuto={handleAuto}
-        />
       </div>
     );
   },
@@ -1305,7 +1320,12 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
   );
 }
 
-function ActionRow({
+/* Top-of-panel action row. Apply is the flagship CTA — pulses softly when
+   idle + a model is loaded, signalling "ready, tap me." Auto sits next to it
+   as a smaller secondary that just runs Apply with size-tuned defaults.
+   Post-apply: Apply morphs into a destructive "Reset" button (existing
+   panel behavior preserved). */
+function TopActionRow({
   status,
   hasModel,
   onApply,
@@ -1320,27 +1340,41 @@ function ActionRow({
 }) {
   const isLoading = status.kind === "loading";
   const isApplied = status.kind === "applied";
+  const isError = status.kind === "error";
+  /* Pulse only when the user is "ready to apply": idle, model loaded, no
+     active loading / applied / error states. Stops the moment the user takes
+     any action. */
+  const shouldPulse = hasModel && !isLoading && !isApplied && !isError;
 
   const primaryStyle: CSSProperties = {
     flex: 1,
-    padding: "10px 14px",
+    height: 38,
+    padding: "0 14px",
     borderRadius: UI.radius.md,
     border: isApplied ? `1px solid ${UI.accent.red}` : "none",
-    fontSize: 12,
-    fontWeight: 600,
+    fontSize: 12.5,
+    fontWeight: 700,
+    letterSpacing: "0.2px",
     cursor: hasModel && !isLoading ? "pointer" : "not-allowed",
-    opacity: hasModel ? 1 : 0.5,
+    opacity: hasModel ? 1 : 0.55,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     transition: UI.transition,
-    background: isApplied ? UI.bg.elevated : `linear-gradient(135deg, ${UI.accent.cyan}, ${UI.accent.blue})`,
+    background: isApplied
+      ? UI.bg.elevated
+      : `linear-gradient(135deg, ${UI.accent.cyan}, ${UI.accent.blue})`,
     color: isApplied ? UI.accent.red : "#07070D",
+    boxShadow: isApplied
+      ? "none"
+      : "0 2px 12px rgba(0,245,255,0.32), inset 0 1px 0 rgba(255,255,255,0.18)",
+    animation: shouldPulse ? "ifc-apply-pulse 2.2s ease-in-out infinite" : undefined,
   };
 
   const autoStyle: CSSProperties = {
-    padding: "10px 12px",
+    height: 38,
+    padding: "0 12px",
     borderRadius: UI.radius.md,
     border: `1px solid ${UI.border.default}`,
     background: UI.bg.card,
@@ -1353,32 +1387,53 @@ function ActionRow({
     alignItems: "center",
     gap: 6,
     transition: UI.transition,
+    flexShrink: 0,
   };
 
   return (
     <div
       style={{
-        position: "sticky",
-        bottom: 0,
         display: "flex",
         gap: 8,
         padding: "10px 12px",
-        background: `linear-gradient(to top, ${UI.bg.base} 70%, rgba(7,7,13,0))`,
-        borderTop: `1px solid ${UI.border.subtle}`,
+        background: UI.bg.base,
+        borderBottom: `1px solid ${UI.border.subtle}`,
       }}
     >
       {isApplied ? (
-        <button type="button" onClick={onReset} disabled={isLoading} style={primaryStyle}>
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={isLoading}
+          style={primaryStyle}
+          title="Strip all enhancements and return to raw IFC"
+        >
           <RotateCcw size={13} />
           Reset
         </button>
       ) : (
-        <button type="button" onClick={onApply} disabled={!hasModel || isLoading} style={primaryStyle}>
-          {isLoading ? <Loader2 size={13} /> : <Sparkles size={13} />}
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={!hasModel || isLoading}
+          style={primaryStyle}
+          title={hasModel ? "Run the full enhance pipeline with the pre-filled recipe" : "Upload an IFC first"}
+        >
+          {isLoading ? (
+            <Loader2 size={14} className="animate-spin" strokeWidth={2.4} />
+          ) : (
+            <Sparkles size={14} strokeWidth={2.4} />
+          )}
           {isLoading ? "Applying…" : "Apply Enhancement"}
         </button>
       )}
-      <button type="button" onClick={onAuto} disabled={!hasModel || isLoading} style={autoStyle} title="Pick sensible defaults based on model size">
+      <button
+        type="button"
+        onClick={onAuto}
+        disabled={!hasModel || isLoading}
+        style={autoStyle}
+        title="Pick sensible defaults based on model size, then apply"
+      >
         <Wand2 size={13} />
         Auto
       </button>
