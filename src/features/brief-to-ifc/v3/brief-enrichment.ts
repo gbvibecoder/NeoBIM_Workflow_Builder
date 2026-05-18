@@ -17,6 +17,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { briefSpecSchema } from "./types";
 import type { BriefEnrichmentResult, BriefSpec } from "./types";
+import { zodToOpusToolSchema } from "./zod-to-opus-schema";
 
 const BRIEF_ENRICHMENT_MODEL = "claude-opus-4-7";
 const OPUS_INPUT_COST_PER_MILLION = 5;
@@ -49,141 +50,13 @@ CRITICAL RULES:
 
 Produce the spec by calling \`${TOOL_NAME}\` with the structured payload. Do not write prose outside the tool call.`;
 
+/** Auto-generated from the zod `briefSpecSchema` — no hand-maintained
+ *  mirror that can drift (H11 audit finding). The `zodToOpusToolSchema`
+ *  converter handles the full zod-v4 subset used by the spec, including
+ *  `specular_rgb` and `polygon_local_m` fields that the hand-written
+ *  schema previously omitted. */
 function briefSpecJsonSchema(): Record<string, unknown> {
-  // Hand-written mirror of `briefSpecSchema`. We keep this in lockstep
-  // with `types.ts` rather than synth-from-zod because zod-to-json-schema
-  // isn't in the dependency tree and the surface is small.
-  return {
-    type: "object",
-    properties: {
-      project: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          type: {
-            type: "string",
-            enum: ["exhibition_booth", "office", "residential", "retail"],
-          },
-          location: { type: "string" },
-          description: { type: "string" },
-        },
-        required: ["name", "type", "location", "description"],
-      },
-      site: {
-        type: "object",
-        properties: {
-          bounds_m: {
-            type: "array",
-            items: { type: "number" },
-            minItems: 2,
-            maxItems: 2,
-          },
-          height_limit_m: { type: "number" },
-          coordinate_origin: { type: "string", enum: ["sw_corner"] },
-        },
-        required: ["bounds_m", "height_limit_m", "coordinate_origin"],
-      },
-      spaces: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            name: { type: "string" },
-            long_name: { type: "string" },
-            polygon_world_m: {
-              anyOf: [
-                {
-                  type: "array",
-                  items: {
-                    type: "array",
-                    items: { type: "number" },
-                    minItems: 2, maxItems: 2,
-                  },
-                  minItems: 3,
-                },
-                { type: "null" },
-              ],
-            },
-            circular_centre_radius: {
-              type: "array",
-              items: { type: "number" },
-              minItems: 3, maxItems: 3,
-            },
-            height_m: { type: "number" },
-            occupancy_type: { type: "string" },
-          },
-          required: ["id", "name", "long_name", "polygon_world_m", "height_m", "occupancy_type"],
-        },
-      },
-      elements: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            type: {
-              type: "string",
-              enum: [
-                "slab", "wall", "column", "beam", "space",
-                "covering", "furniture", "lighting", "proxy",
-                // Gap B fix (2026-05-17): typed openings keep IfcDoor /
-                // IfcWindow visible to downstream BIM tools.
-                "door", "window",
-              ],
-            },
-            origin_world_m: {
-              type: "array", items: { type: "number" },
-              minItems: 3, maxItems: 3,
-            },
-            dims_m: {
-              type: "array", items: { type: "number" },
-              minItems: 3, maxItems: 3,
-            },
-            radius_m: { type: "number" },
-            rotation_z_rad: { type: "number" },
-            material_id: { type: "string" },
-            description: { type: "string" },
-            object_type: { type: "string" },
-            tag: { type: "string" },
-            contained_in_space_id: { type: "string" },
-          },
-          required: ["id", "type", "origin_world_m", "material_id", "description", "object_type", "tag"],
-        },
-      },
-      materials: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            name: { type: "string" },
-            rgb: {
-              type: "array", items: { type: "number" },
-              minItems: 3, maxItems: 3,
-            },
-            roughness: { type: "number" },
-            method: {
-              type: "string",
-              enum: ["MATT", "METAL", "PHONG", "PLASTIC"],
-            },
-            category: { type: "string" },
-          },
-          required: ["id", "name", "rgb", "roughness", "method", "category"],
-        },
-      },
-      brand_language: {
-        type: "object",
-        properties: {
-          primary_text: { type: "string" },
-          approved_terms: { type: "array", items: { type: "string" } },
-          forbidden_terms: { type: "array", items: { type: "string" } },
-        },
-        required: ["primary_text", "approved_terms", "forbidden_terms"],
-      },
-    },
-    required: ["project", "site", "spaces", "elements", "materials", "brand_language"],
-  };
+  return zodToOpusToolSchema(briefSpecSchema);
 }
 
 function createAnthropicClient(): Anthropic {

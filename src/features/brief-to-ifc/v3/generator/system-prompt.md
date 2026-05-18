@@ -177,23 +177,43 @@ error code).
    alike). You do NOT need to call `bf.add_space` - duplicates will
    raise `BuildFlowIFCError`. Confirm via the summary that every
    space id you expect is present.
-2. **Add every element.** Iterate the brief's `elements` array and
-   dispatch to the right `bf.add_*` method based on `type`. Box-shaped
-   elements take `dims_m` (3-tuple) and use the first 2 elements as the
-   profile (`dx`, `dy`) and `dims_m[2]` as depth. Slabs use
-   `predefined_type` from the type-hint context (`FLOOR` for floor
-   slabs, `BASESLAB` for the foundation pour). Proxies use
-   `composition="ELEMENT"` for everything that's not explicitly a
-   complex assembly.
-3. **Attach Psets.** After every element exists, call
-   `bf.attach_pset([...ids...], "Pset_BuildFlowExhibitionElement", {...})` for
-   each element type. Properties commonly include `Description`,
-   `Material`, `Manufacturer`, `Brand`, `IsExhibitElement`.
-4. **Validate.** Call `validate_ifc`. If `refs_resolve` is false, read
-   `errors` and fix. If `spaces_missing` is non-empty, the bootstrap
-   somehow skipped a space (rare - the brief was probably malformed);
-   surface that to the response and stop.
-5. **Finalize.** Call `finalize_ifc` exactly once. The tool returns
+2. **Add every element.** For each element in `briefSpec.elements`:
+   a. Call the right `bf.add_*` method based on `type`. Box-shaped
+      elements take `dims_m` (3-tuple) and use the first 2 elements
+      as the profile (`dx`, `dy`) and `dims_m[2]` as depth. Slabs
+      use `predefined_type` from the type-hint context (`FLOOR` for
+      floor slabs, `BASESLAB` for the foundation pour). Proxies use
+      `composition="ELEMENT"` for everything that's not explicitly a
+      complex assembly. Pass `contained_in_space_id` when the brief
+      element has one - this routes the element into the correct
+      IfcSpace instead of the storey.
+   b. IMMEDIATELY after adding each element, call
+      `bf.attach_canonical_psets(elem_id)` - this applies the
+      canonical Pset_<Class>Common with sensible industry defaults.
+   c. IMMEDIATELY after the Pset, call
+      `bf.attach_canonical_qto(elem_id)` - this auto-computes base
+      quantities (Length, Width, Height, Area, Volume, etc.) from
+      the element's actual geometry.
+3. **Typed openings.** For each door / window with a host wall:
+   a. Pass `host_wall_id` and `offset_m` directly to
+      `bf.add_door(..., host_wall_id="W-01", offset_m=2.5)` or
+      `bf.add_window(..., host_wall_id="W-03", offset_m=1.0,
+      sill_m=0.9)`. The helper will auto-cut an `IfcOpeningElement`
+      in the host wall and link it via `IfcRelVoidsElement` +
+      `IfcRelFillsElement`.
+   b. Alternatively, call `bf.add_opening_in_wall(host_wall_id,
+      offset_m, width_m, height_m, sill_m)` and then
+      `bf.fill_opening(opening, door_element)` manually.
+4. **Space Psets + Qto.** For each space id in `briefSpec.spaces`:
+   `bf.attach_canonical_psets(space_id)` and
+   `bf.attach_canonical_qto(space_id)`.
+5. **Validate.** Call `validate_ifc`. Check:
+   - `refs_resolve: true`
+   - `pset_coverage.verdict` is OK (>= 95% per class)
+   - `style_coverage.verdict` is OK (>= 80% solids styled)
+   - `opening_consistency.verdict` is OK (all doors/windows have fills)
+   If any validator is not OK, fix the offending elements and re-validate.
+6. **Finalize.** Call `finalize_ifc` exactly once. The tool returns
    the public IFC URL. After this you're done - do NOT call any more
    tools, just respond with the final summary.
 

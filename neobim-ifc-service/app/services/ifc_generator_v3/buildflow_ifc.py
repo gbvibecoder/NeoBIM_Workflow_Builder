@@ -590,6 +590,7 @@ class BuildFlowIFC:
         object_type: str = "",
         description: str = "",
         tag: str = "",
+        contained_in_space_id: Optional[str] = None,
     ) -> Any:
         """`IfcFurnishingElement` — no PredefinedType slot in 2X3."""
         return self._add_box_element(
@@ -598,6 +599,7 @@ class BuildFlowIFC:
             material=material, predefined_type=None,
             object_type=object_type,
             description=description, tag=tag,
+            contained_in_space_id=contained_in_space_id,
         )
 
     def add_light_fixture(
@@ -610,6 +612,7 @@ class BuildFlowIFC:
         object_type: str = "",
         description: str = "",
         tag: str = "",
+        contained_in_space_id: Optional[str] = None,
     ) -> Any:
         """`IfcLightFixture` — no PredefinedType slot in 2X3."""
         return self._add_box_element(
@@ -618,6 +621,7 @@ class BuildFlowIFC:
             material=material, predefined_type=None,
             object_type=object_type,
             description=description, tag=tag,
+            contained_in_space_id=contained_in_space_id,
         )
 
     def add_door(
@@ -630,6 +634,10 @@ class BuildFlowIFC:
         object_type: str = "",
         description: str = "",
         tag: str = "",
+        contained_in_space_id: Optional[str] = None,
+        host_wall_id: Optional[str] = None,
+        offset_m: Optional[float] = None,
+        sill_m: float = 0.0,
     ) -> Any:
         """`IfcDoor` — typed opening, NOT a proxy.
 
@@ -645,14 +653,24 @@ class BuildFlowIFC:
         `OverallWidth` are derived from the geometry. Pass dims in
         METRES (e.g. `dims=(0.9, 0.1)` for a 90 cm wide × 10 cm deep
         door leaf; `depth=2.1` for a 2.1 m tall door).
+
+        If `host_wall_id` and `offset_m` are provided, the door will
+        automatically cut an opening in the host wall and fill it.
         """
-        return self._add_box_element(
+        element = self._add_box_element(
             ifc_class="IfcDoor",
             element_id=door_id, origin=origin, dims=dims, depth=depth,
             material=material, predefined_type=None,
             object_type=object_type,
             description=description, tag=tag,
+            contained_in_space_id=contained_in_space_id,
         )
+        if host_wall_id and offset_m is not None:
+            opening = self.add_opening_in_wall(
+                host_wall_id, offset_m, dims[0], depth, sill_m,
+            )
+            self.fill_opening(opening, element)
+        return element
 
     def add_window(
         self,
@@ -664,6 +682,10 @@ class BuildFlowIFC:
         object_type: str = "",
         description: str = "",
         tag: str = "",
+        contained_in_space_id: Optional[str] = None,
+        host_wall_id: Optional[str] = None,
+        offset_m: Optional[float] = None,
+        sill_m: float = 0.9,
     ) -> Any:
         """`IfcWindow` — typed opening, NOT a proxy.
 
@@ -675,14 +697,25 @@ class BuildFlowIFC:
         Pass dims in METRES (e.g. `dims=(1.2, 0.05)` for a 1.2 m wide
         × 5 cm deep window pane; `depth=1.5` for a 1.5 m tall window).
         Place the SW corner at the wall's inner face.
+
+        If `host_wall_id` and `offset_m` are provided, the window will
+        automatically cut an opening in the host wall and fill it.
+        `sill_m` defaults to 0.9m (standard window sill height).
         """
-        return self._add_box_element(
+        element = self._add_box_element(
             ifc_class="IfcWindow",
             element_id=window_id, origin=origin, dims=dims, depth=depth,
             material=material, predefined_type=None,
             object_type=object_type,
             description=description, tag=tag,
+            contained_in_space_id=contained_in_space_id,
         )
+        if host_wall_id and offset_m is not None:
+            opening = self.add_opening_in_wall(
+                host_wall_id, offset_m, dims[0], depth, sill_m,
+            )
+            self.fill_opening(opening, element)
+        return element
 
     # ── property sets / quantities ───────────────────────────────────
 
@@ -742,6 +775,688 @@ class BuildFlowIFC:
         )
         api.run("pset.edit_qto", self._ifc, qto=qto, properties=quantities)
         return qto
+
+    # ── canonical Psets + Qto (Phase BCD — B2) ──────────────────────
+
+    PSET_DEFAULTS: Dict[str, Dict[str, Any]] = {
+        "IfcWall": {
+            "pset_name": "Pset_WallCommon",
+            "props": {
+                "LoadBearing": False,
+                "IsExternal": True,
+                "ThermalTransmittance": 0.30,
+                "AcousticRating": "Rw 45 dB",
+                "FireRating": "REI 60",
+                "Compartmentation": False,
+                "Combustible": False,
+                "SurfaceSpreadOfFlame": "Class 0",
+            },
+        },
+        "IfcDoor": {
+            "pset_name": "Pset_DoorCommon",
+            "props": {
+                "IsExternal": True,
+                "FireRating": "EI 30",
+                "AcousticRating": "Rw 35 dB",
+                "ThermalTransmittance": 1.6,
+                "SmokeStop": False,
+                "SecurityRating": "Standard",
+                "HandicapAccessible": True,
+            },
+        },
+        "IfcWindow": {
+            "pset_name": "Pset_WindowCommon",
+            "props": {
+                "IsExternal": True,
+                "ThermalTransmittance": 1.2,
+                "GlazingAreaFraction": 0.78,
+                "FireRating": "Not Required",
+                "AcousticRating": "Rw 32 dB",
+                "SecurityRating": "Standard",
+            },
+        },
+        "IfcSpace": {
+            "pset_name": "Pset_SpaceCommon",
+            "props": {
+                "Reference": None,
+                "IsExternal": False,
+                "PubliclyAccessible": False,
+                "HandicapAccessible": True,
+                "OccupancyType": None,
+                "OccupancyNumber": None,
+                "GrossPlannedArea": None,
+                "NetPlannedArea": None,
+            },
+        },
+        "IfcSlab": {
+            "pset_name": "Pset_SlabCommon",
+            "props": {
+                "LoadBearing": True,
+                "IsExternal": False,
+                "ThermalTransmittance": 0.25,
+                "FireRating": "REI 60",
+                "AcousticRating": "Rw 52 dB",
+            },
+        },
+        "IfcFurnishingElement": {
+            "pset_name": "Pset_FurnitureCommon",
+            "props": {
+                "Reference": None,
+                "Manufacturer": "BuildFlow Reference Spec",
+            },
+        },
+        "IfcLightFixture": {
+            "pset_name": "Pset_LightFixtureTypeCommon",
+            "props": {
+                "Reference": None,
+                "LightFixturePlacingType": "SURFACE",
+                "MaintenanceFactor": 0.85,
+                "NumberOfSources": 1,
+                "TotalWattage": 36.0,
+            },
+        },
+        "IfcCovering": {
+            "pset_name": "Pset_CoveringCommon",
+            "props": {
+                "IsExternal": False,
+                "Reference": None,
+            },
+        },
+    }
+
+    QTO_FIELDS: Dict[str, List[str]] = {
+        "IfcWall": ["Length", "Width", "Height", "GrossSideArea", "NetSideArea", "GrossVolume", "NetVolume"],
+        "IfcDoor": ["Width", "Height", "Area"],
+        "IfcWindow": ["Width", "Height", "Area"],
+        "IfcSpace": ["Height", "FinishCeilingHeight", "GrossFloorArea", "NetFloorArea", "GrossWallArea", "NetWallArea", "GrossVolume", "NetVolume", "GrossPerimeter"],
+        "IfcSlab": ["Width", "Length", "Depth", "GrossArea", "NetArea", "GrossVolume", "NetVolume"],
+        "IfcFurnishingElement": ["Width", "Depth", "Height"],
+        "IfcLightFixture": [],
+        "IfcCovering": ["GrossArea", "NetArea"],
+    }
+
+    QTO_NAMES: Dict[str, str] = {
+        "IfcWall": "Qto_WallBaseQuantities",
+        "IfcDoor": "Qto_DoorBaseQuantities",
+        "IfcWindow": "Qto_WindowBaseQuantities",
+        "IfcSpace": "Qto_SpaceBaseQuantities",
+        "IfcSlab": "Qto_SlabBaseQuantities",
+        "IfcFurnishingElement": "Qto_FurnitureBaseQuantities",
+        "IfcCovering": "Qto_CoveringBaseQuantities",
+    }
+
+    def attach_canonical_psets(
+        self,
+        element_id: str,
+        overrides: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Any]:
+        """Look up the element's IFC class and attach the canonical Pset
+        with sensible defaults merged with caller overrides.
+
+        Returns the created IfcPropertySet, or None if the class has no
+        canonical Pset defined.
+        """
+        if element_id not in self._elements_by_id:
+            # Spaces are keyed by name, not tag — try space lookup.
+            if element_id in self._spaces_by_id:
+                return self._attach_canonical_psets_for_space(element_id, overrides)
+            raise BuildFlowIFCError(
+                f"attach_canonical_psets({element_id!r}): unknown element id"
+            )
+        element = self._elements_by_id[element_id]
+        ifc_class = element.is_a()
+        config = self.PSET_DEFAULTS.get(ifc_class)
+        if not config:
+            return None
+        props = dict(config["props"])
+        # Fill Reference from the element's Name/ObjectType if available.
+        if "Reference" in props and props["Reference"] is None:
+            props["Reference"] = getattr(element, "ObjectType", None) or getattr(element, "Name", element_id)
+        if overrides:
+            props.update(overrides)
+        # Strip None-valued entries — ifcopenshell will fail on IfcPropertySingleValue
+        # with a None value. Omitting the property is schema-correct.
+        props = {k: v for k, v in props.items() if v is not None}
+        api = ifcopenshell.api
+        pset = api.run(
+            "pset.add_pset", self._ifc, product=element, name=str(config["pset_name"]),
+        )
+        api.run("pset.edit_pset", self._ifc, pset=pset, properties=_ascii_safe(props))
+        return pset
+
+    def _attach_canonical_psets_for_space(
+        self,
+        space_id: str,
+        overrides: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Any]:
+        """Attach Pset_SpaceCommon to a space (keyed by Name, not Tag)."""
+        space = self._spaces_by_id.get(space_id)
+        if not space:
+            return None
+        config = self.PSET_DEFAULTS.get("IfcSpace")
+        if not config:
+            return None
+        props = dict(config["props"])
+        props["Reference"] = getattr(space, "ObjectType", None) or space_id
+        occ_type = getattr(space, "ObjectType", None)
+        if occ_type and props.get("OccupancyType") is None:
+            props["OccupancyType"] = occ_type
+        if overrides:
+            props.update(overrides)
+        props = {k: v for k, v in props.items() if v is not None}
+        api = ifcopenshell.api
+        pset = api.run(
+            "pset.add_pset", self._ifc, product=space, name=str(config["pset_name"]),
+        )
+        api.run("pset.edit_pset", self._ifc, pset=pset, properties=_ascii_safe(props))
+        return pset
+
+    def attach_canonical_qto(
+        self,
+        element_id: str,
+        computed: Optional[Dict[str, float]] = None,
+    ) -> Optional[Any]:
+        """Auto-compute base quantities from the element's geometry and
+        attach as the canonical Qto for its IFC class.
+
+        If `computed` is provided, it overrides the auto-computed values.
+        Returns the IfcElementQuantity, or None if the class has no Qto.
+        """
+        # Space handling: spaces are keyed by name.
+        if element_id in self._spaces_by_id:
+            return self._attach_canonical_qto_for_space(element_id, computed)
+        if element_id not in self._elements_by_id:
+            raise BuildFlowIFCError(
+                f"attach_canonical_qto({element_id!r}): unknown element id"
+            )
+        element = self._elements_by_id[element_id]
+        ifc_class = element.is_a()
+        qto_name = self.QTO_NAMES.get(ifc_class)
+        fields = self.QTO_FIELDS.get(ifc_class)
+        if not qto_name or not fields:
+            return None
+
+        quantities = self._compute_qto_from_geometry(element, ifc_class, fields)
+        if computed:
+            quantities.update(computed)
+        if not quantities:
+            return None
+
+        api = ifcopenshell.api
+        qto = api.run(
+            "pset.add_qto", self._ifc, product=element, name=qto_name,
+        )
+        api.run("pset.edit_qto", self._ifc, qto=qto, properties=quantities)
+        return qto
+
+    def _attach_canonical_qto_for_space(
+        self,
+        space_id: str,
+        computed: Optional[Dict[str, float]] = None,
+    ) -> Optional[Any]:
+        """Attach Qto_SpaceBaseQuantities to an IfcSpace."""
+        space = self._spaces_by_id.get(space_id)
+        if not space:
+            return None
+        qto_name = "Qto_SpaceBaseQuantities"
+
+        # Derive from the space's polygon + extrusion depth.
+        quantities: Dict[str, float] = {}
+        poly, height = self._extract_polygon_and_height(space)
+        if poly and len(poly) >= 3 and height > 0:
+            area = abs(self._polygon_area(poly))
+            perimeter = self._polygon_perimeter(poly)
+            quantities["Height"] = height
+            quantities["FinishCeilingHeight"] = height
+            quantities["GrossFloorArea"] = round(area, 4)
+            quantities["NetFloorArea"] = round(area, 4)
+            quantities["GrossWallArea"] = round(perimeter * height, 4)
+            quantities["NetWallArea"] = round(perimeter * height, 4)
+            quantities["GrossVolume"] = round(area * height, 4)
+            quantities["NetVolume"] = round(area * height, 4)
+            quantities["GrossPerimeter"] = round(perimeter, 4)
+
+        if computed:
+            quantities.update(computed)
+        if not quantities:
+            return None
+
+        api = ifcopenshell.api
+        qto = api.run("pset.add_qto", self._ifc, product=space, name=qto_name)
+        api.run("pset.edit_qto", self._ifc, qto=qto, properties=quantities)
+        return qto
+
+    def _compute_qto_from_geometry(
+        self,
+        element: Any,
+        ifc_class: str,
+        fields: List[str],
+    ) -> Dict[str, float]:
+        """Best-effort quantity computation from the element's bbox."""
+        quantities: Dict[str, float] = {}
+        # Extract dims from the element's extruded area solid.
+        rep = getattr(element, "Representation", None)
+        if not rep:
+            return quantities
+        for shape_rep in (rep.Representations or []):
+            for item in (shape_rep.Items or []):
+                if not item.is_a("IfcExtrudedAreaSolid"):
+                    continue
+                depth = float(item.Depth) if item.Depth else 0.0
+                area_def = item.SweptArea
+                if area_def and area_def.is_a("IfcRectangleProfileDef"):
+                    dx = float(area_def.XDim)
+                    dy = float(area_def.YDim)
+                    return self._qto_from_box(ifc_class, fields, dx, dy, depth)
+                if area_def and area_def.is_a("IfcCircleProfileDef"):
+                    radius = float(area_def.Radius)
+                    circle_area = math.pi * radius * radius
+                    if "Width" in fields:
+                        quantities["Width"] = round(2 * radius, 4)
+                    if "Depth" in fields:
+                        quantities["Depth"] = round(2 * radius, 4)
+                    if "Height" in fields:
+                        quantities["Height"] = round(depth, 4)
+                    if "GrossArea" in fields:
+                        quantities["GrossArea"] = round(circle_area, 4)
+                    if "NetArea" in fields:
+                        quantities["NetArea"] = round(circle_area, 4)
+                    if "GrossVolume" in fields:
+                        quantities["GrossVolume"] = round(circle_area * depth, 4)
+                    if "NetVolume" in fields:
+                        quantities["NetVolume"] = round(circle_area * depth, 4)
+                    return quantities
+                if area_def and area_def.is_a("IfcArbitraryClosedProfileDef"):
+                    # Polygon profile — compute area from vertices.
+                    curve = getattr(area_def, "OuterCurve", None)
+                    if curve and curve.is_a("IfcPolyline"):
+                        poly = [(float(p.Coordinates[0]), float(p.Coordinates[1]))
+                                for p in (curve.Points or [])]
+                        poly_area = abs(self._polygon_area(poly))
+                        perimeter = self._polygon_perimeter(poly)
+                        if "GrossFloorArea" in fields:
+                            quantities["GrossFloorArea"] = round(poly_area, 4)
+                        if "NetFloorArea" in fields:
+                            quantities["NetFloorArea"] = round(poly_area, 4)
+                        if "Height" in fields:
+                            quantities["Height"] = round(depth, 4)
+                        if "GrossVolume" in fields:
+                            quantities["GrossVolume"] = round(poly_area * depth, 4)
+                        if "NetVolume" in fields:
+                            quantities["NetVolume"] = round(poly_area * depth, 4)
+                        if "GrossPerimeter" in fields:
+                            quantities["GrossPerimeter"] = round(perimeter, 4)
+                    return quantities
+        return quantities
+
+    def _qto_from_box(
+        self,
+        ifc_class: str,
+        fields: List[str],
+        dx: float,
+        dy: float,
+        depth: float,
+    ) -> Dict[str, float]:
+        """Compute Qto quantities from a box profile (dx x dy extruded by depth)."""
+        q: Dict[str, float] = {}
+        if ifc_class in ("IfcWall",):
+            length = dx
+            width = dy
+            height = depth
+            if "Length" in fields:
+                q["Length"] = round(length, 4)
+            if "Width" in fields:
+                q["Width"] = round(width, 4)
+            if "Height" in fields:
+                q["Height"] = round(height, 4)
+            if "GrossSideArea" in fields:
+                q["GrossSideArea"] = round(length * height, 4)
+            if "NetSideArea" in fields:
+                q["NetSideArea"] = round(length * height, 4)
+            if "GrossVolume" in fields:
+                q["GrossVolume"] = round(length * width * height, 4)
+            if "NetVolume" in fields:
+                q["NetVolume"] = round(length * width * height, 4)
+        elif ifc_class in ("IfcDoor", "IfcWindow"):
+            width = dx
+            height = depth
+            if "Width" in fields:
+                q["Width"] = round(width, 4)
+            if "Height" in fields:
+                q["Height"] = round(height, 4)
+            if "Area" in fields:
+                q["Area"] = round(width * height, 4)
+        elif ifc_class in ("IfcSlab",):
+            if "Width" in fields:
+                q["Width"] = round(dy, 4)
+            if "Length" in fields:
+                q["Length"] = round(dx, 4)
+            if "Depth" in fields:
+                q["Depth"] = round(depth, 4)
+            if "GrossArea" in fields:
+                q["GrossArea"] = round(dx * dy, 4)
+            if "NetArea" in fields:
+                q["NetArea"] = round(dx * dy, 4)
+            if "GrossVolume" in fields:
+                q["GrossVolume"] = round(dx * dy * depth, 4)
+            if "NetVolume" in fields:
+                q["NetVolume"] = round(dx * dy * depth, 4)
+        elif ifc_class in ("IfcFurnishingElement",):
+            if "Width" in fields:
+                q["Width"] = round(dx, 4)
+            if "Depth" in fields:
+                q["Depth"] = round(dy, 4)
+            if "Height" in fields:
+                q["Height"] = round(depth, 4)
+        elif ifc_class in ("IfcCovering",):
+            if "GrossArea" in fields:
+                q["GrossArea"] = round(dx * dy, 4)
+            if "NetArea" in fields:
+                q["NetArea"] = round(dx * dy, 4)
+        return q
+
+    @staticmethod
+    def _polygon_area(poly: List[Tuple[float, float]]) -> float:
+        """Shoelace formula for polygon area."""
+        n = len(poly)
+        if n < 3:
+            return 0.0
+        area = 0.0
+        for i in range(n):
+            j = (i + 1) % n
+            area += poly[i][0] * poly[j][1]
+            area -= poly[j][0] * poly[i][1]
+        return area / 2.0
+
+    @staticmethod
+    def _polygon_perimeter(poly: List[Tuple[float, float]]) -> float:
+        """Sum of edge lengths for a closed polygon."""
+        n = len(poly)
+        perimeter = 0.0
+        for i in range(n):
+            j = (i + 1) % n
+            dx = poly[j][0] - poly[i][0]
+            dy = poly[j][1] - poly[i][1]
+            perimeter += math.sqrt(dx * dx + dy * dy)
+        return perimeter
+
+    def _extract_polygon_and_height(
+        self, product: Any
+    ) -> Tuple[Optional[List[Tuple[float, float]]], float]:
+        """Extract the polygon vertices and extrusion height from a product's
+        IfcArbitraryClosedProfileDef representation."""
+        rep = getattr(product, "Representation", None)
+        if not rep:
+            return None, 0.0
+        for shape_rep in (rep.Representations or []):
+            for item in (shape_rep.Items or []):
+                if not item.is_a("IfcExtrudedAreaSolid"):
+                    continue
+                depth = float(item.Depth) if item.Depth else 0.0
+                area_def = item.SweptArea
+                if area_def and area_def.is_a("IfcArbitraryClosedProfileDef"):
+                    curve = getattr(area_def, "OuterCurve", None)
+                    if curve and curve.is_a("IfcPolyline"):
+                        poly = [(float(p.Coordinates[0]), float(p.Coordinates[1]))
+                                for p in (curve.Points or [])]
+                        return poly, depth
+        return None, 0.0
+
+    # ── per-solid IfcStyledItem (Phase BCD — C) ─────────────────────
+
+    def style_solid(
+        self,
+        element_id: str,
+        material_id: Optional[str] = None,
+    ) -> List[Any]:
+        """Emit one IfcStyledItem per IfcExtrudedAreaSolid in the element's
+        Body representation.
+
+        If `material_id` is None, looks up the material already associated
+        with the element via IfcRelAssociatesMaterial and finds the
+        corresponding bootstrap surface style. Returns the list of created
+        IfcStyledItem entities.
+
+        web-ifc (the BuildFlow viewer) does NOT traverse the indirect
+        material -> IfcMaterialDefinitionRepresentation -> IfcStyledItem
+        chain. It requires a direct IfcStyledItem on each geometric
+        representation item. This method bridges that gap.
+        """
+        # Resolve the element.
+        element = self._elements_by_id.get(element_id) or self._spaces_by_id.get(element_id)
+        if not element:
+            raise BuildFlowIFCError(
+                f"style_solid({element_id!r}): unknown element/space id"
+            )
+        # Resolve the style from the material.
+        style = self._resolve_style_for_element(element, material_id)
+        if not style:
+            return []
+
+        # Walk the Body representation and find all solids.
+        styled_items: List[Any] = []
+        rep = getattr(element, "Representation", None)
+        if not rep:
+            return styled_items
+        for shape_rep in (rep.Representations or []):
+            for item in (shape_rep.Items or []):
+                if item.is_a("IfcExtrudedAreaSolid"):
+                    si = self._ifc.create_entity(
+                        "IfcStyledItem",
+                        Item=item,
+                        Styles=[style],
+                        Name=None,
+                    )
+                    styled_items.append(si)
+        return styled_items
+
+    def _resolve_style_for_element(
+        self,
+        element: Any,
+        material_id: Optional[str],
+    ) -> Optional[Any]:
+        """Find the IfcPresentationStyleAssignment for an element's material."""
+        if material_id and material_id in self._material_styles:
+            return self._material_styles[material_id]
+
+        # Walk IfcRelAssociatesMaterial to find the material.
+        for rel in self._ifc.by_type("IfcRelAssociatesMaterial"):
+            related = rel.RelatedObjects or ()
+            if element in related:
+                mat = rel.RelatingMaterial
+                if mat:
+                    mat_name = getattr(mat, "Name", None)
+                    if mat_name:
+                        # Reverse-lookup: _materials_by_id values are IfcMaterial
+                        # entities; _material_styles is keyed by brief-mat-id.
+                        for mid, m in self._materials_by_id.items():
+                            if m == mat or getattr(m, "Name", None) == mat_name:
+                                return self._material_styles.get(mid)
+        return None
+
+    def _style_solid_internal(self, element: Any, material_id: str) -> None:
+        """Internal auto-styling called from _add_box_element / _add_circle_element.
+        Creates one IfcStyledItem per IfcExtrudedAreaSolid in the element's Body rep."""
+        style = self._material_styles.get(material_id)
+        if not style:
+            return
+        rep = getattr(element, "Representation", None)
+        if not rep:
+            return
+        for shape_rep in (rep.Representations or []):
+            for item in (shape_rep.Items or []):
+                if item.is_a("IfcExtrudedAreaSolid"):
+                    self._ifc.create_entity(
+                        "IfcStyledItem",
+                        Item=item,
+                        Styles=[style],
+                        Name=None,
+                    )
+
+    # ── typed openings + voids + fills (Phase BCD — D) ──────────────
+
+    def add_opening_in_wall(
+        self,
+        host_wall_id: str,
+        offset_m: float,
+        width_m: float,
+        height_m: float,
+        sill_m: float = 0.0,
+    ) -> Any:
+        """Create an IfcOpeningElement cut into a host wall.
+
+        `offset_m` is metres from the wall's start along its axis.
+        `sill_m` is the sill height above the wall's base.
+        The opening is positioned in the wall's local coordinate system
+        and linked via IfcRelVoidsElement.
+
+        Returns the IfcOpeningElement.
+        """
+        if host_wall_id not in self._elements_by_id:
+            raise BuildFlowIFCError(
+                f"add_opening_in_wall({host_wall_id!r}): unknown wall id"
+            )
+        host_wall = self._elements_by_id[host_wall_id]
+        if not host_wall.is_a("IfcWall"):
+            raise BuildFlowIFCError(
+                f"add_opening_in_wall({host_wall_id!r}): element is {host_wall.is_a()}, not IfcWall"
+            )
+
+        # Extract wall thickness from its profile.
+        wall_thickness = 0.1  # fallback
+        wall_rep = getattr(host_wall, "Representation", None)
+        if wall_rep:
+            for sr in (wall_rep.Representations or []):
+                for item in (sr.Items or []):
+                    if item.is_a("IfcExtrudedAreaSolid"):
+                        area = item.SweptArea
+                        if area and area.is_a("IfcRectangleProfileDef"):
+                            wall_thickness = float(area.YDim)
+
+        api = ifcopenshell.api
+        opening_id = f"opening-{host_wall_id}-{uuid.uuid4().hex[:8]}"
+
+        opening = api.run(
+            "root.create_entity", self._ifc,
+            ifc_class="IfcOpeningElement",
+            name=opening_id,
+        )
+
+        # Opening geometry: a box (width x wall_thickness x height).
+        rect = self._ifc.create_entity(
+            "IfcRectangleProfileDef",
+            ProfileType="AREA",
+            ProfileName=None,
+            Position=self._ifc.create_entity(
+                "IfcAxis2Placement2D",
+                Location=self._ifc.create_entity(
+                    "IfcCartesianPoint", Coordinates=(width_m / 2.0, wall_thickness / 2.0),
+                ),
+                RefDirection=None,
+            ),
+            XDim=width_m,
+            YDim=wall_thickness,
+        )
+        solid = self._ifc.create_entity(
+            "IfcExtrudedAreaSolid",
+            SweptArea=rect,
+            Position=self._ifc.create_entity(
+                "IfcAxis2Placement3D",
+                Location=self._ifc.create_entity("IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0)),
+                Axis=None, RefDirection=None,
+            ),
+            ExtrudedDirection=self._ifc.create_entity(
+                "IfcDirection", DirectionRatios=(0.0, 0.0, 1.0),
+            ),
+            Depth=height_m,
+        )
+        rep = self._ifc.create_entity(
+            "IfcShapeRepresentation",
+            ContextOfItems=self._body_ctx,
+            RepresentationIdentifier="Body",
+            RepresentationType="SweptSolid",
+            Items=[solid],
+        )
+        opening.Representation = self._ifc.create_entity(
+            "IfcProductDefinitionShape", Representations=[rep],
+        )
+
+        # Position the opening in the wall's LOCAL coordinate system:
+        # offset_m along the wall's X axis, 0 along Y, sill_m along Z.
+        # The opening's placement is relative to the wall's placement.
+        placement = self._ifc.create_entity(
+            "IfcLocalPlacement",
+            PlacementRelTo=host_wall.ObjectPlacement,
+            RelativePlacement=self._ifc.create_entity(
+                "IfcAxis2Placement3D",
+                Location=self._ifc.create_entity(
+                    "IfcCartesianPoint", Coordinates=(offset_m, 0.0, sill_m),
+                ),
+                Axis=None, RefDirection=None,
+            ),
+        )
+        opening.ObjectPlacement = placement
+
+        # IfcRelVoidsElement — cut the opening out of the wall.
+        self._ifc.create_entity(
+            "IfcRelVoidsElement",
+            GlobalId=ifcopenshell.guid.new(),
+            OwnerHistory=self._ifc.by_type("IfcOwnerHistory")[0] if self._ifc.by_type("IfcOwnerHistory") else None,
+            Name=f"Void {opening_id}",
+            Description=None,
+            RelatingBuildingElement=host_wall,
+            RelatedOpeningElement=opening,
+        )
+
+        return opening
+
+    def fill_opening(
+        self,
+        opening: Any,
+        fill_element: Any,
+    ) -> Any:
+        """Create an IfcRelFillsElement linking an opening to a door/window.
+
+        Both arguments are ifcopenshell entity references (not string IDs).
+        """
+        rel = self._ifc.create_entity(
+            "IfcRelFillsElement",
+            GlobalId=ifcopenshell.guid.new(),
+            OwnerHistory=self._ifc.by_type("IfcOwnerHistory")[0] if self._ifc.by_type("IfcOwnerHistory") else None,
+            Name=None,
+            Description=None,
+            RelatingOpeningElement=opening,
+            RelatedBuildingElement=fill_element,
+        )
+        return rel
+
+    # ── spatial containment override (Phase BCD — H9) ───────────────
+
+    def _contain_in_space(self, element: Any, space_id: str) -> bool:
+        """Assign an element to an IfcSpace instead of the storey.
+
+        Uses `ifcopenshell.api.run("spatial.assign_container", ...)` to
+        move the element from the storey's containment to the specified
+        space's containment. Returns True if successful.
+        """
+        space = self._spaces_by_id.get(space_id)
+        if not space:
+            return False
+        try:
+            ifcopenshell.api.run(
+                "spatial.assign_container", self._ifc,
+                products=[element], relating_structure=space,
+            )
+            return True
+        except Exception:
+            try:
+                ifcopenshell.api.run(
+                    "spatial.assign_container", self._ifc,
+                    product=element, relating_structure=space,
+                )
+                return True
+            except Exception:
+                return False
 
     # ── inspection ───────────────────────────────────────────────────
 
@@ -919,6 +1634,7 @@ class BuildFlowIFC:
         composition_type: Optional[str] = None,
         description: str = "",
         tag: str = "",
+        contained_in_space_id: Optional[str] = None,
     ) -> Any:
         element_id = str(_ascii_safe(element_id))
         material = str(_ascii_safe(material))
@@ -1048,12 +1764,20 @@ class BuildFlowIFC:
         )
         element.ObjectPlacement = local_placement
 
-        self._contain_in_storey(element)
+        # Spatial containment: route to IfcSpace if brief element specifies
+        # contained_in_space_id (H9 fix); otherwise fall through to storey.
+        if contained_in_space_id and contained_in_space_id in self._spaces_by_id:
+            self._contain_in_space(element, contained_in_space_id)
+        else:
+            self._contain_in_storey(element)
+
         if material in self._materials_by_id:
             api.run(
                 "material.assign_material", self._ifc,
                 products=[element], material=self._materials_by_id[material],
             )
+            # Per-solid IfcStyledItem so web-ifc renders colours (Phase C fix).
+            self._style_solid_internal(element, material)
 
         self._elements_by_id[element_id] = element
         return element
@@ -1068,6 +1792,7 @@ class BuildFlowIFC:
         material: str,
         description: str = "",
         tag: str = "",
+        contained_in_space_id: Optional[str] = None,
     ) -> Any:
         element_id = str(_ascii_safe(element_id))
         material = str(_ascii_safe(material))
@@ -1144,12 +1869,19 @@ class BuildFlowIFC:
             RelativePlacement=placement_axis,
         )
 
-        self._contain_in_storey(element)
+        # Spatial containment: route to IfcSpace if specified (H9 fix).
+        if contained_in_space_id and contained_in_space_id in self._spaces_by_id:
+            self._contain_in_space(element, contained_in_space_id)
+        else:
+            self._contain_in_storey(element)
+
         if material in self._materials_by_id:
             api.run(
                 "material.assign_material", self._ifc,
                 products=[element], material=self._materials_by_id[material],
             )
+            # Per-solid IfcStyledItem so web-ifc renders colours (Phase C fix).
+            self._style_solid_internal(element, material)
 
         self._elements_by_id[element_id] = element
         return element

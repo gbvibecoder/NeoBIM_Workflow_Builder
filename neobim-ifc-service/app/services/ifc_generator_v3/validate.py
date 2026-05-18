@@ -183,6 +183,32 @@ def validate_ifc_file(
     element_coverage_result: Optional[Dict[str, Any]] = None
     origin_collapse_result: Optional[Dict[str, Any]] = None
 
+    # Phase BCD validators (always run — not brief-gated).
+    pset_coverage_result: Optional[Dict[str, Any]] = None
+    style_coverage_result: Optional[Dict[str, Any]] = None
+    opening_consistency_result: Optional[Dict[str, Any]] = None
+    aggregate_coverage_result: Optional[Dict[str, Any]] = None
+    # Dormant validators (Gap A + Gap B) — now wired.
+    polygon_footprint_result: Optional[Dict[str, Any]] = None
+    door_window_typing_result: Optional[Dict[str, Any]] = None
+
+    try:
+        pset_coverage_result = validate_pset_coverage(f, brief)
+    except Exception as exc:
+        pset_coverage_result = {"verdict": "ERROR", "error": f"{type(exc).__name__}: {exc}"}
+    try:
+        style_coverage_result = validate_style_coverage(f, brief)
+    except Exception as exc:
+        style_coverage_result = {"verdict": "ERROR", "error": f"{type(exc).__name__}: {exc}"}
+    try:
+        opening_consistency_result = validate_opening_consistency(f, brief)
+    except Exception as exc:
+        opening_consistency_result = {"verdict": "ERROR", "error": f"{type(exc).__name__}: {exc}"}
+    try:
+        aggregate_coverage_result = validate_aggregate_coverage(f, brief)
+    except Exception as exc:
+        aggregate_coverage_result = {"verdict": "ERROR", "error": f"{type(exc).__name__}: {exc}"}
+
     if brief is not None:
         try:
             world_bbox_result = validate_world_bbox(f, brief)
@@ -211,6 +237,15 @@ def validate_ifc_file(
                 "verdict": "ERROR",
                 "error": f"{type(exc).__name__}: {exc}",
             }
+        # Dormant validators — now wired into the main validation path.
+        try:
+            polygon_footprint_result = validate_polygon_footprint(f, brief)
+        except Exception as exc:
+            polygon_footprint_result = {"verdict": "ERROR", "error": f"{type(exc).__name__}: {exc}"}
+        try:
+            door_window_typing_result = validate_door_window_typing(f, brief)
+        except Exception as exc:
+            door_window_typing_result = {"verdict": "ERROR", "error": f"{type(exc).__name__}: {exc}"}
 
     return {
         "schema": schema,
@@ -226,6 +261,14 @@ def validate_ifc_file(
         "space_polygons": space_polygons_result,
         "element_coverage": element_coverage_result,
         "origin_collapse": origin_collapse_result,
+        # Phase BCD validators
+        "pset_coverage": pset_coverage_result,
+        "style_coverage": style_coverage_result,
+        "opening_consistency": opening_consistency_result,
+        "aggregate_coverage": aggregate_coverage_result,
+        # Dormant validators (now wired)
+        "polygon_footprint": polygon_footprint_result,
+        "door_window_typing": door_window_typing_result,
     }
 
 
@@ -535,6 +578,8 @@ def validate_element_coverage(
         "lighting": "IfcLightFixture",  # IFC4-only; falls back in 2X3
         "proxy": "IfcBuildingElementProxy",
         "space": "IfcSpace",
+        "door": "IfcDoor",
+        "window": "IfcWindow",
     }
 
     expected_by_class: Dict[str, int] = {}
@@ -874,4 +919,203 @@ def validate_polygon_footprint(
         "polygon_edge_total": polygon_edge_total,
         "actual_wall_count": actual_walls,
         "failures": failures,
+    }
+
+
+# ─── Phase BCD validators ──────────────────────────────────────────────
+
+# Canonical Pset names per IFC class. These MUST stay in sync with
+# BuildFlowIFC.PSET_DEFAULTS in buildflow_ifc.py.
+_CANONICAL_PSETS: Dict[str, str] = {
+    "IfcWall": "Pset_WallCommon",
+    "IfcDoor": "Pset_DoorCommon",
+    "IfcWindow": "Pset_WindowCommon",
+    "IfcSpace": "Pset_SpaceCommon",
+    "IfcSlab": "Pset_SlabCommon",
+    "IfcFurnishingElement": "Pset_FurnitureCommon",
+    "IfcLightFixture": "Pset_LightFixtureTypeCommon",
+    "IfcCovering": "Pset_CoveringCommon",
+}
+
+
+def _get_psets_for_element(element: Any) -> List[str]:
+    """Return the names of all IfcPropertySet instances attached to `element`."""
+    names: List[str] = []
+    for rel in getattr(element, "IsDefinedBy", ()) or ():
+        if rel.is_a("IfcRelDefinesByProperties"):
+            ps = rel.RelatingPropertyDefinition
+            if ps and ps.is_a("IfcPropertySet"):
+                name = getattr(ps, "Name", None)
+                if name:
+                    names.append(name)
+    return names
+
+
+def validate_pset_coverage(
+    f: "ifcopenshell.file",
+    brief_spec: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Per IFC class, % of elements with the canonical Pset.
+
+    Returns OK if >= 95% coverage per class; WARN at 80-95%; FAIL below 80%.
+    """
+    per_class: Dict[str, Dict[str, Any]] = {}
+    for ifc_class, pset_name in _CANONICAL_PSETS.items():
+        try:
+            elements = f.by_type(ifc_class)
+        except RuntimeError:
+            continue
+        if not elements:
+            continue
+        total = len(elements)
+        with_pset = 0
+        for e in elements:
+            pset_names = _get_psets_for_element(e)
+            if pset_name in pset_names:
+                with_pset += 1
+        coverage = with_pset / total if total > 0 else 1.0
+        per_class[ifc_class] = {
+            "pset_name": pset_name,
+            "total": total,
+            "with_pset": with_pset,
+            "coverage": round(coverage, 4),
+        }
+
+    if not per_class:
+        return {"verdict": "OK", "per_class": {}, "note": "no elements found"}
+
+    min_coverage = min(c["coverage"] for c in per_class.values())
+    if min_coverage >= 0.95:
+        verdict = "OK"
+    elif min_coverage >= 0.80:
+        verdict = "WARN"
+    else:
+        verdict = "FAIL"
+
+    return {
+        "verdict": verdict,
+        "min_coverage": round(min_coverage, 4),
+        "per_class": per_class,
+    }
+
+
+def validate_style_coverage(
+    f: "ifcopenshell.file",
+    brief_spec: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """% of IfcExtrudedAreaSolid with >= 1 IfcStyledItem."""
+    styled_items = f.by_type("IfcStyledItem")
+    styled_rep_items: set = set()
+    for si in styled_items:
+        item = getattr(si, "Item", None)
+        if item:
+            styled_rep_items.add(item.id())
+
+    total_solids = 0
+    styled_solids = 0
+    for solid in f.by_type("IfcExtrudedAreaSolid"):
+        total_solids += 1
+        if solid.id() in styled_rep_items:
+            styled_solids += 1
+
+    if total_solids == 0:
+        return {
+            "verdict": "OK",
+            "total_solids": 0,
+            "styled_solids": 0,
+            "coverage": 1.0,
+        }
+
+    coverage = styled_solids / total_solids
+    verdict = "OK" if coverage >= 0.80 else ("WARN" if coverage >= 0.50 else "FAIL")
+
+    return {
+        "verdict": verdict,
+        "total_solids": total_solids,
+        "styled_solids": styled_solids,
+        "coverage": round(coverage, 4),
+    }
+
+
+def validate_opening_consistency(
+    f: "ifcopenshell.file",
+    brief_spec: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Every IfcDoor and IfcWindow has:
+    - exactly one IfcRelFillsElement pointing to it (as RelatedBuildingElement)
+    - the corresponding IfcOpeningElement has exactly one IfcRelVoidsElement
+      pointing to its host wall
+    Returns FAIL if any door/window is "floating" without an opening relationship.
+    """
+    doors = f.by_type("IfcDoor")
+    windows = f.by_type("IfcWindow")
+    all_openings = doors + windows
+
+    if not all_openings:
+        return {
+            "verdict": "OK",
+            "total_doors": 0,
+            "total_windows": 0,
+            "with_fill": 0,
+            "without_fill": 0,
+            "coverage": 1.0,
+            "failures": [],
+        }
+
+    # Build lookup: element id -> IfcRelFillsElement
+    fill_rels = f.by_type("IfcRelFillsElement")
+    filled_elements: Dict[int, Any] = {}
+    for rel in fill_rels:
+        bldg_elem = getattr(rel, "RelatedBuildingElement", None)
+        if bldg_elem:
+            filled_elements[bldg_elem.id()] = rel
+
+    with_fill = 0
+    without_fill = 0
+    failures: List[str] = []
+
+    for elem in all_openings:
+        if elem.id() in filled_elements:
+            with_fill += 1
+        else:
+            without_fill += 1
+            label = getattr(elem, "Name", None) or getattr(elem, "Tag", None) or getattr(elem, "GlobalId", "?")
+            failures.append(
+                f"{elem.is_a()} {label} has no IfcRelFillsElement "
+                "(floating door/window without opening cut)"
+            )
+
+    total = len(all_openings)
+    coverage = with_fill / total if total > 0 else 1.0
+    verdict = "OK" if not failures else "FAIL"
+
+    return {
+        "verdict": verdict,
+        "total_doors": len(doors),
+        "total_windows": len(windows),
+        "with_fill": with_fill,
+        "without_fill": without_fill,
+        "coverage": round(coverage, 4),
+        "failures": failures[:20],
+    }
+
+
+def validate_aggregate_coverage(
+    f: "ifcopenshell.file",
+    brief_spec: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """For Phase BCD: pass if no element in brief_spec has `parts[]`.
+    Reserved for Phase F when composite furniture lands.
+    """
+    if brief_spec:
+        elements = brief_spec.get("elements") or []
+        has_parts = any(bool(e.get("parts")) for e in elements)
+        if has_parts:
+            return {
+                "verdict": "WARN",
+                "note": "brief contains elements with parts[] but composite aggregation is not yet implemented (Phase F)",
+            }
+    return {
+        "verdict": "OK",
+        "note": "no composite elements in brief; aggregate validation is a Phase F concern",
     }

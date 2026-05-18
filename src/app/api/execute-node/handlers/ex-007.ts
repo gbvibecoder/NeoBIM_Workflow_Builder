@@ -127,6 +127,7 @@ export const handleEX007: NodeHandler = async (ctx) => {
       stage: "ifc-export-preview",
       filename: fileName,
       mimeType: "application/x-step",
+      engine: "ifcopenshell",
       ifcUrl,
       topPngUrl: result.topPngUrl,
       isoPngUrl: result.isoPngUrl,
