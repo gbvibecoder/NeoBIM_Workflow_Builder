@@ -27,6 +27,12 @@ export const handleTR028: NodeHandler = async (ctx) => {
     (inputData as Record<string, unknown>)?.spec ??
     inputData;
 
+  // eslint-disable-next-line no-console
+  console.info(
+    `[tr-028] handler invoked, briefSpec keys=${Object.keys((rawSpec && typeof rawSpec === "object" ? rawSpec : {}) as Record<string, unknown>).join(",")}, ` +
+    `furniture items=${Array.isArray((rawSpec as Record<string, unknown>)?.furniture) ? ((rawSpec as Record<string, unknown>).furniture as unknown[]).length : 0}`,
+  );
+
   const parsed = briefSpecSchema.safeParse(rawSpec);
   if (!parsed.success) {
     throw new Error(

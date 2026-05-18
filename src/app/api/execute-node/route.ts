@@ -293,7 +293,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!REAL_NODE_IDS.has(catalogueId)) {
+  const routing = REAL_NODE_IDS.has(catalogueId) ? "real" : "rejected";
+  // eslint-disable-next-line no-console
+  console.info(`[execute-node] nodeTypeId=${catalogueId} routing=${routing}`);
+
+  if (routing === "rejected") {
     await logValidationError(executionId, catalogueId, `Node ${catalogueId} not in REAL_NODE_IDS`);
     return NextResponse.json(
       formatErrorResponse(UserErrors.NODE_NOT_IMPLEMENTED(catalogueId)),
