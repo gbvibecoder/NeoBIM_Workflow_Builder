@@ -53,8 +53,8 @@ import {
   checkBriefToIfcV3Quota,
   incrementBriefToIfcV3Usage,
 } from "@/features/brief-to-ifc/v3/quota/quota";
-import { runDeterministic } from "@/features/brief-to-ifc/v3/generator/deterministic-runner";
-import { detectBuilderKind, ArchetypeNotSupportedError } from "@/features/brief-to-ifc/v3/archetype-detector";
+// TODO: Re-enable when BriefToIfcV3Run has classifiedArchetype field.
+// import { classifyBrief } from "@/features/brief-to-ifc/v3/archetype-classifier";
 
 export const maxDuration = 800;
 
@@ -238,42 +238,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // PHASE_EVAL_RESULTS_REPORT_2026-05-16.md (run cmp7zv5i2000004juwmdgchau
   // stuck in RUNNING with zero heartbeat updates for 3+ min). Pattern
   // mirrors `src/app/api/auth/register/route.ts` + `src/lib/auth.ts`.
-  // Feature flag: USE_DETERMINISTIC_BUILDER routes to the deterministic
-  // path (Phase G) for supported archetypes. Default: false (agent loop).
-  const useDeterministic = process.env.USE_DETERMINISTIC_BUILDER === "true";
-  let canUseDeterministic = false;
-  if (useDeterministic) {
-    try {
-      detectBuilderKind(briefSpec);
-      canUseDeterministic = true;
-    } catch {
-      // Archetype not supported — fall back to agent loop.
-      canUseDeterministic = false;
-    }
-  }
+  // TODO: Re-enable archetype classifier when BriefToIfcV3Run has a
+  // `classifiedArchetype` field (requires Prisma migration). Currently
+  // there's nowhere to store the result — calling Anthropic for a label
+  // we throw away wastes credits. The classifier code exists at
+  // src/features/brief-to-ifc/v3/archetype-classifier.ts and is ready
+  // to wire once the schema has the field.
 
   after(async () => {
     await runBackground({
       prisma,
       runId: run.id,
-      timeoutMs: canUseDeterministic ? 60_000 : 700_000,
+      timeoutMs: 700_000,
       fn: async (ctx) => {
-        if (canUseDeterministic) {
-          await ctx.log("INFO", "GENERATE", "Deterministic builder starting (Phase G).");
-          const result = await runDeterministic({
-            brief: briefSpec,
-            schema: "IFC4",
-          });
-          if (!result.ok) {
-            throw Object.assign(
-              new Error(result.error?.message ?? "deterministic builder failed"),
-              { code: toBriefToIfcV3ErrorCode(result.error?.code) },
-            );
-          }
-          return result;
-        }
-
-        // Agent loop (existing path)
         await ctx.log("INFO", "GENERATE", "Generator agent loop starting.");
         const result = await runGenerator({
           brief: briefSpec,

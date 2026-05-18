@@ -31,14 +31,14 @@ describe("system-prompt drift", () => {
     expect(cnst).toBe(md);
   });
 
-  it("the prompt contains the load-bearing IFC2X3 strictness rules", () => {
+  it("the prompt contains load-bearing IFC strictness rules", () => {
     // Defensive: a refactor that accidentally truncates the .md file
     // (e.g. an empty rewrite) would pass the byte-equality test above
     // because both sides would be empty. Anchor against three specific
     // strings that MUST be in the prompt for the agent to author IFC
     // correctly.
-    expect(GENERATOR_SYSTEM_PROMPT).toContain("IFC2X3");
-    expect(GENERATOR_SYSTEM_PROMPT).toContain("CompositionType");
+    expect(GENERATOR_SYSTEM_PROMPT).toContain("IFC4");
+    expect(GENERATOR_SYSTEM_PROMPT).toContain("attach_canonical_psets");
     expect(GENERATOR_SYSTEM_PROMPT).toContain("finalize_ifc");
   });
 });

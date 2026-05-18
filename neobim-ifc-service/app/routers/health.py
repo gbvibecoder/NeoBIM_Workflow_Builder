@@ -97,3 +97,53 @@ async def ready():
             },
             status_code=503,
         )
+
+
+@router.get("/api/v1/health/v3-readiness")
+async def v3_readiness():
+    """Post-deploy smoke check for v3 pipeline helpers.
+
+    Probes every helper that the agent sandbox pre-binds. If any returns
+    false, the agent loop will crash at runtime when it calls that helper.
+    One curl post-deploy tells you immediately.
+    """
+    helpers = {
+        "resolve_material": False,
+        "compose_furniture": False,
+        "apply_naming_convention": False,
+        "add_site_context": False,
+        "validate_brief_spec": False,
+        "run_preflight": False,
+    }
+    _probe_map = {
+        "resolve_material": "app.services.ifc_generator_v3.material_library",
+        "compose_furniture": "app.services.ifc_generator_v3.furniture_compositor",
+        "apply_naming_convention": "app.services.ifc_generator_v3.naming_resolver",
+        "add_site_context": "app.services.ifc_generator_v3.site_context",
+        "validate_brief_spec": "app.services.ifc_generator_v3.spec_validator",
+        "run_preflight": "app.services.ifc_generator_v3.preflight",
+    }
+    for name, module_path in _probe_map.items():
+        try:
+            mod = __import__(module_path, fromlist=[name])
+            fn = getattr(mod, name, None)
+            helpers[name] = callable(fn)
+        except Exception:
+            helpers[name] = False
+
+    ifc_version = "unknown"
+    try:
+        ifc_version = ifcopenshell.version
+    except Exception:
+        pass
+
+    all_ok = all(helpers.values())
+    return JSONResponse(
+        {
+            "ok": all_ok,
+            "buildflow_ifc_helpers": helpers,
+            "schema_default": "IFC4",
+            "ifcopenshell_version": ifc_version,
+        },
+        status_code=200 if all_ok else 503,
+    )

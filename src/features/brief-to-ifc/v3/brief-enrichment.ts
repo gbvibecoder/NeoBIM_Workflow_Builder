@@ -28,6 +28,17 @@ const TOOL_NAME = "submit_brief_spec";
 
 const SYSTEM_PROMPT = `You are a senior architect translating a free-text architectural brief into a strict JSON specification a downstream IFC generator can author from. Read the brief carefully, then call \`${TOOL_NAME}\` with the structured spec.
 
+FAITHFULNESS RULE (overrides everything below):
+Your output spec MUST contain ONLY elements the brief explicitly mentions or directly implies. Do NOT add:
+- Reception desks, plants, signage, accessories, decorations the brief didn't mention
+- Ceiling fans, AC units, light fixtures the brief didn't ask for
+- Rooms the brief didn't mention (no balconies, pooja niches, utility rooms, storage closets unless stated)
+- Furniture beyond what the brief enumerates
+If the brief says "8 workstations", your spec has exactly 8. Not 8 + chairs + monitors + accessories.
+If the brief says "office", build an office with what the brief lists — NOT what is commonly in offices.
+For parameters the brief leaves unspecified (wall thickness, material colors, ceiling height), pick sensible defaults and log them in \`assumptions_made[]\`.
+The \`archetype\` field is a LABEL for the result page, not a behavior driver. Do NOT add archetype-typical features based on it.
+
 CRITICAL RULES:
 
 1. ASCII ONLY. Never use em-dashes (-), middle dots (.), curly quotes ('"), arrows (->) or any other non-ASCII character in any string field. Use plain hyphens, periods, straight quotes, and "->" / "<-" written out. STEP serialization downstream fails on a single non-ASCII byte.

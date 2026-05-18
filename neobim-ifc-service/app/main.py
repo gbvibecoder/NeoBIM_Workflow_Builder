@@ -226,7 +226,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 from app.routers import health, export, audit, design, builder_script  # noqa: E402
 from app.routers import v3_generator  # noqa: E402  — Phase v3 generator agent tools.
 from app.routers import v3_previews  # noqa: E402  — Canvas EX-007 preview renderer.
-from app.routers import v3_deterministic  # noqa: E402  — Phase G deterministic builder.
 
 app.include_router(health.router)
 app.include_router(export.router, prefix="/api/v1")
@@ -235,7 +234,6 @@ app.include_router(design.router, prefix="/api/v1")
 app.include_router(builder_script.router, prefix="/api/v1")
 app.include_router(v3_generator.router, prefix="/api/v3/generator")
 app.include_router(v3_previews.router, prefix="/api/v3/generator")
-app.include_router(v3_deterministic.router, prefix="/api/v3/deterministic")
 
 
 @app.get("/")

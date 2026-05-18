@@ -97,6 +97,14 @@ class Sandbox:
     namespace. Stateless — the caller (router) handles
     `BuildFlowIFC.save_state` / `load_state` around each call so the
     sandbox itself never holds session memory.
+
+    Pre-bound helpers (available directly in agent code, no import needed):
+      - `resolve_material(intent, archetype, ifc_class)` — curated library
+      - `compose_furniture(bf, type, origin, rot, mat, ...)` — composites
+      - `apply_naming_convention(bf, spec)` — human-readable names
+      - `add_site_context(bf, polygon)` — site + ground + north arrow
+      - `validate_brief_spec(spec)` — spec consistency
+      - `run_preflight(spec, material_ids)` — scale/coord sanity
     """
 
     def __init__(self, bf_instance: Any) -> None:
@@ -146,6 +154,9 @@ class Sandbox:
             "__name__": "__bf_sandbox__",
             "bf": self._bf,
             "math": math,
+            # Phase HARNESS helpers — pre-bound so agent code calls them
+            # directly (no import statement needed).
+            **self._load_helpers(),
         }
 
         try:
@@ -171,6 +182,60 @@ class Sandbox:
                 error_traceback=tb,
                 duration_ms=duration,
             )
+
+    # ── pre-bound helpers ─────────────────────────────────────────────
+
+    @staticmethod
+    def _missing_helper_factory(name: str, original_error: str):
+        """Return a callable that raises a clear error if the agent tries
+        to use a helper that failed to import."""
+        def _missing(*args: Any, **kwargs: Any) -> Any:
+            raise RuntimeError(
+                f"Helper '{name}' was not loaded into the sandbox. "
+                f"Original import error: {original_error}. "
+                f"This is a deployment bug — the helper file may be missing from "
+                f"neobim-ifc-service/app/services/ifc_generator_v3/."
+            )
+        _missing.__name__ = f"<missing:{name}>"
+        return _missing
+
+    @staticmethod
+    def _load_helpers() -> Dict[str, Any]:
+        """Lazy-load Phase HARNESS helpers into the sandbox namespace.
+
+        Each function is imported at call time (not module import time)
+        so a missing file doesn't crash the entire service on startup.
+        On failure: logs a warning AND binds a sentinel callable that
+        raises a clear RuntimeError if the agent tries to call it.
+        """
+        import structlog
+        log = structlog.get_logger()
+
+        helpers: Dict[str, Any] = {}
+        _imports = [
+            ("resolve_material", "material_library", "resolve_material"),
+            ("compose_furniture", "furniture_compositor", "compose_furniture"),
+            ("apply_naming_convention", "naming_resolver", "apply_naming_convention"),
+            ("add_site_context", "site_context", "add_site_context"),
+            ("validate_brief_spec", "spec_validator", "validate_brief_spec"),
+            ("run_preflight", "preflight", "run_preflight"),
+        ]
+        for bound_name, module_name, func_name in _imports:
+            try:
+                mod = __import__(
+                    f"app.services.ifc_generator_v3.{module_name}",
+                    fromlist=[func_name],
+                )
+                helpers[bound_name] = getattr(mod, func_name)
+            except Exception as exc:
+                log.warning(
+                    "sandbox_helper_unavailable",
+                    helper=bound_name,
+                    module=module_name,
+                    error=str(exc),
+                )
+                helpers[bound_name] = Sandbox._missing_helper_factory(bound_name, str(exc))
+        return helpers
 
     # ── gated import ─────────────────────────────────────────────────
 
