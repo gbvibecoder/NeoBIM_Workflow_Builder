@@ -1,5 +1,5 @@
 /**
- * Minimal zod v4 -> JSON-Schema converter for Anthropic tool_use.
+ * Minimal zod v4 -> JSON-Schema (draft 2020-12) converter for Anthropic tool_use.
  *
  * Covers the subset of zod constructs used by `briefSpecSchema`:
  * z.object, z.string, z.number, z.boolean, z.array, z.enum, z.literal,
@@ -8,6 +8,12 @@
  * Targets zod 4.x internal structure (_def.type, _def.shape, etc.).
  * No external dependencies — replaces the hand-written JSON schema in
  * `brief-enrichment.ts` so schema drift (H11) can't happen again.
+ *
+ * Draft 2020-12 compliance:
+ *  - Tuples use `prefixItems` + `items: false` (NOT `items: [array]`)
+ *  - Objects have `additionalProperties: false`
+ *  - No `definitions` (use `$defs` if needed)
+ *  - No `nullable` keyword (use `anyOf` with null branch)
  */
 
 import { type ZodTypeAny } from "zod";
@@ -28,8 +34,8 @@ interface ZodCheck {
 }
 
 /**
- * Convert a zod schema to the JSON-Schema subset that Anthropic tool_use
- * accepts. The output is suitable for `tool.input_schema`.
+ * Convert a zod schema to a JSON Schema draft 2020-12 object suitable
+ * for Anthropic's `tool.input_schema`.
  */
 export function zodToOpusToolSchema(schema: ZodTypeAny): JsonSchema {
   return convert(schema);
@@ -64,7 +70,6 @@ function convert(schema: ZodTypeAny): JsonSchema {
       if (values.length === 1) {
         return convertLiteral(values[0]);
       }
-      // Multi-value literal → enum
       return { enum: values };
     }
 
@@ -83,10 +88,13 @@ function convert(schema: ZodTypeAny): JsonSchema {
     }
 
     case "tuple": {
+      // Draft 2020-12: use `prefixItems` for tuple validation,
+      // `items: false` to disallow extra elements.
       const items = (d.items as ZodTypeAny[]) ?? [];
       return {
         type: "array",
-        items: items.map(convert),
+        prefixItems: items.map(convert),
+        items: false,
         minItems: items.length,
         maxItems: items.length,
       };
@@ -104,7 +112,11 @@ function convert(schema: ZodTypeAny): JsonSchema {
         }
       }
 
-      const result: JsonSchema = { type: "object", properties };
+      const result: JsonSchema = {
+        type: "object",
+        properties,
+        additionalProperties: false,
+      };
       if (required.length > 0) {
         result.required = required;
       }
@@ -124,7 +136,6 @@ function convert(schema: ZodTypeAny): JsonSchema {
 
     case "union": {
       const options = (d.options as ZodTypeAny[]) ?? [];
-      // If there's a discriminator, emit oneOf (for discriminatedUnion)
       if (d.discriminator) {
         return { oneOf: options.map(convert) };
       }
@@ -145,7 +156,6 @@ function convert(schema: ZodTypeAny): JsonSchema {
     }
 
     default:
-      // Fallback — emit a permissive schema rather than crash.
       return {};
   }
 }

@@ -20,6 +20,7 @@ describe("zodToOpusToolSchema", () => {
         active: { type: "boolean" },
       },
       required: ["name", "age", "active"],
+      additionalProperties: false,
     });
   });
 
@@ -46,12 +47,15 @@ describe("zodToOpusToolSchema", () => {
                 bio: { type: "string" },
               },
               required: ["bio"],
+              additionalProperties: false,
             },
           },
           required: ["id", "profile"],
+          additionalProperties: false,
         },
       },
       required: ["user"],
+      additionalProperties: false,
     });
   });
 
@@ -69,10 +73,12 @@ describe("zodToOpusToolSchema", () => {
             type: "object",
             properties: { name: { type: "string" } },
             required: ["name"],
+            additionalProperties: false,
           },
         },
       },
       required: ["items"],
+      additionalProperties: false,
     });
   });
 
@@ -91,6 +97,7 @@ describe("zodToOpusToolSchema", () => {
         c: { type: "string" },
       },
       required: ["b"],
+      additionalProperties: false,
     });
   });
 
@@ -105,6 +112,7 @@ describe("zodToOpusToolSchema", () => {
         color: { type: "string", enum: ["red", "green", "blue"] },
       },
       required: ["color"],
+      additionalProperties: false,
     });
   });
 
@@ -119,10 +127,11 @@ describe("zodToOpusToolSchema", () => {
         origin: { type: "string", enum: ["sw_corner"] },
       },
       required: ["origin"],
+      additionalProperties: false,
     });
   });
 
-  it("converts tuple", () => {
+  it("converts tuple using prefixItems (draft 2020-12)", () => {
     const schema = z.object({
       point: z.tuple([z.number(), z.number()]),
     });
@@ -132,12 +141,14 @@ describe("zodToOpusToolSchema", () => {
       properties: {
         point: {
           type: "array",
-          items: [{ type: "number" }, { type: "number" }],
+          prefixItems: [{ type: "number" }, { type: "number" }],
+          items: false,
           minItems: 2,
           maxItems: 2,
         },
       },
       required: ["point"],
+      additionalProperties: false,
     });
   });
 
@@ -156,6 +167,7 @@ describe("zodToOpusToolSchema", () => {
             radius: { type: "number" },
           },
           required: ["type", "radius"],
+          additionalProperties: false,
         },
         {
           type: "object",
@@ -164,6 +176,7 @@ describe("zodToOpusToolSchema", () => {
             width: { type: "number" },
           },
           required: ["type", "width"],
+          additionalProperties: false,
         },
       ],
     });
@@ -180,6 +193,7 @@ describe("zodToOpusToolSchema", () => {
         name: { type: "string", minLength: 1, maxLength: 200 },
       },
       required: ["name"],
+      additionalProperties: false,
     });
   });
 
@@ -190,7 +204,6 @@ describe("zodToOpusToolSchema", () => {
     });
     const result = zodToOpusToolSchema(schema);
     const props = result.properties as Record<string, Record<string, unknown>>;
-    // z.number().positive() uses exclusiveMinimum: 0
     expect(props.height.exclusiveMinimum).toBe(0);
     expect(props.value.minimum).toBe(0);
     expect(props.value.maximum).toBe(1);
@@ -209,8 +222,8 @@ describe("zodToOpusToolSchema", () => {
   it("round-trips the full briefSpecSchema with all current fields", () => {
     const result = zodToOpusToolSchema(briefSpecSchema);
 
-    // Top-level shape
     expect(result.type).toBe("object");
+    expect(result.additionalProperties).toBe(false);
     const props = result.properties as Record<string, Record<string, unknown>>;
     expect(props.project).toBeDefined();
     expect(props.site).toBeDefined();
@@ -222,26 +235,55 @@ describe("zodToOpusToolSchema", () => {
       expect.arrayContaining(["project", "site", "spaces", "elements", "materials", "brand_language"]),
     );
 
-    // Elements array has the right type enum including door/window
     const elemItems = (props.elements as Record<string, unknown>).items as Record<string, unknown>;
     const elemProps = elemItems.properties as Record<string, Record<string, unknown>>;
     expect(elemProps.type.enum).toEqual(
       expect.arrayContaining(["slab", "wall", "door", "window", "furniture", "lighting"]),
     );
-
-    // polygon_local_m field is present and optional
     expect(elemProps.polygon_local_m).toBeDefined();
-
-    // contained_in_space_id is present and optional
     expect(elemProps.contained_in_space_id).toBeDefined();
 
-    // Materials have specular_rgb (optional)
     const matItems = (props.materials as Record<string, unknown>).items as Record<string, unknown>;
     const matProps = matItems.properties as Record<string, Record<string, unknown>>;
     expect(matProps.specular_rgb).toBeDefined();
 
-    // Site has coordinate_origin as literal
     const siteProps = props.site.properties as Record<string, Record<string, unknown>>;
     expect(siteProps.coordinate_origin.enum).toEqual(["sw_corner"]);
+  });
+
+  it("full briefSpecSchema has no draft-2020-12-forbidden keywords", () => {
+    const schema = zodToOpusToolSchema(briefSpecSchema);
+
+    function walk(node: unknown, path = ""): void {
+      if (typeof node !== "object" || node === null) return;
+      const obj = node as Record<string, unknown>;
+
+      // No pre-2020-12 keywords
+      expect(obj).not.toHaveProperty("definitions");
+      expect(obj).not.toHaveProperty("nullable");
+      expect(obj).not.toHaveProperty("discriminator");
+
+      // Tuple arrays must use prefixItems, not items-as-array
+      if (obj.type === "array" && Array.isArray(obj.items)) {
+        throw new Error(
+          `at ${path}: 'items' is an array — use 'prefixItems' for draft 2020-12`,
+        );
+      }
+
+      // Objects must have additionalProperties
+      if (obj.type === "object" && obj.properties && !("additionalProperties" in obj)) {
+        throw new Error(
+          `at ${path}: object missing 'additionalProperties'`,
+        );
+      }
+
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v === "object" && v !== null) {
+          walk(v, `${path}.${k}`);
+        }
+      }
+    }
+
+    walk(schema);
   });
 });
