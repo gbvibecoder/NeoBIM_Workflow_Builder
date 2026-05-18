@@ -4,8 +4,9 @@ import React, { useState, useCallback } from "react";
 import {
   FolderOpen, Home, Scissors, Ruler, Grid3x3,
   Camera, Maximize, Box, Eye, EyeOff, Palette,
-  RotateCcw, ChevronDown, Download, Keyboard,
-  Layers, Scan, PanelBottomOpen, X, Waypoints,
+  RotateCcw, ChevronDown, Download,
+  Layers, Scan, X, Waypoints,
+  Calculator, Loader2,
 } from "lucide-react";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
 import type {
@@ -21,13 +22,20 @@ interface ToolbarProps {
   viewportRef: React.RefObject<ViewportHandle | null>;
   modelInfo: IFCModelInfo | null;
   onOpenFile: () => void;
-  onUnload: () => void;
-  bottomPanelOpen: boolean;
-  onToggleBottomPanel: () => void;
+  /* showShortcuts / onToggleShortcuts are still wired up because the
+     shortcuts MODAL lives inside this component and listens to them. The
+     header button that USED to toggle them was removed in 2026-05-18 Follow-up
+     (it was crowding the Calculate BOQ CTA). Trigger is now the "?" keyboard
+     shortcut in IFCViewerPage's keydown handler. */
   showShortcuts: boolean;
   onToggleShortcuts: () => void;
   measureUnit: "m" | "ft";
   onToggleUnit: () => void;
+  /* Primary CTA — launches BOQ cost-estimation workflow with the currently
+     loaded IFC pre-attached. Disabled state shows when no IFC is loaded. */
+  onCalculateBOQ: () => void;
+  canCalculateBOQ: boolean;
+  boqLaunching: boolean;
 }
 
 /* ─── Shared button style ─────────────────── */
@@ -62,6 +70,92 @@ const dividerStyle: React.CSSProperties = {
   margin: "0 4px",
   flexShrink: 0,
 };
+
+/* File-metadata badge shared style — sits to the LEFT of the toolbar tools
+   (after Upload New). Pulled out of the JSX so the badge style stays in one
+   place and doesn't drift over time. */
+const badgeStyle: React.CSSProperties = {
+  color: UI.text.tertiary,
+  fontSize: 11,
+  fontFamily: "var(--font-jetbrains)",
+  padding: "4px 12px",
+  borderRadius: 12,
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.06)",
+  letterSpacing: "0.3px",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+};
+
+/* Primary CTA — Calculate BOQ. Filled blue gradient on the dark toolbar so it
+   pops as the action you should actually take once the model is loaded. */
+const boqBtnBase: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  height: 34,
+  padding: "0 14px",
+  borderRadius: UI.radius.sm,
+  background: "linear-gradient(135deg, #4F8AFF 0%, #6E7CFF 100%)",
+  border: "1px solid rgba(99,130,255,0.5)",
+  color: "#FFFFFF",
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: "0.2px",
+  cursor: "pointer",
+  transition: UI.transition,
+  boxShadow: "0 2px 12px rgba(79,138,255,0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
+  flexShrink: 0,
+  whiteSpace: "nowrap",
+};
+
+const boqBtnDisabled: React.CSSProperties = {
+  background: "rgba(79,138,255,0.10)",
+  borderColor: "rgba(79,138,255,0.18)",
+  color: UI.text.tertiary,
+  boxShadow: "none",
+  cursor: "not-allowed",
+};
+
+function CalculateBOQButton({
+  disabled,
+  loading,
+  onClick,
+}: {
+  disabled: boolean;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  const isDisabled = disabled || loading;
+  return (
+    <button
+      onClick={onClick}
+      disabled={isDisabled}
+      title={disabled ? "Upload an IFC first" : "Run the BOQ cost-estimation workflow with this IFC"}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        ...boqBtnBase,
+        ...(isDisabled ? boqBtnDisabled : {}),
+        ...(hover && !isDisabled
+          ? {
+              background: "linear-gradient(135deg, #5C95FF 0%, #7B89FF 100%)",
+              boxShadow: "0 2px 16px rgba(79,138,255,0.5), inset 0 1px 0 rgba(255,255,255,0.22)",
+              transform: "translateY(-1px)",
+            }
+          : {}),
+      }}
+    >
+      {loading ? (
+        <Loader2 size={14} className="animate-spin" />
+      ) : (
+        <Calculator size={14} strokeWidth={2.2} />
+      )}
+      <span>Calculate BOQ</span>
+    </button>
+  );
+}
 
 /* ─── ToolBtn Component ───────────────────── */
 function ToolBtn({
@@ -182,13 +276,13 @@ export function Toolbar({
   viewportRef,
   modelInfo,
   onOpenFile,
-  onUnload,
-  bottomPanelOpen,
-  onToggleBottomPanel,
   showShortcuts,
   onToggleShortcuts,
   measureUnit,
   onToggleUnit,
+  onCalculateBOQ,
+  canCalculateBOQ,
+  boqLaunching,
 }: ToolbarProps) {
   const [viewMode, setViewMode] = useState<ViewModeType>("shaded");
   const [colorBy, setColorBy] = useState<ColorByType>("default");
@@ -219,188 +313,205 @@ export function Toolbar({
           background: UI.bg.toolbar,
           backdropFilter: "blur(12px)",
           borderBottom: "1px solid rgba(255,255,255,0.04)",
-          flexWrap: "wrap",
+          /* SINGLE-LINE TOOLBAR. The previous wrap layout pushed the right-side
+             group (badge + utility buttons) onto a second row whenever the
+             tools overflowed available width — exactly the bug shown in the
+             screenshots. The fix is a fixed three-region layout: a pinned-left
+             metadata badge, a horizontally-scrollable tool strip in the
+             middle, and pinned-right utilities + the primary CTA. */
+          flexWrap: "nowrap",
           minHeight: 48,
           position: "relative",
           zIndex: 30,
         }}
       >
-        {/* File */}
-        <ToolBtn icon={FolderOpen} label="Open" onClick={onOpenFile} showLabel />
-
+        {/* LEFT — pinned: file-metadata badge */}
         {hasModel && (
           <>
+            <span style={badgeStyle}>
+              {modelInfo.schema} · {modelInfo.elementCount} elements · {(modelInfo.fileSize / (1024 * 1024)).toFixed(1)} MB
+            </span>
             <div style={dividerStyle} />
-
-            {/* Navigation */}
-            <ToolBtn icon={Home} label="Fit All" shortcut="F" onClick={() => v?.fitToView()} showLabel />
-            <ToolBtn icon={Maximize} label="Fit" shortcut="V" onClick={() => v?.fitToSelection()} />
-
-            <ToolBtn
-              icon={Box}
-              label="Views"
-              showLabel
-              onClick={() => {}}
-              dropdown={
-                <>
-                  {(["front", "back", "left", "right", "top", "bottom", "iso"] as PresetView[]).map((view) => (
-                    <DropItem key={view} label={view.charAt(0).toUpperCase() + view.slice(1)} onClick={() => v?.setPresetView(view)} />
-                  ))}
-                </>
-              }
-            />
-
-            <div style={dividerStyle} />
-
-            {/* Tools */}
-            <ToolBtn
-              icon={Scissors}
-              label="Section"
-              shortcut="S"
-              showLabel
-              onClick={() => v?.toggleSectionPlane("x")}
-              dropdown={
-                <>
-                  {(["x", "y", "z"] as SectionAxis[]).map((axis) => (
-                    <DropItem key={axis} label={`Section ${axis.toUpperCase()}`} onClick={() => v?.toggleSectionPlane(axis)} />
-                  ))}
-                </>
-              }
-            />
-            <ToolBtn
-              icon={Ruler}
-              label={measuring ? "Stop" : "Measure"}
-              shortcut="M"
-              active={measuring}
-              showLabel
-              onClick={() => {
-                if (measuring) {
-                  v?.cancelMeasurement();
-                  setMeasuring(false);
-                } else {
-                  v?.startMeasurement();
-                  setMeasuring(true);
-                }
-              }}
-            />
-            {/* Unit toggle (m/ft) */}
-            <button
-              onClick={onToggleUnit}
-              title={`Switch to ${measureUnit === "m" ? "feet/inches" : "meters"}`}
-              style={{
-                ...btnBase,
-                width: "auto",
-                padding: "0 8px",
-                fontSize: 11,
-                fontWeight: 600,
-                fontFamily: "var(--font-jetbrains)",
-                color: UI.text.secondary,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = UI.text.primary; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = UI.text.secondary; }}
-            >
-              {measureUnit}
-            </button>
-
-            <div style={dividerStyle} />
-
-            {/* Visual */}
-            <ToolBtn
-              icon={Eye}
-              label="Style"
-              showLabel
-              onClick={() => {}}
-              dropdown={
-                <>
-                  <DropItem label="Shaded" active={viewMode === "shaded"} onClick={() => doSetViewMode("shaded")} />
-                  <DropItem label="Wireframe" active={viewMode === "wireframe"} onClick={() => doSetViewMode("wireframe")} />
-                  <DropItem label="X-Ray" active={viewMode === "xray"} onClick={() => doSetViewMode("xray")} />
-                </>
-              }
-            />
-            <ToolBtn
-              icon={Palette}
-              label="Color By"
-              onClick={() => {}}
-              dropdown={
-                <>
-                  <DropItem label="Default" active={colorBy === "default"} onClick={() => doSetColorBy("default")} />
-                  <DropItem label="By Storey" active={colorBy === "storey"} onClick={() => doSetColorBy("storey")} />
-                  <DropItem label="By Category" active={colorBy === "category"} onClick={() => doSetColorBy("category")} />
-                </>
-              }
-            />
-            <ToolBtn icon={Grid3x3} label="Toggle Grid" onClick={() => v?.toggleGrid()} />
-            <ToolBtn icon={Layers} label="Toggle Edges" onClick={() => v?.toggleEdges()} />
-            <ToolBtn
-              icon={Waypoints}
-              label={ortho ? "Perspective" : "Orthographic"}
-              active={ortho}
-              onClick={() => {
-                const next = !ortho;
-                setOrtho(next);
-                v?.setProjection(next ? "orthographic" : "perspective");
-              }}
-            />
-
-            <div style={dividerStyle} />
-
-            {/* Selection actions */}
-            <ToolBtn icon={EyeOff} label="Hide Selected" shortcut="H" onClick={() => v?.hideSelected()} />
-            <ToolBtn icon={Scan} label="Isolate Selected" shortcut="I" onClick={() => v?.isolateSelected()} />
-            <ToolBtn icon={RotateCcw} label="Show All" shortcut="A" onClick={() => v?.showAll()} />
-
-            <div style={dividerStyle} />
-
-            {/* Export */}
-            <ToolBtn icon={Camera} label="Screenshot" shortcut="P" onClick={() => v?.takeScreenshot()} />
-            <ToolBtn
-              icon={Download}
-              label="Export CSV"
-              onClick={() => {
-                const csv = v?.getCSVData();
-                if (!csv) return;
-                const blob = new Blob([csv], { type: "text/csv" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `ifc-elements-${Date.now()}.csv`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-            />
           </>
         )}
 
-        {/* Spacer */}
-        <div style={{ flex: 1 }} />
+        {/* MIDDLE — scrollable tool strip. flex:1 + minWidth:0 + overflowX:auto
+            lets the row absorb extra width on wide viewports and degrade to
+            horizontal scroll on narrow ones, without bumping the pinned-right
+            CTA off-screen. */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            flex: 1,
+            minWidth: 0,
+            overflowX: "auto",
+            overflowY: "hidden",
+            scrollbarWidth: "thin",
+          }}
+        >
+          {/* File */}
+          <ToolBtn icon={FolderOpen} label="Open" onClick={onOpenFile} showLabel />
 
-        {/* Right side */}
+          {hasModel && (
+            <>
+              <div style={dividerStyle} />
+
+              {/* Navigation */}
+              <ToolBtn icon={Home} label="Fit All" shortcut="F" onClick={() => v?.fitToView()} showLabel />
+              <ToolBtn icon={Maximize} label="Fit" shortcut="V" onClick={() => v?.fitToSelection()} />
+
+              <ToolBtn
+                icon={Box}
+                label="Views"
+                showLabel
+                onClick={() => {}}
+                dropdown={
+                  <>
+                    {(["front", "back", "left", "right", "top", "bottom", "iso"] as PresetView[]).map((view) => (
+                      <DropItem key={view} label={view.charAt(0).toUpperCase() + view.slice(1)} onClick={() => v?.setPresetView(view)} />
+                    ))}
+                  </>
+                }
+              />
+
+              <div style={dividerStyle} />
+
+              {/* Tools */}
+              <ToolBtn
+                icon={Scissors}
+                label="Section"
+                shortcut="S"
+                showLabel
+                onClick={() => v?.toggleSectionPlane("x")}
+                dropdown={
+                  <>
+                    {(["x", "y", "z"] as SectionAxis[]).map((axis) => (
+                      <DropItem key={axis} label={`Section ${axis.toUpperCase()}`} onClick={() => v?.toggleSectionPlane(axis)} />
+                    ))}
+                  </>
+                }
+              />
+              <ToolBtn
+                icon={Ruler}
+                label={measuring ? "Stop" : "Measure"}
+                shortcut="M"
+                active={measuring}
+                showLabel
+                onClick={() => {
+                  if (measuring) {
+                    v?.cancelMeasurement();
+                    setMeasuring(false);
+                  } else {
+                    v?.startMeasurement();
+                    setMeasuring(true);
+                  }
+                }}
+              />
+              {/* Unit toggle (m/ft) */}
+              <button
+                onClick={onToggleUnit}
+                title={`Switch to ${measureUnit === "m" ? "feet/inches" : "meters"}`}
+                style={{
+                  ...btnBase,
+                  width: "auto",
+                  padding: "0 8px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: "var(--font-jetbrains)",
+                  color: UI.text.secondary,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = UI.text.primary; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = UI.text.secondary; }}
+              >
+                {measureUnit}
+              </button>
+
+              <div style={dividerStyle} />
+
+              {/* Visual */}
+              <ToolBtn
+                icon={Eye}
+                label="Style"
+                showLabel
+                onClick={() => {}}
+                dropdown={
+                  <>
+                    <DropItem label="Shaded" active={viewMode === "shaded"} onClick={() => doSetViewMode("shaded")} />
+                    <DropItem label="Wireframe" active={viewMode === "wireframe"} onClick={() => doSetViewMode("wireframe")} />
+                    <DropItem label="X-Ray" active={viewMode === "xray"} onClick={() => doSetViewMode("xray")} />
+                  </>
+                }
+              />
+              <ToolBtn
+                icon={Palette}
+                label="Color By"
+                onClick={() => {}}
+                dropdown={
+                  <>
+                    <DropItem label="Default" active={colorBy === "default"} onClick={() => doSetColorBy("default")} />
+                    <DropItem label="By Storey" active={colorBy === "storey"} onClick={() => doSetColorBy("storey")} />
+                    <DropItem label="By Category" active={colorBy === "category"} onClick={() => doSetColorBy("category")} />
+                  </>
+                }
+              />
+              <ToolBtn icon={Grid3x3} label="Toggle Grid" onClick={() => v?.toggleGrid()} />
+              <ToolBtn icon={Layers} label="Toggle Edges" onClick={() => v?.toggleEdges()} />
+              <ToolBtn
+                icon={Waypoints}
+                label={ortho ? "Perspective" : "Orthographic"}
+                active={ortho}
+                onClick={() => {
+                  const next = !ortho;
+                  setOrtho(next);
+                  v?.setProjection(next ? "orthographic" : "perspective");
+                }}
+              />
+
+              <div style={dividerStyle} />
+
+              {/* Selection actions */}
+              <ToolBtn icon={EyeOff} label="Hide Selected" shortcut="H" onClick={() => v?.hideSelected()} />
+              <ToolBtn icon={Scan} label="Isolate Selected" shortcut="I" onClick={() => v?.isolateSelected()} />
+              <ToolBtn icon={RotateCcw} label="Show All" shortcut="A" onClick={() => v?.showAll()} />
+
+              <div style={dividerStyle} />
+
+              {/* Export */}
+              <ToolBtn icon={Camera} label="Screenshot" shortcut="P" onClick={() => v?.takeScreenshot()} />
+              <ToolBtn
+                icon={Download}
+                label="Export CSV"
+                onClick={() => {
+                  const csv = v?.getCSVData();
+                  if (!csv) return;
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `ifc-elements-${Date.now()}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              />
+            </>
+          )}
+        </div>
+
+        {/* RIGHT — pinned: Calculate BOQ primary CTA only.
+            The X-close, Panel-Toggle, and Keyboard-Shortcuts header buttons
+            were removed (X 2026-05-18 — duplicated Upload New; Panel-Toggle +
+            Shortcuts 2026-05-18 follow-up — crowded the Calculate BOQ CTA and
+            caused avatar overlap at narrow viewports). Bottom panel still
+            toggles via the `[` keyboard shortcut and the in-panel minimize /
+            expand buttons; shortcuts overlay still toggles via the `?` key. */}
         {hasModel && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{
-              color: UI.text.tertiary,
-              fontSize: 11,
-              fontFamily: "var(--font-jetbrains)",
-              padding: "4px 12px",
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.06)",
-              letterSpacing: "0.3px",
-            }}>
-              {modelInfo.schema} · {modelInfo.elementCount} elements · {(modelInfo.fileSize / (1024 * 1024)).toFixed(1)} MB
-            </span>
-            <ToolBtn
-              icon={PanelBottomOpen}
-              label="Toggle Panels"
-              active={bottomPanelOpen}
-              onClick={onToggleBottomPanel}
-            />
-            <ToolBtn icon={Keyboard} label="Shortcuts" shortcut="?" onClick={onToggleShortcuts} />
-            <ToolBtn
-              icon={X}
-              label="Close Model"
-              onClick={onUnload}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <CalculateBOQButton
+              disabled={!canCalculateBOQ}
+              loading={boqLaunching}
+              onClick={onCalculateBOQ}
             />
           </div>
         )}

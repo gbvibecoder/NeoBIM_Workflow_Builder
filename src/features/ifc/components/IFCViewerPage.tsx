@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Viewport } from "@/features/ifc/components/Viewport";
 import { UploadZone } from "@/features/ifc/components/UploadZone";
 import { Toolbar } from "@/features/ifc/components/Toolbar";
@@ -83,7 +84,9 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
   const autoEnhancedRef = useRef(false);
   const [autoEnhancing, setAutoEnhancing] = useState(false);
   const [enhanceStatus, setEnhanceStatus] = useState<EnhanceStatus>({ kind: "idle" });
+  const [boqLaunching, setBoqLaunching] = useState(false);
   const bp = useBreakpoint();
+  const router = useRouter();
 
   /* Panel resize handler */
   useEffect(() => {
@@ -348,6 +351,18 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
     void clearLastIFCFile();
   }, []);
 
+  /* Calculate BOQ — launch the wf-09 "IFC Model → BOQ Cost Estimate" prebuilt
+     workflow with the currently-loaded IFC pre-attached. The IFC bytes are
+     already persisted to IndexedDB by loadBufferIntoViewer → saveLastIFCFile,
+     and the canvas's FileUploadInput auto-attach effect picks them up when it
+     sees ?autoAttachIFC=1 on the URL. Same handoff pattern as IntegrationBanner,
+     just promoted to a permanent header CTA. No R2 upload needed. */
+  const handleCalculateBOQ = useCallback(() => {
+    if (!currentFile || boqLaunching) return;
+    setBoqLaunching(true);
+    router.push("/dashboard/canvas?template=wf-09&autoAttachIFC=1");
+  }, [currentFile, boqLaunching, router]);
+
   const handleApplyEnhancement = useCallback(
     async (res: EnhanceSuccess) => {
       /* Reset Tier 1 enhancement before the Editor-driven reload — same
@@ -532,13 +547,13 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
           viewportRef={viewportRef}
           modelInfo={modelInfo}
           onOpenFile={handleOpenFile}
-          onUnload={handleUnload}
-          bottomPanelOpen={bottomPanelOpen}
-          onToggleBottomPanel={() => setBottomPanelOpen((p) => !p)}
           showShortcuts={showShortcuts}
           onToggleShortcuts={() => setShowShortcuts((p) => !p)}
           measureUnit={measureUnit}
           onToggleUnit={handleToggleUnit}
+          onCalculateBOQ={handleCalculateBOQ}
+          canCalculateBOQ={currentFile !== null}
+          boqLaunching={boqLaunching}
         />
           </div>
         </div>
