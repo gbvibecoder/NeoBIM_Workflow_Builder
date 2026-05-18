@@ -105,17 +105,46 @@ These are injected into the sandbox namespace alongside `bf` and `math`:
 - NEVER invent RGB material values when `resolve_material` returns a match.
 - NEVER use millimetres. ALL dimensions are METRES.
 
-## Section 4b: Furniture Parts — How to Handle
+## Section 4b: Decomposed Furniture — Parts Handling
 
-Each entry in `spec["furniture"]` may or may not have a `parts` array.
+Each entry in briefSpec.furniture[] may have a `parts` array. Handling rules are STRICT and NON-NEGOTIABLE.
 
-**CASE A** — `parts` is present and non-empty:
-Build the parent IfcFurnishingElement at item position with item type as Name. For EACH part in `parts[]`, build a separate IfcFurnishingElement (or `part["ifc_class"]`) with world position computed as `item_position + part["origin_local_m"]` (rotated by item rotation around Z if non-zero). Use `part["shape"]` ("box" or "cylinder") with `part["dims_m"]`. Resolve material via `resolve_material(part["material_id"], archetype, part["ifc_class"])`. Apply `bf.attach_canonical_psets` and `bf.attach_canonical_qto` on each child. Link ALL parts to parent via ONE `IfcRelAggregates` call.
+**CASE A** — parts present and non-empty (length >= 1):
 
-**CASE B** — `parts` is absent or empty:
-Build a single IfcFurnishingElement at item position with item dims as bounding box. This is the standard fallback. Do NOT search for parts that are not there. Move on immediately.
+STEP A1. Create parent IfcFurnishingElement at item.position. Name = item.id, ObjectType = item.type.
 
-**CRITICAL:** Build ALL furniture in a SINGLE `run_python` tool call. Do not make one tool call per piece of furniture. Write one Python block that iterates `spec["furniture"]` and creates everything in one execution. Same for walls, slabs, openings — batch them.
+STEP A2. For EVERY part in item.parts (do not skip any, do not collapse any):
+- Create child element of class part.ifc_class (default IfcFurnishingElement)
+- World position = item.position + part.origin_local_m, rotated by item.rotation around Z if non-zero
+- Geometry: build SweptSolid per part.shape ("box" or "cylinder") with part.dims_m
+- Attach Pset_FurnitureTypeCommon
+- Style with part.material_id
+- Contain in the same IfcSpace as the parent
+
+STEP A3. Create ONE IfcRelAggregates linking parent to ALL children. This step is MANDATORY. Without it, the parts are loose and the IFC is structurally invalid as a composite assembly.
+
+**CASE B** — parts absent or empty array:
+Build a single IfcFurnishingElement at item.position with item.dims as a single bounding box.
+
+CRITICAL — DO NOT COLLAPSE PARTS:
+If parts.length is 10, you build 10 child elements + 1 parent + 1 IfcRelAggregates = 12 IFC entities. If you build fewer, you have a bug. The verifier will read the spec and count back — discrepancy = failure.
+
+CRITICAL — BATCH ALL FURNITURE IN ONE run_python CALL:
+Iterate briefSpec.furniture[] inside a single Python block. Do not make one tool call per item or per part. One run_python call must build all parents, children, and IfcRelAggregates relationships together.
+
+## Section 4c: Floor Finishes
+
+If briefSpec.materials[] or the brief text references a floor finish material distinct from the structural slab material (e.g. "polished concrete", "vinyl tile", "epoxy", "wood plank"), build an IfcCovering on top of the structural floor slab.
+
+Pattern:
+- IfcCovering with PredefinedType FLOORING
+- Placed at z = slab_top (just above the structural slab)
+- Thickness 20-50mm per material convention
+- Material from resolved finish via resolve_material()
+- Attach Pset_CoveringCommon
+- Contain in the same storey as the slab
+
+Without IfcCovering, BIM tools cannot distinguish "concrete structural slab" from "polished concrete floor finish" — they are semantically and practically different.
 
 ## Section 5: Worked Example
 

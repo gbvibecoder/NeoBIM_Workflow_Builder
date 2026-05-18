@@ -533,19 +533,9 @@ export function useResultPageData(executionId: string): ResultPageData {
       .map(a => asStr(asRecord(a.data).url) ?? "")
       .filter(Boolean);
 
-    // EX-007 emits `type: "file"` for the IFC export. Its data carries
-    // preview PNG URLs (topPngUrl / isoPngUrl) that the existing image
-    // grid would otherwise miss — file artifacts aren't scanned for
-    // `url`. Lift them in here so the GeneratedAssetsSection thumbnail
-    // grid still renders the renders, even though the primary artifact
-    // is now classified as a file download.
-    for (const a of findAllByType(artifacts, "file")) {
-      const d = asRecord(a.data);
-      const top = asStr(d.topPngUrl);
-      const iso = asStr(d.isoPngUrl);
-      if (top) allImageUrls.push(top);
-      if (iso) allImageUrls.push(iso);
-    }
+    // Phase Beta 1: PNG preview rendering removed from EX-007. File
+    // artifacts no longer carry topPngUrl/isoPngUrl. This block is
+    // intentionally empty — kept as a comment to prevent re-introduction.
 
     const heroImageUrl = allImageUrls[0] ?? null;
 

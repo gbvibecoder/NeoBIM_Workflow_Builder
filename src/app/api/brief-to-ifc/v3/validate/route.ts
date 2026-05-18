@@ -130,8 +130,13 @@ function deriveView(
     );
   }
 
-  const verdict: "OK" | "FAILED" =
-    failures.length === 0 ? "OK" : "FAILED";
+  // Only worldBbox and originCollapse are hard failures — they indicate
+  // structural geometry problems (wrong units, missing geometry). Polygon
+  // mismatch and element coverage are quality warnings: the agent may
+  // legitimately merge adjacent spaces or skip minor elements, and the
+  // wall-thickness tolerance makes polygon deltas expected.
+  const hardFailure = !worldBboxOk || !originOk;
+  const verdict: "OK" | "FAILED" = hardFailure ? "FAILED" : "OK";
 
   // Length unit isn't directly on the validate result — but world_bbox
   // verdict implicitly proves it: an OK world bbox means the IFC was

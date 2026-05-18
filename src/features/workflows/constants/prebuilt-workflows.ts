@@ -128,7 +128,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 1460, y: 300 },
           data: {
             catalogueId: "EX-007",
-            label: "IFC Export + Preview",
+            label: "IFC Export",
             category: "export",
             status: "idle",
             inputs: [{ id: "ifc-in", label: "Validated IFC", type: "ifc" }],

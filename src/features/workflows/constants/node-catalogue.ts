@@ -795,9 +795,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   },
   {
     id: "EX-007",
-    name: "IFC Export + Preview",
+    name: "IFC Export",
     description:
-      "Final stage of the AI IFC pipeline — exposes the IFC R2 URL, deep link to the BIM viewer, and renders top + isometric PNG previews so users see the building right on canvas.",
+      "Final stage of the AI IFC pipeline — exposes the IFC R2 URL and deep link to the BIM viewer. Passthrough of the finalized IFC asset.",
     category: "export",
     icon: "FileBox",
     inputs: [
@@ -805,11 +805,10 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     ],
     outputs: [
       { id: "ifc-out", label: "IFC File", type: "ifc" },
-      { id: "previews-out", label: "Top + Iso PNGs", type: "image" },
     ],
-    apiEngine: "BuildFlow Preview Sandbox (Railway, matplotlib + ifcopenshell.geom)",
-    tags: ["ifc", "preview", "matplotlib", "v3", "render", "export"],
-    executionTime: "5-15s",
+    apiEngine: "R2 passthrough (no sandbox call)",
+    tags: ["ifc", "v3", "export", "download"],
+    executionTime: "< 1s",
   },
 ];
 

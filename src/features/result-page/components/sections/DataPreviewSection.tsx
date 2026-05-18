@@ -68,7 +68,16 @@ export function DataPreviewSection({ data, index }: DataPreviewSectionProps) {
     : data.model3dData?.kind === "html-iframe"
       ? data.model3dData.label?.toLowerCase()
       : null;
+  // IFC export workflows: suppress all JSON debug blobs (briefSpec,
+  // metrics, validator output) — the hero card shows the summary and
+  // the user can download the raw IFC. Debug data clutters the page.
+  const isIfcExport = !!data.ifcExport;
+
   const jsonToShow = data.jsonData.filter(item => {
+    // Hide ALL json blocks for IFC export workflows — hero card is
+    // the user-facing surface; JSON debug is developer-only noise.
+    if (isIfcExport) return false;
+
     // Hide json whose payload IS the hero's data (presence of floorPlanProject
     // key is the marker)
     if (hasFloorPlanInteractive && item.json && Object.prototype.hasOwnProperty.call(item.json, "floorPlanProject")) {
