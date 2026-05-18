@@ -394,6 +394,25 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     tags: ["validate", "geometry", "bbox", "ifc", "v3", "qa"],
     executionTime: "< 3s",
   },
+  {
+    id: "TR-028",
+    name: "Item Decomposer",
+    description:
+      "Decomposes named furniture/equipment items into their physical parts via parallel Opus calls. Each item gets a parts[] array with 6+ sub-components for realistic multi-part IFC entities.",
+    category: "transform",
+    icon: "Wand2",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+      { id: "classification-in", label: "Classification", type: "text" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (with parts)", type: "json" },
+      { id: "metrics-out", label: "Decomposer Metrics", type: "json" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 (parallel tool_use)",
+    tags: ["ai", "decompose", "furniture", "parts", "ifc", "v3", "anthropic"],
+    executionTime: "5-20s",
+  },
 
   // ── Brief-to-IFC v2 (Phase 1) — AI-powered faithful IFC creation ──
   {
@@ -859,7 +878,7 @@ export const CATEGORY_CONFIG = {
  *  was the source of the "DEMO" badge bug (Phase 0 §1.2). TR-024/TR-022/
  *  EX-006 are the Brief-to-IFC v2 (Phase 1) nodes (retired). TR-025/26/27
  *  and EX-007 are the v3 Canvas Unification nodes (2026-05-17). */
-export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
+export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'TR-028', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {

@@ -44,6 +44,7 @@ import { handleEX006 } from "./ex-006";
 import { handleTR025 } from "./tr-025";
 import { handleTR026 } from "./tr-026";
 import { handleTR027 } from "./tr-027";
+import { handleTR028 } from "./tr-028";
 import { handleEX007 } from "./ex-007";
 
 export const nodeHandlers: Record<string, NodeHandler> = {
@@ -63,6 +64,7 @@ export const nodeHandlers: Record<string, NodeHandler> = {
   "TR-025": handleTR025,
   "TR-026": handleTR026,
   "TR-027": handleTR027,
+  "TR-028": handleTR028,
   "GN-001": handleGN001,
   "GN-003": handleGN003,
   "GN-004": handleGN004,

@@ -150,6 +150,29 @@ export const furnitureLayoutSchema = z.object({
   offset_m: z.number().min(0).optional(),
 });
 
+/** Shape of a decomposed furniture part (Phase Alpha: Item Decomposer). */
+export const furniturePartSchema = z.object({
+  id: z.string().min(1).max(64),
+  subtype: z.string().max(200),
+  origin_local_m: z.tuple([z.number(), z.number(), z.number()]),
+  dims_m: z.tuple([
+    z.number().positive(),
+    z.number().positive(),
+    z.number().positive(),
+  ]),
+  shape: z.enum(["box", "cylinder"]).default("box"),
+  rotation_z_rad: z.number().default(0),
+  material_id: z.string().min(1),
+  ifc_class: z
+    .enum([
+      "IfcFurnishingElement",
+      "IfcSystemFurnitureElement",
+      "IfcDiscreteAccessory",
+    ])
+    .default("IfcFurnishingElement"),
+  notes: z.string().max(500).optional(),
+});
+
 export const briefFurnitureSchema = z.object({
   id: z.string().min(1).max(64),
   type: z.string().max(200),
@@ -161,13 +184,11 @@ export const briefFurnitureSchema = z.object({
     z.number().positive(),
     z.number().positive(),
   ]).optional(),
-  parts: z.array(z.object({
-    id: z.string().min(1).max(64),
-    type: z.string().max(200),
-    relative_origin: z.tuple([z.number(), z.number(), z.number()]),
-    dims_m: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]),
-    material_id: z.string().min(1),
-  })).optional(),
+  /** Decomposed physical parts — populated by the Item Decomposer
+   *  (TR-028) between enrichment and agent building. When present, the
+   *  agent builder creates a parent + child IfcFurnishingElements linked
+   *  via IfcRelAggregates. When absent, falls back to single-box. */
+  parts: z.array(furniturePartSchema).optional(),
   material_id: z.string().min(1),
   description: z.string().max(1000).default(""),
 });
@@ -217,6 +238,7 @@ export type BriefSpace = z.infer<typeof briefSpaceSchema>;
 export type BriefElement = z.infer<typeof briefElementSchema>;
 export type BriefMaterial = z.infer<typeof briefMaterialSchema>;
 export type BriefOpening = z.infer<typeof briefOpeningSchema>;
+export type FurniturePart = z.infer<typeof furniturePartSchema>;
 export type BriefFurniture = z.infer<typeof briefFurnitureSchema>;
 export type BriefLighting = z.infer<typeof briefLightingSchema>;
 export type GlobalParameters = z.infer<typeof globalParametersSchema>;

@@ -11,6 +11,8 @@ export type {
   BriefSpace,
   BriefElement,
   BriefMaterial,
+  BriefFurniture,
+  FurniturePart,
   BriefEnrichmentResult,
   GeneratorResult,
   AgentTokenLedgerEntry,
@@ -28,6 +30,7 @@ export {
   briefSpaceSchema,
   briefElementSchema,
   briefMaterialSchema,
+  furniturePartSchema,
 } from "./types";
 
 export {
@@ -38,3 +41,5 @@ export {
 
 export { enrichBrief } from "./brief-enrichment";
 export { runGenerator } from "./generator/driver";
+export { decomposeBriefSpecItems } from "./item-decomposer";
+export type { DecomposerMetrics, DecomposerResult } from "./item-decomposer";

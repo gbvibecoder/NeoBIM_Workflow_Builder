@@ -607,6 +607,94 @@ class BuildFlowIFC:
             contained_in_space_id=contained_in_space_id,
         )
 
+    def add_furniture_part(
+        self,
+        parent_id: str,
+        part_spec: Dict[str, Any],
+        item_world_origin: Tuple[float, float, float],
+        item_rotation: float = 0.0,
+    ) -> Any:
+        """Build a single furniture part as an IfcFurnishingElement.
+
+        `part_spec` follows the Phase Alpha decomposer schema:
+            id, subtype, origin_local_m, dims_m, shape, rotation_z_rad,
+            material_id, ifc_class, notes
+
+        Returns the IFC entity for later aggregation.
+        """
+        import math as _math
+
+        local = part_spec.get("origin_local_m", [0, 0, 0])
+        cos_r = _math.cos(item_rotation)
+        sin_r = _math.sin(item_rotation)
+        rx = local[0] * cos_r - local[1] * sin_r
+        ry = local[0] * sin_r + local[1] * cos_r
+        world_origin = (
+            item_world_origin[0] + rx,
+            item_world_origin[1] + ry,
+            item_world_origin[2] + local[2],
+        )
+
+        dims_m = part_spec.get("dims_m", [0.1, 0.1, 0.1])
+        shape = part_spec.get("shape", "box")
+        ifc_class = part_spec.get("ifc_class", "IfcFurnishingElement")
+        mat_id = part_spec.get("material_id", "mat-paint-white")
+        subtype = part_spec.get("subtype", "")
+        part_id = f"{parent_id}-{part_spec.get('id', 'part')}"
+
+        # For cylinders, dims_m = [radius, radius, height]; use radius
+        # as both x/y dims for the bounding box approach.
+        if shape == "cylinder":
+            box_dims = (dims_m[0] * 2, dims_m[1] * 2)
+            box_depth = dims_m[2]
+        else:
+            box_dims = (dims_m[0], dims_m[1])
+            box_depth = dims_m[2]
+
+        return self._add_box_element(
+            ifc_class=ifc_class if ifc_class in (
+                "IfcFurnishingElement", "IfcSystemFurnitureElement",
+                "IfcDiscreteAccessory",
+            ) else "IfcFurnishingElement",
+            element_id=part_id, origin=world_origin,
+            dims=box_dims, depth=box_depth,
+            material=mat_id, predefined_type=None,
+            object_type=subtype,
+            description=part_spec.get("notes", f"Part of {parent_id}"),
+            tag=part_id,
+            contained_in_space_id=None,
+        )
+
+    def aggregate_parts(
+        self,
+        parent_id: str,
+        child_ids: list,
+        label: str = "",
+    ) -> None:
+        """Link child IFC entities to a parent via IfcRelAggregates."""
+        import ifcopenshell.guid as _guid
+
+        parent_el = self._elements_by_id.get(parent_id)
+        if not parent_el:
+            return
+        children = [
+            self._elements_by_id[cid]
+            for cid in child_ids
+            if cid in self._elements_by_id
+        ]
+        if not children:
+            return
+        oh_list = self._ifc.by_type("IfcOwnerHistory")
+        oh = oh_list[0] if oh_list else None
+        self._ifc.create_entity(
+            "IfcRelAggregates",
+            GlobalId=_guid.new(),
+            OwnerHistory=oh,
+            Name=label or f"Aggregates {parent_id}",
+            RelatingObject=parent_el,
+            RelatedObjects=children,
+        )
+
     def add_light_fixture(
         self,
         l_id: str,

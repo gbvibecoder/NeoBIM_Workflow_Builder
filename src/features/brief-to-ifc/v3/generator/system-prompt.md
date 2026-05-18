@@ -105,6 +105,29 @@ These are injected into the sandbox namespace alongside `bf` and `math`:
 - NEVER invent RGB material values when `resolve_material` returns a match.
 - NEVER use millimetres. ALL dimensions are METRES.
 
+## Section 4b: Decomposed Furniture — Parts Handling
+
+When `spec["furniture"][i]["parts"]` is present and non-empty:
+
+1. Create a PARENT `IfcFurnishingElement` for the item using `bf.add_furniture(item_id, item_origin, item_dims, item_depth, item_material, ...)`. Place it at the item's world position.
+2. For each part in `parts[]`, create a CHILD element using `bf.add_furniture(child_id, world_origin, (part.dims_m[0], part.dims_m[1]), part.dims_m[2], part.material_id, ...)`:
+   - `child_id` = `f"{item_id}-{part['id']}"`
+   - `world_origin` = item world origin + part `origin_local_m` (apply item rotation if non-zero)
+   - Dimensions from `part.dims_m` — for `shape: "cylinder"`, first two are radius (equal), third is height
+   - Material from `part.material_id` — resolve via `resolve_material(part['material_id'], archetype, part['ifc_class'])`
+   - Call `bf.attach_canonical_psets(child_id)` and `bf.attach_canonical_qto(child_id)` on each child
+3. Link all children to parent via `IfcRelAggregates`:
+   ```python
+   oh = bf._ifc.by_type("IfcOwnerHistory")[0]
+   bf._ifc.create_entity("IfcRelAggregates",
+       GlobalId=ifcopenshell.guid.new(), OwnerHistory=oh,
+       Name=f"Decomposed {item_id}",
+       RelatingObject=parent_element, RelatedObjects=child_elements)
+   ```
+4. Contain the PARENT in the appropriate `IfcSpace` via `contained_in_space_id`.
+
+When `parts[]` is absent or empty: fall back to current single-box `bf.add_furniture(...)` or `compose_furniture(...)` behavior. Do NOT skip the item.
+
 ## Section 5: Worked Example
 
 Brief: "10x4m office, 3m ceiling. 1 door north wall at 2m. 2 windows south wall at 1.5m and 5m. 4 workstations."

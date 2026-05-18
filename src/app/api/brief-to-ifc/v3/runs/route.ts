@@ -43,6 +43,7 @@ import {
   briefSpecSchema,
   enrichBrief,
   runGenerator,
+  decomposeBriefSpecItems,
   shouldUseBriefToIfcV3,
   type BriefSpec,
 } from "@/features/brief-to-ifc/v3";
@@ -191,6 +192,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // ── Item Decomposer (Phase Alpha) ──────────────────────────────────
+  // Runs BETWEEN enrichment and row creation. Mutates briefSpec by
+  // embedding `parts[]` on each furniture entry via parallel Opus calls.
+  // Non-fatal: if the decomposer fails or hits cost guardrails, the run
+  // continues with un-decomposed items (single-box fallback).
+  let decomposerCostUsd = 0;
+  let decomposerDurationMs = 0;
+  let decomposerTotalParts = 0;
+  try {
+    const decomposerResult = await decomposeBriefSpecItems(briefSpec, undefined);
+    briefSpec = decomposerResult.spec;
+    decomposerCostUsd = decomposerResult.metrics.cost_usd;
+    decomposerDurationMs = decomposerResult.metrics.wall_time_ms;
+    decomposerTotalParts = decomposerResult.metrics.total_parts;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[bf-v3 /runs] Item decomposer failed (non-fatal):`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+
   // Create the run row in PENDING. The row's existence is the
   // observability anchor — the diagnostic CLI keys off `id` here.
   const run = await prisma.briefToIfcV3Run.create({
@@ -219,10 +242,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   await appendLog(prisma, {
     executionId: run.id, level: "INFO", source: "LIFECYCLE",
-    message: `Run created (briefSpec snapshot persisted). Background work dispatching.`,
+    message:
+      `Run created (briefSpec snapshot persisted, ` +
+      `${decomposerTotalParts} parts decomposed). Background work dispatching.`,
     metadata: {
       hasEnrichment: enrichmentCostUsd > 0,
       enrichmentCostUsd, enrichmentDurationMs,
+      decomposerCostUsd, decomposerDurationMs, decomposerTotalParts,
       maxTurns: body.max_turns ?? null,
       costCapUsd: body.cost_cap_usd ?? null,
     },

@@ -23,7 +23,7 @@ import type { NodeHandlerContext } from "./handlers";
 // EX-006 retained — their handlers return 410, but the dispatcher
 // still routes there so the user gets a clean error instead of a
 // generic NODE_NOT_IMPLEMENTED.
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "TR-013", "TR-014", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "TR-013", "TR-014", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "TR-028", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
 
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
