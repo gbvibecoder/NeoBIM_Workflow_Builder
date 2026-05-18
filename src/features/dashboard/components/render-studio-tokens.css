@@ -45,4 +45,18 @@
   --rs-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --rs-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
   --rs-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Extended palette — added 2026-05-18 for Phase Z.IFC.1 (IFC viewer
+     Light Render Studio renovation). Additive; existing tokens unchanged. */
+  --rs-trace: #FBF9F4;                            /* slightly warmer than bone, paper variant for panel insets */
+  --rs-rule-stronger: rgba(14, 18, 24, 0.22);     /* heaviest separator (selected/active borders) */
+  --rs-text-faint: rgba(14, 18, 24, 0.32);        /* very muted helper text */
+  --rs-blueprint-soft: rgba(26, 77, 92, 0.08);    /* tinted background for blueprint accents */
+  --rs-blueprint-line: rgba(26, 77, 92, 0.22);    /* tinted border for blueprint accents */
+  --rs-sage-soft: rgba(74, 107, 77, 0.10);        /* tinted background for success state */
+  --rs-burnt-soft: rgba(194, 106, 59, 0.10);      /* tinted background for warning/danger accents */
+  --rs-amber-mark: #E0A93A;                       /* highlighter amber for AI-Beta pills */
+  --rs-amber-soft: rgba(224, 169, 58, 0.10);      /* tinted background for amber pills */
+  --rs-status-error: #B23A48;                     /* error red — desaturated for paper theme */
+  --rs-status-error-soft: rgba(178, 58, 72, 0.08);
 }

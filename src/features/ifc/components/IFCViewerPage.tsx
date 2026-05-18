@@ -11,7 +11,7 @@ import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
 import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
-import { Sparkles, PanelRightClose, PanelRightOpen, ArrowLeft } from "lucide-react";
+import { Sparkles, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
 import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/components/IFCEnhancePanel";
 import { ViewerSkeleton } from "@/features/ifc/components/ViewerSkeleton";
@@ -85,6 +85,21 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
   const bp = useBreakpoint();
   const router = useRouter();
 
+  /* Hydrate persisted panel width once on mount (Phase Z.IFC.1 opportunity
+     #8 — keep the user's chosen width across reloads). */
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("buildflow.ifc-viewer.panelWidth");
+      if (!raw) return;
+      const v = parseInt(raw, 10);
+      if (Number.isFinite(v) && v >= 240 && v <= 800) {
+        setPanelWidth(v);
+      }
+    } catch {
+      /* sandboxed / disabled localStorage — fall back to default 360 */
+    }
+  }, []);
+
   /* Panel resize handler */
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
@@ -97,6 +112,16 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
       setPanelWidth(Math.max(240, Math.min(cap, newWidth)));
     };
     const onMouseUp = () => {
+      if (resizingRef.current) {
+        try {
+          window.localStorage.setItem(
+            "buildflow.ifc-viewer.panelWidth",
+            String(panelWidth),
+          );
+        } catch {
+          /* ignore */
+        }
+      }
       resizingRef.current = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
@@ -107,7 +132,7 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
-  }, []);
+  }, [panelWidth]);
 
   const hasModel = modelInfo !== null;
 
@@ -471,12 +496,12 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: UI.bg.base,
+        background: UI.bg.page,
         position: "relative",
         borderRadius: 8,
         overflow: "hidden",
-        border: "1px solid rgba(255,255,255,0.06)",
-        boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
+        border: `1px solid ${UI.border.subtle}`,
+        boxShadow: UI.shadow.card,
       }}
     >
       <input
@@ -488,62 +513,25 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
       />
 
       {/* Back button + Toolbar — only show once a model is loaded */}
-      {hasModel && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 0,
-          }}
-        >
-          <button
-            onClick={handleUnload}
-            title="Back to Upload"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "4px 10px",
-              margin: "4px 0 4px 8px",
-              background: "rgba(99,130,255,0.10)",
-              border: "1px solid rgba(99,130,255,0.20)",
-              borderRadius: UI.radius.sm,
-              color: UI.text.primary,
-              fontSize: 11.5,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: UI.transition,
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(99,130,255,0.20)";
-              e.currentTarget.style.borderColor = "rgba(99,130,255,0.35)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(99,130,255,0.10)";
-              e.currentTarget.style.borderColor = "rgba(99,130,255,0.20)";
-            }}
-          >
-            <ArrowLeft size={13} />
-            Upload New
-          </button>
-          <div style={{ flex: 1, minWidth: 0 }}>
-        <Toolbar
-          viewportRef={viewportRef}
-          modelInfo={modelInfo}
-          onOpenFile={handleOpenFile}
-          showShortcuts={showShortcuts}
-          onToggleShortcuts={() => setShowShortcuts((p) => !p)}
-          measureUnit={measureUnit}
-          onToggleUnit={handleToggleUnit}
-          onCalculateBOQ={handleCalculateBOQ}
-          canCalculateBOQ={currentFile !== null}
-          boqLaunching={boqLaunching}
-        />
-          </div>
-        </div>
-      )}
+      {/* Toolbar (Phase Z.IFC.1 — Light Render Studio). Owns its own
+          Upload New + file identity, so the previous "Back to Upload"
+          wrapper button is gone. handleUnload is still invoked when the
+          user picks a new file (handleFileSelected wipes prior state).
+          Toolbar renders whether or not a model is loaded; the inner
+          middle tool strip only appears when hasModel. */}
+      <Toolbar
+        viewportRef={viewportRef}
+        modelInfo={modelInfo}
+        onOpenFile={handleOpenFile}
+        onUnload={handleUnload}
+        showShortcuts={showShortcuts}
+        onToggleShortcuts={() => setShowShortcuts((p) => !p)}
+        measureUnit={measureUnit}
+        onToggleUnit={handleToggleUnit}
+        onCalculateBOQ={handleCalculateBOQ}
+        canCalculateBOQ={currentFile !== null}
+        boqLaunching={boqLaunching}
+      />
 
       {/* Integration banner — full-width bar between toolbar and viewport */}
       {hasModel && <IntegrationBanner visible={hasModel} />}
@@ -665,10 +653,9 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
               top: 0,
               right: 0,
               bottom: 0,
-              borderLeft: "2px solid rgba(0,245,255,0.5)",
-              background: "rgba(12,12,20,0.98)",
-              backdropFilter: "blur(12px)",
-              boxShadow: "-8px 0 24px rgba(0,0,0,0.5), inset 2px 0 0 rgba(0,245,255,0.12)",
+              borderLeft: `2px solid var(--rs-blueprint-line)`,
+              background: UI.bg.trace,
+              boxShadow: "-2px 0 12px rgba(14,18,24,0.06), inset 2px 0 0 var(--rs-blueprint-soft)",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
@@ -695,34 +682,31 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                   background: "transparent",
                   transition: "background 0.15s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(79,138,255,0.3)"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--rs-blueprint-line)"; }}
                 onMouseLeave={(e) => { if (!resizingRef.current) e.currentTarget.style.background = "transparent"; }}
               />
             )}
 
             {bottomPanelOpen ? (
               <>
-                {/* Panel header with tabs */}
+                {/* Panel header with tabs — Phase Z.IFC.1 light theme */}
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    borderBottom: "1px solid rgba(255,255,255,0.04)",
-                    background: UI.bg.base,
+                    borderBottom: `1px solid ${UI.border.subtle}`,
+                    background: UI.bg.paper,
                     flexShrink: 0,
                   }}
                 >
-                  {(["tree", "properties", "editor", "enhance-ai"] as const).map((tab) => {
+                  {(["enhance-ai", "editor", "tree", "properties"] as const).map((tab) => {
                     const active = bottomTab === tab;
                     const label =
-                      tab === "tree" ? "Tree"
-                      : tab === "properties" ? "Properties"
-                      : tab === "editor" ? "Editor"
-                      : "Enhance";
-                    /* Cyan accent is reserved for the new AI Enhance tab — signals
-                       it's the flagship feature. Editor uses the standard blue. */
+                      tab === "enhance-ai" ? "Enhance"
+                      : tab === "editor" ? "Edit"
+                      : tab === "tree" ? "Tree"
+                      : "Inspect";
                     const isEnhanceAI = tab === "enhance-ai";
-                    const activeColor = isEnhanceAI ? UI.accent.cyan : UI.accent.blue;
                     return (
                       <button
                         key={tab}
@@ -730,25 +714,32 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                         style={{
                           flex: 1,
                           padding: "10px 0",
-                          background: "transparent",
+                          background: active ? UI.bg.trace : "transparent",
                           borderWidth: 0,
                           borderBottomWidth: 2,
                           borderBottomStyle: "solid",
-                          borderBottomColor: active ? activeColor : "transparent",
-                          color: active ? activeColor : UI.text.tertiary,
+                          borderBottomColor: active ? "var(--rs-blueprint)" : "transparent",
+                          color: active ? UI.text.primary : UI.text.tertiary,
                           fontSize: 10.5,
-                          fontWeight: 600,
+                          fontWeight: active ? 700 : 600,
                           cursor: "pointer",
                           textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          transition: "color 0.15s",
+                          letterSpacing: 0.6,
+                          transition: UI.transition,
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
                           gap: 5,
+                          fontFamily: UI.font.mono,
                         }}
                       >
-                        {isEnhanceAI && <Sparkles size={11} strokeWidth={2.2} />}
+                        {isEnhanceAI && (
+                          <Sparkles
+                            size={11}
+                            strokeWidth={2.2}
+                            color={active ? "var(--rs-blueprint)" : UI.text.tertiary}
+                          />
+                        )}
                         {label}
                       </button>
                     );
@@ -774,7 +765,7 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = UI.text.primary;
-                      e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                      e.currentTarget.style.background = "var(--rs-cream)";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.color = UI.text.secondary;
@@ -839,42 +830,104 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
 
       </div>
 
-      {/* Bottom status bar — schema / element count / file size. Moved here
-          from the toolbar (2026-05-18 follow-up: header was eating too much
-          vertical space). Sits below the viewport's flex-1 row so the right
-          sidebar's absolute positioning doesn't overlap it. */}
+      {/* Bottom status bar — Phase Z.IFC.1 Light Render Studio.
+          SCHEMA · ELEMENTS · SIZE · DETECTED chips + italic Fraunces filename
+          on the right. Sits below the viewport flex row; sidebar absolute
+          positioning never overlaps it. */}
       {hasModel && modelInfo && (
         <div
           style={{
             flexShrink: 0,
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            padding: "3px 14px",
-            background: "rgba(7,7,13,0.94)",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
-            color: UI.text.tertiary,
-            fontSize: 10.5,
-            fontFamily: "var(--font-jetbrains)",
-            letterSpacing: "0.3px",
-            minHeight: 22,
+            gap: 16,
+            padding: "0 16px",
+            height: 32,
+            background: UI.bg.paper,
+            borderTop: `1px solid ${UI.border.subtle}`,
             whiteSpace: "nowrap",
             overflow: "hidden",
           }}
         >
-          <span>{modelInfo.schema}</span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>{modelInfo.elementCount} elements</span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>{(modelInfo.fileSize / (1024 * 1024)).toFixed(1)} MB</span>
+          <StatusChip label="Schema" value={modelInfo.schema} />
+          <StatusChip label="Elements" value={String(modelInfo.elementCount)} />
+          <StatusChip
+            label="Size"
+            value={`${(modelInfo.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+          />
+          <StatusChip
+            label="Detected"
+            value="Residential"
+            accent="sage"
+          />
           <span style={{ flex: 1 }} />
           {currentFile && (
-            <span style={{ opacity: 0.65 }}>{currentFile.name}</span>
+            <span
+              style={{
+                fontSize: 12,
+                fontStyle: "italic",
+                fontFamily: UI.font.display,
+                color: UI.text.secondary,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: "40%",
+              }}
+              title={currentFile.name}
+            >
+              {currentFile.name}
+            </span>
           )}
         </div>
       )}
 
     </div>
+  );
+}
+
+/* ─── Small status chip used by the bottom bar ──────────────────────────── */
+function StatusChip({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: "blueprint" | "sage";
+}) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 10,
+        fontFamily: UI.font.mono,
+        letterSpacing: 0.6,
+      }}
+    >
+      <span
+        style={{
+          color: UI.text.tertiary,
+          textTransform: "uppercase",
+          fontWeight: 700,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          color:
+            accent === "sage"
+              ? UI.accent.sage
+              : accent === "blueprint"
+                ? UI.accent.blueprint
+                : UI.text.primary,
+          fontWeight: 600,
+        }}
+      >
+        {value}
+      </span>
+    </span>
   );
 }
 
@@ -909,7 +962,7 @@ function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
         height: "100%",
       }}
     >
-      {/* Top: expand button */}
+      {/* Top: expand button — Phase Z.IFC.1 light theme */}
       <button
         type="button"
         onClick={onExpand}
@@ -921,20 +974,20 @@ function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "rgba(0,245,255,0.08)",
-          border: "1px solid rgba(0,245,255,0.3)",
-          color: UI.accent.cyan,
+          background: "var(--rs-blueprint-soft)",
+          border: `1px solid var(--rs-blueprint-line)`,
+          color: UI.accent.blueprint,
           cursor: "pointer",
           borderRadius: 8,
           marginBottom: 6,
-          transition: "background 0.15s, transform 0.15s",
+          transition: UI.transition,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(0,245,255,0.14)";
+          e.currentTarget.style.background = "var(--rs-blueprint-line)";
           e.currentTarget.style.transform = "translateY(-1px)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = "rgba(0,245,255,0.08)";
+          e.currentTarget.style.background = "var(--rs-blueprint-soft)";
           e.currentTarget.style.transform = "translateY(0)";
         }}
       >
@@ -957,17 +1010,17 @@ function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: isActive ? "rgba(79,138,255,0.12)" : "transparent",
-              border: `1px solid ${isActive ? "rgba(79,138,255,0.35)" : "transparent"}`,
-              color: isActive ? UI.accent.blue : UI.text.secondary,
+              background: isActive ? "var(--rs-blueprint-soft)" : "transparent",
+              border: `1px solid ${isActive ? "var(--rs-blueprint-line)" : "transparent"}`,
+              color: isActive ? UI.accent.blueprint : UI.text.secondary,
               cursor: "pointer",
               borderRadius: 8,
               fontSize: 15,
-              transition: "background 0.15s, color 0.15s",
+              transition: UI.transition,
             }}
             onMouseEnter={(e) => {
               if (isActive) return;
-              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+              e.currentTarget.style.background = UI.bg.cream;
               e.currentTarget.style.color = UI.text.primary;
             }}
             onMouseLeave={(e) => {
@@ -991,12 +1044,13 @@ function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
         style={{
           writingMode: "vertical-rl",
           transform: "rotate(180deg)",
-          letterSpacing: "1.5px",
+          letterSpacing: 1.5,
           textTransform: "uppercase",
-          fontWeight: 600,
+          fontWeight: 700,
           fontSize: 9,
           color: UI.text.tertiary,
           padding: "8px 0",
+          fontFamily: UI.font.mono,
         }}
       >
         Enhancer

@@ -1,6 +1,11 @@
-/* ─── IFC Viewer Constants ────────────────────────────────────────────────── */
+/* ─── IFC Viewer Constants — Phase Z.IFC.1 Light Render Studio ─────────────
+   Rewritten 2026-05-18. The UI object now binds to render-studio-tokens
+   (`var(--rs-*)`) so the viewer chrome aligns with the dashboard /
+   billing / settings light surfaces. The 3D scene background stays as
+   a literal hex (Three.js can't read CSS variables).                    */
 
-/* Category colors for "color by category" mode */
+/* Category colors for "color by category" mode — preserved as-is, the
+   viewport engine reads these literally. */
 export const CATEGORY_COLORS: Record<string, string> = {
   IFCWALL: "#7CB9E8",
   IFCWALLSTANDARDCASE: "#7CB9E8",
@@ -40,60 +45,97 @@ export const STOREY_COLORS = [
   "#7986CB",
 ];
 
-/* UI styling constants matching the app design system */
+/* UI styling constants — Light Render Studio palette.
+   All values are CSS `var(--rs-*)` references so theme tweaks propagate
+   from `src/features/dashboard/components/render-studio-tokens.css`. */
 export const UI = {
   bg: {
-    base: "#07070D",
-    canvas: "#0B0B13",
-    card: "#12121E",
-    elevated: "#1A1A2A",
-    hover: "#1F1F32",
-    toolbar: "rgba(18,18,30,0.92)",
+    page: "var(--rs-bone)",          // outer page background
+    paper: "var(--rs-paper)",        // panel surfaces / toolbar
+    cream: "var(--rs-cream)",        // inset surfaces (search input, segmented track)
+    trace: "var(--rs-trace)",        // slight warm variant of paper for sidebar
+    canvas: "var(--rs-paper)",       // viewport stays light
+    base: "var(--rs-bone)",          // back-compat alias (kept so legacy imports compile)
+    card: "var(--rs-paper)",         // back-compat alias for cards
+    elevated: "var(--rs-paper)",     // back-compat alias for dropdowns / popovers
+    hover: "var(--rs-cream)",        // back-compat alias for hover states
+    toolbar: "var(--rs-paper)",      // back-compat alias for toolbar
   },
   text: {
-    primary: "#F0F0F5",
-    secondary: "#9898B0",
-    tertiary: "#5C5C78",
-    disabled: "#3A3A50",
+    primary: "var(--rs-ink)",
+    soft: "var(--rs-ink-soft)",
+    secondary: "var(--rs-text)",
+    tertiary: "var(--rs-text-mute)",
+    faint: "var(--rs-text-faint)",
+    disabled: "var(--rs-text-faint)",
   },
   border: {
-    subtle: "rgba(255,255,255,0.06)",
-    default: "rgba(255,255,255,0.10)",
-    focus: "rgba(79,138,255,0.4)",
+    subtle: "var(--rs-rule)",
+    default: "var(--rs-rule-strong)",
+    strong: "var(--rs-rule-stronger)",
+    focus: "rgba(26,77,92,0.4)",
   },
   accent: {
-    cyan: "#00F5FF",
-    copper: "#B87333",
-    amber: "#FFBF00",
-    blue: "#4F8AFF",
-    green: "#34D399",
-    red: "#F87171",
+    blueprint: "var(--rs-blueprint)",
+    blueprint2: "var(--rs-blueprint-2)",
+    blueprintSoft: "var(--rs-blueprint-soft)",
+    blueprintLine: "var(--rs-blueprint-line)",
+    burnt: "var(--rs-burnt)",
+    burntSoft: "var(--rs-burnt-soft)",
+    sage: "var(--rs-sage)",
+    sageSoft: "var(--rs-sage-soft)",
+    ember: "var(--rs-ember)",
+    amber: "var(--rs-amber-mark)",
+    amberSoft: "var(--rs-amber-soft)",
+    red: "var(--rs-status-error)",
+    redSoft: "var(--rs-status-error-soft)",
+    /* Back-compat aliases — primary "blue" reads as blueprint teal, "cyan"
+       reads as blueprint-2 (lighter teal). Legacy callers compile unchanged. */
+    blue: "var(--rs-blueprint)",
+    cyan: "var(--rs-blueprint-2)",
+    green: "var(--rs-sage)",
+    copper: "var(--rs-burnt)",
   },
   radius: {
-    sm: 6,
-    md: 10,
-    lg: 14,
-    xl: 18,
+    sm: 5,
+    md: 6,
+    lg: 8,
+    xl: 10,
   },
   shadow: {
-    card: "0 4px 16px rgba(0,0,0,0.25)",
-    panel: "0 0 0 1px rgba(255,255,255,0.06), 0 20px 60px rgba(0,0,0,0.5)",
-    glow: "0 0 0 1px rgba(79,138,255,0.3), 0 4px 20px rgba(79,138,255,0.25)",
+    card: "0 2px 4px rgba(14,18,24,0.05), 0 8px 24px rgba(14,18,24,0.08)",
+    paper: "0 1px 2px rgba(14,18,24,0.04), 0 4px 12px rgba(14,18,24,0.06)",
+    floating:
+      "0 4px 16px rgba(14,18,24,0.08), 0 24px 64px rgba(14,18,24,0.12)",
+    /* Back-compat alias — `panel` was used for dropdown menus + the side
+       panel shadow. Maps to `floating`. `glow` is now a paper-toned focus
+       ring instead of a blue-cyan halo. */
+    panel:
+      "0 4px 16px rgba(14,18,24,0.08), 0 24px 64px rgba(14,18,24,0.12)",
+    glow:
+      "0 0 0 1px rgba(26,77,92,0.25), 0 4px 16px rgba(26,77,92,0.18)",
   },
-  transition: "all 0.15s ease",
+  transition: "all 150ms ease",
+  font: {
+    display: 'Fraunces, Georgia, serif',
+    body: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif',
+    mono: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
+  },
 } as const;
 
-/* 3D scene defaults */
+/* 3D scene defaults — viewport engine reads these literally so they stay
+   as raw hex / numbers (no CSS variable indirection possible here). The
+   background is the off-white "vellum" feel.                            */
 export const SCENE = {
-  background: 0x0c0f18,
-  backgroundTop: 0x12121e,
-  backgroundBottom: 0x08080e,
+  background: 0xf6f4ee,         // matches --rs-bone
+  backgroundTop: 0xfbf9f4,      // matches --rs-trace
+  backgroundBottom: 0xf6f4ee,
   gridSize: 200,
   gridDivisions: 40,
-  gridColor1: 0x2a2a4a,
-  gridColor2: 0x1a1a3a,
-  highlightColor: 0x4f8aff,
-  highlightEmissive: 0x4466ff,
+  gridColor1: 0xb8b8c2,         // soft mid-grey grid major
+  gridColor2: 0xd8d8e0,         // fainter minor lines
+  highlightColor: 0x1a4d5c,     // blueprint teal selection halo
+  highlightEmissive: 0x1a4d5c,
   selectionOpacity: 0.9,
   cameraNear: 0.1,
   cameraFar: 5000,
@@ -102,7 +144,7 @@ export const SCENE = {
   maxPixelRatio: 2,
 } as const;
 
-/* Keyboard shortcuts */
+/* Keyboard shortcuts — preserved verbatim. */
 export const SHORTCUTS: Record<string, { key: string; label: string; description: string }> = {
   fitToView: { key: "f", label: "F", description: "Fit model to view" },
   fitToSelection: { key: "v", label: "V", description: "Fit to selection" },

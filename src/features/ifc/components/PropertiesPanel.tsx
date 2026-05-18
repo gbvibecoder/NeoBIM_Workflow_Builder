@@ -41,9 +41,9 @@ function PropRow({ label, value }: { label: string; value: string | number | boo
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        padding: "4px 0",
+        padding: "6px 0",
         gap: 8,
-        borderBottom: `1px solid rgba(255,255,255,0.03)`,
+        borderBottom: `1px dashed ${UI.border.subtle}`,
       }}
     >
       <span style={{ color: UI.text.tertiary, fontSize: 12, minWidth: 80, flexShrink: 0 }}>{label}</span>
@@ -105,57 +105,136 @@ function PsetGroup({ name, properties }: { name: string; properties: { name: str
 export function PropertiesPanel({ element }: PropertiesPanelProps) {
   if (!element) {
     return (
-      <div style={{
-        padding: 24,
-        color: UI.text.tertiary,
-        fontSize: 13,
-        textAlign: "center",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 8,
-      }}>
-        <div style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid rgba(255,255,255,0.06)",
+      <div
+        style={{
+          padding: 32,
+          color: UI.text.tertiary,
+          fontSize: 12.5,
+          textAlign: "center",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 4,
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-            <path d="M3 3h7l2 2h9v15H3z"/>
+          gap: 12,
+          fontFamily: "Geist, -apple-system, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 12,
+            background: UI.bg.cream,
+            border: `1px solid ${UI.border.subtle}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            position: "relative",
+          }}
+        >
+          {/* Architectural blueprint glyph */}
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ opacity: 0.6, color: UI.text.tertiary }}
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="3" y1="9" x2="21" y2="9" />
+            <line x1="9" y1="9" x2="9" y2="21" />
+            <line x1="14" y1="3" x2="14" y2="9" />
           </svg>
         </div>
-        <span>Click an element to view properties</span>
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              color: UI.text.primary,
+              fontWeight: 600,
+              fontFamily: "Fraunces, Georgia, serif",
+              fontStyle: "italic",
+              marginBottom: 4,
+            }}
+          >
+            Nothing inspected yet
+          </div>
+          <div style={{ lineHeight: 1.5, maxWidth: 240 }}>
+            Click any element in the 3D viewport or pick from the Tree tab —
+            details appear here.
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 12, overflowY: "auto", height: "100%" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 12 }}>
-        <h4 style={{ color: UI.text.primary, fontSize: 14, fontWeight: 600, marginBottom: 2 }}>
-          {element.name || element.typeName}
-        </h4>
+    <div style={{ padding: 14, overflowY: "auto", height: "100%" }}>
+      {/* Selected element card — drafting strip on the left */}
+      <div
+        style={{
+          position: "relative",
+          background: UI.bg.paper,
+          border: `1px solid ${UI.border.subtle}`,
+          borderRadius: UI.radius.md,
+          padding: "12px 14px",
+          marginBottom: 14,
+          paddingLeft: 16,
+        }}
+      >
         <span
+          aria-hidden
           style={{
-            display: "inline-block",
-            fontSize: 11,
-            padding: "2px 8px",
-            borderRadius: 4,
-            background: "rgba(79,138,255,0.08)",
-            color: UI.accent.blue,
-            fontWeight: 500,
-            letterSpacing: "0.3px",
+            position: "absolute",
+            top: 8,
+            bottom: 8,
+            left: 0,
+            width: 3,
+            background: "var(--rs-blueprint)",
+            borderRadius: 2,
+          }}
+        />
+        <div
+          style={{
+            fontSize: 9.5,
+            fontWeight: 700,
+            letterSpacing: 1.0,
+            textTransform: "uppercase",
+            color: UI.text.tertiary,
+            fontFamily: "JetBrains Mono, ui-monospace, monospace",
+            marginBottom: 4,
           }}
         >
           {element.typeName}
-        </span>
+        </div>
+        <h4
+          style={{
+            color: UI.text.primary,
+            fontSize: 16,
+            fontWeight: 500,
+            margin: "0 0 6px",
+            fontFamily: "Fraunces, Georgia, serif",
+            fontStyle: "italic",
+            letterSpacing: -0.1,
+          }}
+        >
+          {element.name || element.typeName}
+        </h4>
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: 0.6,
+            textTransform: "uppercase",
+            color: UI.text.tertiary,
+            fontFamily: "JetBrains Mono, ui-monospace, monospace",
+          }}
+        >
+          Express ID · {element.expressID}
+        </div>
       </div>
 
       {/* Core properties */}
@@ -178,7 +257,7 @@ export function PropertiesPanel({ element }: PropertiesPanelProps) {
             textTransform: "uppercase" as const,
             letterSpacing: "0.5px",
             paddingBottom: 4,
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: `1px solid ${UI.border.subtle}`,
           }}>
             Quantities
           </p>
@@ -199,7 +278,7 @@ export function PropertiesPanel({ element }: PropertiesPanelProps) {
             textTransform: "uppercase" as const,
             letterSpacing: "0.5px",
             paddingBottom: 4,
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: `1px solid ${UI.border.subtle}`,
           }}>
             Property Sets
           </p>

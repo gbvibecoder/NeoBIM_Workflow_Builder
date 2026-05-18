@@ -12,7 +12,6 @@ import {
   type RefObject,
 } from "react";
 import {
-  Sparkles,
   Sun,
   Sunset,
   Cloud,
@@ -21,10 +20,8 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
-  RotateCcw,
   AlertTriangle,
   CheckCircle2,
-  Wand2,
   MapPin,
   Home,
   Building2,
@@ -75,9 +72,10 @@ import {
   type PanoramaController,
   type PanoramaTier2Adapter,
 } from "@/features/panorama/lib/panorama-controller";
-import type { PanoramaAsset } from "@/features/panorama/constants";
+import { PANORAMA_BUCKET_LABELS, type PanoramaAsset } from "@/features/panorama/constants";
 import { resolveBuildingType } from "@/features/panorama/lib/type-resolver";
 import { PanoramaSection } from "@/features/panorama/components/PanoramaSection";
+import { ApplyHero } from "@/features/ifc/components/primitives";
 
 /* ─── Props + imperative handle ──────────────────────────────────────── */
 
@@ -119,29 +117,37 @@ const QUALITY_OPTIONS: Array<{ id: MaterialQuality; label: string; helper: strin
 
 /* ─── Shared style helpers ───────────────────────────────────────────── */
 
+/* ─── Inline style helpers — Phase Z.IFC.1 Light Render Studio ───────────
+   These functions are intentionally KEPT (rather than replaced with the
+   new <Switch>/<SegmentedPicker> primitives) so the 30+ existing call
+   sites compile unchanged. The VALUES were re-bound to RS tokens so the
+   panel theme flips with the rest of the chrome.                        */
+
 const sectionHeaderStyle: CSSProperties = {
   width: "100%",
   display: "flex",
   alignItems: "center",
-  gap: 6,
-  padding: "8px 10px",
+  gap: 8,
+  padding: "10px 12px",
   background: "transparent",
   border: "none",
   color: UI.text.primary,
-  fontSize: 12,
+  fontSize: 12.5,
   fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.4px",
+  letterSpacing: 0.1,
   cursor: "pointer",
+  fontFamily: UI.font.body,
+  textAlign: "left",
 };
 
 const rowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "8px 10px",
+  padding: "8px 12px",
   fontSize: 12.5,
-  color: UI.text.secondary,
+  color: UI.text.primary,
+  fontFamily: UI.font.body,
 };
 
 const pickerBtnStyle = (active: boolean): CSSProperties => ({
@@ -152,22 +158,23 @@ const pickerBtnStyle = (active: boolean): CSSProperties => ({
   alignItems: "center",
   gap: 3,
   borderRadius: UI.radius.sm,
-  border: `1px solid ${active ? UI.accent.cyan : UI.border.default}`,
-  background: active ? "rgba(0,245,255,0.08)" : UI.bg.card,
-  color: active ? UI.accent.cyan : UI.text.secondary,
+  border: `1px solid ${active ? "var(--rs-blueprint)" : UI.border.subtle}`,
+  background: active ? "var(--rs-blueprint-soft)" : UI.bg.paper,
+  color: active ? "var(--rs-blueprint)" : UI.text.secondary,
   fontSize: 10.5,
-  fontWeight: 600,
+  fontWeight: active ? 600 : 500,
   cursor: "pointer",
   transition: UI.transition,
+  fontFamily: UI.font.body,
 });
 
 const switchStyle = (on: boolean): CSSProperties => ({
   position: "relative",
-  width: 34,
-  height: 18,
-  borderRadius: 9,
-  border: "none",
-  background: on ? UI.accent.cyan : UI.border.default,
+  width: 36,
+  height: 20,
+  borderRadius: 10,
+  border: `1px solid ${on ? "var(--rs-blueprint)" : UI.border.default}`,
+  background: on ? "var(--rs-blueprint)" : UI.bg.cream,
   cursor: "pointer",
   transition: UI.transition,
   padding: 0,
@@ -176,12 +183,13 @@ const switchStyle = (on: boolean): CSSProperties => ({
 
 const switchThumbStyle = (on: boolean): CSSProperties => ({
   position: "absolute",
-  top: 2,
-  left: on ? 18 : 2,
-  width: 14,
-  height: 14,
-  borderRadius: 7,
-  background: "#fff",
+  top: 1,
+  left: on ? 17 : 1,
+  width: 16,
+  height: 16,
+  borderRadius: 8,
+  background: "#FFFFFF",
+  boxShadow: "0 1px 2px rgba(14,18,24,0.18)",
   transition: UI.transition,
 });
 
@@ -653,6 +661,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     }, [status, tier2Counts, tier3Result, tier3Toggles.enabled, tier4Result, tier4Toggles.enabled, tier4Toggles.windowFrames, tier4Toggles.windowSills, tier4Toggles.railings, lastAppliedSlug]);
 
     const anyDisabled = !hasModel || isLoading;
+    const detection = useMemo(() => resolveBuildingType(null), []);
 
     return (
       <div
@@ -661,44 +670,33 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           flexDirection: "column",
           height: "100%",
           color: UI.text.primary,
-          background: UI.bg.base,
+          background: UI.bg.trace,
         }}
       >
-        {/* Pulse keyframes for the primary Apply CTA. Embedded inline so the
-            animation works without touching tailwind.config or globals.css —
-            same pattern other panels in this app use for one-off keyframes. */}
+        {/* Pulse keyframes for the primary Apply CTA. */}
         <style>{`
           @keyframes ifc-apply-pulse {
-            0%, 100% { box-shadow: 0 2px 12px rgba(0,245,255,0.32), inset 0 1px 0 rgba(255,255,255,0.18); }
-            50%      { box-shadow: 0 2px 22px rgba(0,245,255,0.70), inset 0 1px 0 rgba(255,255,255,0.25); }
+            0%, 100% { box-shadow: 0 2px 8px rgba(26,77,92,0.25), inset 0 1px 0 rgba(255,255,255,0.15); }
+            50%      { box-shadow: 0 4px 18px rgba(26,77,92,0.40), inset 0 1px 0 rgba(255,255,255,0.20); }
           }
         `}</style>
 
-        {/* Header */}
-        <header style={{ padding: "12px 14px 8px", borderBottom: `1px solid ${UI.border.subtle}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <Sparkles size={16} color={UI.accent.cyan} strokeWidth={2.2} aria-hidden />
-            <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Enhance with AI</h2>
-          </div>
-          <p style={{ fontSize: 11, color: UI.text.tertiary, margin: "4px 0 0 0", lineHeight: 1.4 }}>
-            Raw IFC by default. Recipe is pre-filled — tap below when you&apos;re ready.
-            Your .ifc file is never modified.
-          </p>
-        </header>
+        {/* Premium Apply hero — replaces both the prior header banner AND the
+            sticky TopActionRow. Pulsing primary + Auto secondary + post-apply
+            Reset all live here now. */}
+        <ApplyHero
+          detected={hasModel ? PANORAMA_BUCKET_LABELS[detection.bucket] : null}
+          detectedSource={hasModel ? detection.source : null}
+          applying={isLoading}
+          applied={isApplied}
+          disabled={!hasModel}
+          onApply={() => handleApply()}
+          onAuto={handleAuto}
+          onReset={handleReset}
+        />
 
         {/* Status banner */}
         <StatusBanner status={status} summary={classifiedSummary} />
-
-        {/* Primary action row — moved here (was sticky-bottom prior to 2026-05-18).
-            Apply Enhancement is the flagship CTA; user clicks here to trigger
-            the full tier1→2→3→4 pipeline. Pulses subtly when idle + ready. */}
-        <TopActionRow
-          status={status}
-          hasModel={hasModel}
-          onApply={() => handleApply()}
-          onReset={handleReset}
-          onAuto={handleAuto}
-        />
 
         {/* Scrollable toggles */}
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 0 24px 0" }}>
@@ -1266,12 +1264,22 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ borderBottom: `1px solid ${UI.border.subtle}` }}>
+    <div
+      style={{
+        margin: "0 14px 8px",
+        background: UI.bg.paper,
+        border: `1px solid ${UI.border.subtle}`,
+        borderRadius: UI.radius.md,
+        overflow: "hidden",
+      }}
+    >
       <button type="button" onClick={onToggle} style={sectionHeaderStyle}>
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <span>{title}</span>
+        <span style={{ color: UI.text.tertiary, display: "inline-flex", flexShrink: 0 }}>
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
+        <span style={{ flex: 1 }}>{title}</span>
       </button>
-      {expanded && <div>{children}</div>}
+      {expanded && <div style={{ padding: "0 4px 8px" }}>{children}</div>}
     </div>
   );
 }
@@ -1287,14 +1295,22 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
     gap: 8,
     borderBottom: `1px solid ${UI.border.subtle}`,
     lineHeight: 1.35,
+    fontFamily: UI.font.body,
   };
 
   if (status.kind === "loading") {
     return (
-      <div style={{ ...base, background: "rgba(79,138,255,0.08)", color: UI.accent.blue }}>
-        <Loader2 size={13} aria-hidden />
+      <div
+        style={{
+          ...base,
+          background: "var(--rs-blueprint-soft)",
+          color: UI.accent.blueprint,
+          borderTop: `1px solid var(--rs-blueprint-line)`,
+        }}
+      >
+        <Loader2 size={13} aria-hidden className="animate-spin" />
         <span style={{ flex: 1 }}>{status.step}</span>
-        <span style={{ fontVariantNumeric: "tabular-nums", color: UI.text.secondary }}>
+        <span style={{ fontVariantNumeric: "tabular-nums", color: UI.text.secondary, fontFamily: UI.font.mono, fontSize: 10.5 }}>
           {Math.round(status.progress * 100)}%
         </span>
       </div>
@@ -1303,7 +1319,13 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
 
   if (status.kind === "error") {
     return (
-      <div style={{ ...base, background: "rgba(248,113,113,0.08)", color: UI.accent.red }}>
+      <div
+        style={{
+          ...base,
+          background: "var(--rs-status-error-soft)",
+          color: UI.accent.red,
+        }}
+      >
         <AlertTriangle size={13} aria-hidden />
         <span>{status.message}</span>
       </div>
@@ -1311,7 +1333,13 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
   }
 
   return (
-    <div style={{ ...base, background: "rgba(52,211,153,0.08)", color: UI.accent.green }}>
+    <div
+      style={{
+        ...base,
+        background: "var(--rs-sage-soft)",
+        color: UI.accent.sage,
+      }}
+    >
       <CheckCircle2 size={13} aria-hidden />
       <span style={{ flex: 1, color: UI.text.primary }}>
         Applied · {summary ?? "no classified elements"}
@@ -1320,123 +1348,5 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
   );
 }
 
-/* Top-of-panel action row. Apply is the flagship CTA — pulses softly when
-   idle + a model is loaded, signalling "ready, tap me." Auto sits next to it
-   as a smaller secondary that just runs Apply with size-tuned defaults.
-   Post-apply: Apply morphs into a destructive "Reset" button (existing
-   panel behavior preserved). */
-function TopActionRow({
-  status,
-  hasModel,
-  onApply,
-  onReset,
-  onAuto,
-}: {
-  status: EnhanceStatus;
-  hasModel: boolean;
-  onApply: () => void;
-  onReset: () => void;
-  onAuto: () => void;
-}) {
-  const isLoading = status.kind === "loading";
-  const isApplied = status.kind === "applied";
-  const isError = status.kind === "error";
-  /* Pulse only when the user is "ready to apply": idle, model loaded, no
-     active loading / applied / error states. Stops the moment the user takes
-     any action. */
-  const shouldPulse = hasModel && !isLoading && !isApplied && !isError;
-
-  const primaryStyle: CSSProperties = {
-    flex: 1,
-    height: 38,
-    padding: "0 14px",
-    borderRadius: UI.radius.md,
-    border: isApplied ? `1px solid ${UI.accent.red}` : "none",
-    fontSize: 12.5,
-    fontWeight: 700,
-    letterSpacing: "0.2px",
-    cursor: hasModel && !isLoading ? "pointer" : "not-allowed",
-    opacity: hasModel ? 1 : 0.55,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    transition: UI.transition,
-    background: isApplied
-      ? UI.bg.elevated
-      : `linear-gradient(135deg, ${UI.accent.cyan}, ${UI.accent.blue})`,
-    color: isApplied ? UI.accent.red : "#07070D",
-    boxShadow: isApplied
-      ? "none"
-      : "0 2px 12px rgba(0,245,255,0.32), inset 0 1px 0 rgba(255,255,255,0.18)",
-    animation: shouldPulse ? "ifc-apply-pulse 2.2s ease-in-out infinite" : undefined,
-  };
-
-  const autoStyle: CSSProperties = {
-    height: 38,
-    padding: "0 12px",
-    borderRadius: UI.radius.md,
-    border: `1px solid ${UI.border.default}`,
-    background: UI.bg.card,
-    color: UI.text.primary,
-    fontSize: 11.5,
-    fontWeight: 600,
-    cursor: hasModel && !isLoading ? "pointer" : "not-allowed",
-    opacity: hasModel && !isLoading ? 1 : 0.5,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    transition: UI.transition,
-    flexShrink: 0,
-  };
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: 8,
-        padding: "10px 12px",
-        background: UI.bg.base,
-        borderBottom: `1px solid ${UI.border.subtle}`,
-      }}
-    >
-      {isApplied ? (
-        <button
-          type="button"
-          onClick={onReset}
-          disabled={isLoading}
-          style={primaryStyle}
-          title="Strip all enhancements and return to raw IFC"
-        >
-          <RotateCcw size={13} />
-          Reset
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={onApply}
-          disabled={!hasModel || isLoading}
-          style={primaryStyle}
-          title={hasModel ? "Run the full enhance pipeline with the pre-filled recipe" : "Upload an IFC first"}
-        >
-          {isLoading ? (
-            <Loader2 size={14} className="animate-spin" strokeWidth={2.4} />
-          ) : (
-            <Sparkles size={14} strokeWidth={2.4} />
-          )}
-          {isLoading ? "Applying…" : "Apply Enhancement"}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onAuto}
-        disabled={!hasModel || isLoading}
-        style={autoStyle}
-        title="Pick sensible defaults based on model size, then apply"
-      >
-        <Wand2 size={13} />
-        Auto
-      </button>
-    </div>
-  );
-}
+/* TopActionRow removed 2026-05-18 Phase Z.IFC.1 — replaced by the
+   <ApplyHero/> primitive at the top of the panel. */

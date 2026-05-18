@@ -21,10 +21,10 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const isImmersive = pathname === "/dashboard";
   // Pages whose top-edge surface is a light cream/white (Phase 4.2 result
-  // page redesign + 3D render wizard + light editors). UserMenu adopts a
-  // light-tone trigger so the floating avatar reads cleanly against the
-  // cream surface. Dark-surface pages (canvas, IFC viewer, immersive
-  // landing) keep the dark-tone trigger.
+  // page redesign + 3D render wizard + light editors + Phase Z.IFC.1 IFC
+  // viewer). UserMenu adopts a light-tone trigger so the floating avatar
+  // reads cleanly against the cream surface. Dark-surface pages (canvas,
+  // immersive landing) keep the dark-tone trigger.
   const isLightSurface =
     pathname === "/dashboard" ||
     pathname === "/dashboard/workflows" ||
@@ -35,6 +35,7 @@ export default function DashboardLayout({
     pathname === "/dashboard/3d-render" ||
     pathname === "/dashboard/floor-plan" ||
     pathname === "/dashboard/brief-renders" ||
+    pathname === "/dashboard/ifc-viewer" ||
     pathname.startsWith("/dashboard/results/");
   // Canvas page — uses startsWith to handle pathname edge cases (trailing
   // slash, null from usePathname, or future sub-routes under canvas/).
