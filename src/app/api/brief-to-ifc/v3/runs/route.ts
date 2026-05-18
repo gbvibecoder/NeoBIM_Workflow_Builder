@@ -53,6 +53,8 @@ import {
   checkBriefToIfcV3Quota,
   incrementBriefToIfcV3Usage,
 } from "@/features/brief-to-ifc/v3/quota/quota";
+import { runDeterministic } from "@/features/brief-to-ifc/v3/generator/deterministic-runner";
+import { detectBuilderKind, ArchetypeNotSupportedError } from "@/features/brief-to-ifc/v3/archetype-detector";
 
 export const maxDuration = 800;
 
@@ -236,22 +238,48 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // PHASE_EVAL_RESULTS_REPORT_2026-05-16.md (run cmp7zv5i2000004juwmdgchau
   // stuck in RUNNING with zero heartbeat updates for 3+ min). Pattern
   // mirrors `src/app/api/auth/register/route.ts` + `src/lib/auth.ts`.
+  // Feature flag: USE_DETERMINISTIC_BUILDER routes to the deterministic
+  // path (Phase G) for supported archetypes. Default: false (agent loop).
+  const useDeterministic = process.env.USE_DETERMINISTIC_BUILDER === "true";
+  let canUseDeterministic = false;
+  if (useDeterministic) {
+    try {
+      detectBuilderKind(briefSpec);
+      canUseDeterministic = true;
+    } catch {
+      // Archetype not supported — fall back to agent loop.
+      canUseDeterministic = false;
+    }
+  }
+
   after(async () => {
     await runBackground({
       prisma,
       runId: run.id,
-      timeoutMs: 700_000, // 700s — leaves Vercel's 800s ceiling with margin
+      timeoutMs: canUseDeterministic ? 60_000 : 700_000,
       fn: async (ctx) => {
+        if (canUseDeterministic) {
+          await ctx.log("INFO", "GENERATE", "Deterministic builder starting (Phase G).");
+          const result = await runDeterministic({
+            brief: briefSpec,
+            schema: "IFC4",
+          });
+          if (!result.ok) {
+            throw Object.assign(
+              new Error(result.error?.message ?? "deterministic builder failed"),
+              { code: toBriefToIfcV3ErrorCode(result.error?.code) },
+            );
+          }
+          return result;
+        }
+
+        // Agent loop (existing path)
         await ctx.log("INFO", "GENERATE", "Generator agent loop starting.");
         const result = await runGenerator({
           brief: briefSpec,
           maxTurns: body.max_turns,
           costCapUsd: body.cost_cap_usd,
           onTurn: (record) => {
-            // Fire-and-forget per-turn logs. `void` keeps the agent loop
-            // moving while appendLog persists in the background. Safe
-            // here because the enclosing `after()` keeps the function
-            // alive for the whole agent-loop duration.
             void appendLog(prisma, {
               executionId: run.id, level: "INFO", source: "TOOL_CALL",
               message:
@@ -269,8 +297,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           },
         });
         if (!result.ok) {
-          // Surface the generator's structured error code to the
-          // runBackground error path verbatim — no recoding.
           throw Object.assign(
             new Error(result.error?.message ?? "generator failed"),
             { code: toBriefToIfcV3ErrorCode(result.error?.code) },
@@ -289,9 +315,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         turnRecords: result.turnRecords,
       }),
     }).catch((err) => {
-      // `runBackground` doesn't throw — but defensive: if something does
-      // escape, log it loudly. The row will be left in RUNNING for the
-      // stuck-sweep cron to clean up.
       // eslint-disable-next-line no-console
       console.error(`[bf-v3 /runs] runBackground escaped throw for ${run.id}:`, err);
     });

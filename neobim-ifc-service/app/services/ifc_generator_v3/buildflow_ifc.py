@@ -180,9 +180,14 @@ class BuildFlowIFC:
     capture references for `attach_pset` etc.
     """
 
-    SCHEMA = "IFC2X3"
+    SCHEMA = "IFC4"  # Default for new builds; "IFC2X3" still supported as fallback
 
-    def __init__(self, brief: Dict[str, Any]) -> None:
+    def __init__(self, brief: Dict[str, Any], schema: str = "IFC4") -> None:
+        if schema not in ("IFC4", "IFC2X3"):
+            raise BuildFlowIFCError(
+                f"Unsupported schema {schema!r}; must be 'IFC4' or 'IFC2X3'."
+            )
+        self.SCHEMA = schema
         self._brief: Dict[str, Any] = _ascii_safe(dict(brief))
         self._ifc = ifcopenshell.file(schema=self.SCHEMA)
         self._elements_by_id: Dict[str, Any] = {}
@@ -202,11 +207,10 @@ class BuildFlowIFC:
 
         # IFC2X3 strictness — `root.create_entity` synthesises an
         # IfcOwnerHistory which needs BOTH an IfcPersonAndOrganization
-        # AND an IfcApplication in the file. In IFC4 ifcopenshell will
-        # auto-create them; in 2X3 it raises with explicit error messages
-        # ("Please create a user to continue" / "Please create an
-        # application to continue"). We pre-populate both so the first
-        # `root.create_entity` succeeds.
+        # AND an IfcApplication in the file. In IFC4 ifcopenshell may
+        # auto-create them in some versions, but we pre-populate both
+        # unconditionally so the first `root.create_entity` succeeds
+        # regardless of schema.
         #
         # NOTE the British spelling — ifcopenshell uses `add_organisation`
         # / `add_person_and_organisation` (matching the IFC schema entity
@@ -389,16 +393,17 @@ class BuildFlowIFC:
         )
         space.LongName = long_name or space_id
         space.ObjectType = occupancy
-        # `IfcSpace.Tag` is IFC4-only. IfcSpatialStructureElement (the
-        # 2X3 parent) has Name / Description / LongName / CompositionType
-        # — no Tag. We use Name as the id surface; `_spaces_by_id` is the
-        # source of truth for reverse lookup.
+        # IFC4 has Tag on IfcSpace (via IfcElement inheritance chain);
+        # IFC2X3 does not. Set it when available; Name is the primary
+        # id surface regardless.
+        if self.SCHEMA != "IFC2X3":
+            try:
+                space.Tag = space_id
+            except (AttributeError, RuntimeError):
+                pass
         try:
             space.CompositionType = "ELEMENT"
         except AttributeError:
-            # ifcopenshell 0.8 raises rather than returning False for
-            # absent-in-schema attributes — swallow silently, this attr
-            # IS optional in 2X3.
             pass
 
         self._attach_geometry_extruded_polygon(space, polygon, height)
@@ -1667,27 +1672,35 @@ class BuildFlowIFC:
         if description:
             element.Description = description
 
-        # PredefinedType — only set if the class supports it AND we have
-        # a valid value. Otherwise leave it unset (schema default).
-        if (
-            predefined_type
-            and ifc_class in _IFC2X3_HAS_PREDEFINED_TYPE
-            and ifc_class in _PREDEFINED_TYPE_ENUMS
-            and predefined_type.upper() in _PREDEFINED_TYPE_ENUMS[ifc_class]
-            and ifc_class != "IfcBuildingElementProxy"
-        ):
-            try:
-                element.PredefinedType = predefined_type.upper()
-            except Exception:
-                # ifcopenshell rejects — leave unset rather than crash.
-                pass
+        # PredefinedType — schema-aware. IFC4 allows PredefinedType on
+        # many more classes than IFC2X3. We consult the right allow-list.
+        if predefined_type and ifc_class != "IfcBuildingElementProxy":
+            from .canonical_psets import IFC4_PREDEFINED_TYPES
+            if self.SCHEMA == "IFC4":
+                allowed = IFC4_PREDEFINED_TYPES.get(ifc_class)
+            else:
+                allowed = _PREDEFINED_TYPE_ENUMS.get(ifc_class)
+            if allowed and predefined_type.upper() in allowed:
+                try:
+                    element.PredefinedType = predefined_type.upper()
+                except Exception:
+                    # ifcopenshell rejects — leave unset rather than crash.
+                    pass
 
         # CompositionType — IfcBuildingElementProxy only, validated upstream.
+        # In IFC4, IfcBuildingElementProxy gains PredefinedType too.
         if composition_type and ifc_class == "IfcBuildingElementProxy":
-            try:
-                element.CompositionType = composition_type
-            except Exception:
-                pass
+            if self.SCHEMA == "IFC4":
+                # IFC4: use PredefinedType, not CompositionType.
+                try:
+                    element.PredefinedType = composition_type.upper()
+                except Exception:
+                    pass
+            else:
+                try:
+                    element.CompositionType = composition_type
+                except Exception:
+                    pass
 
         # Geometry: rectangle profile extruded along +Z by `depth`.
         #

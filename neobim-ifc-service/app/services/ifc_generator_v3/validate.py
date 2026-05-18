@@ -575,7 +575,7 @@ def validate_element_coverage(
         "beam": "IfcBeam",
         "covering": "IfcCovering",
         "furniture": "IfcFurnishingElement",
-        "lighting": "IfcLightFixture",  # IFC4-only; falls back in 2X3
+        "lighting": "IfcLightFixture",  # Native in IFC4; available in IFC2X3 too
         "proxy": "IfcBuildingElementProxy",
         "space": "IfcSpace",
         "door": "IfcDoor",

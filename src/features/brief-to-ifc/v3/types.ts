@@ -93,6 +93,106 @@ export const briefBrandLanguageSchema = z.object({
   forbidden_terms: z.array(z.string().max(200)).max(50),
 });
 
+// ─── Phase EFG: Extended schemas ───────────────────────────────────
+
+/** Archetype — drives which deterministic builder to invoke (Phase G).
+ *  `"other"` falls back to the agent loop. */
+export const archetypeSchema = z.enum([
+  "office",
+  "residential_2bhk",
+  "residential_3bhk",
+  "gym",
+  "exhibition",
+  "retail",
+  "restaurant",
+  "classroom",
+  "other",
+]);
+
+/** Global construction parameters inferred from the brief. The enricher
+ *  fills defaults when the brief is silent and logs them to
+ *  `assumptions_made[]`. */
+export const globalParametersSchema = z.object({
+  ceiling_height_m: z.number().positive().default(3.0),
+  wall_thickness_ext_m: z.number().positive().default(0.2),
+  wall_thickness_int_m: z.number().positive().default(0.1),
+  slab_thickness_m: z.number().positive().default(0.15),
+  roof_thickness_m: z.number().positive().default(0.15),
+  default_door_height_m: z.number().positive().default(2.1),
+  default_door_width_m: z.number().positive().default(0.9),
+  default_window_sill_m: z.number().positive().default(0.9),
+  default_window_head_m: z.number().positive().default(2.4),
+});
+
+/** Openings as a peer to elements — each door/window carries its host
+ *  wall reference and offset so the deterministic builder can cut voids
+ *  without LLM guidance. */
+export const briefOpeningSchema = z.object({
+  id: z.string().min(1).max(64),
+  type: z.enum(["door", "window"]),
+  host_wall_id: z.string().min(1).max(64),
+  offset_m: z.number().min(0),
+  width_m: z.number().positive(),
+  height_m: z.number().positive(),
+  sill_m: z.number().min(0).default(0),
+  swing: z.enum(["left", "right", "double", "sliding"]).optional(),
+  material_id: z.string().min(1),
+  description: z.string().max(1000).default(""),
+});
+
+/** Furniture layout strategies for deterministic placement. */
+export const furnitureLayoutSchema = z.object({
+  kind: z.enum(["grid", "explicit", "perimeter_offset"]).default("explicit"),
+  rows: z.number().int().positive().optional(),
+  cols: z.number().int().positive().optional(),
+  pitch_x_m: z.number().positive().optional(),
+  pitch_y_m: z.number().positive().optional(),
+  offset_m: z.number().min(0).optional(),
+});
+
+export const briefFurnitureSchema = z.object({
+  id: z.string().min(1).max(64),
+  type: z.string().max(200),
+  count: z.number().int().positive().default(1),
+  layout: furnitureLayoutSchema.optional(),
+  anchor_space_id: z.string().max(64).optional(),
+  bounding_box: z.tuple([
+    z.number().positive(),
+    z.number().positive(),
+    z.number().positive(),
+  ]).optional(),
+  parts: z.array(z.object({
+    id: z.string().min(1).max(64),
+    type: z.string().max(200),
+    relative_origin: z.tuple([z.number(), z.number(), z.number()]),
+    dims_m: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]),
+    material_id: z.string().min(1),
+  })).optional(),
+  material_id: z.string().min(1),
+  description: z.string().max(1000).default(""),
+});
+
+/** Lighting zone for deterministic fixture placement. */
+export const lightingZoneSchema = z.object({
+  anchor_space_id: z.string().max(64),
+  fixture_type: z.string().max(200).default("LED Panel"),
+  count: z.number().int().positive().default(1),
+  layout: furnitureLayoutSchema.optional(),
+  material_id: z.string().min(1),
+});
+
+export const briefLightingSchema = z.object({
+  strategy: z.enum(["grid", "perimeter", "explicit"]).default("grid"),
+  zones: z.array(lightingZoneSchema).default([]),
+});
+
+/** Assumptions the enricher made where the brief was silent. */
+export const assumptionSchema = z.object({
+  field: z.string().max(200),
+  assumed_value: z.string().max(500),
+  reason: z.string().max(500),
+});
+
 // ─── BriefSpec ──────────────────────────────────────────────────────
 
 export const briefSpecSchema = z.object({
@@ -102,12 +202,25 @@ export const briefSpecSchema = z.object({
   elements: z.array(briefElementSchema).max(2000),
   materials: z.array(briefMaterialSchema).min(1).max(64),
   brand_language: briefBrandLanguageSchema,
+  // Phase EFG extensions — all optional for backward compat with
+  // existing Opus outputs that don't know about these fields yet.
+  archetype: archetypeSchema.optional(),
+  global_parameters: globalParametersSchema.optional(),
+  openings: z.array(briefOpeningSchema).max(200).optional(),
+  furniture: z.array(briefFurnitureSchema).max(500).optional(),
+  lighting: briefLightingSchema.optional(),
+  assumptions_made: z.array(assumptionSchema).max(100).optional(),
 });
 
 export type BriefSpec = z.infer<typeof briefSpecSchema>;
 export type BriefSpace = z.infer<typeof briefSpaceSchema>;
 export type BriefElement = z.infer<typeof briefElementSchema>;
 export type BriefMaterial = z.infer<typeof briefMaterialSchema>;
+export type BriefOpening = z.infer<typeof briefOpeningSchema>;
+export type BriefFurniture = z.infer<typeof briefFurnitureSchema>;
+export type BriefLighting = z.infer<typeof briefLightingSchema>;
+export type GlobalParameters = z.infer<typeof globalParametersSchema>;
+export type Assumption = z.infer<typeof assumptionSchema>;
 
 // ─── Generator agent loop — tool payloads / outcomes ────────────────
 

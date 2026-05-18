@@ -48,6 +48,18 @@ CRITICAL RULES:
 
 9. IRREGULAR FOOTPRINTS. If the brief describes a non-rectangular plan (L-shape, T-shape, U-shape, or any shape with a perpendicular extension), you MUST capture the actual perimeter polygon in the space's polygon_world_m field. Set site.bounds_m to the axis-aligned bounding box of the polygon (so site.bounds_m = [10, 8] for a 10m arm + 4m perpendicular extension that brings the AABB to 10×8). The polygon itself goes in space.polygon_world_m as counter-clockwise (x, y) vertices in metres. Example for the 10m arm + 4×4 right-angle extension: polygon_world_m: [[0,0], [10,0], [10,4], [4,4], [4,8], [0,8]]. DO NOT flatten the L-shape into a single rectangle (e.g. [14,4]) — the downstream generator builds perimeter walls along whichever polygon you give it, so a flattened polygon yields a flattened building. If the footprint is rectangular, keep polygon_world_m as the simple 4-vertex outline matching site.bounds_m.
 
+10. ARCHETYPE FIELD. Set \`archetype\` to the best match: "office", "residential_2bhk", "residential_3bhk", "gym", "exhibition", "retail", "restaurant", "classroom", or "other". This drives which deterministic builder runs downstream. If unsure, use "other".
+
+11. GLOBAL PARAMETERS. Fill \`global_parameters\` with construction defaults. If the brief specifies ceiling height, wall thickness, etc., use those values. Otherwise use sensible defaults (3.0m ceiling, 0.2m ext wall, 0.1m int wall, 0.15m slab, 2.1m door height, 0.9m window sill). Log every assumed value in \`assumptions_made[]\` with { field, assumed_value, reason }.
+
+12. OPENINGS ARRAY. In addition to listing doors/windows in \`elements[]\`, also populate the \`openings[]\` array. Each opening MUST have: id, type ("door"|"window"), host_wall_id (the id of the wall element it cuts into), offset_m (metres from the wall's start along its axis), width_m, height_m, sill_m (0 for doors, 0.9 for typical windows), material_id. This lets the deterministic builder cut void openings without LLM guidance.
+
+13. FURNITURE ARRAY. Populate \`furniture[]\` for items that follow a repeating pattern. Each entry has: id, type (e.g. "workstation", "meeting_chair"), count, layout ({ kind: "grid", rows, cols, pitch_x_m, pitch_y_m } or { kind: "explicit" }), anchor_space_id (which space it belongs to), bounding_box ([width, depth, height] in metres), material_id. Grid layouts are preferred for repeated items (e.g. 8 workstations in 2 rows of 4).
+
+14. LIGHTING. Populate \`lighting\` with { strategy: "grid", zones: [...] }. Each zone has: anchor_space_id, fixture_type (e.g. "LED Panel"), count, layout (same as furniture), material_id. Use "grid" strategy for offices, "perimeter" for exhibition/retail.
+
+15. ASSUMPTIONS. Every default you infer (wall thickness, ceiling height, material color, occupancy count, etc.) MUST be logged in \`assumptions_made[]\` with { field: "path.to.field", assumed_value: "the value", reason: "brief was silent on this" }.
+
 Produce the spec by calling \`${TOOL_NAME}\` with the structured payload. Do not write prose outside the tool call.`;
 
 /** Auto-generated from the zod `briefSpecSchema` — no hand-maintained
