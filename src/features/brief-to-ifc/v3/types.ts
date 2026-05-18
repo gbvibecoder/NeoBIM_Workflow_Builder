@@ -140,13 +140,17 @@ export const briefOpeningSchema = z.object({
   description: z.string().max(1000).default(""),
 });
 
-/** Furniture layout strategies for deterministic placement. */
+/** Furniture layout strategies for deterministic placement.
+ *
+ *  pitch_x_m / pitch_y_m are nonnegative (not positive) because Opus
+ *  occasionally emits 0 for single-instance items. The briefFurnitureSchema
+ *  refinement below enforces pitch > 0 only when count > 1. */
 export const furnitureLayoutSchema = z.object({
   kind: z.enum(["grid", "explicit", "perimeter_offset"]).default("explicit"),
   rows: z.number().int().positive().optional(),
   cols: z.number().int().positive().optional(),
-  pitch_x_m: z.number().positive().optional(),
-  pitch_y_m: z.number().positive().optional(),
+  pitch_x_m: z.number().nonnegative().optional(),
+  pitch_y_m: z.number().nonnegative().optional(),
   offset_m: z.number().min(0).optional(),
 });
 
@@ -203,7 +207,24 @@ export const briefFurnitureSchema = z.object({
   /** Phase Beta 3: hint for Item Decomposer — produce at least this many
    *  parts on the next decomposition pass. */
   requested_part_count: z.number().int().positive().optional(),
-});
+}).refine(
+  (item) => {
+    const count = item.count ?? 1;
+    // Single-instance items: pitch can be 0 or absent
+    if (count <= 1) return true;
+    // Multi-instance items with grid layout: need at least one non-zero pitch
+    if (item.layout?.kind === "grid") {
+      const pitchX = item.layout?.pitch_x_m ?? 0;
+      const pitchY = item.layout?.pitch_y_m ?? 0;
+      return pitchX > 0 || pitchY > 0;
+    }
+    return true;
+  },
+  {
+    message: "Multi-instance grid furniture (count > 1) requires pitch_x_m > 0 OR pitch_y_m > 0",
+    path: ["layout"],
+  },
+);
 
 /** Lighting zone for deterministic fixture placement. */
 export const lightingZoneSchema = z.object({
