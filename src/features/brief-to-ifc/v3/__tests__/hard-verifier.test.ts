@@ -36,6 +36,7 @@ function makeVerifiedReport(): VerifierReport {
     mismatches: [],
     summary: "All parts present",
     verified_at: new Date().toISOString(),
+    source: "railway",
   };
 }
 
@@ -108,7 +109,9 @@ describe("Hard Verifier — verifyBuild", () => {
     });
 
     const result = await verifyBuild("https://r2.example/test.ifc", spec, { sandboxUrl: "" });
-    expect(result.mismatches[0].expected).toBe(3);
+    // First mismatch is now "unverified" (global). Parts mismatch is after it.
+    const partsMM = result.mismatches.find(m => m.type === "missing_parts");
+    expect(partsMM?.expected).toBe(3);
   });
 
   it("verifierReportSchema validates correctly", () => {
@@ -134,12 +137,14 @@ describe("Hard Verifier — verifyBuild", () => {
     expect(parsed.data?.mismatches).toHaveLength(2);
   });
 
-  it("empty spec (no furniture) produces no mismatches in heuristic", async () => {
+  it("empty spec (no furniture) produces only global unverified mismatch", async () => {
     const { verifyBuild } = await import("../hard-verifier");
     const spec = makeSpec({ furniture: [] });
     const result = await verifyBuild("https://r2.example/test.ifc", spec, { sandboxUrl: "" });
 
-    expect(result.mismatches).toHaveLength(0);
-    expect(result.summary).toContain("0 expected parts");
+    // Only the global "unverified" entry — no furniture-specific mismatches
+    const partsMM = result.mismatches.filter(m => m.type === "missing_parts");
+    expect(partsMM).toHaveLength(0);
+    expect(result.mismatches.some(m => m.type === "unverified")).toBe(true);
   });
 });

@@ -317,6 +317,8 @@ export const verifierMismatchSchema = z.object({
     "size_mismatch_minor",
     "missing_covering",
     "unexpected_geometry",
+    "wrong_class",
+    "unverified",
   ]),
   item_id: z.string(),
   item_type: z.string().optional(),
@@ -334,6 +336,10 @@ export const verifierReportSchema = z.object({
   mismatches: z.array(verifierMismatchSchema),
   summary: z.string().max(500),
   verified_at: z.string(),
+  /** Phase Beta 4: tracks whether this report came from real Railway
+   *  parsing or a heuristic fallback. Spec Patcher forces iteration
+   *  when source !== "railway". */
+  source: z.enum(["railway", "heuristic_fallback", "unavailable"]).default("railway"),
 });
 
 // ─── Phase Beta 3: Spec Patcher (TR-033) ─────────────────────────────
@@ -346,6 +352,7 @@ export const specPatchSchema = z.object({
     "fix_size",
     "add_trim",
     "increase_decomposition",
+    "fix_class",
   ]),
   rationale: z.string().max(500),
   payload: z.unknown(),

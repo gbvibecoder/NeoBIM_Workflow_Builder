@@ -1,12 +1,12 @@
 /**
- * Hard Verifier (TR-035, Phase Beta 3).
+ * Hard Verifier (TR-035, Phase Beta 3+4).
  *
  * Deterministic comparison of spec.furniture[*].parts vs actual IFC
- * entity counts. Calls the Python build-verifier endpoint on Railway
- * for proper ifcopenshell-based IFC parsing.
+ * entity counts. Calls the Python build-verifier endpoint on Railway.
  *
- * When the Python endpoint is unreachable (local dev, Railway down),
- * falls back to a heuristic report based on spec analysis only.
+ * Phase Beta 4: source field tracks whether the report came from real
+ * Railway parsing or heuristic fallback. Heuristic is now PESSIMISTIC
+ * (verified=false, coverage=0) to force the Spec Patcher to iterate.
  */
 
 import { verifierReportSchema } from "./types";
@@ -18,27 +18,32 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_PARTS_MIN_FRACTION = 0.7;
 const DEFAULT_DIM_TOLERANCE_M = 0.1;
 
+/** Keywords indicating a composite furniture item (should have parts). */
+const COMPOSITE_KEYWORDS = [
+  "desk", "table", "machine", "stand", "kit", "array", "system",
+  "rack", "unit", "station", "assembly", "fixture", "panel",
+  "instrument", "appliance", "workstation", "console", "cabinet",
+  "monitor", "tripod", "mannequin", "microphone", "speaker",
+];
+
 // ─── Types ──────────────────────────────────────────────────────────────
 
 export interface VerifyBuildOptions {
-  /** Override for the Railway sandbox URL. */
   sandboxUrl?: string;
-  /** Timeout for the Python endpoint call. */
   timeoutMs?: number;
-  /** Minimum fraction of spec parts that must be present. */
   partsMinFraction?: number;
-  /** Dimensional tolerance in metres. */
   dimToleranceM?: number;
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+function isCompositeName(name: string): boolean {
+  const lower = name.toLowerCase();
+  return COMPOSITE_KEYWORDS.some(kw => lower.includes(kw));
 }
 
 // ─── Main entry point ───────────────────────────────────────────────────
 
-/**
- * Verify a built IFC against its source BriefSpec.
- *
- * Calls the Python verifier endpoint for proper IFC parsing.
- * Returns a VerifierReport with parts/trim coverage and mismatches.
- */
 export async function verifyBuild(
   ifcUrl: string,
   spec: BriefSpec,
@@ -58,45 +63,40 @@ export async function verifyBuild(
         body: JSON.stringify({
           ifc_url: ifcUrl,
           spec,
-          tolerance: {
-            dim_m: dimToleranceM,
-            parts_min_fraction: partsMinFraction,
-          },
+          tolerance: { dim_m: dimToleranceM, parts_min_fraction: partsMinFraction },
         }),
         signal: AbortSignal.timeout(timeoutMs),
       });
 
       if (res.ok) {
         const data = await res.json();
-        const parsed = verifierReportSchema.safeParse(data);
-        if (parsed.success) return parsed.data;
+        const parsed = verifierReportSchema.safeParse({ ...data, source: "railway" });
+        if (parsed.success) {
+          // eslint-disable-next-line no-console
+          console.info("[hard-verifier] source=railway, verified=", parsed.data.verified, "parts_coverage=", parsed.data.parts_coverage);
+          return parsed.data;
+        }
         // eslint-disable-next-line no-console
-        console.warn("[hard-verifier] Python response failed schema validation, falling back to heuristic.");
+        console.warn("[hard-verifier] Railway response failed schema validation, falling back to heuristic.");
       } else {
         // eslint-disable-next-line no-console
-        console.warn(`[hard-verifier] Python endpoint returned ${res.status}, falling back to heuristic.`);
+        console.warn(`[hard-verifier] Railway returned ${res.status}, falling back to heuristic.`);
       }
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.warn("[hard-verifier] Python endpoint unreachable:", err instanceof Error ? err.message : err);
+      console.warn("[hard-verifier] Railway unreachable:", err instanceof Error ? err.message : err);
     }
   }
 
-  // Fallback: heuristic verification based on spec analysis
-  return buildHeuristicReport(spec, partsMinFraction);
+  // Fallback: pessimistic heuristic
+  // eslint-disable-next-line no-console
+  console.info("[hard-verifier] source=heuristic_fallback");
+  return buildHeuristicReport(spec);
 }
 
-// ─── Heuristic fallback ─────────────────────────────────────────────────
+// ─── Pessimistic heuristic fallback ─────────────────────────────────────
 
-/**
- * Build a heuristic verification report when the Python endpoint is
- * unavailable. Counts expected parts/trim from the spec and produces
- * a conservative estimate (always returns verified=false with a warning).
- */
-function buildHeuristicReport(
-  spec: BriefSpec,
-  partsMinFraction: number,
-): VerifierReport {
+function buildHeuristicReport(spec: BriefSpec): VerifierReport {
   const furniture = spec.furniture ?? [];
   const trim = spec.trim ?? [];
 
@@ -107,7 +107,18 @@ function buildHeuristicReport(
 
   const mismatches: VerifierReport["mismatches"] = [];
 
-  // Flag items with parts that we can't verify
+  // Global "unverified" mismatch — forces Spec Patcher to iterate
+  mismatches.push({
+    type: "unverified",
+    item_id: "<global>",
+    severity: "med",
+    expected: "Railway verification",
+    actual: "heuristic_fallback",
+    description: "Hard Verifier could not parse IFC via Railway. Defaulting to unverified — Spec Patcher should iterate.",
+    suggested_patch: "Retry build OR check Railway service health",
+  });
+
+  // Flag items with parts we can't verify
   for (const item of furniture) {
     if (item.parts && item.parts.length > 0) {
       mismatches.push({
@@ -115,9 +126,25 @@ function buildHeuristicReport(
         item_id: item.id,
         item_type: item.type,
         expected: item.parts.length,
-        actual: "unknown (Python verifier unavailable)",
+        actual: "unknown",
         severity: "med",
-        description: `Cannot verify ${item.parts.length} parts for ${item.id} — Python verifier offline.`,
+        description: `Cannot verify ${item.parts.length} parts for ${item.id} — Railway offline.`,
+        suggested_patch: "force_parts",
+      });
+    }
+  }
+
+  // Flag composite-named items that have NO parts at all
+  for (const item of furniture) {
+    if ((!item.parts || item.parts.length === 0) && isCompositeName(item.type)) {
+      mismatches.push({
+        type: "missing_parts",
+        item_id: item.id,
+        item_type: item.type,
+        expected: 3,
+        actual: 0,
+        severity: "high",
+        description: `Composite item ${item.id} (${item.type}) has no parts — needs decomposition.`,
         suggested_patch: "force_parts",
       });
     }
@@ -128,7 +155,8 @@ function buildHeuristicReport(
     parts_coverage: 0,
     trim_coverage: 0,
     mismatches,
-    summary: `Heuristic report: ${totalExpectedParts} expected parts, ${trim.length} expected trim. Python verifier unavailable — cannot confirm IFC contents.`,
+    summary: `Heuristic (pessimistic): ${totalExpectedParts} expected parts, ${trim.length} trim. Railway unavailable. ${mismatches.length} issue(s) flagged.`,
     verified_at: new Date().toISOString(),
+    source: "heuristic_fallback",
   };
 }

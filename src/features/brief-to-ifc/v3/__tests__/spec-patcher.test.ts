@@ -29,6 +29,7 @@ function makeVerifierReport(overrides?: Partial<VerifierReport>): VerifierReport
     trim_coverage: 1.0,
     mismatches: [],
     summary: "All OK",
+    source: "railway",
     verified_at: "2026-05-18T00:00:00Z",
     ...overrides,
   };

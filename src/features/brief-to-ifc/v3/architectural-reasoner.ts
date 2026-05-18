@@ -311,21 +311,30 @@ export async function applyArchitecturalReasoning(
     }
 
     // Both attempts failed validation
-    // eslint-disable-next-line no-console
-    console.warn(
-      "[architectural-reasoner] Failed to produce valid designRationale after retry. Returning spec unchanged.",
-    );
     metrics.cost_usd = Math.round(runningCost * 1_000_000) / 1_000_000;
     metrics.wall_time_ms = Date.now() - startedAt;
 
-    // Observability: flag suspiciously fast completions
-    if (metrics.wall_time_ms < 2000 && metrics.opus_calls === 0) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[architectural-reasoner] ANOMALY: wall_time_ms=${metrics.wall_time_ms} ` +
-        `but opus_calls=${metrics.opus_calls}. Possible bypass.`,
+    // β.4 HARD CRASH: if wall time is suspiciously fast OR we have
+    // non-trivial furniture but zero rationale, this is a bypass.
+    // Do NOT silently return unchanged spec — crash so the pipeline
+    // surfaces the failure visibly.
+    if (metrics.wall_time_ms < 3000 && furniture.length > 0) {
+      throw new Error(
+        `[architectural-reasoner] Short-circuited: ${metrics.wall_time_ms}ms, ` +
+        `${metrics.opus_calls} Opus calls, ${furniture.length} furniture items, ` +
+        `0 valid rationale. Silent bypass detected.`,
       );
     }
+
+    // Slow failure (Opus was called but returned bad JSON both times).
+    // Return unchanged spec — the pipeline will continue without rationale,
+    // which is suboptimal but not broken.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[architectural-reasoner] Both attempts failed validation. ` +
+      `wall_time_ms=${metrics.wall_time_ms}, opus_calls=${metrics.opus_calls}. ` +
+      `Returning spec unchanged.`,
+    );
     return { spec, metrics };
   } catch (err) {
     // eslint-disable-next-line no-console

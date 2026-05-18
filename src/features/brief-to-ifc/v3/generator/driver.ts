@@ -248,6 +248,19 @@ The pipeline may invoke you up to 3 times for the same brief. The spec may have 
 RULE 5 — TRIM ENFORCEMENT:
 Every item in spec.trim[] MUST be built. Trim is small and easy to drop under cognitive load — resist this. Build trim items inside the same batched run_python block as furniture.
 
+## Section 4g: NEVER USE IfcBuildingElementProxy FOR FURNITURE
+
+IfcBuildingElementProxy means "I don't know what this is." Furniture, fixtures, and fittings ALWAYS have a proper IFC class. Apply this decision table mechanically:
+
+Item contains: chair, stool, sofa, bench, seat, desk, table, workstation, counter, shelf, cabinet, drawer, wardrobe, cupboard, bed, mattress, monitor, screen, display, tv, arm, mount, bracket, stand, tripod, easel, rack, rail, hook, bar, mirror, frame, mannequin, machine, appliance, instrument, microphone, speaker, amplifier, sewing_machine, kit → IfcFurnishingElement
+Item contains: rug, mat, carpet, runner → IfcCovering (FLOORING)
+Item contains: lamp, light, sconce → IfcLightFixture
+Item contains: plug, outlet, switch, socket → IfcFlowTerminal
+DEFAULT for any BriefSpec.furniture[] item: IfcFurnishingElement
+ABSOLUTELY NEVER: IfcBuildingElementProxy for items in BriefSpec.furniture[].
+
+SELF-CHECK before finalize_ifc: count IfcBuildingElementProxy. If any correspond to BriefSpec.furniture[] entries, re-emit them with IfcFurnishingElement before finalizing.
+
 ## Section 5: Worked Example
 
 Brief: "10x4m office, 3m ceiling. 1 door north wall at 2m. 2 windows south wall at 1.5m and 5m. 4 workstations."

@@ -156,7 +156,7 @@ async function generatePatches(
   } catch {
     // eslint-disable-next-line no-console
     console.warn("[spec-patcher] Anthropic client unavailable — returning deterministic patches.");
-    return generateDeterministicPatches(verifierReport, visionReport);
+    return generateDeterministicPatches(verifierReport, visionReport, spec);
   }
 
   const userMessage = JSON.stringify({
@@ -199,11 +199,11 @@ async function generatePatches(
       parsed = JSON.parse(raw);
     } catch {
       const match = raw.match(/\[[\s\S]*\]/);
-      if (!match) return generateDeterministicPatches(verifierReport, visionReport);
+      if (!match) return generateDeterministicPatches(verifierReport, visionReport, spec);
       parsed = JSON.parse(match[0]);
     }
 
-    if (!Array.isArray(parsed)) return generateDeterministicPatches(verifierReport, visionReport);
+    if (!Array.isArray(parsed)) return generateDeterministicPatches(verifierReport, visionReport, spec);
 
     const validated: SpecPatch[] = [];
     const seenKeys = new Set<string>();
@@ -223,8 +223,22 @@ async function generatePatches(
   } catch {
     // eslint-disable-next-line no-console
     console.warn("[spec-patcher] Opus call failed — falling back to deterministic patches.");
-    return generateDeterministicPatches(verifierReport, visionReport);
+    return generateDeterministicPatches(verifierReport, visionReport, spec);
   }
+}
+
+// ─── Composite item detection ───────────────────────────────────────────
+
+const COMPOSITE_KEYWORDS = [
+  "desk", "table", "machine", "stand", "kit", "array", "system",
+  "rack", "unit", "station", "assembly", "fixture", "panel",
+  "instrument", "appliance", "workstation", "console", "cabinet",
+  "monitor", "tripod", "mannequin", "microphone", "speaker",
+];
+
+function isCompositeName(name: string): boolean {
+  const lower = name.toLowerCase();
+  return COMPOSITE_KEYWORDS.some(kw => lower.includes(kw));
 }
 
 // ─── Deterministic fallback patches ─────────────────────────────────────
@@ -232,12 +246,14 @@ async function generatePatches(
 function generateDeterministicPatches(
   verifierReport: VerifierReport,
   visionReport: VisionReport,
+  spec?: BriefSpec,
 ): SpecPatch[] {
   const patches: SpecPatch[] = [];
   const seenKeys = new Set<string>();
 
   // From verifier mismatches
   for (const mm of verifierReport.mismatches) {
+    if (patches.length >= MAX_PATCHES) break;
     if (mm.type === "missing_parts" || mm.type === "missing_aggregation") {
       const key = `${mm.item_id}:force_parts`;
       if (!seenKeys.has(key)) {
@@ -260,8 +276,18 @@ function generateDeterministicPatches(
         });
         seenKeys.add(key);
       }
+    } else if (mm.type === "wrong_class") {
+      const key = `${mm.item_id}:fix_class`;
+      if (!seenKeys.has(key)) {
+        patches.push({
+          item_id: mm.item_id,
+          patch_type: "fix_class",
+          rationale: mm.description,
+          payload: { item_id: mm.item_id, expected_class: mm.expected },
+        });
+        seenKeys.add(key);
+      }
     }
-    if (patches.length >= MAX_PATCHES) break;
   }
 
   // From vision issues
@@ -277,6 +303,31 @@ function generateDeterministicPatches(
           payload: { item_id: issue.affected_element, minimum_parts_count: 3 },
         });
         seenKeys.add(key);
+      }
+    }
+  }
+
+  // β.4 BLIND PATCHES: when mismatches + vision issues produced no actionable
+  // patches but quality is still low, generate patches from spec analysis.
+  // This covers the case where the heuristic fallback returned empty mismatches
+  // because items had no parts[] (Decomposer skipped them).
+  if (patches.length === 0 && spec) {
+    const furniture = spec.furniture ?? [];
+    for (const item of furniture) {
+      if (patches.length >= MAX_PATCHES) break;
+      const needsDecomp = isCompositeName(item.type) &&
+        (!item.parts || item.parts.length < 3);
+      if (needsDecomp) {
+        const key = `${item.id}:force_parts`;
+        if (!seenKeys.has(key)) {
+          patches.push({
+            item_id: item.id,
+            patch_type: "force_parts",
+            rationale: `Blind patch: composite item '${item.type}' has ${item.parts?.length ?? 0} parts (need >= 3)`,
+            payload: { item_id: item.id, minimum_parts_count: Math.max(item.parts?.length ?? 0, 4) },
+          });
+          seenKeys.add(key);
+        }
       }
     }
   }
@@ -349,9 +400,13 @@ export async function patchAndIterate(
       break;
     }
 
-    // Generate patches
+    // Generate patches (pass spec for blind-patch fallback when mismatches empty)
     const patchFn = options.patchFn ?? (async (mm, vi, s) =>
-      generateDeterministicPatches({ verified: false, parts_coverage: best.partsCoverage, trim_coverage: best.trimCoverage, mismatches: mm, summary: "", verified_at: "" }, { quality_score: best.qualityScore, pass: false, issues: vi, summary: "", inspected_at: "" })
+      generateDeterministicPatches(
+        { verified: false, parts_coverage: best.partsCoverage, trim_coverage: best.trimCoverage, mismatches: mm, summary: "", verified_at: "", source: "heuristic_fallback" },
+        { quality_score: best.qualityScore, pass: false, issues: vi, summary: "", inspected_at: "" },
+        s, // spec for blind patches
+      )
     );
     const patches = await patchFn(best.verifierMismatches, best.visionIssues, currentSpec);
 
