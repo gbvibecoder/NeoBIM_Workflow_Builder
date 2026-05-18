@@ -39,9 +39,12 @@ interface ToolbarProps {
 }
 
 /* ─── Shared button style ─────────────────── */
+/* Heights dropped from 38→32 and toolbar padding from 6px→3px so the whole
+   header bar takes ~38px of vertical space instead of ~50px (user feedback
+   2026-05-18: "header taking lots of space"). */
 const btnBase: React.CSSProperties = {
-  width: 38,
-  height: 38,
+  width: 32,
+  height: 32,
   borderRadius: UI.radius.sm,
   display: "flex",
   alignItems: "center",
@@ -65,46 +68,31 @@ const btnHover: React.CSSProperties = {
 
 const dividerStyle: React.CSSProperties = {
   width: 1,
-  height: 24,
+  height: 20,
   background: UI.border.subtle,
   margin: "0 4px",
   flexShrink: 0,
 };
 
-/* File-metadata badge shared style — sits to the LEFT of the toolbar tools
-   (after Upload New). Pulled out of the JSX so the badge style stays in one
-   place and doesn't drift over time. */
-const badgeStyle: React.CSSProperties = {
-  color: UI.text.tertiary,
-  fontSize: 11,
-  fontFamily: "var(--font-jetbrains)",
-  padding: "4px 12px",
-  borderRadius: 12,
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  letterSpacing: "0.3px",
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-};
-
 /* Primary CTA — Calculate BOQ. Filled blue gradient on the dark toolbar so it
-   pops as the action you should actually take once the model is loaded. */
+   pops as the action you should actually take once the model is loaded.
+   Sized to match the shrunk button base (height 28 vs prior 34). */
 const boqBtnBase: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: 6,
-  height: 34,
-  padding: "0 14px",
+  height: 28,
+  padding: "0 12px",
   borderRadius: UI.radius.sm,
   background: "linear-gradient(135deg, #4F8AFF 0%, #6E7CFF 100%)",
   border: "1px solid rgba(99,130,255,0.5)",
   color: "#FFFFFF",
-  fontSize: 12,
+  fontSize: 11.5,
   fontWeight: 600,
   letterSpacing: "0.2px",
   cursor: "pointer",
   transition: UI.transition,
-  boxShadow: "0 2px 12px rgba(79,138,255,0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
+  boxShadow: "0 2px 10px rgba(79,138,255,0.32), inset 0 1px 0 rgba(255,255,255,0.18)",
   flexShrink: 0,
   whiteSpace: "nowrap",
 };
@@ -195,18 +183,18 @@ function ToolBtn({
         title={`${label}${shortcut ? ` (${shortcut})` : ""}`}
         style={{
           ...btnBase,
-          ...(showLabel ? { width: "auto", padding: "0 10px", gap: 5 } : {}),
+          ...(showLabel ? { width: "auto", padding: "0 8px", gap: 4 } : {}),
           ...(hover || active ? btnHover : {}),
           ...(active ? { color: UI.accent.blue, borderColor: "rgba(79,138,255,0.25)", background: "rgba(79,138,255,0.1)", boxShadow: "0 0 12px rgba(79,138,255,0.15)" } : {}),
           opacity: disabled ? 0.35 : 1,
         }}
       >
-        <Icon size={showLabel ? 15 : 18} />
+        <Icon size={showLabel ? 13 : 16} />
         {showLabel && (
-          <span style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>
+          <span style={{ fontSize: 10.5, fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>
         )}
         {dropdown && (
-          <ChevronDown size={10} style={{ ...(showLabel ? { marginLeft: 2 } : { position: "absolute" as const, right: 2, bottom: 4 }), opacity: 0.5 }} />
+          <ChevronDown size={9} style={{ ...(showLabel ? { marginLeft: 1 } : { position: "absolute" as const, right: 2, bottom: 3 }), opacity: 0.5 }} />
         )}
       </button>
       {dropdown && showDrop && (
@@ -309,32 +297,24 @@ export function Toolbar({
           display: "flex",
           alignItems: "center",
           gap: 4,
-          padding: "6px 12px",
+          /* Right padding reserves clearance for the dashboard's user-avatar
+             circle, which is rendered by the parent layout (outside this
+             component) and overlaps the toolbar's right edge — was clipping
+             "Calculate BOQ" → "Calculate". 56px = ~40px avatar + 16px gutter. */
+          padding: "3px 60px 3px 10px",
           background: UI.bg.toolbar,
           backdropFilter: "blur(12px)",
           borderBottom: "1px solid rgba(255,255,255,0.04)",
-          /* SINGLE-LINE TOOLBAR. The previous wrap layout pushed the right-side
-             group (badge + utility buttons) onto a second row whenever the
-             tools overflowed available width — exactly the bug shown in the
-             screenshots. The fix is a fixed three-region layout: a pinned-left
-             metadata badge, a horizontally-scrollable tool strip in the
-             middle, and pinned-right utilities + the primary CTA. */
+          /* SINGLE-LINE TOOLBAR with a fixed two-region layout:
+             scrollable middle (tool strip) + pinned-right (Calculate BOQ).
+             File-metadata badge was moved to a slim bottom status bar in
+             IFCViewerPage so the header stays as compact as possible. */
           flexWrap: "nowrap",
-          minHeight: 48,
+          minHeight: 38,
           position: "relative",
           zIndex: 30,
         }}
       >
-        {/* LEFT — pinned: file-metadata badge */}
-        {hasModel && (
-          <>
-            <span style={badgeStyle}>
-              {modelInfo.schema} · {modelInfo.elementCount} elements · {(modelInfo.fileSize / (1024 * 1024)).toFixed(1)} MB
-            </span>
-            <div style={dividerStyle} />
-          </>
-        )}
-
         {/* MIDDLE — scrollable tool strip. flex:1 + minWidth:0 + overflowX:auto
             lets the row absorb extra width on wide viewports and degrade to
             horizontal scroll on narrow ones, without bumping the pinned-right

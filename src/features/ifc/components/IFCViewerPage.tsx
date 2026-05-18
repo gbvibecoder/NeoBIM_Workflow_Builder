@@ -516,14 +516,14 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 6,
-              padding: "6px 14px",
-              margin: "6px 0 6px 8px",
+              gap: 5,
+              padding: "4px 10px",
+              margin: "4px 0 4px 8px",
               background: "rgba(99,130,255,0.10)",
               border: "1px solid rgba(99,130,255,0.20)",
               borderRadius: UI.radius.sm,
               color: UI.text.primary,
-              fontSize: 13,
+              fontSize: 11.5,
               fontWeight: 500,
               cursor: "pointer",
               transition: UI.transition,
@@ -539,7 +539,7 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
               e.currentTarget.style.borderColor = "rgba(99,130,255,0.20)";
             }}
           >
-            <ArrowLeft size={15} />
+            <ArrowLeft size={13} />
             Upload New
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -856,6 +856,41 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
         )}
 
       </div>
+
+      {/* Bottom status bar — schema / element count / file size. Moved here
+          from the toolbar (2026-05-18 follow-up: header was eating too much
+          vertical space). Sits below the viewport's flex-1 row so the right
+          sidebar's absolute positioning doesn't overlap it. */}
+      {hasModel && modelInfo && (
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "3px 14px",
+            background: "rgba(7,7,13,0.94)",
+            borderTop: "1px solid rgba(255,255,255,0.05)",
+            color: UI.text.tertiary,
+            fontSize: 10.5,
+            fontFamily: "var(--font-jetbrains)",
+            letterSpacing: "0.3px",
+            minHeight: 22,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+          }}
+        >
+          <span>{modelInfo.schema}</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>{modelInfo.elementCount} elements</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>{(modelInfo.fileSize / (1024 * 1024)).toFixed(1)} MB</span>
+          <span style={{ flex: 1 }} />
+          {currentFile && (
+            <span style={{ opacity: 0.65 }}>{currentFile.name}</span>
+          )}
+        </div>
+      )}
 
     </div>
   );
