@@ -45,6 +45,12 @@ import { handleTR025 } from "./tr-025";
 import { handleTR026 } from "./tr-026";
 import { handleTR027 } from "./tr-027";
 import { handleTR028 } from "./tr-028";
+// Phase Beta 2 (2026-05-18): 5 new pipeline nodes
+import { handleTR029 } from "./tr-029";
+import { handleTR030 } from "./tr-030";
+import { handleTR031 } from "./tr-031";
+import { handleTR032 } from "./tr-032";
+import { handleTR034 } from "./tr-034";
 import { handleEX007 } from "./ex-007";
 
 export const nodeHandlers: Record<string, NodeHandler> = {
@@ -65,6 +71,11 @@ export const nodeHandlers: Record<string, NodeHandler> = {
   "TR-026": handleTR026,
   "TR-027": handleTR027,
   "TR-028": handleTR028,
+  "TR-029": handleTR029,
+  "TR-030": handleTR030,
+  "TR-031": handleTR031,
+  "TR-032": handleTR032,
+  "TR-034": handleTR034,
   "GN-001": handleGN001,
   "GN-003": handleGN003,
   "GN-004": handleGN004,

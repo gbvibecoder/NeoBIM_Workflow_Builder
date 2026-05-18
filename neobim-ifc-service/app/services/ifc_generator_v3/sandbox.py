@@ -126,6 +126,13 @@ class Sandbox:
                 "BuildFlowIFC is missing aggregate_parts() — "
                 "Railway image may be stale. Redeploy neobim-ifc-service."
             )
+        # Phase Beta 2: trim & hardware helpers
+        for _method in ("add_skirting", "add_door_hardware", "add_window_hardware"):
+            if not callable(getattr(bf_instance, _method, None)):
+                raise RuntimeError(
+                    f"BuildFlowIFC is missing {_method}() — "
+                    "Railway image may be stale. Redeploy neobim-ifc-service."
+                )
 
     def execute(self, code: str) -> SandboxResult:
         """Execute the agent-authored Python. Returns captured stdout +

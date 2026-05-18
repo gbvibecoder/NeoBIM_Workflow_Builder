@@ -240,6 +240,25 @@ export interface ResultPageData {
    *  When set, the result page renders the IFC hero card instead of
    *  the image hero, and the page tag becomes "IFC Export". */
   ifcExport: IfcExportSummary | null;
+
+  // ── Phase Beta 2: Vision + Reasoning ──────────────────────────────────────
+
+  /** Quality score from TR-032 Vision Inspector (0-100). Null when TR-032
+   *  didn't run or returned no report. */
+  qualityScore: number | null;
+  /** Full vision report issues array from TR-032. */
+  visionIssues: Array<{
+    severity: "low" | "med" | "high";
+    type: string;
+    description: string;
+    affected_element?: string;
+  }>;
+  /** Design rationale entries from TR-029 Architectural Reasoner. */
+  designRationale: Array<{
+    itemId: string;
+    position: [number, number, number];
+    rationale: string;
+  }>;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -862,6 +881,50 @@ export function useResultPageData(executionId: string): ResultPageData {
       }
     }
 
+    // ── Phase Beta 2: Vision Report + Design Rationale ─────────
+    // Scan JSON artifacts for TR-032 visionReport and TR-029 designRationale.
+    let qualityScore: number | null = null;
+    let visionIssues: ResultPageData["visionIssues"] = [];
+    let designRationale: ResultPageData["designRationale"] = [];
+    for (const a of artifacts.values()) {
+      if (a.type !== "json") continue;
+      const dd = asRecord(a.data);
+      // TR-032 Vision Inspector: data.visionReport
+      if (dd.visionReport && typeof dd.visionReport === "object" && qualityScore === null) {
+        const vr = dd.visionReport as Record<string, unknown>;
+        const qs = typeof vr.quality_score === "number" ? vr.quality_score : null;
+        if (qs !== null) qualityScore = qs;
+        if (Array.isArray(vr.issues)) {
+          visionIssues = (vr.issues as Array<Record<string, unknown>>).map(issue => {
+            const sev = asStr(issue.severity);
+            return {
+              severity: (sev === "low" || sev === "med" || sev === "high") ? sev : "low",
+              type: asStr(issue.type) ?? "other",
+              description: asStr(issue.description) ?? "",
+              affected_element: asStr(issue.affected_element),
+            };
+          });
+        }
+      }
+      // TR-029 Architectural Reasoner: data.briefSpec.designRationale
+      if (dd.briefSpec && typeof dd.briefSpec === "object" && designRationale.length === 0) {
+        const spec = dd.briefSpec as Record<string, unknown>;
+        if (Array.isArray(spec.designRationale)) {
+          designRationale = (spec.designRationale as Array<Record<string, unknown>>).map((r, idx) => {
+            const pos = Array.isArray(r.position) && r.position.length === 3
+              && r.position.every((v: unknown) => typeof v === "number")
+              ? (r.position as [number, number, number])
+              : [0, 0, 0] as [number, number, number];
+            return {
+              itemId: asStr(r.itemId) ?? `item-${idx}`,
+              position: pos,
+              rationale: asStr(r.rationale) ?? "",
+            };
+          });
+        }
+      }
+    }
+
     // ── JSON ─────────
     const jsonData = findAllByType(artifacts, "json").map(a => {
       const d = asRecord(a.data);
@@ -938,6 +1001,9 @@ export function useResultPageData(executionId: string): ResultPageData {
       boqSummary,
       clashSummary,
       ifcExport,
+      qualityScore,
+      visionIssues,
+      designRationale,
     };
   }, [
     rawArtifacts,

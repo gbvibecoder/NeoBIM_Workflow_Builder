@@ -695,6 +695,137 @@ class BuildFlowIFC:
             RelatedObjects=children,
         )
 
+    # ── Phase Beta 2: Trim & hardware helpers ──────────────────────────
+
+    def add_skirting(
+        self,
+        skirting_id: str,
+        host_space_id: str,
+        wall_id: str,
+        height: float = 0.075,
+        depth: float = 0.018,
+        material_id: str = "mat-paint-white",
+    ) -> Any:
+        """Build skirting as IfcCovering (FLOORING) along a wall base.
+
+        Looks up the wall's origin and dims to compute skirting length
+        and placement. Returns the IFC entity.
+        """
+        wall_el = self._elements_by_id.get(wall_id)
+        if not wall_el:
+            return None
+
+        # Get wall placement — extract from the tracked data
+        wall_data = self._tracked_data.get(wall_id, {})
+        wall_origin = wall_data.get("origin", (0, 0, 0))
+        wall_dims = wall_data.get("dims", (1.0, 0.2))
+        wall_length = wall_dims[0] if isinstance(wall_dims, (list, tuple)) else 1.0
+
+        return self._add_box_element(
+            ifc_class="IfcCovering",
+            element_id=skirting_id,
+            origin=(wall_origin[0], wall_origin[1], wall_origin[2]),
+            dims=(wall_length, depth),
+            depth=height,
+            material=material_id,
+            predefined_type="FLOORING",
+            object_type="Skirting",
+            description=f"Skirting along {wall_id}",
+            tag=skirting_id,
+            contained_in_space_id=host_space_id,
+        )
+
+    def add_door_hardware(
+        self,
+        hardware_id: str,
+        host_door_id: str,
+        hardware_type: str,
+        position_local: Tuple[float, float, float],
+        dims: Tuple[float, float, float],
+        material_id: str = "mat-brass",
+    ) -> Any:
+        """Build door hardware as IfcDiscreteAccessory.
+
+        hardware_type: "hinge" | "handle" | "strike_plate"
+        position_local: offset from door origin
+        dims: (width, depth, height) in metres
+        """
+        valid_types = {"hinge", "handle", "strike_plate"}
+        if hardware_type not in valid_types:
+            raise ValueError(
+                f"Invalid hardware_type {hardware_type!r}. "
+                f"Must be one of: {', '.join(sorted(valid_types))}"
+            )
+
+        door_el = self._elements_by_id.get(host_door_id)
+        door_data = self._tracked_data.get(host_door_id, {})
+        door_origin = door_data.get("origin", (0, 0, 0))
+        space_id = door_data.get("contained_in_space_id")
+
+        world_origin = (
+            door_origin[0] + position_local[0],
+            door_origin[1] + position_local[1],
+            door_origin[2] + position_local[2],
+        )
+
+        return self._add_box_element(
+            ifc_class="IfcDiscreteAccessory",
+            element_id=hardware_id,
+            origin=world_origin,
+            dims=(dims[0], dims[1]),
+            depth=dims[2],
+            material=material_id,
+            predefined_type=None,
+            object_type=f"Door {hardware_type.replace('_', ' ').title()}",
+            description=f"{hardware_type} for {host_door_id}",
+            tag=hardware_id,
+            contained_in_space_id=space_id,
+        )
+
+    def add_window_hardware(
+        self,
+        hardware_id: str,
+        host_window_id: str,
+        hardware_type: str,
+        position_local: Tuple[float, float, float],
+        dims: Tuple[float, float, float],
+        material_id: str = "mat-aluminium",
+    ) -> Any:
+        """Build window hardware as IfcDiscreteAccessory.
+
+        hardware_type: "handle" | "sash_lock"
+        """
+        valid_types = {"handle", "sash_lock"}
+        if hardware_type not in valid_types:
+            raise ValueError(
+                f"Invalid hardware_type {hardware_type!r}. "
+                f"Must be one of: {', '.join(sorted(valid_types))}"
+            )
+
+        win_data = self._tracked_data.get(host_window_id, {})
+        win_origin = win_data.get("origin", (0, 0, 0))
+        space_id = win_data.get("contained_in_space_id")
+
+        world_origin = (
+            win_origin[0] + position_local[0],
+            win_origin[1] + position_local[1],
+            win_origin[2] + position_local[2],
+        )
+
+        return self._add_box_element(
+            ifc_class="IfcDiscreteAccessory",
+            element_id=hardware_id,
+            origin=world_origin,
+            dims=(dims[0], dims[1]),
+            depth=dims[2],
+            material=material_id,
+            predefined_type=None,
+            object_type=f"Window {hardware_type.replace('_', ' ').title()}",
+            description=f"{hardware_type} for {host_window_id}",
+            tag=hardware_id,
+            contained_in_space_id=space_id,
+        )
+
     def add_light_fixture(
         self,
         l_id: str,

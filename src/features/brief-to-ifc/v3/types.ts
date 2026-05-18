@@ -214,6 +214,57 @@ export const assumptionSchema = z.object({
   reason: z.string().max(500),
 });
 
+// ─── Phase Beta 2: Design Rationale (TR-029 Architectural Reasoner) ──
+
+export const designRationaleSchema = z.object({
+  itemId: z.string().min(1).max(64),
+  position: z.tuple([z.number(), z.number(), z.number()]),
+  rotation_z_rad: z.number().default(0),
+  rationale: z.string().min(1).max(500),
+});
+
+// ─── Phase Beta 2: Trim & Hardware (TR-030 Trim Specifier) ──────────
+
+export const trimItemSchema = z.object({
+  id: z.string().min(1).max(64),
+  type: z.enum([
+    "skirting", "picture_rail", "cornice",
+    "door_hinge", "door_handle", "door_strike_plate",
+    "window_handle", "window_sash_lock",
+    "door_sill", "wall_corner_protector",
+  ]),
+  hostId: z.string().min(1),
+  dims_m: z.tuple([
+    z.number().positive(), z.number().positive(), z.number().positive(),
+  ]).optional(),
+  origin_local_m: z.tuple([z.number(), z.number(), z.number()]).optional(),
+  rotation_z_rad: z.number().default(0),
+  material_id: z.string().min(1),
+  ifc_class: z
+    .enum(["IfcCovering", "IfcDiscreteAccessory", "IfcBuildingElementProxy"])
+    .default("IfcDiscreteAccessory"),
+});
+
+// ─── Phase Beta 2: Vision Inspector (TR-032) ────────────────────────
+
+export const visionIssueSchema = z.object({
+  severity: z.enum(["low", "med", "high"]),
+  type: z.enum([
+    "geometry", "positioning", "proportions", "missing",
+    "collapsed", "material", "other",
+  ]),
+  description: z.string().max(500),
+  affected_element: z.string().optional(),
+});
+
+export const visionReportSchema = z.object({
+  quality_score: z.number().int().min(0).max(100),
+  pass: z.boolean(),
+  issues: z.array(visionIssueSchema),
+  summary: z.string().max(500),
+  inspected_at: z.string(),
+});
+
 // ─── BriefSpec ──────────────────────────────────────────────────────
 
 export const briefSpecSchema = z.object({
@@ -231,6 +282,9 @@ export const briefSpecSchema = z.object({
   furniture: z.array(briefFurnitureSchema).max(500).optional(),
   lighting: briefLightingSchema.optional(),
   assumptions_made: z.array(assumptionSchema).max(100).optional(),
+  // Phase Beta 2 extensions
+  designRationale: z.array(designRationaleSchema).optional(),
+  trim: z.array(trimItemSchema).max(500).optional(),
 });
 
 export type BriefSpec = z.infer<typeof briefSpecSchema>;
@@ -243,6 +297,10 @@ export type BriefFurniture = z.infer<typeof briefFurnitureSchema>;
 export type BriefLighting = z.infer<typeof briefLightingSchema>;
 export type GlobalParameters = z.infer<typeof globalParametersSchema>;
 export type Assumption = z.infer<typeof assumptionSchema>;
+export type DesignRationale = z.infer<typeof designRationaleSchema>;
+export type TrimItem = z.infer<typeof trimItemSchema>;
+export type VisionIssue = z.infer<typeof visionIssueSchema>;
+export type VisionReport = z.infer<typeof visionReportSchema>;
 
 // ─── Generator agent loop — tool payloads / outcomes ────────────────
 

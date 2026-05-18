@@ -414,6 +414,95 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "5-20s",
   },
 
+  // ── Phase Beta 2 (2026-05-18): 5 new pipeline nodes ──
+  {
+    id: "TR-029",
+    name: "Architectural Reasoner",
+    description:
+      "Applies domain-specific positioning logic to furniture items via Opus. Photography studios get backdrop-away-from-light, offices get desk-facing-window, etc.",
+    category: "transform",
+    icon: "Compass",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (with rationale)", type: "json" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 (single call)",
+    tags: ["ai", "reasoning", "positioning", "domain", "v3", "anthropic"],
+    executionTime: "15-30s",
+  },
+  {
+    id: "TR-030",
+    name: "Trim Specifier",
+    description:
+      "Adds architectural trim and hardware — skirting along walls, door hinges/handles/strike plates, window handles. Single Opus call.",
+    category: "transform",
+    icon: "Wrench",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (with trim)", type: "json" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 (single call)",
+    tags: ["ai", "trim", "hardware", "skirting", "v3", "anthropic"],
+    executionTime: "10-25s",
+  },
+  {
+    id: "TR-031",
+    name: "Material Resolver",
+    description:
+      "Resolves material strings to 50-entry canonical library via fuzzy match — deterministic, sub-50ms. No AI call.",
+    category: "transform",
+    icon: "Palette",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (normalized materials)", type: "json" },
+    ],
+    apiEngine: "Deterministic (no AI call)",
+    tags: ["material", "resolver", "deterministic", "v3"],
+    executionTime: "< 50ms",
+  },
+  {
+    id: "TR-034",
+    name: "Spec Validator",
+    description:
+      "Deterministic spec validation gate — fails fast on structural errors (missing polygons, NaN coords, broken refs), warns on quality issues.",
+    category: "transform",
+    icon: "ShieldCheck",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (validated)", type: "json" },
+      { id: "report-out", label: "Validation Report", type: "json" },
+    ],
+    apiEngine: "Deterministic (no AI call)",
+    tags: ["validate", "spec", "deterministic", "gate", "v3"],
+    executionTime: "< 10ms",
+  },
+  {
+    id: "TR-032",
+    name: "Vision Inspector",
+    description:
+      "Renders IFC to PNG, feeds to Opus 4.7 vision with briefSpec. Returns quality_score 0-100, issues list, pass/fail. Read-only — does not modify IFC.",
+    category: "transform",
+    icon: "Eye",
+    inputs: [
+      { id: "ifc-in", label: "IFC File", type: "ifc" },
+    ],
+    outputs: [
+      { id: "report-out", label: "Vision Report", type: "json" },
+      { id: "ifc-out", label: "IFC File (passthrough)", type: "ifc" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 (vision)",
+    tags: ["ai", "vision", "quality", "inspection", "v3", "anthropic"],
+    executionTime: "20-45s",
+  },
+
   // ── Brief-to-IFC v2 (Phase 1) — AI-powered faithful IFC creation ──
   {
     id: "TR-024",
@@ -877,7 +966,7 @@ export const CATEGORY_CONFIG = {
  *  was the source of the "DEMO" badge bug (Phase 0 §1.2). TR-024/TR-022/
  *  EX-006 are the Brief-to-IFC v2 (Phase 1) nodes (retired). TR-025/26/27
  *  and EX-007 are the v3 Canvas Unification nodes (2026-05-17). */
-export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'TR-028', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
+export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'TR-028', 'TR-029', 'TR-030', 'TR-031', 'TR-032', 'TR-034', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {

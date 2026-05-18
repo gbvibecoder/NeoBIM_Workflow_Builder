@@ -41,6 +41,14 @@ import {
   isLogsSectionEligible,
 } from "@/features/result-page/components/sections/LogsSection";
 import { LiveStatusStrip } from "@/features/result-page/components/sections/LiveStatusStrip";
+import {
+  QualityReportSection,
+  isQualityReportEligible,
+} from "@/features/result-page/components/sections/QualityReportSection";
+import {
+  DesignRationaleSection,
+  isDesignRationaleEligible,
+} from "@/features/result-page/components/sections/DesignRationaleSection";
 import { NotFound } from "@/features/result-page/components/empty/NotFound";
 import { Forbidden } from "@/features/result-page/components/empty/Forbidden";
 import { readSavedNote } from "@/features/result-page/components/features/AnnotateButton";
@@ -221,6 +229,18 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
                   <HeroSection data={data} heroKind={heroKind} />
                 </ErrorBoundary>
               )}
+
+              {/* Phase Beta 2: Quality Report + Design Rationale collapsibles */}
+              {isQualityReportEligible(data) ? (
+                <ErrorBoundary>
+                  <QualityReportSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {isDesignRationaleEligible(data) ? (
+                <ErrorBoundary>
+                  <DesignRationaleSection data={data} />
+                </ErrorBoundary>
+              ) : null}
 
               {/* Phase 4.1 Fix 3 — section indices derived from rendered count.
                   Each section's eligibility predicate is consulted in declaration

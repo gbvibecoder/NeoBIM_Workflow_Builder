@@ -21,6 +21,10 @@ export type {
   SandboxValidateResult,
   SandboxSummaryResult,
   SandboxFinalizeResult,
+  DesignRationale,
+  TrimItem,
+  VisionIssue,
+  VisionReport,
 } from "./types";
 
 export {
@@ -31,6 +35,10 @@ export {
   briefElementSchema,
   briefMaterialSchema,
   furniturePartSchema,
+  designRationaleSchema,
+  trimItemSchema,
+  visionIssueSchema,
+  visionReportSchema,
 } from "./types";
 
 export {
@@ -43,3 +51,8 @@ export { enrichBrief } from "./brief-enrichment";
 export { runGenerator } from "./generator/driver";
 export { decomposeBriefSpecItems } from "./item-decomposer";
 export type { DecomposerMetrics, DecomposerResult } from "./item-decomposer";
+export { applyArchitecturalReasoning } from "./architectural-reasoner";
+export { applyTrimSpecification } from "./trim-specifier";
+export { resolveMaterials } from "./material-resolver";
+export { validateSpec } from "./spec-validator-node";
+export { inspectIFC } from "./vision-inspector";

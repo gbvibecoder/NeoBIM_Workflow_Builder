@@ -56,6 +56,8 @@ import {
   runBriefToIfcQueued,
   isBriefToIfcV2Composition,
 } from "@/features/ifc/services/brief-to-ifc-v2/run-brief-to-ifc-queued";
+import { mergeBriefSpecs, isBriefSpecLike } from "@/features/execution/utils/spec-merge";
+import type { BriefSpec } from "@/features/brief-to-ifc/v3/types";
 
 // All node IDs that have real API implementations on the server.
 // NOTE: TR-022/TR-024/EX-006 (Brief-to-IFC v2, Phase 1) were added to
@@ -63,7 +65,7 @@ import {
 // src/app/api/execute-node/route.ts. The pre-existing divergence flagged
 // in Phase 0 §1.4 (client set missing GN-007/GN-008/TR-013/TR-014) is
 // left untouched here — out of scope for Phase 1.
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "TR-028", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "TR-028", "TR-029", "TR-030", "TR-031", "TR-032", "TR-034", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
 
 // Live nodes — ALWAYS use real API execution regardless of NEXT_PUBLIC_ENABLE_MOCK_EXECUTION.
 // These are production-ready and should never fall through to mock when authenticated.
@@ -92,6 +94,12 @@ const LIVE_NODE_IDS = new Set([
   "TR-027",  // Geometric Validator (v3 visual gates — /validate endpoint)
   "EX-007",  // IFC Export + Preview (Railway PNG renders — /render-previews endpoint)
   "TR-028",  // Item Decomposer (Phase Alpha — parallel Opus parts decomposition)
+  // Phase Beta 2 (2026-05-18): 5 new pipeline nodes
+  "TR-029",  // Architectural Reasoner (Opus domain positioning)
+  "TR-030",  // Trim Specifier (Opus skirting + door hardware)
+  "TR-031",  // Material Resolver (deterministic fuzzy match)
+  "TR-032",  // Vision Inspector (Opus vision quality scoring)
+  "TR-034",  // Spec Validator (deterministic structural validation)
 ]);
 
 interface APIErrorResponse {
@@ -1269,6 +1277,38 @@ interface TopologicalSortResult {
   hasCycle: boolean;
   cycleNodeLabels: string[];
   disconnectedNodes: WorkflowNode[];
+  levels: WorkflowNode[][];
+}
+
+/** Group topologically-sorted nodes into execution levels. Nodes at the
+ *  same level share no dependency edge → safe for Promise.all parallelism. */
+function computeExecutionLevels(
+  sortedNodes: WorkflowNode[],
+  edges: { source: string; target: string }[],
+): WorkflowNode[][] {
+  const nodeLevel = new Map<string, number>();
+
+  for (const node of sortedNodes) {
+    const incoming = edges.filter((e) => e.target === node.id);
+    if (incoming.length === 0) {
+      nodeLevel.set(node.id, 0);
+    } else {
+      const maxParent = Math.max(
+        ...incoming.map((e) => nodeLevel.get(e.source) ?? 0),
+      );
+      nodeLevel.set(node.id, maxParent + 1);
+    }
+  }
+
+  const maxLevel = sortedNodes.length > 0
+    ? Math.max(...Array.from(nodeLevel.values()))
+    : -1;
+  const levels: WorkflowNode[][] = [];
+  for (let l = 0; l <= maxLevel; l++) {
+    const atLevel = sortedNodes.filter((n) => nodeLevel.get(n.id) === l);
+    if (atLevel.length > 0) levels.push(atLevel);
+  }
+  return levels;
 }
 
 // Topological sort using Kahn's algorithm — detects cycles and disconnected nodes
@@ -1326,6 +1366,9 @@ function topologicalSort(nodes: WorkflowNode[], edges: { source: string; target:
     hasCycle: cycleNodes.length > 0,
     cycleNodeLabels: cycleNodes.map(n => n.data.label),
     disconnectedNodes,
+    /** Execution levels for parallelism: nodes at the same level have
+     *  no edges between them and can run via Promise.all. */
+    levels: computeExecutionLevels(sorted, edges),
   };
 }
 
@@ -1343,26 +1386,73 @@ function getUpstreamArtifact(
     return artifactMap.get(incomingEdges[0].source) ?? null;
   }
 
-  // Multiple inputs — merge data from all upstream nodes
-  const mergedData: Record<string, unknown> = {};
+  // Multiple inputs — merge data from all upstream nodes.
+  // When ALL upstream artifacts carry a BriefSpec (fan-in from the
+  // TR-028/TR-030/TR-031 parallel branch), use the structured
+  // mergeBriefSpecs function to avoid last-writer-wins clobber.
+  // Otherwise fall back to flat Object.assign.
+  const upstreamArtifacts: ExecutionArtifact[] = [];
   let firstArtifact: ExecutionArtifact | null = null;
 
   for (const edge of incomingEdges) {
     const artifact = artifactMap.get(edge.source);
     if (artifact) {
       if (!firstArtifact) firstArtifact = artifact;
-      if (artifact.data && typeof artifact.data === "object") {
-        const dataKeys = Object.keys(artifact.data as Record<string, unknown>).filter(k => k.startsWith("_"));
-        Object.assign(mergedData, artifact.data);
-      }
+      upstreamArtifacts.push(artifact);
     } else {
       console.warn(`[merge] Node ${nodeId} ← source ${edge.source}: NO ARTIFACT FOUND in map`);
     }
   }
 
-  const mergedUnderscoreKeys = Object.keys(mergedData).filter(k => k.startsWith("_"));
-
   if (!firstArtifact) return null;
+
+  // Detect BriefSpec fan-in: every upstream artifact's data (or data.briefSpec)
+  // looks like a BriefSpec. This is the parallel branch pattern.
+  const extractSpec = (a: ExecutionArtifact): unknown => {
+    const d = a.data as Record<string, unknown> | undefined;
+    return d?.briefSpec ?? d?.spec ?? d;
+  };
+  const allBriefSpecLike = upstreamArtifacts.length >= 2 &&
+    upstreamArtifacts.every(a => isBriefSpecLike(extractSpec(a)));
+
+  if (allBriefSpecLike) {
+    // Structured merge: extract BriefSpec from each, merge, wrap back
+    const specs = upstreamArtifacts.map(a => extractSpec(a)) as BriefSpec[];
+    const merged = mergeBriefSpecs(specs);
+    // Preserve non-briefSpec metadata from each artifact.
+    // Deep-merge `metrics` objects so all three nodes' metrics survive.
+    // Collect summaries into an array instead of last-writer-wins.
+    const mergedData: Record<string, unknown> = {};
+    const allMetrics: Record<string, unknown> = {};
+    const allSummaries: string[] = [];
+    for (const a of upstreamArtifacts) {
+      if (a.data && typeof a.data === "object") {
+        const d = a.data as Record<string, unknown>;
+        for (const [key, value] of Object.entries(d)) {
+          if (key === "briefSpec" || key === "spec") continue; // merged separately
+          if (key === "metrics" && value && typeof value === "object") {
+            Object.assign(allMetrics, value);
+          } else if (key === "summary" && typeof value === "string") {
+            allSummaries.push(value);
+          } else {
+            mergedData[key] = value;
+          }
+        }
+      }
+    }
+    mergedData.briefSpec = merged;
+    if (Object.keys(allMetrics).length > 0) mergedData.metrics = allMetrics;
+    if (allSummaries.length > 0) mergedData.summary = allSummaries.join(" | ");
+    return { ...firstArtifact, data: mergedData };
+  }
+
+  // Fallback: flat Object.assign merge for non-BriefSpec fan-ins
+  const mergedData: Record<string, unknown> = {};
+  for (const a of upstreamArtifacts) {
+    if (a.data && typeof a.data === "object") {
+      Object.assign(mergedData, a.data);
+    }
+  }
 
   return { ...firstArtifact, data: mergedData };
 }
@@ -1745,14 +1835,26 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
 
     // Reuse already-computed topological sort (cycle check already passed above)
     const orderedNodes = sortCheck.sorted;
+    const executionLevels = sortCheck.levels;
 
     let hasError = false;
+    // Flag set by error handlers inside Promise.all — prevents starting
+    // new levels after a hard failure (rate limit or LIVE node error).
+    let breakExecution = false;
     // Map of nodeId → artifact for edge-based data routing
     const artifactMap = new Map<string, ExecutionArtifact>();
+    let nodesProcessed = 0;
 
-    for (let i = 0; i < orderedNodes.length; i++) {
-      const node = orderedNodes[i] as WorkflowNode;
-      setProgress(Math.round((i / orderedNodes.length) * 100));
+    // Level-based execution: nodes at the same topological level run in
+    // parallel via Promise.allSettled. Levels execute sequentially.
+    for (const level of executionLevels) {
+      if (breakExecution) break;
+
+      // If this level has a single node, run it directly (no overhead).
+      // If multiple nodes, run them in parallel.
+      const nodePromises = level.map((node) => (async () => {
+      // ─── BEGIN PER-NODE BODY (shared for sequential and parallel) ───
+      if (breakExecution) return; // another node in this level failed hard
 
       updateNodeStatus(node.id, "running");
       log("running", `Running: ${node.data.label}`, node.data.catalogueId);
@@ -1840,7 +1942,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
               nodeTrace.outputSummary = `Reused ${prevArtifact.type} from previous run`;
               finishNodeTrace(nodeTrace, "success");
               setExecutionTrace({ ...trace });
-              continue;
+              return; // cache hit — skip execution for this node
             }
           }
         }
@@ -2122,7 +2224,8 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           finishNodeTrace(nodeTrace, "error");
           trace.errors.push(`${nodeTrace.nodeName}: rate limit exceeded`);
           setExecutionTrace({ ...trace });
-          break;
+          breakExecution = true;
+          return; // exit this node's async IIFE
         }
 
         // LIVE nodes must NEVER fall back to mock — they hard-fail so the user
@@ -2157,7 +2260,8 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           finishNodeTrace(nodeTrace, "error");
           trace.errors.push(`${nodeTrace.nodeName}: ${errMsg}`);
           setExecutionTrace({ ...trace });
-          break;
+          breakExecution = true;
+          return; // exit this node's async IIFE
         }
 
         // Non-fatal error for non-LIVE nodes — fall back to mock execution and continue
@@ -2269,7 +2373,14 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           setExecutionTrace({ ...trace });
         }
       }
-    }
+      // ─── END PER-NODE BODY ───
+      })()); // close async IIFE + map callback
+
+      // Run all nodes in this level in parallel (or single if level.length === 1)
+      await Promise.allSettled(nodePromises);
+      nodesProcessed += level.length;
+      setProgress(Math.round((nodesProcessed / orderedNodes.length) * 100));
+    } // end level loop
 
     setProgress(100);
     completeExecution(hasError ? "partial" : "success");

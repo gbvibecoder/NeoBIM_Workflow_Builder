@@ -127,7 +127,7 @@ export function IfcHeroSection({ data }: IfcHeroSectionProps) {
           </div>
         </header>
 
-        <KpiRow ifc={ifc} bboxLabel={bboxLabel} />
+        <KpiRow ifc={ifc} bboxLabel={bboxLabel} qualityScore={data.qualityScore} />
 
         <div
           style={{
@@ -192,10 +192,17 @@ export function IfcHeroSection({ data }: IfcHeroSectionProps) {
 interface KpiRowProps {
   ifc: NonNullable<ResultPageData["ifcExport"]>;
   bboxLabel: string | null;
+  qualityScore: number | null;
 }
 
-function KpiRow({ ifc, bboxLabel }: KpiRowProps) {
-  const items: Array<{ label: string; value: string }> = [];
+function qualityColor(score: number): string {
+  if (score >= 85) return "#16A34A"; // green
+  if (score >= 70) return "#CA8A04"; // yellow
+  return "#DC2626"; // red
+}
+
+function KpiRow({ ifc, bboxLabel, qualityScore }: KpiRowProps) {
+  const items: Array<{ label: string; value: string; color?: string }> = [];
   if (typeof ifc.entityCount === "number" && ifc.entityCount > 0) {
     items.push({ label: "ENTITIES", value: ifc.entityCount.toLocaleString() });
   }
@@ -211,6 +218,12 @@ function KpiRow({ ifc, bboxLabel }: KpiRowProps) {
       value: ifc.verdict === "OK" ? "✓ OK" : "✗ FAILED",
     });
   }
+  // Phase Beta 2: Quality score from TR-032 Vision Inspector
+  items.push({
+    label: "QUALITY",
+    value: typeof qualityScore === "number" ? String(qualityScore) : "\u2014",
+    color: typeof qualityScore === "number" ? qualityColor(qualityScore) : "#94A3B8",
+  });
   if (items.length === 0) return null;
 
   return (
@@ -220,6 +233,7 @@ function KpiRow({ ifc, bboxLabel }: KpiRowProps) {
         gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
         gap: 12,
       }}
+      data-testid="ifc-kpi-row"
     >
       {items.map(item => (
         <div
@@ -246,10 +260,11 @@ function KpiRow({ ifc, bboxLabel }: KpiRowProps) {
             {item.label}
           </div>
           <div
+            data-testid={item.label === "QUALITY" ? "quality-badge-value" : undefined}
             style={{
               fontSize: 15,
               fontWeight: 700,
-              color: "#0F172A",
+              color: item.color ?? "#0F172A",
               fontFamily: "var(--font-jetbrains), ui-monospace, monospace",
             }}
           >

@@ -146,6 +146,33 @@ Pattern:
 
 Without IfcCovering, BIM tools cannot distinguish "concrete structural slab" from "polished concrete floor finish" — they are semantically and practically different.
 
+## Section 4d: Trim Handling
+
+If briefSpec.trim[] is present, build each trim item:
+
+SKIRTING (type "skirting"):
+  Build as IfcCovering with PredefinedType=FLOORING. Place along the base of each wall in the host space. Width = wall length. Height = 0.075m. Depth = 0.018m. Material per spec. Attach Pset_CoveringCommon.
+
+DOOR HARDWARE (door_hinge, door_handle, door_strike_plate):
+  Build as IfcDiscreteAccessory. Place per origin_local_m relative to host door. Attach Pset_FurnitureTypeCommon. Contain in same space as host.
+
+WINDOW HARDWARE (window_handle, window_sash_lock):
+  Build as IfcDiscreteAccessory attached to host window. Place per origin_local_m.
+
+Build trim AFTER walls/doors/windows. Always batch all trim items in a SINGLE run_python block.
+
+## Section 4e: Design Rationale Override
+
+If briefSpec.designRationale[] is present, it is the AUTHORITATIVE source for item positions:
+
+For each entry in designRationale:
+  - Find the matching item in briefSpec.furniture[] by id (itemId field)
+  - Override item position with rationale.position
+  - Override item rotation with rationale.rotation_z_rad
+  - Include rationale text as a description Pset property
+
+If an item exists in furniture[] but not in designRationale[], use its own position. Do NOT fail — just proceed.
+
 ## Section 5: Worked Example
 
 Brief: "10x4m office, 3m ceiling. 1 door north wall at 2m. 2 windows south wall at 1.5m and 5m. 4 workstations."
