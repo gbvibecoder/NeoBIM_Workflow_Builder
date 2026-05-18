@@ -30,6 +30,7 @@ import { AnimatedEdge } from "@/features/canvas/components/edges/AnimatedEdge";
 import { SlimLibraryStrip } from "@/features/canvas/components/panels/SlimLibraryStrip";
 import { SlimLibraryDrawer } from "@/features/canvas/components/panels/SlimLibraryDrawer";
 import { CanvasToolbar } from "@/features/canvas/components/toolbar/CanvasToolbar";
+import { CanvasBackButton } from "@/features/canvas/components/chrome/CanvasBackButton";
 
 import { ExecutionLog } from "@/features/canvas/components/ExecutionLog";
 // Phase 1 redesign: result page is route-mounted at /dashboard/results/[id].
@@ -1090,6 +1091,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             />
           </div>
         )}
+
+        {/* Back-to-dashboard pill — top-left, outside the centered toolbar */}
+        <CanvasBackButton />
 
         {/* Toolbar always renders — the showcase overlay no longer mounts here. */}
         <CanvasToolbar
