@@ -297,34 +297,34 @@ export function Toolbar({
           display: "flex",
           alignItems: "center",
           gap: 4,
-          /* Right padding reserves clearance for the dashboard's user-avatar
-             circle, which is rendered by the parent layout (outside this
-             component) and overlaps the toolbar's right edge — was clipping
-             "Calculate BOQ" → "Calculate". 56px = ~40px avatar + 16px gutter. */
-          padding: "3px 60px 3px 10px",
+          /* Symmetric horizontal padding. Earlier revisions reserved 60px of
+             right-padding to clear the dashboard avatar, but that pushed
+             Calculate BOQ far right and created a visible gap after Download.
+             With the middle strip no longer set to flex:1, the right group
+             sits flush against the last tool button on the LEFT side of the
+             toolbar — leaving the right side naturally empty for the avatar
+             to overlay without interfering with any button. */
+          padding: "3px 10px",
           background: UI.bg.toolbar,
           backdropFilter: "blur(12px)",
           borderBottom: "1px solid rgba(255,255,255,0.04)",
-          /* SINGLE-LINE TOOLBAR with a fixed two-region layout:
-             scrollable middle (tool strip) + pinned-right (Calculate BOQ).
-             File-metadata badge was moved to a slim bottom status bar in
-             IFCViewerPage so the header stays as compact as possible. */
           flexWrap: "nowrap",
           minHeight: 38,
           position: "relative",
           zIndex: 30,
         }}
       >
-        {/* MIDDLE — scrollable tool strip. flex:1 + minWidth:0 + overflowX:auto
-            lets the row absorb extra width on wide viewports and degrade to
-            horizontal scroll on narrow ones, without bumping the pinned-right
-            CTA off-screen. */}
+        {/* MIDDLE — tool strip sized to its content (NOT flex:1). The earlier
+            flex:1 stretched it across the toolbar, creating a dead gap between
+            the last tool button (Download) and Calculate BOQ. Setting
+            `flex: "0 1 auto"` keeps natural sizing on wide screens (no gap)
+            and still allows shrinking + horizontal scroll on narrow ones. */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 4,
-            flex: 1,
+            flex: "0 1 auto",
             minWidth: 0,
             overflowX: "auto",
             overflowY: "hidden",
