@@ -135,3 +135,4 @@ PROD_DEPLOY_RUNBOOK.md
 # the MILLI.METRE bug). Corrected post-fix outputs already live at
 # prod-eval-outputs-v2/. See forensics/repo-state-audit-2026-05-17.md.
 prod-eval-outputs/
+evals/results/
