@@ -790,21 +790,16 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                     })}
                   </div>
                 </div>
-              </Section>
 
-              {/* ── LIGHTING DETAILS ── */}
-              <Section
-                expanded={expanded.lighting}
-                onToggle={() => setExpanded((p) => ({ ...p, lighting: !p.lighting }))}
-                title="Interior glow"
-              >
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Lit interior windows</span>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      Warm emissive glow behind glass — strongest at night
-                    </span>
-                  </div>
+                {/* Lit interior windows — merged from the prior "Interior glow"
+                    section (Phase Z.IFC.2 follow-up 2026-05-19). Logical home
+                    is here under Lighting, not a separate card for one switch.
+                    Helper text moved to title attribute. */}
+                <div
+                  style={rowStyle}
+                  title="Warm emissive glow behind glass — strongest at night."
+                >
+                  <span>Lit interior windows</span>
                   <button
                     type="button"
                     aria-label="Toggle lit interior windows"
@@ -817,51 +812,62 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 </div>
               </Section>
 
-              {/* ── SITE CONTEXT (Phase 3) ── */}
+              {/* ── GROUND — Phase Z.IFC.2 follow-up 2026-05-19:
+                  Dropped the "Enable site context" master toggle (always-on
+                  in practice; users only ever interact with the ground
+                  switch + type chip). Single switch + type row now. */}
               <Section
                 expanded={expanded.context}
                 onToggle={() => setExpanded((p) => ({ ...p, context: !p.context }))}
                 title="Ground"
               >
+                {/* Show ground — single switch (master + ground plane were
+                    redundant). Tier-2 master is auto-derived from this
+                    switch via the orchestrator's `nextTier2.context &&
+                    nextTier2.ground` gate. We force context on when ground
+                    is on by toggling both in lock-step below. */}
                 <div style={rowStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <MapPin size={13} color={UI.accent.cyan} aria-hidden />
-                    <span>Enable site context</span>
+                    <span>Show ground plane</span>
                   </div>
                   <button
                     type="button"
-                    aria-label="Toggle site context master"
-                    disabled={anyDisabled}
-                    onClick={() => setTier2Toggles((p) => ({ ...p, context: !p.context }))}
-                    style={switchStyle(tier2Toggles.context)}
-                  >
-                    <span style={switchThumbStyle(tier2Toggles.context)} />
-                  </button>
-                </div>
-
-                {/* Ground */}
-                <div style={rowStyle}>
-                  <span>Ground plane</span>
-                  <button
-                    type="button"
                     aria-label="Toggle ground plane"
-                    disabled={anyDisabled || !tier2Toggles.context}
-                    onClick={() => setTier2Toggles((p) => ({ ...p, ground: !p.ground }))}
+                    disabled={anyDisabled}
+                    onClick={() =>
+                      setTier2Toggles((p) => ({
+                        ...p,
+                        /* Phase Z.IFC.2 follow-up: master + plane move
+                           together. Apply pipeline gates on `context && ground`. */
+                        ground: !p.ground,
+                        context: !p.ground,
+                      }))
+                    }
                     style={switchStyle(tier2Toggles.ground)}
                   >
                     <span style={switchThumbStyle(tier2Toggles.ground)} />
                   </button>
                 </div>
-                <div style={{ padding: "4px 10px 10px" }}>
-                  <div style={{ fontSize: 10.5, color: UI.text.tertiary, marginBottom: 6, letterSpacing: "0.4px", textTransform: "uppercase" }}>
+                <div style={{ padding: "4px 10px 8px" }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: UI.text.tertiary,
+                      marginBottom: 4,
+                      letterSpacing: 0.4,
+                      textTransform: "uppercase",
+                      fontFamily: UI.font.mono,
+                    }}
+                  >
                     Ground type
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 5 }}>
                     {(["auto", "grass", "concrete", "asphalt"] as GroundType[]).map((g) => (
                       <button
                         key={g}
                         type="button"
-                        disabled={anyDisabled || !tier2Toggles.context || !tier2Toggles.ground}
+                        disabled={anyDisabled || !tier2Toggles.ground}
                         onClick={() => setTier2Toggles((p) => ({ ...p, groundType: g }))}
                         style={pickerBtnStyle(tier2Toggles.groundType === g)}
                       >
@@ -1035,13 +1041,11 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                       </div>
                     </div>
 
-                    <div style={rowStyle}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <span>Bulkheads + HVAC</span>
-                        <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                          Stair access box + condenser units
-                        </span>
-                      </div>
+                    <div
+                      style={rowStyle}
+                      title="Stair access box + condenser units."
+                    >
+                      <span>Bulkheads + HVAC</span>
                       <button
                         type="button"
                         aria-label="Toggle bulkheads"
@@ -1157,14 +1161,12 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                   </button>
                 </div>
 
-                {/* Balcony railings */}
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Balcony railings</span>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      Metal top + base rail with balusters along cantilever edges
-                    </span>
-                  </div>
+                {/* Balcony railings — helper text → tooltip */}
+                <div
+                  style={rowStyle}
+                  title="Metal top + base rail with balusters along cantilever edges."
+                >
+                  <span>Balcony railings</span>
                   <button
                     type="button"
                     aria-label="Toggle balcony railings"
@@ -1178,14 +1180,12 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                   </button>
                 </div>
 
-                {/* Window frames */}
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Window frames</span>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      4-sided frame · mullion ≥ 1.2 m · transom ≥ 1.5 m
-                    </span>
-                  </div>
+                {/* Window frames — helper text → tooltip */}
+                <div
+                  style={rowStyle}
+                  title="4-sided frame · mullion ≥ 1.2 m · transom ≥ 1.5 m."
+                >
+                  <span>Window frames</span>
                   <button
                     type="button"
                     aria-label="Toggle window frames"
@@ -1237,14 +1237,12 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                   </div>
                 </div>
 
-                {/* Window sills */}
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Window sills</span>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      Concrete ledge below each frame
-                    </span>
-                  </div>
+                {/* Window sills — helper text → tooltip */}
+                <div
+                  style={rowStyle}
+                  title="Concrete ledge below each frame."
+                >
+                  <span>Window sills</span>
                   <button
                     type="button"
                     aria-label="Toggle window sills"

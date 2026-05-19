@@ -132,7 +132,12 @@ export function ApplyHero({
         }}
       />
 
-      {/* Eyebrow + detected chip — tighter row */}
+      {/* Eyebrow + detected chip — single-row, ellipsis-truncate.
+          Prior version wrapped the chip to 3 lines on narrow widths
+          ("DETECTED · RESIDENTIAL APARTMENT" overflowing). Now the chip
+          shrinks via minWidth:0 + truncation. "(DEFAULT)" source is
+          dropped — implied when the chip is sage-tinted; restore via
+          tooltip on the chip itself. */}
       <div
         style={{
           display: "flex",
@@ -140,6 +145,7 @@ export function ApplyHero({
           gap: 8,
           justifyContent: "space-between",
           marginBottom: 2,
+          minWidth: 0,
         }}
       >
         <span
@@ -153,6 +159,7 @@ export function ApplyHero({
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
+            flexShrink: 0,
           }}
         >
           <Sparkles size={11} color="var(--rs-blueprint)" />
@@ -160,6 +167,7 @@ export function ApplyHero({
         </span>
         {detected && (
           <span
+            title={detectedSource ? `Detected ${detected} (${detectedSource})` : `Detected ${detected}`}
             style={{
               fontSize: 10,
               fontWeight: 600,
@@ -170,6 +178,9 @@ export function ApplyHero({
               display: "inline-flex",
               alignItems: "center",
               gap: 4,
+              minWidth: 0,
+              maxWidth: "60%",
+              overflow: "hidden",
             }}
           >
             <span
@@ -181,12 +192,16 @@ export function ApplyHero({
                 boxShadow: "0 0 6px rgba(74,107,77,0.6)",
               }}
             />
-            Detected · {detected}
-            {detectedSource && (
-              <span style={{ color: UI.text.tertiary, fontWeight: 500 }}>
-                ({detectedSource})
-              </span>
-            )}
+            <span
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                minWidth: 0,
+              }}
+            >
+              Detected · {detected}
+            </span>
           </span>
         )}
       </div>
