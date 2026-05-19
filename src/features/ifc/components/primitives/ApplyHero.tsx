@@ -41,16 +41,18 @@ export function ApplyHero({
 }: Props) {
   const shouldPulse = !disabled && !applying && !applied;
 
+  /* Compact button heights (Phase Z.IFC.2 follow-up 2026-05-19):
+     40 → 34 to recover vertical space without losing tappability. */
   const primaryStyle: CSSProperties = applied
     ? {
         flex: 1,
-        height: 40,
-        padding: "0 16px",
+        height: 34,
+        padding: "0 14px",
         borderRadius: UI.radius.md,
         border: `1px solid ${UI.accent.red}`,
         background: UI.bg.paper,
         color: UI.accent.red,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: 700,
         cursor: "pointer",
         display: "inline-flex",
@@ -63,13 +65,13 @@ export function ApplyHero({
       }
     : {
         flex: 1,
-        height: 40,
-        padding: "0 16px",
+        height: 34,
+        padding: "0 14px",
         borderRadius: UI.radius.md,
         border: "none",
         background: "linear-gradient(135deg, var(--rs-blueprint) 0%, var(--rs-blueprint-2) 100%)",
         color: "#FFFFFF",
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: 700,
         cursor: disabled || applying ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
@@ -79,25 +81,25 @@ export function ApplyHero({
         gap: 6,
         fontFamily: UI.font.body,
         letterSpacing: 0.2,
-        boxShadow: "0 2px 8px rgba(26,77,92,0.25), inset 0 1px 0 rgba(255,255,255,0.15)",
+        boxShadow: "0 2px 8px rgba(26,77,92,0.22), inset 0 1px 0 rgba(255,255,255,0.15)",
         animation: shouldPulse ? "ifc-apply-pulse 2.6s ease-in-out infinite" : undefined,
         transition: UI.transition,
       };
 
   const autoStyle: CSSProperties = {
-    height: 40,
-    padding: "0 14px",
+    height: 34,
+    padding: "0 12px",
     borderRadius: UI.radius.md,
     border: `1px solid ${UI.border.default}`,
     background: UI.bg.cream,
     color: UI.text.primary,
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: 600,
     cursor: disabled || applying ? "not-allowed" : "pointer",
     opacity: disabled || applying ? 0.5 : 1,
     display: "inline-flex",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     fontFamily: UI.font.body,
     flexShrink: 0,
     transition: UI.transition,
@@ -110,8 +112,8 @@ export function ApplyHero({
         background: UI.bg.paper,
         border: `1px solid ${UI.border.subtle}`,
         borderRadius: UI.radius.lg,
-        padding: "14px 14px 16px",
-        margin: "12px 14px 12px",
+        padding: "10px 12px 12px",
+        margin: "10px 12px 10px",
         boxShadow: UI.shadow.card,
         overflow: "hidden",
       }}
@@ -130,14 +132,14 @@ export function ApplyHero({
         }}
       />
 
-      {/* Eyebrow + detected chip */}
+      {/* Eyebrow + detected chip — tighter row */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 8,
           justifyContent: "space-between",
-          marginBottom: 6,
+          marginBottom: 2,
         }}
       >
         <span
@@ -189,15 +191,15 @@ export function ApplyHero({
         )}
       </div>
 
-      {/* Italic headline */}
+      {/* Italic headline — compact */}
       <h3
         style={{
-          fontSize: 18,
+          fontSize: 15,
           fontWeight: 500,
           color: UI.text.primary,
-          margin: "0 0 14px",
+          margin: "0 0 10px",
           fontFamily: UI.font.display,
-          letterSpacing: -0.2,
+          letterSpacing: -0.1,
           lineHeight: 1.2,
         }}
       >

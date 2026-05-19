@@ -46,9 +46,9 @@ function GroupDivider({ title, meta }: { title: string; meta?: string }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "20px 16px 8px",
+        padding: "10px 14px 4px",
         borderTop: `1px dashed ${UI.border.subtle}`,
-        marginTop: 4,
+        marginTop: 2,
       }}
     >
       <span

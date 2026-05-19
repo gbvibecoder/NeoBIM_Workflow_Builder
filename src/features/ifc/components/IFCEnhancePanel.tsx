@@ -127,16 +127,18 @@ const QUALITY_OPTIONS: Array<{ id: MaterialQuality; label: string; helper: strin
    sites compile unchanged. The VALUES were re-bound to RS tokens so the
    panel theme flips with the rest of the chrome.                        */
 
+/* Compact paddings — Phase Z.IFC.2 follow-up (2026-05-19): tightened
+   uniformly so each Section card stops eating ~28px of dead chrome. */
 const sectionHeaderStyle: CSSProperties = {
   width: "100%",
   display: "flex",
   alignItems: "center",
-  gap: 8,
-  padding: "10px 12px",
+  gap: 7,
+  padding: "7px 10px",
   background: "transparent",
   border: "none",
   color: UI.text.primary,
-  fontSize: 12.5,
+  fontSize: 12,
   fontWeight: 600,
   letterSpacing: 0.1,
   cursor: "pointer",
@@ -148,8 +150,8 @@ const rowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "8px 12px",
-  fontSize: 12.5,
+  padding: "5px 10px",
+  fontSize: 12,
   color: UI.text.primary,
   fontFamily: UI.font.body,
 };
@@ -724,7 +726,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 onToggle={() =>
                   setExpanded((p) => ({ ...p, panorama: !p.panorama }))
                 }
-                title="Environment (360°)"
+                title="360° Backdrop"
               >
                 <PanoramaSection
                   selectedAsset={stagedPanoramaAsset}
@@ -743,50 +745,15 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 />
               </Section>
 
-              {/* ── MATERIALS ── */}
-              <Section
-                expanded={expanded.materials}
-                onToggle={() => setExpanded((p) => ({ ...p, materials: !p.materials }))}
-                title="Materials"
-              >
-                <div style={rowStyle}>
-                  <span>Apply PBR materials</span>
-                  <button
-                    type="button"
-                    aria-label="Toggle materials"
-                    disabled={anyDisabled}
-                    onClick={() => setToggles((p) => ({ ...p, materials: !p.materials }))}
-                    style={switchStyle(toggles.materials)}
-                  >
-                    <span style={switchThumbStyle(toggles.materials)} />
-                  </button>
-                </div>
-                <div style={{ padding: "4px 10px 10px" }}>
-                  <div style={{ fontSize: 10.5, color: UI.text.tertiary, marginBottom: 6, letterSpacing: "0.4px", textTransform: "uppercase" }}>
-                    Quality
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {QUALITY_OPTIONS.map((q) => (
-                      <button
-                        key={q.id}
-                        type="button"
-                        title={q.helper}
-                        disabled={anyDisabled || !toggles.materials}
-                        onClick={() => setToggles((p) => ({ ...p, quality: q.id }))}
-                        style={pickerBtnStyle(toggles.quality === q.id)}
-                      >
-                        <span>{q.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Section>
+              {/* MATERIALS moved below Ground for logical grouping
+                  (environment-related sections cluster at the top, then
+                  materials, then structural details). See line ~870. */}
 
               {/* ── ENVIRONMENT ── */}
               <Section
                 expanded={expanded.environment}
                 onToggle={() => setExpanded((p) => ({ ...p, environment: !p.environment }))}
-                title="Environment"
+                title="Lighting (HDRI)"
               >
                 <div style={rowStyle}>
                   <span>HDRI lighting</span>
@@ -829,7 +796,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               <Section
                 expanded={expanded.lighting}
                 onToggle={() => setExpanded((p) => ({ ...p, lighting: !p.lighting }))}
-                title="Lighting details"
+                title="Interior glow"
               >
                 <div style={rowStyle}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -854,7 +821,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               <Section
                 expanded={expanded.context}
                 onToggle={() => setExpanded((p) => ({ ...p, context: !p.context }))}
-                title="Site context"
+                title="Ground"
               >
                 <div style={rowStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -899,6 +866,47 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                         style={pickerBtnStyle(tier2Toggles.groundType === g)}
                       >
                         <span style={{ textTransform: "capitalize" }}>{g}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Section>
+
+              {/* ── MATERIALS (moved here Phase Z.IFC.2 follow-up 2026-05-19
+                  for logical grouping — environment/lighting sit at top,
+                  then materials, then geometry/details below). ── */}
+              <Section
+                expanded={expanded.materials}
+                onToggle={() => setExpanded((p) => ({ ...p, materials: !p.materials }))}
+                title="Materials"
+              >
+                <div style={rowStyle}>
+                  <span>Apply PBR materials</span>
+                  <button
+                    type="button"
+                    aria-label="Toggle materials"
+                    disabled={anyDisabled}
+                    onClick={() => setToggles((p) => ({ ...p, materials: !p.materials }))}
+                    style={switchStyle(toggles.materials)}
+                  >
+                    <span style={switchThumbStyle(toggles.materials)} />
+                  </button>
+                </div>
+                <div style={{ padding: "4px 10px 8px" }}>
+                  <div style={{ fontSize: 10, color: UI.text.tertiary, marginBottom: 4, letterSpacing: "0.4px", textTransform: "uppercase", fontFamily: UI.font.mono }}>
+                    Quality
+                  </div>
+                  <div style={{ display: "flex", gap: 5 }}>
+                    {QUALITY_OPTIONS.map((q) => (
+                      <button
+                        key={q.id}
+                        type="button"
+                        title={q.helper}
+                        disabled={anyDisabled || !toggles.materials}
+                        onClick={() => setToggles((p) => ({ ...p, quality: q.id }))}
+                        style={pickerBtnStyle(toggles.quality === q.id)}
+                      >
+                        <span>{q.label}</span>
                       </button>
                     ))}
                   </div>
@@ -1129,7 +1137,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 onToggle={() =>
                   setExpanded((p) => ({ ...p, "building-details": !p["building-details"] }))
                 }
-                title="Building details"
+                title="Details"
               >
                 <div style={rowStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1277,7 +1285,7 @@ function Section({
   return (
     <div
       style={{
-        margin: "0 14px 8px",
+        margin: "0 12px 5px",
         background: UI.bg.paper,
         border: `1px solid ${UI.border.subtle}`,
         borderRadius: UI.radius.md,
@@ -1286,11 +1294,11 @@ function Section({
     >
       <button type="button" onClick={onToggle} style={sectionHeaderStyle}>
         <span style={{ color: UI.text.tertiary, display: "inline-flex", flexShrink: 0 }}>
-          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </span>
         <span style={{ flex: 1 }}>{title}</span>
       </button>
-      {expanded && <div style={{ padding: "0 4px 8px" }}>{children}</div>}
+      {expanded && <div style={{ padding: "0 4px 6px" }}>{children}</div>}
     </div>
   );
 }
