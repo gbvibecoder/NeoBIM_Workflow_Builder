@@ -74,6 +74,12 @@ tests/floor-plan/snapshots/snapshot-*.json
 !neobim-ifc-service/tests/fixtures/sample_briefs/*.txt
 *_SUMMARY.md
 *_REPORT.md
+# Date-suffixed working notes (eg. *_REPORT_2026-05-18.md, *_ANALYSIS_2026-…)
+# slip past the *_SUFFIX.md patterns above because they end in the date,
+# not the suffix. These two catch-alls cover them.
+*_REPORT_*.md
+*_ANALYSIS_*.md
+ANALYSIS_*.md
 *_COMPLETE.md
 *_CHECKLIST.md
 *_GUIDE.md
