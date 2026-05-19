@@ -551,8 +551,19 @@ export function Toolbar({
         {/* spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* RIGHT — Help + BOQ */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        {/* RIGHT — Help + BOQ. Right-side margin 56px clears the dashboard
+            avatar zone (rendered at `right:16` × ~40px diameter by the
+            dashboard layout, outside this component's control). Without
+            this gutter the BOQ button slides under the avatar. */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+            marginRight: 56,
+          }}
+        >
           <HelpButton onClick={onToggleShortcuts} />
           {hasModel && (
             <BOQButton
