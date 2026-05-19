@@ -338,31 +338,22 @@ export function Toolbar({
     <>
       <div
         style={{
+          /* Phase Z.IFC.2 follow-up 2026-05-19: dropped the outer paper bg,
+             border-bottom, and multi-color drafting strip. Toolbar is now
+             chromeless — the tool group pills (which already carry their
+             own paper bg + border + shadow) float over the bone-colored
+             page background, matching the Canvas SlimLibraryStrip pattern.
+             Result: feels free + connected to the 3D canvas below, not
+             walled off by a header bar. */
           position: "relative",
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "0 14px",
+          padding: "0 16px",
           height: 56,
-          background: UI.bg.paper,
-          borderBottom: `1px solid ${UI.border.subtle}`,
+          background: "transparent",
         }}
       >
-        {/* Drafting strip at top of header */}
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background:
-              "linear-gradient(90deg, var(--rs-blueprint) 0%, var(--rs-blueprint-2) 35%, var(--rs-sage) 60%, var(--rs-burnt) 85%, var(--rs-ember) 100%)",
-            opacity: 0.85,
-          }}
-        />
-
         {/* LEFT — Upload New only (Phase Z.IFC.2 follow-up 2026-05-19:
             FileIdentity removed — the filename + schema are already shown
             in the bottom status bar, so this was duplicate info eating
