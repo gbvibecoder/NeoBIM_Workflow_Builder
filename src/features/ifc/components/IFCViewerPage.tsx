@@ -6,7 +6,12 @@ import { Viewport } from "@/features/ifc/components/Viewport";
 import { UploadZone } from "@/features/ifc/components/UploadZone";
 import { Toolbar } from "@/features/ifc/components/Toolbar";
 import { ModelTree } from "@/features/ifc/components/ModelTree";
-import { PropertiesPanel } from "@/features/ifc/components/PropertiesPanel";
+/* PropertiesPanel — kept on disk but unmounted in Phase Z.IFC.2; the
+   Inspect tab was retired. Z.IFC.3 may bring it back as a right-click
+   popover. Import preserved as a no-op so the file stays tree-shaken
+   out cleanly. */
+// import { PropertiesPanel } from "@/features/ifc/components/PropertiesPanel";
+import { EditPanel } from "@/features/ifc/components/EditPanel";
 import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
 import { ViewCube } from "@/features/ifc/components/ViewCube";
@@ -17,14 +22,14 @@ import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/comp
 import { ViewerSkeleton } from "@/features/ifc/components/ViewerSkeleton";
 
 /**
- * Sidebar tab identifiers.
- *
- * Historically `"enhance"` referenced the IFC-text mutator panel (add floor,
- * remove floor, add room). As of Phase 1 of the new Enhance-with-AI feature
- * that panel is renamed "Editor" (`"editor"`), and `"enhance-ai"` is the new
- * 4th tab that (in later phases) applies visual-only enhancements.
+ * Sidebar tab identifiers — Phase Z.IFC.2 (2026-05-19): collapsed to 2.
+ * `tree` shows the spatial-hierarchy panel; `edit` shows the unified
+ * EditPanel which merges the prior "Enhance" + "Editor" panels into one
+ * scrollable surface. The previous `properties` tab was retired — element
+ * inspection will return in Z.IFC.3 as a right-click popover (PropertiesPanel
+ * file is kept on disk for that revival).
  */
-type SidebarTab = "tree" | "properties" | "editor" | "enhance-ai";
+type SidebarTab = "tree" | "edit";
 import {
   saveLastIFCFile,
   loadLastIFCFile,
@@ -67,8 +72,13 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
   const [loadMessage, setLoadMessage] = useState("");
   const [selectedElement, setSelectedElement] = useState<IFCElementData | null>(null);
   const [spatialTree, setSpatialTree] = useState<SpatialNode[]>([]);
-  const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
-  const [bottomTab, setBottomTab] = useState<SidebarTab>("editor");
+  /* Phase Z.IFC.1 follow-up (2026-05-19): sidebar starts CLOSED by default.
+     User opens it explicitly via the CollapsedRail icon column on the right,
+     the `[` keyboard shortcut, OR by picking an element in the viewport
+     (auto-opens to Inspect — see handleSelect). Canvas-first UX: the 3D
+     model gets full horizontal width on first load. */
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
+  const [bottomTab, setBottomTab] = useState<SidebarTab>("edit");
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -92,7 +102,7 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
       const raw = window.localStorage.getItem("buildflow.ifc-viewer.panelWidth");
       if (!raw) return;
       const v = parseInt(raw, 10);
-      if (Number.isFinite(v) && v >= 240 && v <= 800) {
+      if (Number.isFinite(v) && v >= 320 && v <= 800) {
         setPanelWidth(v);
       }
     } catch {
@@ -109,7 +119,9 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
       /* Cap max at 70% of window width so the panel can never fully swallow
          the viewport on narrow laptop windows. Min 240 keeps forms readable. */
       const cap = Math.min(640, Math.floor(window.innerWidth * 0.7));
-      setPanelWidth(Math.max(240, Math.min(cap, newWidth)));
+      /* Phase Z.IFC.2 (2026-05-19): min raised 240 → 320 so the merged
+         EditPanel's ApplyHero buttons + PresetGrid 5-column don't crush. */
+      setPanelWidth(Math.max(320, Math.min(cap, newWidth)));
     };
     const onMouseUp = () => {
       if (resizingRef.current) {
@@ -287,17 +299,13 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
 
   const handleLoadComplete = useCallback(() => {
     setLoading(false);
-    setBottomPanelOpen(true);
-    setBottomTab("editor");
+    setBottomTab("edit");
 
-    /* Raw IFC by default (2026-05-18): the previous auto-apply block here
-       fired the full enhance pipeline on workflow-originated routes
-       (?executionId=…), which hid the raw gray-box geometry the user needed
-       to verify. Auto-apply is removed across the board — fresh uploads AND
-       executionId routes now land on the raw model. Detection + recipe
-       pre-fill still run inside IFCEnhancePanel; the user clicks the
-       prominent top "✨ Apply Enhancement" CTA when they want the visual
-       skin. */
+    /* Raw IFC by default (2026-05-18): no auto-apply on load. The user
+       clicks Apply Enhancement when they want the visual skin.
+       Sidebar-closed-by-default (2026-05-19): no auto-open on load either —
+       the 3D model gets full width; user opens the panel via the right-edge
+       icon column, `[` shortcut, or by picking an element. */
   }, []);
 
   const handleError = useCallback((message: string) => {
@@ -307,16 +315,11 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
 
   const handleSelect = useCallback((element: IFCElementData | null) => {
     setSelectedElement(element);
-    if (element) {
-      setBottomPanelOpen(true);
-      /* Auto-switch to Properties ONLY from Tree — the "pick in tree, see
-         properties" flow. On Editor / Enhance, the user is actively working;
-         yanking them to Properties on a stray canvas click is the Phase-2
-         regression. setSelectedElement still updates Properties data in the
-         background, so manually switching to Properties later shows fresh
-         data. Staying on Properties = stay; Tree → Properties; else stay. */
-      setBottomTab((prev) => (prev === "tree" ? "properties" : prev));
-    }
+    /* Phase Z.IFC.2 (2026-05-19): Inspect tab retired. Selection still
+       highlights the element in the 3D viewport (the Viewport engine
+       handles outline/glow); the sidebar no longer auto-opens nor
+       switches tabs on selection. Z.IFC.3 will surface element details
+       via a right-click popover. */
   }, []);
 
   const handleSpatialTree = useCallback((tree: SpatialNode[]) => {
@@ -699,14 +702,10 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                     flexShrink: 0,
                   }}
                 >
-                  {(["enhance-ai", "editor", "tree", "properties"] as const).map((tab) => {
+                  {(["edit", "tree"] as const).map((tab) => {
                     const active = bottomTab === tab;
-                    const label =
-                      tab === "enhance-ai" ? "Enhance"
-                      : tab === "editor" ? "Edit"
-                      : tab === "tree" ? "Tree"
-                      : "Inspect";
-                    const isEnhanceAI = tab === "enhance-ai";
+                    const label = tab === "edit" ? "Edit" : "Tree";
+                    const isEdit = tab === "edit";
                     return (
                       <button
                         key={tab}
@@ -733,7 +732,7 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                           fontFamily: UI.font.mono,
                         }}
                       >
-                        {isEnhanceAI && (
+                        {isEdit && (
                           <Sparkles
                             size={11}
                             strokeWidth={2.2}
@@ -776,7 +775,11 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                   </button>
                 </div>
 
-                {/* Panel content */}
+                {/* Panel content — Phase Z.IFC.2 (2026-05-19): two tabs
+                    only, Tree + the unified EditPanel. EditPanel stays
+                    MOUNTED while a model is loaded (just display:none on
+                    tab switch) so its inner IFCEnhancePanel engine refs
+                    survive — these hold pre-apply material snapshots. */}
                 <div style={{ flex: 1, overflow: "hidden" }}>
                   {bottomTab === "tree" && (
                     <ModelTree
@@ -785,30 +788,20 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                       viewportRef={viewportRef}
                     />
                   )}
-                  {bottomTab === "properties" && <PropertiesPanel element={selectedElement} />}
-                  {bottomTab === "editor" && (
-                    <IFCEnhancerPanel
-                      sourceFile={currentFile}
-                      onApplyToViewer={handleApplyEnhancement}
-                    />
-                  )}
-                  {/* IFCEnhancePanel stays mounted (just hidden) while a
-                      model is loaded so its engine ref — which holds the
-                      pre-apply material snapshots — survives tab switches.
-                      Unmounting would drop the snapshots and strand the
-                      scene in "enhanced but un-resettable" state. */}
                   {hasModel && (
                     <div
                       style={{
-                        display: bottomTab === "enhance-ai" ? "flex" : "none",
+                        display: bottomTab === "edit" ? "flex" : "none",
                         flexDirection: "column",
                         height: "100%",
                       }}
                     >
-                      <IFCEnhancePanel
+                      <EditPanel
                         ref={enhancePanelRef}
                         viewportRef={viewportRef}
                         hasModel={hasModel}
+                        sourceFile={currentFile}
+                        onApplyToViewer={handleApplyEnhancement}
                       />
                     </div>
                   )}
@@ -931,7 +924,10 @@ function StatusChip({
   );
 }
 
-/* ─── Collapsed-rail sidebar (shown when panel is minimized on desktop/tablet) ─── */
+/* ─── CollapsedRail — Phase Z.IFC.2 (2026-05-19) ─────────────────────────
+   Now matches Canvas/SlimLibraryStrip style (56px wide pill, paper bg,
+   40×40 buttons with 16px icon + 7px mono uppercase label, thin dividers).
+   Two tabs only after the Inspect retirement: Edit and Tree.            */
 
 interface CollapsedRailProps {
   activeTab: SidebarTab;
@@ -939,122 +935,124 @@ interface CollapsedRailProps {
   onExpand: () => void;
 }
 
-function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
-  const items: {
-    id: SidebarTab;
-    label: string;
-    char: string;
-  }[] = [
-    { id: "enhance-ai", label: "Enhance", char: "✨" },
-    { id: "editor", label: "Editor", char: "✎" },
-    { id: "tree", label: "Tree", char: "🗂" },
-    { id: "properties", label: "Properties", char: "ⓘ" },
-  ];
+interface StripBtnProps {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  variant?: "neutral" | "expand";
+}
 
+function StripBtn({ icon, label, active, onClick, variant = "neutral" }: StripBtnProps) {
+  const [hover, setHover] = React.useState(false);
+  const showActive = active || variant === "expand";
+  const activeBg = variant === "expand" ? "var(--rs-blueprint)" : "var(--rs-blueprint-soft)";
+  const activeColor = variant === "expand" ? "#FFFFFF" : UI.accent.blueprint;
+  const idleColor = variant === "expand" ? UI.accent.blueprint : UI.text.secondary;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        border: "none",
+        background: showActive ? activeBg : hover ? UI.bg.cream : "transparent",
+        color: showActive ? activeColor : hover ? UI.text.primary : idleColor,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        position: "relative",
+        transition: UI.transition,
+        padding: 0,
+      }}
+    >
+      {icon}
+      <span
+        style={{
+          fontFamily: UI.font.mono,
+          fontSize: 7,
+          letterSpacing: "0.10em",
+          marginTop: 2,
+          textTransform: "uppercase",
+          fontWeight: 700,
+        }}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
+  const divider = (
+    <div
+      aria-hidden
+      style={{ width: "70%", height: 1, background: UI.border.subtle, margin: "6px auto" }}
+    />
+  );
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "8px 0",
+        padding: 8,
         gap: 4,
         height: "100%",
+        background: UI.bg.paper,
+        border: `1px solid ${UI.border.subtle}`,
+        borderRadius: 14,
+        boxShadow: UI.shadow.paper,
+        margin: 6,
       }}
     >
-      {/* Top: expand button — Phase Z.IFC.1 light theme */}
-      <button
-        type="button"
+      {/* Expand pill */}
+      <StripBtn
+        icon={<PanelRightOpen size={16} strokeWidth={2} />}
+        label="OPEN"
+        active
+        variant="expand"
         onClick={onExpand}
-        title="Maximize panel ([ key)"
-        aria-label="Maximize side panel"
-        style={{
-          width: 36,
-          height: 36,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--rs-blueprint-soft)",
-          border: `1px solid var(--rs-blueprint-line)`,
-          color: UI.accent.blueprint,
-          cursor: "pointer",
-          borderRadius: 8,
-          marginBottom: 6,
-          transition: UI.transition,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--rs-blueprint-line)";
-          e.currentTarget.style.transform = "translateY(-1px)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "var(--rs-blueprint-soft)";
-          e.currentTarget.style.transform = "translateY(0)";
-        }}
-      >
-        <PanelRightOpen size={16} strokeWidth={2} />
-      </button>
+      />
 
-      {/* Tab icons — clicking any expands panel and switches to that tab */}
-      {items.map((item) => {
-        const isActive = item.id === activeTab;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onPickTab(item.id)}
-            title={item.label}
-            aria-label={`Open ${item.label}`}
-            style={{
-              width: 36,
-              height: 36,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: isActive ? "var(--rs-blueprint-soft)" : "transparent",
-              border: `1px solid ${isActive ? "var(--rs-blueprint-line)" : "transparent"}`,
-              color: isActive ? UI.accent.blueprint : UI.text.secondary,
-              cursor: "pointer",
-              borderRadius: 8,
-              fontSize: 15,
-              transition: UI.transition,
-            }}
-            onMouseEnter={(e) => {
-              if (isActive) return;
-              e.currentTarget.style.background = UI.bg.cream;
-              e.currentTarget.style.color = UI.text.primary;
-            }}
-            onMouseLeave={(e) => {
-              if (isActive) return;
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = UI.text.secondary;
-            }}
-          >
-            {item.id === "enhance-ai" ? (
-              <Sparkles size={16} strokeWidth={2} />
-            ) : (
-              <span aria-hidden>{item.char}</span>
-            )}
-          </button>
-        );
-      })}
+      {divider}
 
-      {/* Vertical label at bottom */}
-      <div style={{ flex: 1 }} />
-      <span
-        style={{
-          writingMode: "vertical-rl",
-          transform: "rotate(180deg)",
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-          fontWeight: 700,
-          fontSize: 9,
-          color: UI.text.tertiary,
-          padding: "8px 0",
-          fontFamily: UI.font.mono,
-        }}
-      >
-        Enhancer
-      </span>
+      {/* Tab icons — clicking any expands panel AND switches to that tab */}
+      <StripBtn
+        icon={<Sparkles size={16} strokeWidth={2} />}
+        label="EDIT"
+        active={activeTab === "edit"}
+        onClick={() => onPickTab("edit")}
+      />
+      <StripBtn
+        icon={<TreeIcon />}
+        label="TREE"
+        active={activeTab === "tree"}
+        onClick={() => onPickTab("tree")}
+      />
     </div>
+  );
+}
+
+/* Small tree-glyph SVG — leaner than the previous 🗂 emoji and matches
+   the Canvas rail's strokeWidth=2 icon family. */
+function TreeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="6" height="6" rx="1" />
+      <rect x="15" y="9" width="6" height="6" rx="1" />
+      <rect x="15" y="15" width="6" height="6" rx="1" />
+      <path d="M6 9v6a1 1 0 0 0 1 1h8" />
+      <path d="M6 9v3a1 1 0 0 0 1 1h8" />
+    </svg>
   );
 }

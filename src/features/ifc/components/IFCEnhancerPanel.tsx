@@ -59,6 +59,11 @@ export interface EnhanceSuccess {
 interface IFCEnhancerPanelProps {
   sourceFile: { name: string; buffer: ArrayBuffer } | null;
   onApplyToViewer: (result: EnhanceSuccess) => void;
+  /** Phase Z.IFC.2 (2026-05-19): when true, the panel renders WITHOUT its
+      outer `height: 100%` flex shell AND without the top "IFC Enhancer"
+      filename banner (redundant when the parent EditPanel already shows
+      file identity). All behaviour and state otherwise identical. */
+  embedded?: boolean;
 }
 
 type Status = "idle" | "working" | "success" | "error";
@@ -326,7 +331,7 @@ const EXPERIMENTAL_GROUP_LABELS: Record<SectionDef["group"], string> = {
   free: "Custom",
 };
 
-export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPanelProps) {
+export function IFCEnhancerPanel({ sourceFile, onApplyToViewer, embedded = false }: IFCEnhancerPanelProps) {
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     floors: true,
     rooms: true,
@@ -512,68 +517,70 @@ export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPan
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100%",
-        background: UI.bg.base,
+        height: embedded ? "auto" : "100%",
+        background: embedded ? "transparent" : UI.bg.base,
         color: UI.text.primary,
       }}
     >
-      {/* Header banner */}
-      <div
-        style={{
-          padding: "12px 14px",
-          borderBottom: `1px solid ${UI.border.subtle}`,
-          background: UI.bg.paper,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          flexShrink: 0,
-          position: "relative",
-        }}
-      >
-        <span
-          aria-hidden
+      {/* Header banner — skipped when embedded (EditPanel owns identity). */}
+      {!embedded && (
+        <div
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 2,
-            background: PRIMARY_GRADIENT,
-            opacity: 0.85,
+            padding: "12px 14px",
+            borderBottom: `1px solid ${UI.border.subtle}`,
+            background: UI.bg.paper,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexShrink: 0,
+            position: "relative",
           }}
-        />
-        <Sparkles size={14} color={ACCENT_BLUE} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
+        >
+          <span
+            aria-hidden
             style={{
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: 1.0,
-              textTransform: "uppercase",
-              color: UI.text.tertiary,
-              fontFamily: UI.font.mono,
-              marginBottom: 2,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 2,
+              background: PRIMARY_GRADIENT,
+              opacity: 0.85,
             }}
-          >
-            Direct Edit
-          </div>
-          <div
-            style={{
-              fontSize: 14,
-              fontFamily: UI.font.display,
-              fontStyle: "italic",
-              color: UI.text.primary,
-              fontWeight: 500,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-            title={sourceFile?.name ?? ""}
-          >
-            {sourceFile?.name || "No model loaded"}
+          />
+          <Sparkles size={14} color={ACCENT_BLUE} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 9.5,
+                fontWeight: 700,
+                letterSpacing: 1.0,
+                textTransform: "uppercase",
+                color: UI.text.tertiary,
+                fontFamily: UI.font.mono,
+                marginBottom: 2,
+              }}
+            >
+              Direct Edit
+            </div>
+            <div
+              style={{
+                fontSize: 14,
+                fontFamily: UI.font.display,
+                fontStyle: "italic",
+                color: UI.text.primary,
+                fontWeight: 500,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={sourceFile?.name ?? ""}
+            >
+              {sourceFile?.name || "No model loaded"}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Info strip explaining the supported / experimental split */}
       <div
@@ -601,7 +608,13 @@ export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPan
       </div>
 
       {/* Scrollable body — sections grouped by category */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 10px 12px" }}>
+      <div
+        style={
+          embedded
+            ? { overflowX: "hidden", padding: "8px 10px 12px" }
+            : { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 10px 12px" }
+        }
+      >
         {GROUP_ORDER.map((group) => {
           const groupSections = SECTIONS.filter((s) => s.group === group.id);
           if (groupSections.length === 0) return null;

@@ -84,6 +84,10 @@ interface IFCEnhancePanelProps {
   hasModel: boolean;
   /** Called whenever enhance status changes — used by auto-enhance overlay. */
   onStatusChange?: (status: EnhanceStatus) => void;
+  /** Phase Z.IFC.2 (2026-05-19): when true, the panel renders WITHOUT its
+      outer `height: 100%` flex shell — the parent EditPanel manages scroll
+      and the height cascade. Behaviour and state are otherwise identical. */
+  embedded?: boolean;
 }
 
 export interface IFCEnhancePanelHandle {
@@ -196,7 +200,7 @@ const switchThumbStyle = (on: boolean): CSSProperties => ({
 /* ─── Panel ───────────────────────────────────────────────────────────── */
 
 export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanelProps>(
-  function IFCEnhancePanel({ viewportRef, hasModel, onStatusChange }, panelRef) {
+  function IFCEnhancePanel({ viewportRef, hasModel, onStatusChange, embedded = false }, panelRef) {
     const [toggles, setToggles] = useState<EnhanceToggles>(DEFAULT_TOGGLES);
     const [tier2Toggles, setTier2Toggles] = useState<Tier2Toggles>(DEFAULT_TIER2_TOGGLES);
     const [tier3Toggles, setTier3Toggles] = useState<Tier3Toggles>(DEFAULT_TIER3_TOGGLES);
@@ -668,9 +672,9 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         style={{
           display: "flex",
           flexDirection: "column",
-          height: "100%",
+          height: embedded ? "auto" : "100%",
           color: UI.text.primary,
-          background: UI.bg.trace,
+          background: embedded ? "transparent" : UI.bg.trace,
         }}
       >
         {/* Pulse keyframes for the primary Apply CTA. */}
@@ -698,8 +702,15 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         {/* Status banner */}
         <StatusBanner status={status} summary={classifiedSummary} />
 
-        {/* Scrollable toggles */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 0 24px 0" }}>
+        {/* Scrollable toggles — when embedded, scrolling is owned by parent
+            EditPanel; we just render at natural height here. */}
+        <div
+          style={
+            embedded
+              ? { padding: "4px 0 12px 0" }
+              : { flex: 1, overflowY: "auto", padding: "4px 0 24px 0" }
+          }
+        >
           {!hasModel ? (
             <div style={{ padding: "24px 16px", color: UI.text.secondary, fontSize: 12.5, lineHeight: 1.5 }}>
               Upload an IFC file to start enhancing.
