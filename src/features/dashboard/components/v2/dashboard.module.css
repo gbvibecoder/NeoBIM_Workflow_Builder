@@ -1620,46 +1620,21 @@
   color: var(--rs-text-mute, #9AA1B0);
 }
 
-/* Render pane (right; clip-path is set inline from the split state) */
+/* Render pane (right; clip-path is set inline from the split state).
+   No transition — RAF-driven state updates are already smooth at 60fps,
+   and a tween would fight every frame. Background, horizon and sun
+   glow are now drawn by the building SVG itself (full-bleed scene). */
 .heroV3PaneRender {
   position: absolute;
   inset: 0;
   z-index: 2;
-  background: linear-gradient(180deg, #E8E1D0 0%, #C7BFA6 70%, #A89A7B 100%);
-  transition: clip-path 0.05s linear;
+  background: transparent;
   overflow: hidden;
-}
-.heroV3PaneRender::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 60%;
-  height: 1px;
-  background: rgba(0, 0, 0, 0.08);
-}
-.heroV3PaneRender::after {
-  content: "";
-  position: absolute;
-  top: 12%;
-  right: 14%;
-  width: 130px;
-  height: 130px;
-  border-radius: 50%;
-  background: radial-gradient(circle at center, rgba(255, 237, 200, 0.7) 0%, rgba(255, 237, 200, 0) 70%);
-  pointer-events: none;
 }
 
 .heroV3Building {
   position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: 65%;
-  aspect-ratio: 1.2 / 1;
-  max-width: 600px;
-}
-.heroV3Building svg {
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
