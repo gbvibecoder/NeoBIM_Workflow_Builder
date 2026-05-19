@@ -533,12 +533,19 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
         {hasModel && (
           <div
             style={{
+              /* Phase Z.IFC.2 follow-up 2026-05-19: symmetric left + right
+                 insets so the floating toolbar reads as VISUALLY CENTERED
+                 between the viewport edges. The 80px right inset still
+                 natively clears the dashboard avatar (right:16 × ~40px);
+                 matching 80px on the left balances it visually. */
               position: "absolute",
               top: 16,
-              left: 16,
+              left: 80,
               right: 80,
               zIndex: 30,
               pointerEvents: "none",
+              display: "flex",
+              justifyContent: "center",
             }}
           >
             <Toolbar

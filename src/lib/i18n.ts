@@ -175,6 +175,26 @@ const en = {
   'canvas.empty.ribbonLeft':      'Drawn by you · Scale 1:1 · Not to scale',
   'canvas.empty.ribbonRight':     'Press ⌘K to search nodes',
 
+  // AI Brief modal — Phase Z.CANVAS.AI-BRIEF
+  'ai.brief.fromDesk':            'from the desk of —',
+  'ai.brief.title':               'Brief',
+  'ai.brief.dateLabel':           'Date stamp',
+  'ai.brief.closeLabel':          'Close',
+  'ai.brief.lead':                '↳ describe the workflow you’d like —',
+  'ai.brief.placeholder':         'e.g. take a PDF brief and turn it into a 3-storey massing with concept renders + a BOQ estimate',
+  'ai.brief.draftWatermark':      'DRAFT',
+  'ai.brief.qsLabel':             'or pick a quick start —',
+  'ai.brief.preset1':             'PDF → Massing',
+  'ai.brief.preset2':             'IFC → BOQ',
+  'ai.brief.preset3':             '3 Variants',
+  'ai.brief.preset4':             'Image → Concept',
+  'ai.brief.preset5':             'Full Pipeline',
+  'ai.brief.preset6':             'Compliance',
+  'ai.brief.kbdHint':             '⌘⏎ to draft',
+  'ai.brief.submit':              'Stamp & Send',
+  'ai.brief.pageMarker':          'PAGE 01 / 01',
+  'ai.brief.brief':               'Brief',
+
   // ===== AI CHAT =====
   'aiChat.title': 'AI CHAT',
   'aiChat.aiAssistant': 'AI Assistant',
@@ -3453,6 +3473,26 @@ const de: Record<keyof typeof en, string | string[]> = {
   'canvas.empty.c3Action':        'Vorlagen durchsuchen',
   'canvas.empty.ribbonLeft':      'Von dir gezeichnet · Maßstab 1:1 · Nicht maßstabsgetreu',
   'canvas.empty.ribbonRight':     '⌘K für Knoten-Suche',
+
+  // AI Brief modal — Phase Z.CANVAS.AI-BRIEF
+  'ai.brief.fromDesk':            'vom Schreibtisch von —',
+  'ai.brief.title':               'Briefing',
+  'ai.brief.dateLabel':           'Datumsstempel',
+  'ai.brief.closeLabel':          'Schließen',
+  'ai.brief.lead':                '↳ beschreibe den gewünschten Workflow —',
+  'ai.brief.placeholder':         'z. B. nimm ein PDF-Briefing und erstelle daraus eine 3-stöckige Massing-Studie mit Konzeptrenders und BOQ-Schätzung',
+  'ai.brief.draftWatermark':      'ENTWURF',
+  'ai.brief.qsLabel':             'oder wähle einen Schnellstart —',
+  'ai.brief.preset1':             'PDF → Massing',
+  'ai.brief.preset2':             'IFC → BOQ',
+  'ai.brief.preset3':             '3 Varianten',
+  'ai.brief.preset4':             'Bild → Konzept',
+  'ai.brief.preset5':             'Komplette Pipeline',
+  'ai.brief.preset6':             'Compliance',
+  'ai.brief.kbdHint':             '⌘⏎ als Entwurf',
+  'ai.brief.submit':              'Stempeln & Senden',
+  'ai.brief.pageMarker':          'SEITE 01 / 01',
+  'ai.brief.brief':               'Briefing',
 
   // ===== AI CHAT =====
   'aiChat.title': 'KI-CHAT',

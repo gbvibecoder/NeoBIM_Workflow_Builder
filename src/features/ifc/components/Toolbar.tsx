@@ -348,12 +348,17 @@ export function Toolbar({
              child (UploadNew, scrollable tools, Help+BOQ group) lets
              mouse-drag pan/orbit pass through the empty space between
              pills directly to the Viewport canvas below. */
+          /* Toolbar content-sized so the parent floating wrapper can
+             `justifyContent: center` it for symmetric L/R visual margins
+             (Phase Z.IFC.2 follow-up 2026-05-19). */
           position: "relative",
           display: "flex",
           alignItems: "center",
           gap: 10,
           padding: 0,
           height: 40,
+          width: "fit-content",
+          maxWidth: "100%",
           background: "transparent",
           pointerEvents: "none",
         }}
@@ -577,8 +582,11 @@ export function Toolbar({
           )}
         </div>
 
-        {/* Spacer absorbs any remaining width and reserves the avatar zone */}
-        <div style={{ flex: 1 }} />
+        {/* Spacer removed Phase Z.IFC.2 follow-up 2026-05-19 — the
+            outer floating wrapper now uses `justifyContent: center` to
+            center this content, and the Toolbar root is `width:
+            fit-content`. Spacer would force the toolbar back to filling
+            its parent and break centering. */}
       </div>
 
       {/* Shortcuts modal */}

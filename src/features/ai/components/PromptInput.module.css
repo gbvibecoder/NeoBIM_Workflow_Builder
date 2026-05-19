@@ -1,0 +1,510 @@
+/* ═══════════════════════════════════════════════════════════════
+   AI Brief modal — Studio Sketchbook
+   Phase Z.CANVAS.AI-BRIEF
+   All colors via var(--canvas-empty-*); inherits theme from the
+   .canvas-theme-${theme} class set on <html> + WorkflowCanvas.tsx:969
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Backdrop (flex container; itself the close-on-click target) ── */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(28, 20, 16, 0.22);
+  backdrop-filter: blur(7px) saturate(0.9);
+  -webkit-backdrop-filter: blur(7px) saturate(0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ── Paper sheet ─────────────────────────────────────────────── */
+.brief {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  background: var(--canvas-empty-paper-warm);
+  background-image:
+    radial-gradient(ellipse at 12% 10%, var(--canvas-empty-tint-amber) 0%, transparent 50%),
+    radial-gradient(ellipse at 88% 92%, var(--canvas-empty-tint-rust) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.06) 0%, transparent 70%);
+  border-radius: 4px;
+  box-shadow:
+    0 2px 4px rgba(28, 20, 16, 0.08),
+    0 8px 16px rgba(28, 20, 16, 0.12),
+    0 24px 48px rgba(28, 20, 16, 0.18),
+    0 48px 96px rgba(28, 20, 16, 0.20);
+  transform: rotate(-0.5deg);
+  isolation: isolate;
+  font-family: var(--font-dm-sans), sans-serif;
+}
+
+/* Red margin line inside the paper */
+.brief::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 48px;
+  width: 1px;
+  background: var(--canvas-empty-red-margin);
+  opacity: 0.32;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Sketch border SVG frame ─────────────────────────────────── */
+.frame {
+  position: absolute;
+  inset: -3px;
+  width: calc(100% + 6px);
+  height: calc(100% + 6px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.frame .outer,
+.frame .inner {
+  fill: none;
+  stroke: var(--canvas-empty-ink);
+  vector-effect: non-scaling-stroke;
+}
+.frame .outer { stroke-width: 1.6; opacity: 0.5; }
+.frame .inner { stroke-width: 0.9; opacity: 0.22; }
+
+/* ── Paperclip (decorative) ──────────────────────────────────── */
+.paperclip {
+  position: absolute;
+  top: -10px;
+  left: 60px;
+  width: 22px;
+  height: 50px;
+  transform: rotate(-12deg);
+  pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(1px 2px 2px rgba(28, 20, 16, 0.25));
+}
+
+.paperclip path {
+  fill: none;
+  stroke: #7a7060;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 32px 36px 4px 76px;
+  position: relative;
+  z-index: 2;
+}
+
+.headL {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fromDesk {
+  font-family: var(--font-caveat), cursive;
+  font-size: 17px;
+  color: var(--canvas-empty-pencil);
+  display: inline-block;
+  transform: rotate(-0.8deg);
+  line-height: 1;
+}
+
+.hTitle {
+  font-family: var(--font-display), serif; /* Fraunces */
+  font-style: italic;
+  font-weight: 300;
+  font-size: 52px;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--canvas-empty-ink);
+  margin: -2px 0 0;
+}
+
+.hR {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.dateStamp {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--canvas-empty-red-stamp);
+  border: 1.5px solid var(--canvas-empty-red-stamp);
+  padding: 5px 9px;
+  border-radius: 2px;
+  transform: rotate(4deg);
+  opacity: 0.58;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.dateStamp small {
+  display: block;
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--canvas-empty-pencil-vfaint);
+  color: var(--canvas-empty-pencil);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(.2,.7,.2,1), border-color 0.2s ease, color 0.2s ease;
+  padding: 0;
+}
+
+.closeBtn:hover,
+.closeBtn:focus-visible {
+  border-color: var(--canvas-empty-red-margin);
+  color: var(--canvas-empty-red-margin);
+  transform: rotate(90deg);
+  outline: none;
+}
+
+.closeBtn svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* ── Body + textarea ─────────────────────────────────────────── */
+.body {
+  padding: 18px 36px 8px 76px;
+  position: relative;
+  z-index: 2;
+}
+
+.lead {
+  font-family: var(--font-caveat), cursive;
+  font-size: 21px;
+  color: var(--canvas-empty-amber);
+  transform: rotate(-0.8deg);
+  display: inline-block;
+  margin-bottom: 10px;
+  line-height: 1.2;
+}
+
+.taWrap {
+  position: relative;
+  margin-top: 6px;
+}
+
+/* Inner red margin inside the textarea */
+.taWrap::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 18px;
+  width: 1px;
+  background: var(--canvas-empty-red-margin);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.draftWatermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--canvas-empty-red-stamp);
+  opacity: 0.05;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 1;
+  transition: opacity 0.2s ease;
+}
+
+.taWrap.filled .draftWatermark,
+.taWrap:focus-within .draftWatermark {
+  opacity: 0;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 168px;
+  padding: 16px 18px 16px 30px;
+  background: transparent;
+  background-image: linear-gradient(transparent 31px, var(--canvas-empty-pencil-line) 31px);
+  background-size: 100% 32px;
+  background-position: 0 0;
+  border: 1.5px solid var(--canvas-empty-pencil-vfaint);
+  border-radius: 4px;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 16px;
+  line-height: 32px;
+  color: var(--canvas-empty-ink);
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.textarea::placeholder {
+  font-family: var(--font-caveat), cursive;
+  font-style: italic;
+  font-size: 19px;
+  color: var(--canvas-empty-pencil-faint);
+  line-height: 32px;
+  opacity: 1;
+}
+
+.textarea:focus {
+  border-color: var(--canvas-empty-amber);
+  box-shadow: 0 0 0 3px var(--canvas-empty-amber-soft);
+}
+
+/* ── Quick-start ─────────────────────────────────────────────── */
+.qs {
+  padding: 12px 36px 8px 76px;
+  position: relative;
+  z-index: 2;
+}
+
+.qsLabel {
+  font-family: var(--font-caveat), cursive;
+  font-size: 17px;
+  color: var(--canvas-empty-pencil);
+  display: inline-block;
+  transform: rotate(-0.5deg);
+  margin-bottom: 12px;
+  line-height: 1;
+}
+
+.qsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.chip {
+  position: relative;
+  padding: 7px 13px;
+  border-radius: 3px;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--canvas-empty-paper);
+  color: var(--canvas-empty-ink-soft);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.25s cubic-bezier(.2,.7,.2,1), color 0.2s ease, background 0.2s ease;
+  z-index: 1;
+}
+
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 1.2px solid var(--c, var(--canvas-empty-pencil));
+  border-radius: 4px;
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* Per-chip color + rotation (rotation applied to .chip itself; --c via ::before) */
+.chip:nth-child(1) { --c: var(--canvas-empty-amber);      transform: rotate(-0.8deg); }
+.chip:nth-child(2) { --c: var(--canvas-empty-rust);       transform: rotate( 0.6deg); }
+.chip:nth-child(3) { --c: var(--canvas-empty-amber);      transform: rotate(-0.4deg); }
+.chip:nth-child(4) { --c: var(--canvas-empty-teal);       transform: rotate( 0.7deg); }
+.chip:nth-child(5) { --c: var(--canvas-empty-pencil);     transform: rotate(-0.3deg); }
+.chip:nth-child(6) { --c: var(--canvas-empty-red-margin); transform: rotate( 0.5deg); }
+
+.chip:hover,
+.chip:focus-visible {
+  transform: rotate(0deg) translateY(-2px);
+  color: var(--c);
+  outline: none;
+}
+.chip:hover::before,
+.chip:focus-visible::before {
+  opacity: 0.9;
+}
+
+.chip.active {
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 8%, var(--canvas-empty-paper));
+}
+.chip.active::before {
+  opacity: 1;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 36px 32px 76px;
+  position: relative;
+  z-index: 2;
+}
+
+.kbdHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--canvas-empty-pencil-faint);
+}
+
+.kbdHint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--canvas-empty-pencil-vfaint);
+  border-radius: 3px;
+  background: var(--canvas-empty-paper);
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 10px;
+  color: var(--canvas-empty-pencil);
+  line-height: 1;
+}
+
+/* ── Stamp submit ────────────────────────────────────────────── */
+.stamp {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 22px;
+  background: transparent;
+  border: 2px solid var(--canvas-empty-red-stamp);
+  border-radius: 4px;
+  color: var(--canvas-empty-red-stamp);
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  transform: rotate(-2deg);
+  opacity: 0.85;
+  transition: transform 0.2s cubic-bezier(.2,.7,.2,1), opacity 0.2s ease, background 0.2s ease;
+}
+
+.stamp::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--canvas-empty-red-stamp);
+  border-radius: 5px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.stamp:hover:not(:disabled),
+.stamp:focus-visible:not(:disabled) {
+  transform: rotate(0deg) translateY(-1px) scale(1.03);
+  opacity: 1;
+  background: rgba(184, 56, 56, 0.05);
+  outline: none;
+}
+
+.stamp:active:not(:disabled) {
+  transform: rotate(0deg) translateY(2px) scale(0.96);
+  opacity: 1;
+}
+
+.stamp:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stamp .arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.stamp:hover:not(:disabled) .arrow {
+  transform: translateX(3px);
+}
+
+/* ── Page marker ─────────────────────────────────────────────── */
+.pageMarker {
+  position: absolute;
+  bottom: 14px;
+  left: 76px;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--canvas-empty-pencil-faint);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .brief { transform: rotate(0deg); }
+  .closeBtn,
+  .chip,
+  .stamp,
+  .stamp .arrow,
+  .draftWatermark,
+  .textarea {
+    transition: none !important;
+  }
+  .closeBtn:hover,
+  .closeBtn:focus-visible {
+    transform: none;
+  }
+  .stamp:hover:not(:disabled),
+  .stamp:focus-visible:not(:disabled),
+  .stamp:active:not(:disabled) {
+    transform: rotate(-2deg);
+  }
+  .chip:hover,
+  .chip:focus-visible {
+    transform: rotate(0deg);
+  }
+  .chip:nth-child(1) { transform: rotate(0deg); }
+  .chip:nth-child(2) { transform: rotate(0deg); }
+  .chip:nth-child(3) { transform: rotate(0deg); }
+  .chip:nth-child(4) { transform: rotate(0deg); }
+  .chip:nth-child(5) { transform: rotate(0deg); }
+  .chip:nth-child(6) { transform: rotate(0deg); }
+}

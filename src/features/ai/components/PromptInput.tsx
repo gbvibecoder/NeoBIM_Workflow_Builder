@@ -1,48 +1,86 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Sparkles, X, Loader2 } from "lucide-react";
-import { useWorkflowStore, selectAddNode, selectAddEdge, selectResetCanvas, selectUpdateNode } from "@/features/workflows/stores/workflow-store";
+/**
+ * AI Brief modal — Studio Sketchbook
+ * Phase Z.CANVAS.AI-BRIEF
+ *
+ * Replaces the dark cyberpunk "AI Workflow Generator" panel with a paper-
+ * warm letter sheet that visually belongs to the same Studio Sketchbook
+ * design system as the canvas empty state (commit a5759d0a).
+ *
+ * Locked contracts (see PHASE_AI_BRIEF_MODAL_REDESIGN_REPORT for full list):
+ *  C1  Named export `PromptInput` (NOT default, NOT memo) — preserved per
+ *      original line 102 of the prior implementation.
+ *  C2  Prop signature `{ onClose?: () => void }` unchanged — mount call at
+ *      WorkflowCanvas.tsx:976 passes only `onClose`.
+ *  C3  Submit handler runs the same pipeline as before: matchTemplate →
+ *      buildFromTemplate → resetCanvas → sequential addNode/addEdge with
+ *      identical 170ms / 90ms cadence → patch first IN-001 node with the
+ *      prompt → toast.success → awardXP("ai-prompt-used"). The only behavior
+ *      change is that the modal now closes IMMEDIATELY on submit and the
+ *      canvas populates underneath — the prototype has no progress UI.
+ *  C4  The six quick-start preset prompt strings are preserved byte-for-byte
+ *      in the PRESET_PROMPTS constant below.
+ *  C5  framer-motion entry/exit animation — outer motion.div lives inside
+ *      the parent's <AnimatePresence> at WorkflowCanvas.tsx:974, so exit
+ *      transition plays on close.
+ *  C6  prefers-reduced-motion honored via useReducedMotion() (here) AND
+ *      via @media (prefers-reduced-motion: reduce) in the CSS module.
+ *  C7  No `any`, no @ts-ignore, no eslint-disable.
+ *  C8  ESC closes, ⌘/Ctrl+⏎ submits (when textarea non-empty), backdrop
+ *      click closes.
+ */
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { toast } from "sonner";
+import {
+  useWorkflowStore,
+  selectAddNode,
+  selectAddEdge,
+  selectResetCanvas,
+  selectUpdateNode,
+} from "@/features/workflows/stores/workflow-store";
 import { useUIStore } from "@/shared/stores/ui-store";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { generateId } from "@/lib/utils";
-import { toast } from "sonner";
+import { awardXP } from "@/lib/award-xp";
+import { useLocale } from "@/hooks/useLocale";
 import type { WorkflowTemplate } from "@/types/workflow";
 import type { WorkflowNode, WorkflowEdge, NodeStatus } from "@/types/nodes";
-import { awardXP } from "@/lib/award-xp";
+import s from "./PromptInput.module.css";
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// ─── Preset prompt strings — LC4: preserved byte-identical to prior impl ──
 
-const CHIPS = [
-  { label: "PDF → Massing",    color: "#00F5FF", prompt: "I have a PDF project brief and want to generate a 3D massing model" },
-  { label: "IFC → BOQ",        color: "#B87333", prompt: "Upload an IFC model, extract quantities, and export a bill of quantities" },
-  { label: "3 Variants",       color: "#FFBF00", prompt: "Generate 3 massing variants from a text description with metrics comparison" },
-  { label: "Image → Concept",  color: "#4FC3F7", prompt: "Analyze a reference image and create a concept building matching its style" },
-  { label: "Full Pipeline",    color: "#06B6D4", prompt: "Create a full pipeline from PDF brief to IFC export and compliance report" },
-  { label: "Compliance",       color: "#EF4444", prompt: "Check my IFC model for zoning compliance and generate a PDF report" },
-];
+const PRESET_PROMPTS = {
+  preset1: "I have a PDF project brief and want to generate a 3D massing model",
+  preset2: "Upload an IFC model, extract quantities, and export a bill of quantities",
+  preset3: "Generate 3 massing variants from a text description with metrics comparison",
+  preset4: "Analyze a reference image and create a concept building matching its style",
+  preset5: "Create a full pipeline from PDF brief to IFC export and compliance report",
+  preset6: "Check my IFC model for zoning compliance and generate a PDF report",
+} as const;
 
-import { CATEGORY_COLORS } from "@/lib/ui-constants";
+type PresetId = keyof typeof PRESET_PROMPTS;
 
-const CATEGORY_COLOR = CATEGORY_COLORS;
+// `as const` preserves the `nameKey` literals so they satisfy the
+// TranslationKey union expected by useLocale's `t(...)`.
+const PRESETS = [
+  { id: "preset1", nameKey: "ai.brief.preset1" },
+  { id: "preset2", nameKey: "ai.brief.preset2" },
+  { id: "preset3", nameKey: "ai.brief.preset3" },
+  { id: "preset4", nameKey: "ai.brief.preset4" },
+  { id: "preset5", nameKey: "ai.brief.preset5" },
+  { id: "preset6", nameKey: "ai.brief.preset6" },
+] as const;
 
-const STEPS = ["thinking", "placing", "connecting"] as const;
-type GenerationStep = typeof STEPS[number];
-
-const STEP_LABELS: Record<GenerationStep, string> = {
-  thinking:   "Analyzing prompt…",
-  placing:    "Placing nodes…",
-  connecting: "Connecting edges…",
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Template matching + building — preserved verbatim from prior impl ────
 
 function buildFromTemplate(template: WorkflowTemplate): {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
 } {
-  const nodes: WorkflowNode[] = template.tileGraph.nodes.map(n => ({
+  const nodes: WorkflowNode[] = template.tileGraph.nodes.map((n) => ({
     ...n,
     id: `${n.id}-${generateId()}`,
     data: { ...n.data, status: "idle" as NodeStatus },
@@ -51,7 +89,7 @@ function buildFromTemplate(template: WorkflowTemplate): {
   const idMap = new Map<string, string>();
   template.tileGraph.nodes.forEach((orig, i) => idMap.set(orig.id, nodes[i].id));
 
-  const edges: WorkflowEdge[] = template.tileGraph.edges.map(e => ({
+  const edges: WorkflowEdge[] = template.tileGraph.edges.map((e) => ({
     ...e,
     id: `${e.id}-${generateId()}`,
     source: idMap.get(e.source) ?? e.source,
@@ -63,96 +101,117 @@ function buildFromTemplate(template: WorkflowTemplate): {
 
 function matchTemplate(text: string): WorkflowTemplate {
   const q = text.toLowerCase();
-  if (q.includes("pdf") && (q.includes("mass") || q.includes("brief") || q.includes("ifc") || q.includes("concept"))) return PREBUILT_WORKFLOWS.find(w => w.id === "wf-08") ?? PREBUILT_WORKFLOWS[0];
-  if (q.includes("ifc") && (q.includes("quantity") || q.includes("boq"))) return PREBUILT_WORKFLOWS.find(w => w.id === "wf-09") ?? PREBUILT_WORKFLOWS[0];
-  if (q.includes("variant") || q.includes("options"))                    return PREBUILT_WORKFLOWS.find(w => w.id === "wf-04") ?? PREBUILT_WORKFLOWS[0];
-  if (q.includes("image") && q.includes("concept"))                      return PREBUILT_WORKFLOWS.find(w => w.id === "wf-03") ?? PREBUILT_WORKFLOWS[0];
-  if (q.includes("compliance") || q.includes("zoning"))                  return PREBUILT_WORKFLOWS.find(w => w.id === "wf-04") ?? PREBUILT_WORKFLOWS[0];
-  if (q.includes("full") || q.includes("pipeline"))                      return PREBUILT_WORKFLOWS.find(w => w.id === "wf-08") ?? PREBUILT_WORKFLOWS[0];
-  return PREBUILT_WORKFLOWS.find(w => w.id === "wf-03") ?? PREBUILT_WORKFLOWS[0];
+  if (q.includes("pdf") && (q.includes("mass") || q.includes("brief") || q.includes("ifc") || q.includes("concept"))) return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-08") ?? PREBUILT_WORKFLOWS[0];
+  if (q.includes("ifc") && (q.includes("quantity") || q.includes("boq"))) return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-09") ?? PREBUILT_WORKFLOWS[0];
+  if (q.includes("variant") || q.includes("options"))                    return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-04") ?? PREBUILT_WORKFLOWS[0];
+  if (q.includes("image") && q.includes("concept"))                      return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-03") ?? PREBUILT_WORKFLOWS[0];
+  if (q.includes("compliance") || q.includes("zoning"))                  return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-04") ?? PREBUILT_WORKFLOWS[0];
+  if (q.includes("full") || q.includes("pipeline"))                      return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-08") ?? PREBUILT_WORKFLOWS[0];
+  return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-03") ?? PREBUILT_WORKFLOWS[0];
 }
 
-// ─── Shimmer node pill (used during preview phase) ────────────────────────────
+// ─── Inline decorative SVGs ────────────────────────────────────────────────
 
-function NodePill({ label, color, delay }: { label: string; color: string; delay: number }) {
+function Paperclip() {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.75, y: 8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ delay, type: "spring", stiffness: 420, damping: 28 }}
-      style={{
-        padding: "4px 10px", borderRadius: 6,
-        background: `${color}14`,
-        border: `1px solid ${color}30`,
-        fontSize: 11, fontWeight: 500, color,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </motion.div>
+    <svg className={s.paperclip} viewBox="0 0 22 50" aria-hidden focusable="false">
+      <path d="M 8 4 Q 4 4 4 8 L 4 38 Q 4 44 10 44 Q 16 44 16 38 L 16 12 Q 16 8 12 8 Q 8 8 8 12 L 8 34" />
+    </svg>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+function SketchFrame() {
+  return (
+    <div className={s.frame} aria-hidden>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" focusable="false">
+        <path className={s.outer} d="M 1 2 L 99 1 L 98 99 L 2 98 Z" />
+        <path className={s.inner} d="M 4 5 L 96 4 L 95 96 L 5 95 Z" />
+      </svg>
+    </div>
+  );
+}
+
+function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 12 12" aria-hidden focusable="false">
+      <path d="M 2 2 L 10 10 M 10 2 L 2 10" />
+    </svg>
+  );
+}
+
+// ─── Component ────────────────────────────────────────────────────────────
 
 interface PromptInputProps {
   onClose?: () => void;
 }
 
 export function PromptInput({ onClose }: PromptInputProps) {
-  const prefersReduced = useReducedMotion();
+  const { t } = useLocale();
+  const prefersReducedMotion = useReducedMotion();
   const [prompt, setPrompt] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [step, setStep] = useState<GenerationStep | null>(null);
-  const [previewNodes, setPreviewNodes] = useState<{ label: string; color: string }[]>([]);
+  const [activePreset, setActivePreset] = useState<PresetId | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const addNode = useWorkflowStore(selectAddNode);
   const addEdge = useWorkflowStore(selectAddEdge);
   const resetCanvas = useWorkflowStore(selectResetCanvas);
   const updateNode = useWorkflowStore(selectUpdateNode);
-  const setPromptModeActive = useUIStore(s => s.setPromptModeActive);
+  const setPromptModeActive = useUIStore((st) => st.setPromptModeActive);
 
+  // ── Locale-aware date stamp (NOV 19 / 2026) ────────────────────────────
+  const dateParts = useMemo(() => {
+    const userLocale =
+      typeof navigator !== "undefined" && navigator.language ? navigator.language : "en-US";
+    const now = new Date();
+    return {
+      month: new Intl.DateTimeFormat(userLocale, { month: "short" })
+        .format(now)
+        .toUpperCase(),
+      day: String(now.getDate()).padStart(2, "0"),
+      year: String(now.getFullYear()),
+    };
+  }, []);
+
+  // ── Close ──────────────────────────────────────────────────────────────
+  const handleClose = useCallback(() => {
+    setPromptModeActive(false);
+    onClose?.();
+  }, [onClose, setPromptModeActive]);
+
+  // ── Submit — LC3: same pipeline as prior impl ──────────────────────────
   const handleSubmit = useCallback(async () => {
-    if (!prompt.trim() || isGenerating) return;
-    setIsGenerating(true);
+    const promptText = prompt.trim();
+    if (!promptText) return;
 
-    // Phase 1 — Thinking
-    setStep("thinking");
-    await new Promise(r => setTimeout(r, 1000));
+    // Close modal immediately; canvas will populate visibly underneath.
+    setPromptModeActive(false);
+    onClose?.();
 
-    const template = matchTemplate(prompt);
+    // Brief pause so the modal's exit animation can play before the canvas
+    // starts mutating (avoids a flash of mid-state behind the unmounting modal).
+    await new Promise((r) => setTimeout(r, 200));
+
+    const template = matchTemplate(promptText);
     const { nodes, edges } = buildFromTemplate(template);
 
-    setPreviewNodes(nodes.map(n => ({
-      label: n.data.label,
-      color: CATEGORY_COLOR[n.data.category] ?? "#00F5FF",
-    })));
-
-    // Phase 2 — Placing
-    setStep("placing");
     resetCanvas();
     for (const node of nodes) {
-      await new Promise(r => setTimeout(r, 170));
+      await new Promise((r) => setTimeout(r, 170));
       addNode(node);
     }
-
-    // Phase 3 — Connecting
-    setStep("connecting");
     for (const edge of edges) {
-      await new Promise(r => setTimeout(r, 90));
+      await new Promise((r) => setTimeout(r, 90));
       addEdge(edge);
     }
-    await new Promise(r => setTimeout(r, 200));
 
-    // Pass the user's prompt to the first input node (Text Prompt)
-    const firstInputNode = nodes.find(n => {
+    // Patch the user's prompt into the first text-input node (catalogueId IN-001)
+    const firstInputNode = nodes.find((n) => {
       const catId = (n.data as Record<string, unknown>).catalogueId as string;
       return catId === "IN-001";
     });
     if (firstInputNode) {
       updateNode(firstInputNode.id, {
-        data: { ...firstInputNode.data, inputValue: prompt.trim() },
+        data: { ...firstInputNode.data, inputValue: promptText },
       });
     }
 
@@ -160,296 +219,165 @@ export function PromptInput({ onClose }: PromptInputProps) {
       description: `${nodes.length} nodes placed and connected`,
       duration: 4000,
     });
-
-    // Award XP for AI prompt usage (fire-and-forget)
     awardXP("ai-prompt-used");
+  }, [prompt, resetCanvas, addNode, addEdge, updateNode, setPromptModeActive, onClose]);
 
-    setIsGenerating(false);
-    setStep(null);
-    setPreviewNodes([]);
-    setPromptModeActive(false);
-    onClose?.();
-  }, [prompt, isGenerating, resetCanvas, addNode, addEdge, updateNode, setPromptModeActive, onClose]);
+  // ── Keyboard: ESC closes, ⌘/Ctrl+⏎ submits ─────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleClose();
+      } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        void handleSubmit();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [handleClose, handleSubmit]);
 
-  const canClose = !isGenerating;
+  // ── Auto-focus on mount ────────────────────────────────────────────────
+  useEffect(() => {
+    const t1 = window.setTimeout(() => textareaRef.current?.focus(), 50);
+    return () => window.clearTimeout(t1);
+  }, []);
+
+  // ── Quick-start chip click — fill textarea, mark active ────────────────
+  const handleChipClick = useCallback((id: PresetId) => {
+    const text = PRESET_PROMPTS[id];
+    setPrompt(text);
+    setActivePreset(id);
+    window.setTimeout(() => textareaRef.current?.focus(), 0);
+  }, []);
+
+  // ── Kbd hint: split prefix glyphs from i18n string ─────────────────────
+  // Translation prefixes the string with "⌘⏎ " — we render the keys as
+  // styled <kbd>s and the remaining words as plain text.
+  const kbdHintRaw = t("ai.brief.kbdHint");
+  const kbdHintText = kbdHintRaw.replace(/^[⌘⏎\s]+/, "");
+
+  // ── Animation gates ────────────────────────────────────────────────────
+  const backdropAnim = prefersReducedMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0 } }
+    : { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.35 } };
+
+  const briefAnim = prefersReducedMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0 } }
+    : {
+        initial: { opacity: 0, scale: 0.92, y: 40, rotate: 2 },
+        animate: { opacity: 1, scale: 1,   y: 0,  rotate: -0.5 },
+        exit:    { opacity: 0, scale: 0.94, y: 24, rotate: 1 },
+        transition: { duration: 0.55, ease: [0.16, 0.84, 0.3, 1] as const },
+      };
+
+  const submitDisabled = prompt.trim().length === 0;
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{
-        position: "fixed", inset: 0, zIndex: 50,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "rgba(10, 10, 15, 0.82)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+      className={s.backdrop}
+      {...backdropAnim}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
       }}
-      onClick={e => { if (e.target === e.currentTarget && canClose) onClose?.(); }}
     >
       <motion.div
-        initial={{ y: -28, opacity: 0, scale: 0.97 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
-        exit={{ y: -20, opacity: 0, scale: 0.97 }}
-        transition={{ type: "spring", stiffness: 380, damping: 32 }}
-        style={{
-          position: "relative",
-          width: "100%", maxWidth: 580,
-          margin: "0 16px",
-          background: "#070809",
-          border: "1px solid rgba(184,115,51,0.15)",
-          borderRadius: 4,
-          overflow: "hidden",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px rgba(184,115,51,0.08)",
-        }}
+        className={s.brief}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-brief-title"
+        aria-roledescription={t("ai.brief.brief")}
+        onClick={(e) => e.stopPropagation()}
+        {...briefAnim}
       >
-        {/* Top accent line */}
-        <div style={{
-          height: 2,
-          background: "linear-gradient(90deg, #00F5FF 0%, #B87333 50%, #00F5FF 100%)",
-        }} />
+        <SketchFrame />
+        <Paperclip />
 
-        {/* Header */}
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "16px 18px 14px",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 10,
-              background: "rgba(184,115,51,0.12)",
-              border: "1px solid rgba(184,115,51,0.22)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <motion.div
-                animate={{ rotate: (isGenerating && !prefersReduced) ? [0, 20, -20, 0] : 0 }}
-                transition={{ duration: 1.4, repeat: (isGenerating && !prefersReduced) ? Infinity : 0, ease: "easeInOut" }}
-                style={{ display: "flex" }}
-              >
-                <Sparkles size={16} style={{ color: "#B87333" }} />
-              </motion.div>
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#F0F0F5" }}>
-                AI Workflow Generator
-              </div>
-              <div style={{ fontSize: 10, color: "#55556A", marginTop: 1 }}>
-                Describe your workflow in natural language
-              </div>
-            </div>
+        {/* ── Header ── */}
+        <header className={s.head}>
+          <div className={s.headL}>
+            <span className={s.fromDesk}>{t("ai.brief.fromDesk")}</span>
+            <h2 className={s.hTitle} id="ai-brief-title">
+              {t("ai.brief.title")}
+            </h2>
           </div>
+          <div className={s.hR}>
+            <div className={s.dateStamp} aria-label={t("ai.brief.dateLabel")}>
+              {dateParts.month} {dateParts.day}
+              <small>{dateParts.year}</small>
+            </div>
+            <button
+              type="button"
+              className={s.closeBtn}
+              onClick={handleClose}
+              aria-label={t("ai.brief.closeLabel")}
+            >
+              <CloseGlyph />
+            </button>
+          </div>
+        </header>
 
-          <AnimatePresence>
-            {canClose && (
-              <motion.button
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={onClose}
-                style={{
-                  width: 28, height: 28, borderRadius: 7,
-                  background: "transparent", border: "none",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#55556A", cursor: "pointer",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#1A1A26"; e.currentTarget.style.color = "#F0F0F5"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#55556A"; }}
-              >
-                <X size={14} />
-              </motion.button>
-            )}
-          </AnimatePresence>
+        {/* ── Body ── */}
+        <div className={s.body}>
+          <span className={s.lead}>{t("ai.brief.lead")}</span>
+          <div className={`${s.taWrap} ${prompt.length > 0 ? s.filled : ""}`}>
+            <span className={s.draftWatermark} aria-hidden>
+              {t("ai.brief.draftWatermark")}
+            </span>
+            <textarea
+              ref={textareaRef}
+              className={s.textarea}
+              value={prompt}
+              onChange={(e) => {
+                setPrompt(e.target.value);
+                if (activePreset) setActivePreset(null);
+              }}
+              placeholder={t("ai.brief.placeholder")}
+              rows={5}
+            />
+          </div>
         </div>
 
-        {/* Body */}
-        <AnimatePresence mode="wait">
-          {isGenerating ? (
-            // ── Generating view ───────────────────────────────────────────
-            <motion.div
-              key="generating"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              style={{ padding: "0 18px 22px" }}
-            >
-              {/* Step label */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  style={{ display: "flex" }}
-                >
-                  <Loader2 size={13} style={{ color: "#B87333" }} />
-                </motion.div>
-                <span style={{ fontSize: 12, color: "#8888A0" }}>
-                  {step ? STEP_LABELS[step] : ""}
-                </span>
-              </div>
+        {/* ── Quick-start chips ── */}
+        <div className={s.qs}>
+          <span className={s.qsLabel}>{t("ai.brief.qsLabel")}</span>
+          <div className={s.qsRow} role="list">
+            {PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                role="listitem"
+                className={`${s.chip} ${activePreset === p.id ? s.active : ""}`}
+                onClick={() => handleChipClick(p.id)}
+              >
+                {t(p.nameKey)}
+              </button>
+            ))}
+          </div>
+        </div>
 
-              {/* Node preview area */}
-              <div style={{
-                background: "rgba(10,12,14,0.7)", borderRadius: 4, padding: "14px 14px",
-                border: "1px solid #1E1E2E", minHeight: 88,
-                display: "flex", alignItems: "center",
-              }}>
-                {step === "thinking" ? (
-                  // Shimmer skeleton
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-                    {[0, 0.15, 0.28].map((delay, i) => (
-                      <motion.div
-                        key={i}
-                        animate={{ opacity: [0.25, 0.6, 0.25] }}
-                        transition={{ duration: 1.3, delay, repeat: Infinity }}
-                        style={{
-                          height: 26, borderRadius: 6,
-                          background: "linear-gradient(90deg, #1E1E2E 0%, #2A2A3E 50%, #1E1E2E 100%)",
-                          width: i === 0 ? "75%" : i === 1 ? "55%" : "65%",
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  // Actual node pills appearing staggered
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {previewNodes.map((n, i) => (
-                      <NodePill key={i} label={n.label} color={n.color} delay={i * 0.1} />
-                    ))}
-                  </div>
-                )}
-              </div>
+        {/* ── Footer ── */}
+        <footer className={s.foot}>
+          <span className={s.kbdHint}>
+            <kbd>⌘</kbd>
+            <kbd>⏎</kbd>
+            <span>{kbdHintText}</span>
+          </span>
+          <button
+            type="button"
+            className={s.stamp}
+            onClick={() => void handleSubmit()}
+            disabled={submitDisabled}
+            aria-label={t("ai.brief.submit")}
+          >
+            {t("ai.brief.submit")}
+            <span className={s.arrow} aria-hidden>→</span>
+          </button>
+        </footer>
 
-              {/* Step progress dots */}
-              <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 16 }}>
-                {STEPS.map((s, i) => {
-                  const currentIdx = step ? STEPS.indexOf(step) : -1;
-                  const isDone   = i < currentIdx;
-                  const isActive = i === currentIdx;
-                  return (
-                    <motion.div
-                      key={s}
-                      animate={{ width: isActive ? 18 : 5 }}
-                      transition={{ duration: 0.25 }}
-                      style={{
-                        height: 5, borderRadius: 20,
-                        background: isDone ? "#B87333" : isActive ? "#B87333" : "#2A2A3E",
-                        opacity: isDone ? 0.5 : 1,
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </motion.div>
-
-          ) : (
-            // ── Input view ────────────────────────────────────────────────
-            <motion.div
-              key="input"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* Textarea */}
-              <div style={{ padding: "0 18px 12px" }}>
-                <div style={{ position: "relative" }}>
-                  <textarea
-                    ref={textareaRef}
-                    value={prompt}
-                    onChange={e => setPrompt(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit(); }}
-                    placeholder='Describe your workflow… e.g. "I have a PDF project brief and want to generate 3 massing variants with concept renders"'
-                    rows={4}
-                    autoFocus
-                    style={{
-                      width: "100%", borderRadius: 4,
-                      border: "1px solid #2A2A3E",
-                      background: "#0A0A0F",
-                      padding: "12px 14px", paddingBottom: 30,
-                      fontSize: 13, color: "#F0F0F5", lineHeight: 1.65,
-                      resize: "none", outline: "none",
-                      boxSizing: "border-box",
-                      transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-                    }}
-                    onFocus={e => {
-                      e.currentTarget.style.borderColor = "rgba(184,115,51,0.5)";
-                      e.currentTarget.style.boxShadow = "0 0 0 2px rgba(184,115,51,0.08)";
-                    }}
-                    onBlur={e => {
-                      e.currentTarget.style.borderColor = "#2A2A3E";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}
-                  />
-                  <div style={{
-                    position: "absolute", bottom: 9, right: 10,
-                    fontSize: 9, color: "#2A2A3E", pointerEvents: "none",
-                  }}>
-                    ⌘↵ to generate
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick-start chips */}
-              <div style={{ padding: "0 18px 14px" }}>
-                <div style={{
-                  fontSize: 9, fontWeight: 600, color: "#3A3A4E",
-                  textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 8,
-                }}>
-                  Quick start
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {CHIPS.map(chip => (
-                    <button
-                      key={chip.label}
-                      onClick={() => { setPrompt(chip.prompt); setTimeout(() => textareaRef.current?.focus(), 0); }}
-                      style={{
-                        padding: "4px 10px", borderRadius: 4, cursor: "pointer",
-                        background: `${chip.color}10`,
-                        border: `1px solid ${chip.color}22`,
-                        fontSize: 11, fontWeight: 500, color: chip.color,
-                        transition: "all 0.15s ease",
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.background = `${chip.color}20`;
-                        e.currentTarget.style.borderColor = `${chip.color}45`;
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = `${chip.color}10`;
-                        e.currentTarget.style.borderColor = `${chip.color}22`;
-                      }}
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Generate button */}
-              <div style={{ padding: "0 18px 18px" }}>
-                <button
-                  onClick={handleSubmit}
-                  disabled={!prompt.trim()}
-                  style={{
-                    width: "100%", padding: "11px 0",
-                    borderRadius: 4, border: "none",
-                    background: prompt.trim()
-                      ? "linear-gradient(135deg, #00F5FF 0%, #B87333 100%)"
-                      : "#1A1A26",
-                    color: prompt.trim() ? "#fff" : "#3A3A4E",
-                    fontSize: 13, fontWeight: 600,
-                    cursor: prompt.trim() ? "pointer" : "not-allowed",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    transition: "opacity 0.15s ease, box-shadow 0.15s ease",
-                    boxShadow: prompt.trim() ? "0 4px 20px rgba(0,245,255,0.25)" : "none",
-                  }}
-                  onMouseEnter={e => { if (prompt.trim()) e.currentTarget.style.opacity = "0.88"; }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
-                >
-                  <Sparkles size={14} />
-                  Generate Workflow
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <span className={s.pageMarker} aria-hidden>
+          {t("ai.brief.pageMarker")}
+        </span>
       </motion.div>
     </motion.div>
   );

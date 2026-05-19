@@ -57,9 +57,12 @@ export function ViewCube({ viewportRef, cameraMatrixCSS }: ViewCubeProps) {
   return (
     <div
       style={{
+        /* Phase Z.IFC.2 follow-up 2026-05-19: moved down to clear the
+           floating toolbar (which sits at top:16, height:40). 16px gap
+           below toolbar bottom edge → top:72. */
         position: "absolute",
-        top: 12,
-        left: 12,
+        top: 72,
+        left: 16,
         width: CONTAINER,
         height: CONTAINER,
         perspective: 240,

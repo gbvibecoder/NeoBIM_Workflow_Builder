@@ -306,6 +306,10 @@
   --canvas-empty-grid-blue-major:   rgba(140, 175, 220, 0.18);
   --canvas-empty-tint-amber:        rgba(232, 166, 104, 0.04);
   --canvas-empty-tint-rust:         rgba(216, 142, 90, 0.03);
+
+  /* AI Brief modal — Phase Z.CANVAS.AI-BRIEF (dark) */
+  --canvas-empty-red-stamp:         #E27474;
+  --canvas-empty-pencil-line:       rgba(244, 236, 223, 0.10);
 }
 
 /* ── Light Theme V3 (Modern Creative Studio) ──────────────────── */
@@ -612,6 +616,10 @@
   --canvas-empty-grid-blue-major:   rgba(64, 110, 165, 0.28);
   --canvas-empty-tint-amber:        rgba(184, 115, 51, 0.05);
   --canvas-empty-tint-rust:         rgba(160, 82, 28, 0.04);
+
+  /* AI Brief modal — Phase Z.CANVAS.AI-BRIEF (light) */
+  --canvas-empty-red-stamp:         #B83838;
+  --canvas-empty-pencil-line:       rgba(28, 20, 16, 0.08);
 }
 
 /* ── Atmospheric mesh overlay (light theme only) ──────────────── */
