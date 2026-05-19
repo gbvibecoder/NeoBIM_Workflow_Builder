@@ -3327,6 +3327,20 @@ const en = {
   'dashboard.v2.briefConstraint2': 'BREEAM Very Good target',
   'dashboard.v2.briefConstraint3': 'Brick + standing-seam zinc roof',
 
+  // Hero V4 — Animated 5-step pipeline (Phase Hero V4, 2026-05-19)
+  'dashboard.v2.pipelineHead': 'The five-step pipeline · live',
+  'dashboard.v2.pipelineFlow': 'brief → floor plan → ifc → 3d model → boq',
+  'dashboard.v2.pipelineBrief': 'Brief',
+  'dashboard.v2.pipelineBriefMeta': 'PDF · parse',
+  'dashboard.v2.pipelineFloor': 'Floor plan',
+  'dashboard.v2.pipelineFloorMeta': '2D · generate',
+  'dashboard.v2.pipelineIfc': 'IFC model',
+  'dashboard.v2.pipelineIfcMeta': '3D · extract',
+  'dashboard.v2.pipeline3d': '3D model',
+  'dashboard.v2.pipeline3dMeta': 'render · visualize',
+  'dashboard.v2.pipelineBoq': 'Bill of qty',
+  'dashboard.v2.pipelineBoqMeta': 'XLSX · price',
+
   // ===== IFC VIEWER (Phase Z.IFC.2 follow-up 2026-05-19) =====
   'ifcViewer.uploadNew': 'Upload New',
   'ifcViewer.calculateBOQ': 'Calculate BOQ',
@@ -6702,6 +6716,20 @@ const de: Record<keyof typeof en, string | string[]> = {
   'dashboard.v2.briefConstraint1': 'Max. Höhe 18 m · gestaffelte Fassade OG4',
   'dashboard.v2.briefConstraint2': 'BREEAM Very Good',
   'dashboard.v2.briefConstraint3': 'Ziegel + Stehfalzdach (Zink)',
+
+  // Hero V4 — Animierte 5-stufige Pipeline (Phase Hero V4, 2026-05-19)
+  'dashboard.v2.pipelineHead': 'Die fünfstufige Pipeline · live',
+  'dashboard.v2.pipelineFlow': 'briefing → grundriss → ifc → 3d-modell → loa',
+  'dashboard.v2.pipelineBrief': 'Briefing',
+  'dashboard.v2.pipelineBriefMeta': 'PDF · parsen',
+  'dashboard.v2.pipelineFloor': 'Grundriss',
+  'dashboard.v2.pipelineFloorMeta': '2D · erzeugen',
+  'dashboard.v2.pipelineIfc': 'IFC-Modell',
+  'dashboard.v2.pipelineIfcMeta': '3D · extrahieren',
+  'dashboard.v2.pipeline3d': '3D-Modell',
+  'dashboard.v2.pipeline3dMeta': 'render · visualisieren',
+  'dashboard.v2.pipelineBoq': 'LoA',
+  'dashboard.v2.pipelineBoqMeta': 'XLSX · bewerten',
 
   // ===== IFC VIEWER (Phase Z.IFC.2 follow-up 2026-05-19) =====
   'ifcViewer.uploadNew': 'Neu hochladen',

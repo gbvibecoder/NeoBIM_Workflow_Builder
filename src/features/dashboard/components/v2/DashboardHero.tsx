@@ -3,6 +3,7 @@ import { ArrowRight, Plus, Sparkles } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { NodesCanvas } from "./NodesCanvas";
 import { WorkspaceStatsCard } from "./WorkspaceStatsCard";
+import { PipelineSteps } from "./PipelineSteps";
 import s from "./dashboard.module.css";
 
 interface DashboardHeroProps {
@@ -48,15 +49,15 @@ export function DashboardHero({ firstName, planTier, stats, loading, lastWorkflo
         <div className={s.heroV3StripR}>
           {!loading && stats ? (
             <span className={s.heroV3StripRunning}>
-              <span className={s.heroV3StripPulse} />
-              {runningCount} running
+              <span className={s.heroV3StripPulse} aria-hidden="true" />
+              <b>{runningCount}</b> running
             </span>
           ) : null}
           <span className={s.heroV3StripPlan}>{planTier}</span>
         </div>
       </div>
 
-      {/* PRETITLE ROW */}
+      {/* HEADER ROW — greeting LEFT · statement RIGHT (side by side) */}
       <div className={s.heroV3PretitleRow}>
         <div className={s.heroV3PretitleL}>
           <div className={s.heroV3Eyebrow}>{t("dashboard.v2.heroEyebrow")}</div>
@@ -65,25 +66,22 @@ export function DashboardHero({ firstName, planTier, stats, loading, lastWorkflo
             <strong className={s.heroV3GreetingName}>{firstName}</strong>.
           </div>
         </div>
-        <div className={s.heroV3DragHint}>{t("dashboard.v2.heroDragHint")}</div>
+        <h1 className={s.heroV3Statement}>
+          {t("dashboard.v2.heroStatementPart1")}{" "}
+          <em className={s.heroV3StatementEm}>{t("dashboard.v2.heroStatementEm1")}</em>{" "}
+          <span className={s.heroV3StatementArrow} aria-hidden="true">→</span>{" "}
+          {t("dashboard.v2.heroStatementSep")}{" "}
+          <em className={s.heroV3StatementEm}>{t("dashboard.v2.heroStatementEm2")}</em>.
+        </h1>
       </div>
 
-      {/* STATEMENT */}
-      <h1 className={s.heroV3Statement}>
-        {t("dashboard.v2.heroStatementPart1")}{" "}
-        <em className={s.heroV3StatementEm}>{t("dashboard.v2.heroStatementEm1")}</em>{" "}
-        <span className={s.heroV3StatementArrow} aria-hidden="true">→</span>{" "}
-        {t("dashboard.v2.heroStatementSep")}{" "}
-        <em className={s.heroV3StatementEm}>{t("dashboard.v2.heroStatementEm2")}</em>.
-      </h1>
-
-      {/* TRANSFORMATION VISUAL */}
+      {/* TRANSFORMATION VISUAL — unchanged (C12 lock) */}
       <NodesCanvas />
 
-      {/* ACTIONS ROW */}
+      {/* ACTIONS ROW — pitch + CTA cluster + inline stats (3-col grid) */}
       <div className={s.heroV3Actions}>
         <p className={s.heroV3Pitch}>{t("dashboard.v2.heroSub")}</p>
-        <div className={s.heroV3CtaRow}>
+        <div className={s.heroV3CtaCluster}>
           {hasLast ? (
             <>
               <Link
@@ -118,10 +116,11 @@ export function DashboardHero({ firstName, planTier, stats, loading, lastWorkflo
             </>
           )}
         </div>
+        <WorkspaceStatsCard stats={stats} loading={loading} />
       </div>
 
-      {/* INLINE STATS STRIP */}
-      <WorkspaceStatsCard stats={stats} loading={loading} />
+      {/* PIPELINE — 5-step animated demo (CSS-only) */}
+      <PipelineSteps />
     </section>
   );
 }
