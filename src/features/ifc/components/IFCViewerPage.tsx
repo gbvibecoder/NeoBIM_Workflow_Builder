@@ -497,15 +497,16 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
   return (
     <div
       style={{
+        /* Phase Z.IFC.2 follow-up 2026-05-19: dropped the outer card chrome
+           (borderRadius / border / boxShadow) that was creating the visible
+           "framed band" at the top of the page. The IFC viewer now flows
+           edge-to-edge inside the dashboard layout's slot. */
         display: "flex",
         flexDirection: "column",
         height: "100%",
         background: UI.bg.page,
         position: "relative",
-        borderRadius: 8,
         overflow: "hidden",
-        border: `1px solid ${UI.border.subtle}`,
-        boxShadow: UI.shadow.card,
       }}
     >
       <input
@@ -516,32 +517,46 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
         onChange={handleFileInput}
       />
 
-      {/* Back button + Toolbar — only show once a model is loaded */}
-      {/* Toolbar (Phase Z.IFC.1 — Light Render Studio). Owns its own
-          Upload New + file identity, so the previous "Back to Upload"
-          wrapper button is gone. handleUnload is still invoked when the
-          user picks a new file (handleFileSelected wipes prior state).
-          Toolbar renders whether or not a model is loaded; the inner
-          middle tool strip only appears when hasModel. */}
-      <Toolbar
-        viewportRef={viewportRef}
-        modelInfo={modelInfo}
-        onOpenFile={handleOpenFile}
-        onUnload={handleUnload}
-        showShortcuts={showShortcuts}
-        onToggleShortcuts={() => setShowShortcuts((p) => !p)}
-        measureUnit={measureUnit}
-        onToggleUnit={handleToggleUnit}
-        onCalculateBOQ={handleCalculateBOQ}
-        canCalculateBOQ={currentFile !== null}
-        boqLaunching={boqLaunching}
-      />
-
-      {/* Integration banner — full-width bar between toolbar and viewport */}
+      {/* Integration banner — full-width bar above the main content area */}
       {hasModel && <IntegrationBanner visible={hasModel} />}
 
-      {/* Main content area — row layout for right panel */}
+      {/* Main content area — row layout for right panel + floating toolbar */}
       <div style={{ flex: 1, display: "flex", flexDirection: "row", overflow: "hidden", position: "relative" }}>
+        {/* Toolbar — Phase Z.IFC.2 follow-up 2026-05-19: now floats OVER
+            the 3D viewport (was a layout flex item taking 56px above).
+            `right: 80` natively clears the dashboard avatar zone (right:16
+            × ~40px diameter). `pointer-events: none` on the wrapper lets
+            mouse-drag pan/orbit pass through the empty space between
+            pills; the Toolbar's own children re-enable pointer events on
+            interactive elements. Only renders when a model is loaded — on
+            the upload page the UploadZone's "Browse files" CTA is enough. */}
+        {hasModel && (
+          <div
+            style={{
+              position: "absolute",
+              top: 16,
+              left: 16,
+              right: 80,
+              zIndex: 30,
+              pointerEvents: "none",
+            }}
+          >
+            <Toolbar
+              viewportRef={viewportRef}
+              modelInfo={modelInfo}
+              onOpenFile={handleOpenFile}
+              onUnload={handleUnload}
+              showShortcuts={showShortcuts}
+              onToggleShortcuts={() => setShowShortcuts((p) => !p)}
+              measureUnit={measureUnit}
+              onToggleUnit={handleToggleUnit}
+              onCalculateBOQ={handleCalculateBOQ}
+              canCalculateBOQ={currentFile !== null}
+              boqLaunching={boqLaunching}
+            />
+          </div>
+        )}
+
         {/* 3D Viewport area */}
         <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
           <Viewport

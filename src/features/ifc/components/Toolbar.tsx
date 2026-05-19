@@ -341,24 +341,35 @@ export function Toolbar({
           /* Phase Z.IFC.2 follow-up 2026-05-19: dropped the outer paper bg,
              border-bottom, and multi-color drafting strip. Toolbar is now
              chromeless — the tool group pills (which already carry their
-             own paper bg + border + shadow) float over the bone-colored
-             page background, matching the Canvas SlimLibraryStrip pattern.
-             Result: feels free + connected to the 3D canvas below, not
-             walled off by a header bar. */
+             own paper bg + border + shadow) float over the 3D canvas grid,
+             matching the Canvas SlimLibraryStrip pattern.
+
+             pointer-events: none on the root + auto on each interactive
+             child (UploadNew, scrollable tools, Help+BOQ group) lets
+             mouse-drag pan/orbit pass through the empty space between
+             pills directly to the Viewport canvas below. */
           position: "relative",
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "0 16px",
-          height: 56,
+          padding: 0,
+          height: 40,
           background: "transparent",
+          pointerEvents: "none",
         }}
       >
         {/* LEFT — Upload New only (Phase Z.IFC.2 follow-up 2026-05-19:
             FileIdentity removed — the filename + schema are already shown
             in the bottom status bar, so this was duplicate info eating
             horizontal space and pushing Calculate BOQ into the avatar). */}
-        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexShrink: 0,
+            pointerEvents: "auto",
+          }}
+        >
           <UploadNewButton onClick={onOpenFile} />
         </div>
 
@@ -375,6 +386,7 @@ export function Toolbar({
               overflowY: "hidden",
               scrollbarWidth: "thin",
               padding: "0 2px",
+              pointerEvents: "auto",
             }}
           >
             {/* Camera group */}
@@ -552,6 +564,7 @@ export function Toolbar({
             alignItems: "center",
             gap: 8,
             flexShrink: 0,
+            pointerEvents: "auto",
           }}
         >
           <HelpButton onClick={onToggleShortcuts} />
