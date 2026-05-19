@@ -27,6 +27,7 @@ import {
   Building2,
 } from "lucide-react";
 import { UI } from "@/features/ifc/components/constants";
+import { useLocale } from "@/hooks/useLocale";
 import type { ViewportHandle } from "@/types/ifc-viewer";
 import {
   DEFAULT_TIER2_TOGGLES,
@@ -203,6 +204,7 @@ const switchThumbStyle = (on: boolean): CSSProperties => ({
 
 export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanelProps>(
   function IFCEnhancePanel({ viewportRef, hasModel, onStatusChange, embedded = false }, panelRef) {
+    const t = useLocale((s) => s.t);
     const [toggles, setToggles] = useState<EnhanceToggles>(DEFAULT_TOGGLES);
     const [tier2Toggles, setTier2Toggles] = useState<Tier2Toggles>(DEFAULT_TIER2_TOGGLES);
     const [tier3Toggles, setTier3Toggles] = useState<Tier3Toggles>(DEFAULT_TIER3_TOGGLES);
@@ -726,7 +728,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 onToggle={() =>
                   setExpanded((p) => ({ ...p, panorama: !p.panorama }))
                 }
-                title="360° Backdrop"
+                title={t("ifcViewer.section.backdrop")}
               >
                 <PanoramaSection
                   selectedAsset={stagedPanoramaAsset}
@@ -753,7 +755,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               <Section
                 expanded={expanded.environment}
                 onToggle={() => setExpanded((p) => ({ ...p, environment: !p.environment }))}
-                title="Lighting (HDRI)"
+                title={t("ifcViewer.section.lighting")}
               >
                 <div style={rowStyle}>
                   <span>HDRI lighting</span>
@@ -819,7 +821,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               <Section
                 expanded={expanded.context}
                 onToggle={() => setExpanded((p) => ({ ...p, context: !p.context }))}
-                title="Ground"
+                title={t("ifcViewer.section.ground")}
               >
                 {/* Show ground — single switch (master + ground plane were
                     redundant). Tier-2 master is auto-derived from this
@@ -884,7 +886,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               <Section
                 expanded={expanded.materials}
                 onToggle={() => setExpanded((p) => ({ ...p, materials: !p.materials }))}
-                title="Materials"
+                title={t("ifcViewer.section.materials")}
               >
                 <div style={rowStyle}>
                   <span>Apply PBR materials</span>
@@ -923,7 +925,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               <Section
                 expanded={expanded.roof}
                 onToggle={() => setExpanded((p) => ({ ...p, roof: !p.roof }))}
-                title="Roof"
+                title={t("ifcViewer.section.roof")}
               >
                 <div style={rowStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1141,7 +1143,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 onToggle={() =>
                   setExpanded((p) => ({ ...p, "building-details": !p["building-details"] }))
                 }
-                title="Details"
+                title={t("ifcViewer.section.details")}
               >
                 <div style={rowStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

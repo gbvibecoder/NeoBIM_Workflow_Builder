@@ -12,10 +12,10 @@ import { ModelTree, type ModelTreeHandle } from "@/features/ifc/components/Model
    out cleanly. */
 // import { PropertiesPanel } from "@/features/ifc/components/PropertiesPanel";
 import { EditPanel } from "@/features/ifc/components/EditPanel";
-import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
 import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
+import { useLocale } from "@/hooks/useLocale";
 import { Sparkles, PanelRightClose } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
 import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/components/IFCEnhancePanel";
@@ -65,6 +65,7 @@ function useBreakpoint() {
    by default, auto-apply removed). Page-level callers still pass it; keeping
    the signature stable avoids breaking the public contract. */
 export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhance?: boolean; restoreFromCache?: boolean }) {
+  const t = useLocale((s) => s.t);
   /* State */
   const [modelInfo, setModelInfo] = useState<IFCModelInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -517,9 +518,6 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
         onChange={handleFileInput}
       />
 
-      {/* Integration banner — full-width bar above the main content area */}
-      {hasModel && <IntegrationBanner visible={hasModel} />}
-
       {/* Main content area — row layout for right panel + floating toolbar */}
       <div style={{ flex: 1, display: "flex", flexDirection: "row", overflow: "hidden", position: "relative" }}>
         {/* Toolbar — Phase Z.IFC.2 follow-up 2026-05-19: now floats OVER
@@ -750,7 +748,7 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                 >
                   {(["edit", "tree"] as const).map((tab) => {
                     const active = bottomTab === tab;
-                    const label = tab === "edit" ? "Edit" : "Tree";
+                    const label = tab === "edit" ? t("ifcViewer.tab.edit") : t("ifcViewer.tab.tree");
                     const isEdit = tab === "edit";
                     return (
                       <button
@@ -878,15 +876,15 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
             overflow: "hidden",
           }}
         >
-          <StatusChip label="Schema" value={modelInfo.schema} />
-          <StatusChip label="Elements" value={String(modelInfo.elementCount)} />
+          <StatusChip label={t("ifcViewer.status.schema")} value={modelInfo.schema} />
+          <StatusChip label={t("ifcViewer.status.elements")} value={String(modelInfo.elementCount)} />
           <StatusChip
-            label="Size"
+            label={t("ifcViewer.status.size")}
             value={`${(modelInfo.fileSize / (1024 * 1024)).toFixed(1)} MB`}
           />
           <StatusChip
-            label="Detected"
-            value="Residential"
+            label={t("ifcViewer.status.detected")}
+            value={t("ifcViewer.status.residential")}
             accent="sage"
           />
           <span style={{ flex: 1 }} />

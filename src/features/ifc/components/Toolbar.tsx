@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
 import { ToolGroup, ToolButton } from "@/features/ifc/components/primitives";
+import { useLocale } from "@/hooks/useLocale";
 import type {
   ViewModeType,
   ColorByType,
@@ -124,6 +125,7 @@ function DropItem({
 
 /* ─── Upload New button ───────────────────────────────────────────────── */
 function UploadNewButton({ onClick }: { onClick: () => void }) {
+  const t = useLocale((s) => s.t);
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -152,7 +154,7 @@ function UploadNewButton({ onClick }: { onClick: () => void }) {
       }}
     >
       <FolderOpen size={13} strokeWidth={2.2} />
-      Upload New
+      {t("ifcViewer.uploadNew")}
     </button>
   );
 }
@@ -162,6 +164,7 @@ function UploadNewButton({ onClick }: { onClick: () => void }) {
 
 /* ─── Help icon button ────────────────────────────────────────────────── */
 function HelpButton({ onClick }: { onClick: () => void }) {
+  const t = useLocale((s) => s.t);
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -169,8 +172,8 @@ function HelpButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      title="Keyboard shortcuts (?)"
-      aria-label="Show keyboard shortcuts"
+      title={`${t("ifcViewer.help")} (?)`}
+      aria-label={t("ifcViewer.help")}
       style={{
         width: 32,
         height: 32,
@@ -201,6 +204,7 @@ function BOQButton({
   loading: boolean;
   onClick: () => void;
 }) {
+  const t = useLocale((s) => s.t);
   const [hover, setHover] = useState(false);
   const isDisabled = disabled || loading;
   return (
@@ -244,7 +248,7 @@ function BOQButton({
       ) : (
         <Calculator size={13} strokeWidth={2.4} />
       )}
-      Calculate BOQ
+      {t("ifcViewer.calculateBOQ")}
     </button>
   );
 }
@@ -291,6 +295,7 @@ export function Toolbar({
   canCalculateBOQ,
   boqLaunching,
 }: ToolbarProps) {
+  const t = useLocale((s) => s.t);
   const [viewMode, setViewMode] = useState<ViewModeType>("shaded");
   const [colorBy, setColorBy] = useState<ColorByType>("default");
   const [measuring, setMeasuring] = useState(false);
@@ -398,19 +403,19 @@ export function Toolbar({
             <ToolGroup label="Camera">
               <ToolButton
                 icon={<Home size={14} strokeWidth={2.2} />}
-                label="Fit All"
+                label={t("ifcViewer.tool.fitAll")}
                 shortcut="F"
                 onClick={() => v?.fitToView()}
               />
               <ToolButton
                 icon={<Maximize size={14} strokeWidth={2.2} />}
-                label="Fit"
+                label={t("ifcViewer.tool.fit")}
                 shortcut="V"
                 onClick={() => v?.fitToSelection()}
               />
               <ToolButton
                 icon={<Box size={14} strokeWidth={2.2} />}
-                label="Views"
+                label={t("ifcViewer.tool.views")}
                 hasDropdown
                 active={openMenu === "views"}
                 onClick={() => setOpenMenu(openMenu === "views" ? null : "views")}
@@ -419,7 +424,7 @@ export function Toolbar({
                   {(["front", "back", "left", "right", "top", "bottom", "iso"] as PresetView[]).map((view) => (
                     <DropItem
                       key={view}
-                      label={view.charAt(0).toUpperCase() + view.slice(1)}
+                      label={t(`ifcViewer.view.${view}` as const)}
                       onClick={() => {
                         v?.setPresetView(view);
                         closeMenu();
@@ -430,7 +435,7 @@ export function Toolbar({
               </ToolButton>
               <ToolButton
                 icon={<Waypoints size={14} strokeWidth={2.2} />}
-                label={ortho ? "Persp" : "Ortho"}
+                label={ortho ? t("ifcViewer.tool.persp") : t("ifcViewer.tool.ortho")}
                 active={ortho}
                 onClick={() => {
                   const next = !ortho;
@@ -444,7 +449,7 @@ export function Toolbar({
             <ToolGroup label="Section + Measure">
               <ToolButton
                 icon={<Scissors size={14} strokeWidth={2.2} />}
-                label="Section"
+                label={t("ifcViewer.tool.section")}
                 shortcut="S"
                 hasDropdown
                 active={openMenu === "section"}
@@ -454,7 +459,7 @@ export function Toolbar({
                   {(["x", "y", "z"] as SectionAxis[]).map((axis) => (
                     <DropItem
                       key={axis}
-                      label={`Section ${axis.toUpperCase()}`}
+                      label={t(`ifcViewer.section.${axis}` as const)}
                       onClick={() => {
                         v?.toggleSectionPlane(axis);
                         closeMenu();
@@ -465,7 +470,7 @@ export function Toolbar({
               </ToolButton>
               <ToolButton
                 icon={<Ruler size={14} strokeWidth={2.2} />}
-                label={measuring ? "Stop" : "Measure"}
+                label={measuring ? t("ifcViewer.tool.stop") : t("ifcViewer.tool.measure")}
                 shortcut="M"
                 active={measuring}
                 onClick={() => {
@@ -485,38 +490,38 @@ export function Toolbar({
             <ToolGroup label="Style">
               <ToolButton
                 icon={<Eye size={14} strokeWidth={2.2} />}
-                label="Style"
+                label={t("ifcViewer.tool.style")}
                 hasDropdown
                 active={openMenu === "style"}
                 onClick={() => setOpenMenu(openMenu === "style" ? null : "style")}
               >
                 <Dropdown open={openMenu === "style"} onClose={closeMenu}>
-                  <DropItem label="Shaded" active={viewMode === "shaded"} onClick={() => doSetViewMode("shaded")} />
-                  <DropItem label="Wireframe" active={viewMode === "wireframe"} onClick={() => doSetViewMode("wireframe")} />
-                  <DropItem label="X-Ray" active={viewMode === "xray"} onClick={() => doSetViewMode("xray")} />
+                  <DropItem label={t("ifcViewer.style.shaded")} active={viewMode === "shaded"} onClick={() => doSetViewMode("shaded")} />
+                  <DropItem label={t("ifcViewer.style.wireframe")} active={viewMode === "wireframe"} onClick={() => doSetViewMode("wireframe")} />
+                  <DropItem label={t("ifcViewer.style.xray")} active={viewMode === "xray"} onClick={() => doSetViewMode("xray")} />
                 </Dropdown>
               </ToolButton>
               <ToolButton
                 icon={<Palette size={14} strokeWidth={2.2} />}
-                label="Color"
+                label={t("ifcViewer.tool.color")}
                 hasDropdown
                 active={openMenu === "color"}
                 onClick={() => setOpenMenu(openMenu === "color" ? null : "color")}
               >
                 <Dropdown open={openMenu === "color"} onClose={closeMenu}>
-                  <DropItem label="Default" active={colorBy === "default"} onClick={() => doSetColorBy("default")} />
-                  <DropItem label="By Storey" active={colorBy === "storey"} onClick={() => doSetColorBy("storey")} />
-                  <DropItem label="By Category" active={colorBy === "category"} onClick={() => doSetColorBy("category")} />
+                  <DropItem label={t("ifcViewer.color.default")} active={colorBy === "default"} onClick={() => doSetColorBy("default")} />
+                  <DropItem label={t("ifcViewer.color.storey")} active={colorBy === "storey"} onClick={() => doSetColorBy("storey")} />
+                  <DropItem label={t("ifcViewer.color.category")} active={colorBy === "category"} onClick={() => doSetColorBy("category")} />
                 </Dropdown>
               </ToolButton>
               <ToolButton
                 icon={<Grid3x3 size={14} strokeWidth={2.2} />}
-                title="Toggle Grid"
+                title={t("ifcViewer.tool.toggleGrid")}
                 onClick={() => v?.toggleGrid()}
               />
               <ToolButton
                 icon={<Layers size={14} strokeWidth={2.2} />}
-                title="Toggle Edges"
+                title={t("ifcViewer.tool.toggleEdges")}
                 onClick={() => v?.toggleEdges()}
               />
             </ToolGroup>
@@ -525,31 +530,31 @@ export function Toolbar({
             <ToolGroup label="Visibility + Export">
               <ToolButton
                 icon={<EyeOff size={14} strokeWidth={2.2} />}
-                title="Hide Selected"
+                title={t("ifcViewer.tool.hide")}
                 shortcut="H"
                 onClick={() => v?.hideSelected()}
               />
               <ToolButton
                 icon={<Scan size={14} strokeWidth={2.2} />}
-                title="Isolate Selected"
+                title={t("ifcViewer.tool.isolate")}
                 shortcut="I"
                 onClick={() => v?.isolateSelected()}
               />
               <ToolButton
                 icon={<RotateCcw size={14} strokeWidth={2.2} />}
-                title="Show All"
+                title={t("ifcViewer.tool.showAll")}
                 shortcut="A"
                 onClick={() => v?.showAll()}
               />
               <ToolButton
                 icon={<Camera size={14} strokeWidth={2.2} />}
-                title="Screenshot"
+                title={t("ifcViewer.tool.screenshot")}
                 shortcut="P"
                 onClick={() => v?.takeScreenshot()}
               />
               <ToolButton
                 icon={<Download size={14} strokeWidth={2.2} />}
-                title="Export CSV"
+                title={t("ifcViewer.tool.exportCSV")}
                 onClick={downloadCSV}
               />
             </ToolGroup>

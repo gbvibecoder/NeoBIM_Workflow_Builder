@@ -3,6 +3,7 @@
 import React, { type CSSProperties, type ReactNode } from "react";
 import { Sparkles, Loader2, Wand2, RotateCcw } from "lucide-react";
 import { UI } from "@/features/ifc/components/constants";
+import { useLocale } from "@/hooks/useLocale";
 
 /* ─── ApplyHero — the premium "Apply Enhancement" CTA card ────────────────
    Phase Z.IFC.1 (2026-05-18). Sits at the top of the Enhance panel.
@@ -39,6 +40,7 @@ export function ApplyHero({
   onAuto,
   onReset,
 }: Props) {
+  const t = useLocale((s) => s.t);
   const shouldPulse = !disabled && !applying && !applied;
 
   /* Compact button heights (Phase Z.IFC.2 follow-up 2026-05-19):
@@ -163,7 +165,7 @@ export function ApplyHero({
           }}
         >
           <Sparkles size={11} color="var(--rs-blueprint)" />
-          AI Enhancement
+          {t("ifcViewer.hero.eyebrow")}
         </span>
         {detected && (
           <span
@@ -200,7 +202,7 @@ export function ApplyHero({
                 minWidth: 0,
               }}
             >
-              Detected · {detected}
+              {t("ifcViewer.hero.detected")} · {detected}
             </span>
           </span>
         )}
@@ -220,7 +222,11 @@ export function ApplyHero({
       >
         {headline ?? (
           <>
-            Bring your IFC to <em style={{ fontStyle: "italic", color: UI.accent.blueprint }}>life</em>.
+            {t("ifcViewer.hero.headlineFirst")}{" "}
+            <em style={{ fontStyle: "italic", color: UI.accent.blueprint }}>
+              {t("ifcViewer.hero.headlineEm")}
+            </em>
+            .
           </>
         )}
       </h3>
@@ -235,7 +241,7 @@ export function ApplyHero({
             title="Strip all enhancements and return to raw IFC"
           >
             <RotateCcw size={14} />
-            Reset
+            {t("ifcViewer.hero.reset")}
           </button>
         ) : (
           <button
@@ -250,7 +256,7 @@ export function ApplyHero({
             ) : (
               <Sparkles size={15} strokeWidth={2.4} />
             )}
-            {applying ? "Applying…" : "Apply Enhancement"}
+            {applying ? t("ifcViewer.hero.applying") : t("ifcViewer.hero.apply")}
           </button>
         )}
         {onAuto && (
@@ -262,7 +268,7 @@ export function ApplyHero({
             title="Pick sensible defaults based on model size, then apply"
           >
             <Wand2 size={13} />
-            Auto
+            {t("ifcViewer.hero.auto")}
           </button>
         )}
       </div>

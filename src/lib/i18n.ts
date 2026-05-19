@@ -3301,6 +3301,81 @@ const en = {
   'dashboard.v2.nodeIfc': 'IFC Model',
   'dashboard.v2.nodeRender': 'Render',
   'dashboard.v2.nodeBoq': 'BOQ',
+
+  // ===== IFC VIEWER (Phase Z.IFC.2 follow-up 2026-05-19) =====
+  'ifcViewer.uploadNew': 'Upload New',
+  'ifcViewer.calculateBOQ': 'Calculate BOQ',
+  'ifcViewer.help': 'Shortcuts',
+  // Toolbar — Camera group
+  'ifcViewer.tool.fitAll': 'Fit All',
+  'ifcViewer.tool.fit': 'Fit',
+  'ifcViewer.tool.views': 'Views',
+  'ifcViewer.tool.ortho': 'Ortho',
+  'ifcViewer.tool.persp': 'Persp',
+  // Toolbar — Section + Measure group
+  'ifcViewer.tool.section': 'Section',
+  'ifcViewer.tool.measure': 'Measure',
+  'ifcViewer.tool.stop': 'Stop',
+  // Toolbar — Style group
+  'ifcViewer.tool.style': 'Style',
+  'ifcViewer.tool.color': 'Color',
+  'ifcViewer.tool.toggleGrid': 'Toggle Grid',
+  'ifcViewer.tool.toggleEdges': 'Toggle Edges',
+  // Toolbar — Visibility + Export group
+  'ifcViewer.tool.hide': 'Hide Selected',
+  'ifcViewer.tool.isolate': 'Isolate Selected',
+  'ifcViewer.tool.showAll': 'Show All',
+  'ifcViewer.tool.screenshot': 'Screenshot',
+  'ifcViewer.tool.exportCSV': 'Export CSV',
+  // View presets
+  'ifcViewer.view.front': 'Front',
+  'ifcViewer.view.back': 'Back',
+  'ifcViewer.view.left': 'Left',
+  'ifcViewer.view.right': 'Right',
+  'ifcViewer.view.top': 'Top',
+  'ifcViewer.view.bottom': 'Bottom',
+  'ifcViewer.view.iso': 'Iso',
+  // Style modes
+  'ifcViewer.style.shaded': 'Shaded',
+  'ifcViewer.style.wireframe': 'Wireframe',
+  'ifcViewer.style.xray': 'X-Ray',
+  // Color modes
+  'ifcViewer.color.default': 'Default',
+  'ifcViewer.color.storey': 'By Storey',
+  'ifcViewer.color.category': 'By Category',
+  // Section axes
+  'ifcViewer.section.x': 'Section X',
+  'ifcViewer.section.y': 'Section Y',
+  'ifcViewer.section.z': 'Section Z',
+  // Sidebar tabs
+  'ifcViewer.tab.tree': 'Tree',
+  'ifcViewer.tab.edit': 'Edit',
+  // CollapsedRail labels
+  'ifcViewer.rail.search': 'SEARCH',
+  'ifcViewer.rail.tree': 'TREE',
+  'ifcViewer.rail.edit': 'EDIT',
+  // ApplyHero
+  'ifcViewer.hero.eyebrow': 'AI Enhancement',
+  'ifcViewer.hero.headlineFirst': 'Bring your IFC to',
+  'ifcViewer.hero.headlineEm': 'life',
+  'ifcViewer.hero.apply': 'Apply Enhancement',
+  'ifcViewer.hero.applying': 'Applying…',
+  'ifcViewer.hero.auto': 'Auto',
+  'ifcViewer.hero.reset': 'Reset',
+  'ifcViewer.hero.detected': 'Detected',
+  // Status chips
+  'ifcViewer.status.schema': 'Schema',
+  'ifcViewer.status.elements': 'Elements',
+  'ifcViewer.status.size': 'Size',
+  'ifcViewer.status.detected': 'Detected',
+  'ifcViewer.status.residential': 'Residential',
+  // Section titles (Enhance panel)
+  'ifcViewer.section.backdrop': '360° Backdrop',
+  'ifcViewer.section.lighting': 'Lighting (HDRI)',
+  'ifcViewer.section.materials': 'Materials',
+  'ifcViewer.section.ground': 'Ground',
+  'ifcViewer.section.roof': 'Roof',
+  'ifcViewer.section.details': 'Details',
 } as const;
 
 const de: Record<keyof typeof en, string | string[]> = {
@@ -6577,6 +6652,81 @@ const de: Record<keyof typeof en, string | string[]> = {
   'dashboard.v2.nodeIfc': 'IFC-Modell',
   'dashboard.v2.nodeRender': 'Rendering',
   'dashboard.v2.nodeBoq': 'BOQ',
+
+  // ===== IFC VIEWER (Phase Z.IFC.2 follow-up 2026-05-19) =====
+  'ifcViewer.uploadNew': 'Neu hochladen',
+  'ifcViewer.calculateBOQ': 'BOQ berechnen',
+  'ifcViewer.help': 'Tastenkürzel',
+  // Toolbar — Camera group
+  'ifcViewer.tool.fitAll': 'Alles anzeigen',
+  'ifcViewer.tool.fit': 'Anzeigen',
+  'ifcViewer.tool.views': 'Ansichten',
+  'ifcViewer.tool.ortho': 'Ortho',
+  'ifcViewer.tool.persp': 'Persp.',
+  // Toolbar — Section + Measure group
+  'ifcViewer.tool.section': 'Schnitt',
+  'ifcViewer.tool.measure': 'Messen',
+  'ifcViewer.tool.stop': 'Stopp',
+  // Toolbar — Style group
+  'ifcViewer.tool.style': 'Stil',
+  'ifcViewer.tool.color': 'Farbe',
+  'ifcViewer.tool.toggleGrid': 'Raster umschalten',
+  'ifcViewer.tool.toggleEdges': 'Kanten umschalten',
+  // Toolbar — Visibility + Export group
+  'ifcViewer.tool.hide': 'Auswahl ausblenden',
+  'ifcViewer.tool.isolate': 'Auswahl isolieren',
+  'ifcViewer.tool.showAll': 'Alle anzeigen',
+  'ifcViewer.tool.screenshot': 'Screenshot',
+  'ifcViewer.tool.exportCSV': 'CSV exportieren',
+  // View presets
+  'ifcViewer.view.front': 'Vorne',
+  'ifcViewer.view.back': 'Hinten',
+  'ifcViewer.view.left': 'Links',
+  'ifcViewer.view.right': 'Rechts',
+  'ifcViewer.view.top': 'Oben',
+  'ifcViewer.view.bottom': 'Unten',
+  'ifcViewer.view.iso': 'Iso',
+  // Style modes
+  'ifcViewer.style.shaded': 'Schattiert',
+  'ifcViewer.style.wireframe': 'Drahtgitter',
+  'ifcViewer.style.xray': 'Röntgen',
+  // Color modes
+  'ifcViewer.color.default': 'Standard',
+  'ifcViewer.color.storey': 'Nach Geschoss',
+  'ifcViewer.color.category': 'Nach Kategorie',
+  // Section axes
+  'ifcViewer.section.x': 'Schnitt X',
+  'ifcViewer.section.y': 'Schnitt Y',
+  'ifcViewer.section.z': 'Schnitt Z',
+  // Sidebar tabs
+  'ifcViewer.tab.tree': 'Struktur',
+  'ifcViewer.tab.edit': 'Bearbeiten',
+  // CollapsedRail labels
+  'ifcViewer.rail.search': 'SUCHE',
+  'ifcViewer.rail.tree': 'STRUKTUR',
+  'ifcViewer.rail.edit': 'BEARB.',
+  // ApplyHero
+  'ifcViewer.hero.eyebrow': 'KI-Verbesserung',
+  'ifcViewer.hero.headlineFirst': 'Bringen Sie Ihr IFC zum',
+  'ifcViewer.hero.headlineEm': 'Leben',
+  'ifcViewer.hero.apply': 'Verbesserung anwenden',
+  'ifcViewer.hero.applying': 'Wird angewendet…',
+  'ifcViewer.hero.auto': 'Auto',
+  'ifcViewer.hero.reset': 'Zurücksetzen',
+  'ifcViewer.hero.detected': 'Erkannt',
+  // Status chips
+  'ifcViewer.status.schema': 'Schema',
+  'ifcViewer.status.elements': 'Elemente',
+  'ifcViewer.status.size': 'Größe',
+  'ifcViewer.status.detected': 'Erkannt',
+  'ifcViewer.status.residential': 'Wohngebäude',
+  // Section titles (Enhance panel)
+  'ifcViewer.section.backdrop': '360°-Hintergrund',
+  'ifcViewer.section.lighting': 'Beleuchtung (HDRI)',
+  'ifcViewer.section.materials': 'Materialien',
+  'ifcViewer.section.ground': 'Boden',
+  'ifcViewer.section.roof': 'Dach',
+  'ifcViewer.section.details': 'Details',
 };
 
 const translations: Record<Locale, Record<string, string | readonly string[]>> = { en, de };
