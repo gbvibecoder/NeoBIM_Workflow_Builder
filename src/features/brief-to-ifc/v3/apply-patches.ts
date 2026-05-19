@@ -3,6 +3,10 @@
  *
  * Pure function that takes a BriefSpec and a list of SpecPatch entries,
  * returns a NEW BriefSpec with the patches applied. Does NOT mutate input.
+ *
+ * @deprecated Phase gamma.1 replaced JSON spec patches with plain-English
+ * Retry Hints (see retry-hint.ts). This module is kept for backwards
+ * compatibility with existing patchAndIterate() in spec-patcher.ts.
  */
 
 import type { BriefSpec, SpecPatch } from "./types";

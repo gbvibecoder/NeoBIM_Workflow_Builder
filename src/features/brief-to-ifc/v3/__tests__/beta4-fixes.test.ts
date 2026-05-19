@@ -216,16 +216,17 @@ describe("Hard Verifier — source field (β.4)", () => {
 
 // ─── Section E: Prompt drift + Section 4g ────────────────────────────────
 
-describe("Section 4g — IfcBuildingElementProxy ban (β.4)", () => {
+describe("IfcBuildingElementProxy ban — gamma.1 prompt (was Section 4g in β.4)", () => {
   it("system-prompt.md matches driver.ts byte-for-byte (drift check)", () => {
     const mdPath = path.join(__dirname, "..", "generator", "system-prompt.md");
     const md = fs.readFileSync(mdPath, "utf-8").trim();
     expect(GENERATOR_SYSTEM_PROMPT.trim()).toBe(md);
   });
 
-  it("Section 4g is present in system prompt", () => {
-    expect(GENERATOR_SYSTEM_PROMPT).toContain("Section 4g");
-    expect(GENERATOR_SYSTEM_PROMPT).toContain("NEVER USE IfcBuildingElementProxy");
+  it("IfcBuildingElementProxy ban is present in prompt (gamma.1 WHAT MAKES A GREAT IFC section)", () => {
+    // Phase gamma.1 moved the proxy ban from Section 4g into the
+    // "WHAT MAKES A GREAT IFC" section with clearer framing.
+    expect(GENERATOR_SYSTEM_PROMPT).toContain("NEVER use IfcBuildingElementProxy");
     expect(GENERATOR_SYSTEM_PROMPT).toContain("IfcFurnishingElement");
     expect(GENERATOR_SYSTEM_PROMPT).toContain("IfcLightFixture");
     expect(GENERATOR_SYSTEM_PROMPT).toContain("IfcFlowTerminal");

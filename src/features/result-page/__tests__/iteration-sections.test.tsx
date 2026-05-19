@@ -34,6 +34,7 @@ function makeData(overrides: Partial<ResultPageData> = {}): ResultPageData {
     qualityScore: null, visionIssues: [], designRationale: [],
     iterationCount: null, bestIteration: null, iterationTrace: [],
     verifierMismatches: [], patchesApplied: [],
+    totalAgentTurns: 0, renderPreviewCalls: 0, retryHints: [],
     ...overrides,
   };
 }

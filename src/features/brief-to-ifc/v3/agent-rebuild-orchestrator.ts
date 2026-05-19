@@ -39,6 +39,12 @@ export interface RebuildOptions {
   maxTurns?: number;
   /** Cost cap for the agent run. */
   costCapUsd?: number;
+  /** Phase gamma.1: verbatim brief text for Direct Agent Mode. */
+  briefText?: string;
+  /** Phase gamma.1: plain-English feedback from previous iteration. */
+  previousFeedback?: string;
+  /** Phase gamma.1: advisory suggestions from upstream nodes. */
+  suggestions?: import("./types").AgentInputSuggestions;
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────
@@ -55,9 +61,12 @@ export async function rebuildAgentPipeline(
   // eslint-disable-next-line no-console
   console.info(`[rebuild-orchestrator] Starting iteration ${options.iteration} for run ${options.runId}`);
 
-  // 1. Agent build
+  // 1. Agent build — Phase gamma.1: pass briefText + feedback + suggestions
   const buildOpts: RunAgentBuildOptions = {
     iteration: options.iteration,
+    briefText: options.briefText,
+    previousFeedback: options.previousFeedback,
+    suggestions: options.suggestions,
     previousMismatches: options.previousResult?.verifierMismatches,
     previousVisionIssues: options.previousResult?.visionIssues,
     previousAttemptUrl: options.previousResult?.ifcUrl,

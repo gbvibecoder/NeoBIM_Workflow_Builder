@@ -1427,6 +1427,10 @@ function getUpstreamArtifact(
     const mergedData: Record<string, unknown> = {};
     const allMetrics: Record<string, unknown> = {};
     const allSummaries: string[] = [];
+    // Phase gamma.1: collect briefText from any upstream artifact that carries it
+    let briefText: string | undefined;
+    // Phase gamma.1: assemble suggestions from upstream advisory nodes
+    const suggestions: Record<string, unknown> = {};
     for (const a of upstreamArtifacts) {
       if (a.data && typeof a.data === "object") {
         const d = a.data as Record<string, unknown>;
@@ -1440,9 +1444,31 @@ function getUpstreamArtifact(
             mergedData[key] = value;
           }
         }
+        // Preserve briefText from whichever upstream node carries it
+        if (!briefText && typeof d.briefText === "string" && d.briefText.length > 0) {
+          briefText = d.briefText as string;
+        }
+        // Collect suggestions from upstream advisory nodes
+        const spec = d.briefSpec as Record<string, unknown> | undefined;
+        if (spec) {
+          if (Array.isArray(spec.designRationale) && spec.designRationale.length > 0) {
+            suggestions.rationale = spec.designRationale;
+          }
+          if (Array.isArray(spec.furniture) && spec.furniture.some((f: Record<string, unknown>) => Array.isArray(f.parts) && (f.parts as unknown[]).length > 0)) {
+            suggestions.decomposed_furniture = spec.furniture;
+          }
+          if (Array.isArray(spec.trim) && spec.trim.length > 0) {
+            suggestions.trim = spec.trim;
+          }
+          if (Array.isArray(spec.materials) && spec.materials.length > 0) {
+            suggestions.materials = spec.materials;
+          }
+        }
       }
     }
     mergedData.briefSpec = merged;
+    if (briefText) mergedData.briefText = briefText;
+    if (Object.keys(suggestions).length > 0) mergedData.suggestions = suggestions;
     if (Object.keys(allMetrics).length > 0) mergedData.metrics = allMetrics;
     if (allSummaries.length > 0) mergedData.summary = allSummaries.join(" | ");
     return { ...firstArtifact, data: mergedData };

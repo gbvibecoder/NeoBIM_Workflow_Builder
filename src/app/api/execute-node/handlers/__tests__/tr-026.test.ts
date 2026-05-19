@@ -133,6 +133,11 @@ describe("TR-026 handler — IFC Agent Builder", () => {
       "max_turns",
       "cost_cap_usd",
       "workflow_id",
+      // Phase gamma.1: Direct Agent Mode fields
+      "brief_text",
+      "suggestions",
+      "previous_feedback",
+      "iteration",
     ]);
     for (const key of Object.keys(body)) {
       expect(ALLOWED_KEYS.has(key), `unexpected key "${key}" in /runs body`).toBe(true);

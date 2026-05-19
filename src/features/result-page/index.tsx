@@ -61,6 +61,7 @@ import {
   DesignRationaleSection,
   isDesignRationaleEligible,
 } from "@/features/result-page/components/sections/DesignRationaleSection";
+import { BuildJourneySection } from "@/features/result-page/components/sections/BuildJourneySection";
 import { NotFound } from "@/features/result-page/components/empty/NotFound";
 import { Forbidden } from "@/features/result-page/components/empty/Forbidden";
 import { readSavedNote } from "@/features/result-page/components/features/AnnotateButton";
@@ -256,6 +257,15 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
               {isIterationTraceEligible(data) ? (
                 <ErrorBoundary>
                   <IterationTraceSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {(data.totalAgentTurns > 0 || data.retryHints.length > 0) ? (
+                <ErrorBoundary>
+                  <BuildJourneySection
+                    totalAgentTurns={data.totalAgentTurns}
+                    renderPreviewCalls={data.renderPreviewCalls}
+                    retryHints={data.retryHints}
+                  />
                 </ErrorBoundary>
               ) : null}
               {isPatchesAppliedEligible(data) ? (

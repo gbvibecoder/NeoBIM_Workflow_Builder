@@ -423,6 +423,18 @@ export type SpecPatch = z.infer<typeof specPatchSchema>;
 export type IterationResult = z.infer<typeof iterationResultSchema>;
 export type PatcherResult = z.infer<typeof patcherResultSchema>;
 
+// ─── Phase γ.1: Direct Agent Mode — advisory suggestions ────────────
+
+/** Suggestions from upstream advisory nodes, passed to the agent
+ *  alongside the verbatim brief and the BriefSpec. The agent treats
+ *  everything except materials as non-binding. */
+export interface AgentInputSuggestions {
+  rationale?: DesignRationale[];
+  decomposed_furniture?: BriefFurniture[];
+  trim?: TrimItem[];
+  materials?: BriefMaterial[];
+}
+
 // ─── Generator agent loop — tool payloads / outcomes ────────────────
 
 export interface SandboxExecResult {

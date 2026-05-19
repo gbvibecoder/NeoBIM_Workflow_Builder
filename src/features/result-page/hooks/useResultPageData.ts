@@ -288,6 +288,12 @@ export interface ResultPageData {
     patch_type: string;
     rationale: string;
   }>;
+  /** Phase gamma.1: total agent turns across all iterations. */
+  totalAgentTurns: number;
+  /** Phase gamma.1: count of render_preview tool calls. */
+  renderPreviewCalls: number;
+  /** Phase gamma.1: plain-English retry hints from each iteration. */
+  retryHints: string[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -997,6 +1003,31 @@ export function useResultPageData(executionId: string): ResultPageData {
       }
     }
 
+    // ── Phase gamma.1: Build Journey (agent turns, render_preview, retry hints) ──
+    let totalAgentTurns = 0;
+    let renderPreviewCalls = 0;
+    const retryHints: string[] = [];
+    for (const a of artifacts.values()) {
+      if (a.type !== "json" && a.type !== "file") continue;
+      const dd = asRecord(a.data);
+      // TR-026 IFC Agent Builder: turns count
+      if (typeof dd.turns === "number" && dd.turns > 0) {
+        totalAgentTurns += dd.turns;
+      }
+      // TR-033 Retry Hint output
+      if (typeof dd.retryHint === "string" && dd.retryHint.length > 0) {
+        retryHints.push(dd.retryHint);
+      }
+      // Count render_preview tool calls from turnRecords or metadata
+      if (dd.runId && typeof dd.generatorCostUsd === "number") {
+        // This is likely a TR-026 output; render preview count would be in metadata
+        const meta = asRecord(a.metadata);
+        if (typeof meta.renderPreviewCount === "number") {
+          renderPreviewCalls += meta.renderPreviewCount;
+        }
+      }
+    }
+
     // ── JSON ─────────
     const jsonData = findAllByType(artifacts, "json").map(a => {
       const d = asRecord(a.data);
@@ -1081,6 +1112,9 @@ export function useResultPageData(executionId: string): ResultPageData {
       iterationTrace,
       verifierMismatches,
       patchesApplied,
+      totalAgentTurns,
+      renderPreviewCalls,
+      retryHints,
     };
   }, [
     rawArtifacts,

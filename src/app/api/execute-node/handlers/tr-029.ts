@@ -51,6 +51,7 @@ export const handleTR029: NodeHandler = async (ctx) => {
     },
     metadata: {
       stage: "architectural-reasoner",
+      advisoryRole: true,
       costUsd: result.metrics.cost_usd,
       durationMs: result.metrics.wall_time_ms,
     },

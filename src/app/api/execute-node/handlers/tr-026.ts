@@ -59,12 +59,46 @@ export const handleTR026: NodeHandler = async (ctx) => {
     );
   }
 
+  // Phase gamma.1: Direct Agent Mode — extract verbatim brief + suggestions
+  const briefText =
+    typeof inputData?.briefText === "string" && inputData.briefText.length > 0
+      ? inputData.briefText
+      : typeof inputData?.prompt === "string" && inputData.prompt.length > 0
+        ? inputData.prompt
+        : undefined;
+
+  const suggestions =
+    inputData?.suggestions && typeof inputData.suggestions === "object"
+      ? (inputData.suggestions as import("@/features/brief-to-ifc/v3/types").AgentInputSuggestions)
+      : undefined;
+
+  const previousFeedback =
+    typeof inputData?.previousFeedback === "string"
+      ? inputData.previousFeedback
+      : typeof inputData?.retryHint === "string"
+        ? inputData.retryHint
+        : undefined;
+
+  const iteration =
+    typeof inputData?.iteration === "number" ? inputData.iteration : 1;
+
+  if (!briefText) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[tr-026] briefText absent in inputData — agent will run in spec-only fallback mode. " +
+      "For best quality, ensure the original brief text flows through upstream nodes.",
+    );
+  }
+
   const { origin, cookie } = await getOriginAndCookie();
 
   const { runAgentBuild } = await import("@/features/brief-to-ifc/v3/agent-build");
 
   const result = await runAgentBuild(briefSpec as BriefSpec, {
-    iteration: 1,
+    briefText,
+    suggestions,
+    previousFeedback,
+    iteration,
     maxTurns: typeof inputData?.max_turns === "number" ? inputData.max_turns : undefined,
     costCapUsd: typeof inputData?.cost_cap_usd === "number" ? inputData.cost_cap_usd : undefined,
     origin,

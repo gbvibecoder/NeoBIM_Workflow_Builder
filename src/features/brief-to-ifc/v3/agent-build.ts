@@ -5,22 +5,30 @@
  * Uses the same HTTP → poll pattern as the TR-026 canvas handler, but
  * returns structured metrics suitable for iteration comparison.
  *
- * Retry context is embedded in the BriefSpec itself: the Spec Patcher
- * sets must_build/force_parts flags on items the previous iteration
- * collapsed. The agent system prompt's Section 4f enforces these flags.
+ * Phase gamma.1 (Direct Agent Mode): the agent now receives the
+ * original brief verbatim, upstream suggestions as advisory context,
+ * and plain-English retry hints on iteration 2+. The spec is still
+ * passed but the brief is the primary input.
  *
  * @module
  */
 
-import type { BriefSpec } from "./types";
+import type { BriefSpec, AgentInputSuggestions } from "./types";
 import type { VerifierMismatch, VisionIssue } from "./types";
+import { AGENT_MAX_TURNS_DIRECT_MODE } from "./constants";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
 export interface RunAgentBuildOptions {
+  /** Verbatim user brief text. Phase gamma.1: primary agent input. */
+  briefText?: string;
+  /** Advisory suggestions from upstream analysis nodes. */
+  suggestions?: AgentInputSuggestions;
+  /** Plain-English retry hint from previous iteration (Phase gamma.1). */
+  previousFeedback?: string;
   /** Which iteration this is (1-based). Default 1. */
   iteration?: number;
-  /** Max agent turns. Default 50. */
+  /** Max agent turns. Default AGENT_MAX_TURNS_DIRECT_MODE (200). */
   maxTurns?: number;
   /** IFC URL from the previous attempt (for observability). */
   previousAttemptUrl?: string;
@@ -127,6 +135,7 @@ export async function runAgentBuild(
   // eslint-disable-next-line no-console
   console.info(
     `[agent-build] Starting — iteration=${options.iteration ?? 1}, ` +
+    `briefText=${options.briefText ? `${options.briefText.length}ch` : "absent"}, ` +
     `retry_context="${retryContext}"`,
   );
 
@@ -134,6 +143,11 @@ export async function runAgentBuild(
   const body: Record<string, unknown> = { briefSpec: spec };
   if (options.maxTurns) body.max_turns = options.maxTurns;
   if (options.costCapUsd) body.cost_cap_usd = options.costCapUsd;
+  // Phase gamma.1: Direct Agent Mode — pass verbatim brief, suggestions, feedback
+  if (options.briefText) body.brief_text = options.briefText;
+  if (options.suggestions) body.suggestions = options.suggestions;
+  if (options.previousFeedback) body.previous_feedback = options.previousFeedback;
+  if (options.iteration) body.iteration = options.iteration;
 
   const createRes = await fetch(`${origin}/api/brief-to-ifc/v3/runs`, {
     method: "POST",

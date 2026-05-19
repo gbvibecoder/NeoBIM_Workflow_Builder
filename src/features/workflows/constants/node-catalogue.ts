@@ -396,9 +396,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   },
   {
     id: "TR-028",
-    name: "Item Decomposer",
+    name: "Item Decomposer (advisory)",
     description:
-      "Decomposes named furniture/equipment items into their physical parts via parallel Opus calls. Each item gets a parts[] array with 6+ sub-components for realistic multi-part IFC entities.",
+      "Item Decomposer (advisory) — suggests part breakdown for furniture/equipment items via parallel Opus calls. Each item gets a parts[] array with 6+ sub-components as suggestions for the agent.",
     category: "transform",
     icon: "Wand2",
     inputs: [
@@ -417,9 +417,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   // ── Phase Beta 2 (2026-05-18): 5 new pipeline nodes ──
   {
     id: "TR-029",
-    name: "Architectural Reasoner",
+    name: "Architectural Reasoner (advisory)",
     description:
-      "Applies domain-specific positioning logic to furniture items via Opus. Photography studios get backdrop-away-from-light, offices get desk-facing-window, etc.",
+      "Architectural Reasoner (advisory) — suggests rationale and positioning for furniture items via Opus. Photography studios get backdrop-away-from-light, offices get desk-facing-window, etc.",
     category: "transform",
     icon: "Compass",
     inputs: [
@@ -434,9 +434,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   },
   {
     id: "TR-030",
-    name: "Trim Specifier",
+    name: "Trim Specifier (advisory)",
     description:
-      "Adds architectural trim and hardware — skirting along walls, door hinges/handles/strike plates, window handles. Single Opus call.",
+      "Trim Specifier (advisory) — suggests trim items including skirting along walls, door hinges/handles/strike plates, window handles. Single Opus call.",
     category: "transform",
     icon: "Wrench",
     inputs: [

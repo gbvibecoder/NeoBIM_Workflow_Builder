@@ -71,6 +71,7 @@ export const handleTR028: NodeHandler = async (ctx) => {
     },
     metadata: {
       stage: "item-decomposer",
+      advisoryRole: true,
       costUsd: result.metrics.cost_usd,
       durationMs: result.metrics.wall_time_ms,
     },

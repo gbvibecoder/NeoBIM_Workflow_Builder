@@ -34,11 +34,18 @@ describe("system-prompt drift", () => {
   it("the prompt contains load-bearing IFC strictness rules", () => {
     // Defensive: a refactor that accidentally truncates the .md file
     // (e.g. an empty rewrite) would pass the byte-equality test above
-    // because both sides would be empty. Anchor against three specific
+    // because both sides would be empty. Anchor against specific
     // strings that MUST be in the prompt for the agent to author IFC
     // correctly.
     expect(GENERATOR_SYSTEM_PROMPT).toContain("IFC4");
     expect(GENERATOR_SYSTEM_PROMPT).toContain("attach_canonical_psets");
     expect(GENERATOR_SYSTEM_PROMPT).toContain("finalize_ifc");
+  });
+
+  it("Phase gamma.1: prompt contains new Direct Agent Mode sections", () => {
+    expect(GENERATOR_SYSTEM_PROMPT).toContain("## HOW YOU WORK");
+    expect(GENERATOR_SYSTEM_PROMPT).toContain("## SEEING YOUR WORK");
+    expect(GENERATOR_SYSTEM_PROMPT).toContain("## UPSTREAM SUGGESTIONS");
+    expect(GENERATOR_SYSTEM_PROMPT).toContain("## WHAT MAKES A GREAT IFC");
   });
 });

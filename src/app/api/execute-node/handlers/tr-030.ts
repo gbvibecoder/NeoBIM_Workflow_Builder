@@ -50,6 +50,7 @@ export const handleTR030: NodeHandler = async (ctx) => {
     },
     metadata: {
       stage: "trim-specifier",
+      advisoryRole: true,
       costUsd: result.metrics.cost_usd,
       durationMs: result.metrics.wall_time_ms,
     },

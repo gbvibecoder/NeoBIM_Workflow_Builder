@@ -82,6 +82,7 @@ function makeMinimalData(overrides: Partial<ResultPageData> = {}): ResultPageDat
     iterationTrace: [],
     verifierMismatches: [],
     patchesApplied: [],
+    totalAgentTurns: 0, renderPreviewCalls: 0, retryHints: [],
     ...overrides,
   };
 }

@@ -154,7 +154,7 @@ describe("cost cap circuit breaker", () => {
     expect(result.ledger).toHaveLength(5);
   });
 
-  it("the published DEFAULT_COST_CAP_USD is the documented $2.50", () => {
-    expect(DEFAULT_COST_CAP_USD).toBe(2.5);
+  it("the published DEFAULT_COST_CAP_USD is $5.00 (Phase gamma.1 Direct Agent Mode)", () => {
+    expect(DEFAULT_COST_CAP_USD).toBe(5.0);
   });
 });

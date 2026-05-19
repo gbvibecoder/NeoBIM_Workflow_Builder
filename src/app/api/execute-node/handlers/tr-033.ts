@@ -51,40 +51,27 @@ export const handleTR033: NodeHandler = async (ctx) => {
 
   const startMs = Date.now();
 
-  // Full path: both reports available → run iterative rebuild loop
+  // Extract brief text from upstream (Phase gamma.1: Direct Agent Mode)
+  const briefText =
+    typeof inputData?.briefText === "string" ? inputData.briefText
+    : typeof inputData?.prompt === "string" ? inputData.prompt
+    : "";
+
+  // Full path: both reports available → generate retry hint
   if (specParsed?.success && verifierParsed?.success && visionParsed?.success) {
-    const { patchAndIterate } = await import("@/features/brief-to-ifc/v3/spec-patcher");
-    const { origin, cookie } = await getOriginAndCookie();
+    const qualityScore = visionParsed.data.quality_score;
+    const iteration = typeof inputData?.iteration === "number" ? inputData.iteration : 1;
 
-    // Build initial result from upstream data
-    const initialResult = {
-      iteration: 1,
-      ifcUrl,
-      qualityScore: visionParsed.data.quality_score,
-      partsCoverage: verifierParsed.data.parts_coverage,
-      trimCoverage: verifierParsed.data.trim_coverage,
-      entityCount: typeof inputData?.entityCount === "number" ? inputData.entityCount : 0,
-      elapsedMs: 0,
-      costUsd: 0,
-      verifierMismatches: verifierParsed.data.mismatches,
-      visionIssues: visionParsed.data.issues,
-    };
-
-    const patcherResult = await patchAndIterate(
-      {
-        spec: specParsed.data,
-        currentResult: initialResult,
-        runId: executionId ?? `exec-${tileInstanceId}`,
-      },
-      {
-        maxIterations: 2,
-        qualityThreshold: 75,
-        partsThreshold: 0.85,
-        costBudgetUsd: 0.50,
-        origin,
-        cookie,
-      },
-    );
+    // Phase gamma.1: Generate plain-English retry hint instead of JSON patches
+    const { generateRetryHint } = await import("@/features/brief-to-ifc/v3/retry-hint");
+    const hintResult = await generateRetryHint({
+      brief: briefText || specParsed.data.project?.description || "",
+      iteration,
+      previousIfcUrl: ifcUrl,
+      verifierReport: verifierParsed.data,
+      visionReport: visionParsed.data,
+      qualityScore,
+    });
 
     const durationMs = Date.now() - startMs;
 
@@ -94,26 +81,37 @@ export const handleTR033: NodeHandler = async (ctx) => {
       tileInstanceId,
       type: "json",
       data: {
-        ifcUrl: patcherResult.finalIfcUrl,
+        ifcUrl,
         briefSpec: specParsed.data,
+        briefText,
         verifierReport: verifierParsed.data,
         visionReport: visionParsed.data,
-        patches_applied: patcherResult.patches_applied,
-        patch_count: patcherResult.patches_applied.length,
-        iterations: patcherResult.iterations,
-        bestIteration: patcherResult.bestIteration,
-        qualityScore: patcherResult.finalQualityScore,
-        entityCount: patcherResult.finalEntityCount,
-        total_cost_usd: patcherResult.total_cost_usd,
-        summary: patcherResult.summary,
+        retryHint: hintResult.hint,
+        shouldIterate: hintResult.shouldIterate,
+        qualityScore,
+        entityCount: typeof inputData?.entityCount === "number" ? inputData.entityCount : 0,
+        iterations: [{
+          iteration,
+          ifcUrl,
+          qualityScore,
+          parts_coverage: verifierParsed.data.parts_coverage,
+          trim_coverage: verifierParsed.data.trim_coverage,
+          entityCount: typeof inputData?.entityCount === "number" ? inputData.entityCount : 0,
+          elapsedMs: durationMs,
+          costUsd: hintResult.cost_usd,
+        }],
+        bestIteration: iteration,
+        total_cost_usd: hintResult.cost_usd,
+        summary: hintResult.shouldIterate
+          ? `Quality ${qualityScore}/100 below threshold. Retry hint generated for iteration ${iteration + 1}.`
+          : `Quality ${qualityScore}/100 meets threshold. No further iteration needed.`,
       },
       metadata: {
-        stage: "spec-patcher",
+        stage: "retry-hint",
         durationMs,
-        patchCount: patcherResult.patches_applied.length,
-        iterationCount: patcherResult.iterations.length,
-        bestIteration: patcherResult.bestIteration,
-        finalQualityScore: patcherResult.finalQualityScore,
+        qualityScore,
+        shouldIterate: hintResult.shouldIterate,
+        hintCostUsd: hintResult.cost_usd,
       },
       createdAt: new Date(),
     };

@@ -56,7 +56,9 @@ import {
 // TODO: Re-enable when BriefToIfcV3Run has classifiedArchetype field.
 // import { classifyBrief } from "@/features/brief-to-ifc/v3/archetype-classifier";
 
-export const maxDuration = 800;
+// Phase gamma.1: Direct Agent Mode — 200 turns can take 10-15 min.
+// 900s is the Vercel Pro ceiling for serverless functions.
+export const maxDuration = 900;
 
 const RATE_LIMIT_PER_HOUR = 10;
 
@@ -67,11 +69,20 @@ const BODY_SCHEMA = z
     project_type: z
       .enum(["exhibition_booth", "office", "residential", "retail"])
       .optional(),
-    max_turns: z.number().int().min(1).max(25).optional(),
-    cost_cap_usd: z.number().min(0.1).max(10.0).optional(),
+    max_turns: z.number().int().min(1).max(200).optional(),
+    cost_cap_usd: z.number().min(0.1).max(15.0).optional(),
     /** Caller-supplied correlation id (e.g. the workflow id from the
      *  canvas). Not enforced; carried back on the status view. */
     workflow_id: z.string().min(1).max(64).optional(),
+    // Phase gamma.1: Direct Agent Mode fields
+    /** Verbatim user brief text — passed directly to the agent. */
+    brief_text: z.string().max(20_000).optional(),
+    /** Advisory suggestions from upstream nodes. */
+    suggestions: z.record(z.string(), z.unknown()).optional(),
+    /** Plain-English retry hint from previous iteration. */
+    previous_feedback: z.string().max(10_000).optional(),
+    /** Which iteration this is (1-based). */
+    iteration: z.number().int().min(1).max(3).optional(),
   })
   .strict()
   .refine((v) => Boolean(v.brief) || Boolean(v.briefSpec), {
@@ -260,6 +271,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         await ctx.log("INFO", "GENERATE", "Generator agent loop starting.");
         const result = await runGenerator({
           brief: briefSpec,
+          briefText: body.brief_text,
+          suggestions: body.suggestions as import("@/features/brief-to-ifc/v3/types").AgentInputSuggestions | undefined,
+          previousFeedback: body.previous_feedback,
+          iteration: body.iteration,
           maxTurns: body.max_turns,
           costCapUsd: body.cost_cap_usd,
           onTurn: (record) => {
