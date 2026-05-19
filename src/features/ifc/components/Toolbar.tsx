@@ -548,20 +548,19 @@ export function Toolbar({
           </div>
         )}
 
-        {/* spacer */}
-        <div style={{ flex: 1 }} />
-
-        {/* RIGHT — Help + BOQ. Right-side margin 56px clears the dashboard
-            avatar zone (rendered at `right:16` × ~40px diameter by the
-            dashboard layout, outside this component's control). Without
-            this gutter the BOQ button slides under the avatar. */}
+        {/* Help + BOQ — sit flush against the last tool group (Download).
+            Phase Z.IFC.2 follow-up 2026-05-19: the prior `flex:1` spacer
+            pushed BOQ to the right edge under the dashboard avatar; this
+            new layout lets the buttons flow naturally left-to-right so
+            the whole toolbar reads as one continuous family, and the
+            empty right zone naturally accommodates the floating avatar
+            (no margin hacks needed). */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
             flexShrink: 0,
-            marginRight: 56,
           }}
         >
           <HelpButton onClick={onToggleShortcuts} />
@@ -573,6 +572,9 @@ export function Toolbar({
             />
           )}
         </div>
+
+        {/* Spacer absorbs any remaining width and reserves the avatar zone */}
+        <div style={{ flex: 1 }} />
       </div>
 
       {/* Shortcuts modal */}
