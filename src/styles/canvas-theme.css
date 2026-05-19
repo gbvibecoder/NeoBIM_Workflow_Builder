@@ -286,6 +286,26 @@
   --canvas-mention-pop-border:    rgba(255, 255, 255, 0.10);
   --canvas-mention-pop-shadow:    0 8px 24px rgba(0, 0, 0, 0.6);
   --canvas-group-dragging-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* Canvas empty state — Studio Sketchbook (dark, sketchbook-in-moonlight) */
+  --canvas-empty-paper:             #0E0E10;
+  --canvas-empty-paper-warm:        #16151A;
+  --canvas-empty-ink:               #F4ECDF;
+  --canvas-empty-ink-soft:          #C8BBA8;
+  --canvas-empty-pencil:            #A89880;
+  --canvas-empty-pencil-faint:      rgba(244, 236, 223, 0.40);
+  --canvas-empty-pencil-vfaint:     rgba(244, 236, 223, 0.14);
+  --canvas-empty-red-margin:        #D86A6A;
+  --canvas-empty-amber:             #E8A668;
+  --canvas-empty-amber-soft:        rgba(232, 166, 104, 0.12);
+  --canvas-empty-teal:              #5EAAA4;
+  --canvas-empty-teal-soft:         rgba(94, 170, 164, 0.12);
+  --canvas-empty-rust:              #D88E5A;
+  --canvas-empty-rust-soft:         rgba(216, 142, 90, 0.12);
+  --canvas-empty-grid-blue:         rgba(140, 175, 220, 0.10);
+  --canvas-empty-grid-blue-major:   rgba(140, 175, 220, 0.18);
+  --canvas-empty-tint-amber:        rgba(232, 166, 104, 0.04);
+  --canvas-empty-tint-rust:         rgba(216, 142, 90, 0.03);
 }
 
 /* ── Light Theme V3 (Modern Creative Studio) ──────────────────── */
@@ -572,6 +592,26 @@
   --canvas-mention-pop-border:    rgba(15, 20, 25, 0.10);
   --canvas-mention-pop-shadow:    0 4px 12px rgba(15,20,25,0.08);
   --canvas-group-dragging-shadow: 0 4px 16px rgba(15, 20, 25, 0.10);
+
+  /* Canvas empty state — Studio Sketchbook (light) */
+  --canvas-empty-paper:             #FAF7F2;
+  --canvas-empty-paper-warm:        #F4EDDF;
+  --canvas-empty-ink:               #1B1410;
+  --canvas-empty-ink-soft:          #3A2E25;
+  --canvas-empty-pencil:            #5C5045;
+  --canvas-empty-pencil-faint:      rgba(28, 20, 16, 0.35);
+  --canvas-empty-pencil-vfaint:     rgba(28, 20, 16, 0.14);
+  --canvas-empty-red-margin:        #C04545;
+  --canvas-empty-amber:             #B87333;
+  --canvas-empty-amber-soft:        rgba(184, 115, 51, 0.10);
+  --canvas-empty-teal:              #2C7873;
+  --canvas-empty-teal-soft:         rgba(44, 120, 115, 0.10);
+  --canvas-empty-rust:              #A0521C;
+  --canvas-empty-rust-soft:         rgba(160, 82, 28, 0.10);
+  --canvas-empty-grid-blue:         rgba(64, 110, 165, 0.16);
+  --canvas-empty-grid-blue-major:   rgba(64, 110, 165, 0.28);
+  --canvas-empty-tint-amber:        rgba(184, 115, 51, 0.05);
+  --canvas-empty-tint-rust:         rgba(160, 82, 28, 0.04);
 }
 
 /* ── Atmospheric mesh overlay (light theme only) ──────────────── */
