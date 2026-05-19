@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from "react";
 import {
   ChevronRight, ChevronDown, Building2, Layers, Box, Search,
 } from "lucide-react";
@@ -11,6 +11,12 @@ interface ModelTreeProps {
   tree: SpatialNode[];
   selectedID: number | null;
   viewportRef: React.RefObject<ViewportHandle | null>;
+}
+
+/* Imperative handle so the CollapsedRail's Search button can focus the
+   filter input after expanding the sidebar + switching to Tree. */
+export interface ModelTreeHandle {
+  focusFilter: () => void;
 }
 
 /* Icon for IFC type */
@@ -171,8 +177,14 @@ function TreeNode({
   );
 }
 
-export function ModelTree({ tree, selectedID, viewportRef }: ModelTreeProps) {
+export const ModelTree = forwardRef<ModelTreeHandle, ModelTreeProps>(
+function ModelTree({ tree, selectedID, viewportRef }, ref) {
   const [filter, setFilter] = useState("");
+  const filterInputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusFilter: () => filterInputRef.current?.focus(),
+  }), []);
 
   const handleSelect = useCallback(
     (id: number) => {
@@ -235,6 +247,7 @@ export function ModelTree({ tree, selectedID, viewportRef }: ModelTreeProps) {
         >
           <Search size={12} color={UI.text.tertiary} />
           <input
+            ref={filterInputRef}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter spatial nodes…"
@@ -266,4 +279,6 @@ export function ModelTree({ tree, selectedID, viewportRef }: ModelTreeProps) {
       </div>
     </div>
   );
-}
+});
+
+ModelTree.displayName = "ModelTree";

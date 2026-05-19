@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Viewport } from "@/features/ifc/components/Viewport";
 import { UploadZone } from "@/features/ifc/components/UploadZone";
 import { Toolbar } from "@/features/ifc/components/Toolbar";
-import { ModelTree } from "@/features/ifc/components/ModelTree";
+import { ModelTree, type ModelTreeHandle } from "@/features/ifc/components/ModelTree";
 /* PropertiesPanel — kept on disk but unmounted in Phase Z.IFC.2; the
    Inspect tab was retired. Z.IFC.3 may bring it back as a right-click
    popover. Import preserved as a no-op so the file stays tree-shaken
@@ -89,6 +89,7 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
 
   const viewportRef = useRef<ViewportHandle | null>(null);
   const enhancePanelRef = useRef<IFCEnhancePanelHandle | null>(null);
+  const modelTreeRef = useRef<ModelTreeHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resizingRef = useRef(false);
   const [boqLaunching, setBoqLaunching] = useState(false);
@@ -642,56 +643,73 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
           )}
         </div>
 
-        {/* ── Right sidebar — ALWAYS visible when a model is loaded, on ALL
-            viewport sizes. `bottomPanelOpen` only controls whether it's
-            expanded (full width with tabs & content) or collapsed to a 56px
-            icon rail. No breakpoint gate: on narrow windows the viewport is
-            cramped but the sidebar is guaranteed visible. The bright cyan
-            border-left + outer glow makes it unmistakable. */}
-        {hasModel && (
+        {/* ── Right sidebar — Phase Z.IFC.2 (2026-05-19) floating treatment.
+            When CLOSED, only a compact ~56px floating pill rail shows
+            (Canvas SlimLibraryStrip style): top-offset 80px from the row,
+            16px from the right, paper bg + border + radius 14 + shadow,
+            content-fit height (NOT 100% — that was the heavy-bar bug).
+            When OPEN, a rounded floating card replaces the rail entirely:
+            16px margin top/right/bottom, same rounded chrome, full width
+            from `panelWidth` (clamped to 260 on tablet/mobile).
+            Both states feel "lifted" off the viewport, matching Canvas. */}
+        {hasModel && !bottomPanelOpen && (
+          <CollapsedRail
+            activeTab={bottomTab}
+            onPickTab={(tab) => {
+              setBottomTab(tab);
+              setBottomPanelOpen(true);
+            }}
+            onExpand={() => setBottomPanelOpen(true)}
+            onSearch={() => {
+              setBottomTab("tree");
+              setBottomPanelOpen(true);
+              /* After the panel mounts, focus the filter input. Tiny
+                 delay because the panel transitions in over ~220ms. */
+              setTimeout(() => modelTreeRef.current?.focusFilter(), 240);
+            }}
+          />
+        )}
+        {hasModel && bottomPanelOpen && (
           <div
             style={{
-              width: bottomPanelOpen ? (bp === "tablet" || bp === "mobile" ? 260 : panelWidth) : 56,
+              width: bp === "tablet" || bp === "mobile" ? 260 : panelWidth,
               position: "absolute",
-              top: 0,
-              right: 0,
-              bottom: 0,
-              borderLeft: `2px solid var(--rs-blueprint-line)`,
+              top: 16,
+              right: 16,
+              bottom: 16,
+              border: `1px solid ${UI.border.subtle}`,
               background: UI.bg.trace,
-              boxShadow: "-2px 0 12px rgba(14,18,24,0.06), inset 2px 0 0 var(--rs-blueprint-soft)",
+              borderRadius: 14,
+              boxShadow: UI.shadow.floating,
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
-              transition: "width 0.22s cubic-bezier(0.4, 0, 0.2, 1)",
               zIndex: 20,
             }}
           >
-            {/* Resize handle — shown whenever the panel is expanded */}
-            {bottomPanelOpen && (
-              <div
-                onMouseDown={() => {
-                  resizingRef.current = true;
-                  document.body.style.cursor = "col-resize";
-                  document.body.style.userSelect = "none";
-                }}
-                style={{
-                  position: "absolute",
-                  left: -2,
-                  top: 0,
-                  bottom: 0,
-                  width: 5,
-                  cursor: "col-resize",
-                  zIndex: 10,
-                  background: "transparent",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--rs-blueprint-line)"; }}
-                onMouseLeave={(e) => { if (!resizingRef.current) e.currentTarget.style.background = "transparent"; }}
-              />
-            )}
+            {/* Resize handle — left edge of the floating card */}
+            <div
+              onMouseDown={() => {
+                resizingRef.current = true;
+                document.body.style.cursor = "col-resize";
+                document.body.style.userSelect = "none";
+              }}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 5,
+                cursor: "col-resize",
+                zIndex: 10,
+                background: "transparent",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--rs-blueprint-line)"; }}
+              onMouseLeave={(e) => { if (!resizingRef.current) e.currentTarget.style.background = "transparent"; }}
+            />
 
-            {bottomPanelOpen ? (
-              <>
+            <>
                 {/* Panel header with tabs — Phase Z.IFC.1 light theme */}
                 <div
                   style={{
@@ -783,6 +801,7 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                 <div style={{ flex: 1, overflow: "hidden" }}>
                   {bottomTab === "tree" && (
                     <ModelTree
+                      ref={modelTreeRef}
                       tree={spatialTree}
                       selectedID={selectedElement?.expressID ?? null}
                       viewportRef={viewportRef}
@@ -807,17 +826,6 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
                   )}
                 </div>
               </>
-            ) : (
-              /* ── Collapsed rail — 48px icon sidebar ── */
-              <CollapsedRail
-                activeTab={bottomTab}
-                onPickTab={(tab) => {
-                  setBottomTab(tab);
-                  setBottomPanelOpen(true);
-                }}
-                onExpand={() => setBottomPanelOpen(true)}
-              />
-            )}
           </div>
         )}
 
@@ -925,14 +933,19 @@ function StatusChip({
 }
 
 /* ─── CollapsedRail — Phase Z.IFC.2 (2026-05-19) ─────────────────────────
-   Now matches Canvas/SlimLibraryStrip style (56px wide pill, paper bg,
-   40×40 buttons with 16px icon + 7px mono uppercase label, thin dividers).
-   Two tabs only after the Inspect retirement: Edit and Tree.            */
+   Floats off the right edge of the viewport row (top:80, right:16),
+   content-fit height — NOT 100% (that was the heavy-bar bug). Matches
+   the Canvas SlimLibraryStrip pattern verbatim: 56px wide paper pill
+   with paper shadow + radius 14, 40×40 buttons with 16px icons + 7px
+   mono uppercase labels, thin 70%-width dividers.
+   Order: SEARCH → TREE → EDIT (Search opens Tree tab + focuses filter). */
 
 interface CollapsedRailProps {
   activeTab: SidebarTab;
   onPickTab: (tab: SidebarTab) => void;
   onExpand: () => void;
+  /** Opens Tree tab + focuses the spatial-filter input. */
+  onSearch: () => void;
 }
 
 interface StripBtnProps {
@@ -945,6 +958,8 @@ interface StripBtnProps {
 
 function StripBtn({ icon, label, active, onClick, variant = "neutral" }: StripBtnProps) {
   const [hover, setHover] = React.useState(false);
+  /* "search" variant — neutral until hover, like Canvas's FIND. Doesn't
+     show the always-active blueprint fill of the "expand" variant. */
   const showActive = active || variant === "expand";
   const activeBg = variant === "expand" ? "var(--rs-blueprint)" : "var(--rs-blueprint-soft)";
   const activeColor = variant === "expand" ? "#FFFFFF" : UI.accent.blueprint;
@@ -992,7 +1007,7 @@ function StripBtn({ icon, label, active, onClick, variant = "neutral" }: StripBt
   );
 }
 
-function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
+function CollapsedRail({ activeTab, onPickTab, onExpand, onSearch }: CollapsedRailProps) {
   const divider = (
     <div
       aria-hidden
@@ -1002,44 +1017,70 @@ function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
   return (
     <div
       style={{
+        /* Float off the right edge of the main content row — Canvas pattern */
+        position: "absolute",
+        top: 80,
+        right: 16,
+        zIndex: 20,
+        width: 56,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         padding: 8,
         gap: 4,
-        height: "100%",
         background: UI.bg.paper,
         border: `1px solid ${UI.border.subtle}`,
         borderRadius: 14,
         boxShadow: UI.shadow.paper,
-        margin: 6,
       }}
     >
-      {/* Expand pill */}
+      {/* SEARCH — opens Tree tab + focuses filter input (Canvas FIND pattern) */}
       <StripBtn
-        icon={<PanelRightOpen size={16} strokeWidth={2} />}
-        label="OPEN"
-        active
-        variant="expand"
-        onClick={onExpand}
+        icon={<SearchIcon />}
+        label="SEARCH"
+        active={false}
+        onClick={onSearch}
       />
 
       {divider}
 
-      {/* Tab icons — clicking any expands panel AND switches to that tab */}
-      <StripBtn
-        icon={<Sparkles size={16} strokeWidth={2} />}
-        label="EDIT"
-        active={activeTab === "edit"}
-        onClick={() => onPickTab("edit")}
-      />
+      {/* TREE — spatial hierarchy */}
       <StripBtn
         icon={<TreeIcon />}
         label="TREE"
         active={activeTab === "tree"}
         onClick={() => onPickTab("tree")}
       />
+
+      {/* EDIT — merged Apply + structural edits */}
+      <StripBtn
+        icon={<Sparkles size={16} strokeWidth={2} />}
+        label="EDIT"
+        active={activeTab === "edit"}
+        onClick={() => onPickTab("edit")}
+      />
+
+      {divider}
+
+      {/* OPEN — expand the floating card */}
+      <StripBtn
+        icon={<PanelRightOpen size={16} strokeWidth={2} />}
+        label="OPEN"
+        active={false}
+        variant="expand"
+        onClick={onExpand}
+      />
     </div>
+  );
+}
+
+/* Inline magnifier glyph — matches Canvas's lucide Search 16px @ strokeWidth 2. */
+function SearchIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
   );
 }
 
