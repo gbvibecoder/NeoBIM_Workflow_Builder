@@ -16,7 +16,7 @@ import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
 import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
-import { Sparkles, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Sparkles, PanelRightClose } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
 import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/components/IFCEnhancePanel";
 import { ViewerSkeleton } from "@/features/ifc/components/ViewerSkeleton";
@@ -659,7 +659,6 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
               setBottomTab(tab);
               setBottomPanelOpen(true);
             }}
-            onExpand={() => setBottomPanelOpen(true)}
             onSearch={() => {
               setBottomTab("tree");
               setBottomPanelOpen(true);
@@ -943,7 +942,6 @@ function StatusChip({
 interface CollapsedRailProps {
   activeTab: SidebarTab;
   onPickTab: (tab: SidebarTab) => void;
-  onExpand: () => void;
   /** Opens Tree tab + focuses the spatial-filter input. */
   onSearch: () => void;
 }
@@ -1007,7 +1005,7 @@ function StripBtn({ icon, label, active, onClick, variant = "neutral" }: StripBt
   );
 }
 
-function CollapsedRail({ activeTab, onPickTab, onExpand, onSearch }: CollapsedRailProps) {
+function CollapsedRail({ activeTab, onPickTab, onSearch }: CollapsedRailProps) {
   const divider = (
     <div
       aria-hidden
@@ -1044,7 +1042,9 @@ function CollapsedRail({ activeTab, onPickTab, onExpand, onSearch }: CollapsedRa
 
       {divider}
 
-      {/* TREE — spatial hierarchy */}
+      {/* TREE — spatial hierarchy. Clicking auto-expands the sidebar via
+          onPickTab → setBottomPanelOpen(true), so a separate "OPEN" button
+          is redundant (removed 2026-05-19 per user feedback). */}
       <StripBtn
         icon={<TreeIcon />}
         label="TREE"
@@ -1052,23 +1052,12 @@ function CollapsedRail({ activeTab, onPickTab, onExpand, onSearch }: CollapsedRa
         onClick={() => onPickTab("tree")}
       />
 
-      {/* EDIT — merged Apply + structural edits */}
+      {/* EDIT — merged Apply + structural edits. Same auto-expand. */}
       <StripBtn
         icon={<Sparkles size={16} strokeWidth={2} />}
         label="EDIT"
         active={activeTab === "edit"}
         onClick={() => onPickTab("edit")}
-      />
-
-      {divider}
-
-      {/* OPEN — expand the floating card */}
-      <StripBtn
-        icon={<PanelRightOpen size={16} strokeWidth={2} />}
-        label="OPEN"
-        active={false}
-        variant="expand"
-        onClick={onExpand}
       />
     </div>
   );
