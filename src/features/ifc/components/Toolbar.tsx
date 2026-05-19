@@ -157,52 +157,8 @@ function UploadNewButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/* ─── File identity chip ──────────────────────────────────────────────── */
-function FileIdentity({ filename, schema }: { filename?: string; schema?: string }) {
-  if (!filename) return null;
-  return (
-    <div
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        height: 32,
-        padding: "0 10px",
-        minWidth: 0,
-        flexShrink: 1,
-      }}
-    >
-      <span
-        style={{
-          fontSize: 9.5,
-          fontWeight: 700,
-          letterSpacing: 1.0,
-          textTransform: "uppercase",
-          color: UI.text.tertiary,
-          fontFamily: UI.font.mono,
-          flexShrink: 0,
-        }}
-      >
-        {schema ?? "IFC"}
-      </span>
-      <span
-        style={{
-          fontSize: 13,
-          fontStyle: "italic",
-          color: UI.text.primary,
-          fontFamily: UI.font.display,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          minWidth: 0,
-        }}
-        title={filename}
-      >
-        {filename}
-      </span>
-    </div>
-  );
-}
+/* FileIdentity removed Phase Z.IFC.2 follow-up 2026-05-19 — duplicate of
+   the bottom status bar's filename + schema chips. */
 
 /* ─── Help icon button ────────────────────────────────────────────────── */
 function HelpButton({ onClick }: { onClick: () => void }) {
@@ -407,15 +363,12 @@ export function Toolbar({
           }}
         />
 
-        {/* LEFT — Upload New + file identity */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexShrink: 1 }}>
+        {/* LEFT — Upload New only (Phase Z.IFC.2 follow-up 2026-05-19:
+            FileIdentity removed — the filename + schema are already shown
+            in the bottom status bar, so this was duplicate info eating
+            horizontal space and pushing Calculate BOQ into the avatar). */}
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           <UploadNewButton onClick={onOpenFile} />
-          {hasModel && (
-            <FileIdentity
-              filename={modelInfo.fileName}
-              schema={modelInfo.schema}
-            />
-          )}
         </div>
 
         {/* MIDDLE — 4 tool groups (only when a model is loaded) */}
