@@ -693,11 +693,18 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
         {hasModel && bottomPanelOpen && (
           <div
             style={{
+              /* Phase Z.IFC.2 follow-up 2026-05-19: floating sidebar now
+                 properly tucked between the toolbar (top edge at y:56) and
+                 the live-chat support bubble (bottom-right, ~56px tall at
+                 bottom:16). top:72 clears the toolbar with a 16px gap;
+                 bottom:80 clears the chat bubble with the same 16px gap.
+                 Result: panel sits in its own visual layer — header above,
+                 chat below, panel never overlaps either. */
               width: bp === "tablet" || bp === "mobile" ? 260 : panelWidth,
               position: "absolute",
-              top: 16,
+              top: 72,
               right: 16,
-              bottom: 16,
+              bottom: 80,
               border: `1px solid ${UI.border.subtle}`,
               background: UI.bg.trace,
               borderRadius: 14,
