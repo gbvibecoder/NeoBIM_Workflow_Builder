@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowRight, Crown } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import s from "./dashboard.module.css";
 
@@ -16,78 +14,77 @@ interface WorkspaceStatsCardProps {
   loading: boolean;
 }
 
+const OUTPUTS_CAP = 6;
+
 export function WorkspaceStatsCard({ stats, loading }: WorkspaceStatsCardProps) {
   const { t } = useLocale();
+  const isLoading = loading || !stats;
+
+  const execDelta = stats
+    ? stats.planLabel === "Admin"
+      ? `${stats.used} · admin · unlimited`
+      : `${stats.used}/${stats.effectiveLimit} runs`
+    : "";
 
   return (
-    <div className={s.statsCard}>
-      <div className={s.statsStrip}>
-        <span className={s.statsStripNum}>FB-S00</span>
-      </div>
-      <div className={s.statsBody}>
-        <div className={s.statsTitle}>
-          <span className={s.statsTitleText}>
-            {t("dashboard.v2.statsTitle")}{" "}
-            <em className={s.statsTitleEm}>{t("dashboard.v2.statsTitleEm")}</em>
-          </span>
-          <Link href="/dashboard/workflows" className={s.statsTitleLink}>
-            {t("dashboard.v2.statsViewAll")} <ArrowRight size={12} />
-          </Link>
+    <div className={s.heroV3InlineStats}>
+      <div className={s.heroV3InlineStat}>
+        <div className={s.heroV3InlineStatLabel}>
+          {t("dashboard.v2.statWorkflows")} · all-time
         </div>
+        <div className={s.heroV3InlineStatVal}>
+          {isLoading ? (
+            <span className={s.skeleton} style={{ display: "inline-block", width: 56, height: 22 }} />
+          ) : (
+            stats.workflowCount
+          )}
+        </div>
+        <div className={s.heroV3InlineStatDelta}>library</div>
+      </div>
 
-        <div className={s.statsGrid}>
-          {loading || !stats ? (
-            <>
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className={s.statsTile}>
-                  <div className={s.statsTileValue}>
-                    <span className={s.skeleton} style={{ display: "inline-block", width: 32, height: 24 }} />
-                  </div>
-                  <div className={s.statsTileLabel}>
-                    <span className={s.skeleton} style={{ display: "inline-block", width: 48, height: 10 }} />
-                  </div>
-                </div>
-              ))}
-            </>
+      <div className={s.heroV3InlineStat}>
+        <div className={s.heroV3InlineStatLabel}>
+          {t("dashboard.v2.statExecutions")} · success
+        </div>
+        <div className={s.heroV3InlineStatVal}>
+          {isLoading ? (
+            <span className={s.skeleton} style={{ display: "inline-block", width: 56, height: 22 }} />
+          ) : (
+            stats.executionCount
+          )}
+        </div>
+        <div className={s.heroV3InlineStatDelta}>{isLoading ? "" : execDelta}</div>
+      </div>
+
+      <div className={s.heroV3InlineStat}>
+        <div className={s.heroV3InlineStatLabel}>
+          {t("dashboard.v2.statOutputs")} · recent
+        </div>
+        <div className={s.heroV3InlineStatVal}>
+          {isLoading ? (
+            <span className={s.skeleton} style={{ display: "inline-block", width: 56, height: 22 }} />
           ) : (
             <>
-              <div className={s.statsTile}>
-                <div className={s.statsTileValue}>{stats.workflowCount}</div>
-                <div className={s.statsTileLabel}>{t("dashboard.v2.statWorkflows")}</div>
-              </div>
-              <div className={s.statsTile}>
-                <div className={s.statsTileValue}>{stats.executionCount}</div>
-                <div className={s.statsTileLabel}>{t("dashboard.v2.statExecutions")}</div>
-              </div>
-              <div className={s.statsTile}>
-                <div className={s.statsTileValue}>{stats.outputsCount}</div>
-                <div className={s.statsTileLabel}>{t("dashboard.v2.statOutputs")}</div>
-              </div>
-              <div className={s.statsTile}>
-                <div className={s.statsTileValue}>L{stats.level}</div>
-                <div className={s.statsTileLabel}>{t("dashboard.v2.statXpLevel")}</div>
-              </div>
+              {stats.outputsCount}
+              <span className={s.heroV3InlineStatSuffix}>/{OUTPUTS_CAP}</span>
             </>
           )}
         </div>
+        <div className={s.heroV3InlineStatDelta}>last cycle</div>
+      </div>
 
-        {loading || !stats ? (
-          <div className={s.statsPlan}>
-            <span className={s.skeleton} style={{ display: "inline-block", width: 100, height: 24 }} />
-          </div>
-        ) : (
-          <div className={s.statsPlan}>
-            <div className={s.statsPlanInfo}>
-              <span className={s.statsPlanIcon}>
-                <Crown size={11} /> {stats.planLabel}
-              </span>
-              <span className={s.statsPlanName}>{stats.planLabel} plan</span>
-            </div>
-            <div className={s.statsPlanUsage}>
-              {stats.used}/{stats.effectiveLimit} runs
-            </div>
-          </div>
-        )}
+      <div className={s.heroV3InlineStat}>
+        <div className={s.heroV3InlineStatLabel}>
+          {t("dashboard.v2.statXpLevel")} · max
+        </div>
+        <div className={s.heroV3InlineStatVal}>
+          {isLoading ? (
+            <span className={s.skeleton} style={{ display: "inline-block", width: 56, height: 22 }} />
+          ) : (
+            <>L{stats.level}</>
+          )}
+        </div>
+        <div className={s.heroV3InlineStatDelta}>max tier</div>
       </div>
     </div>
   );

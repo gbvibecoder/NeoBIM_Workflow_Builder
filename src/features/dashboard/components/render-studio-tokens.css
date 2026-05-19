@@ -59,4 +59,8 @@
   --rs-amber-soft: rgba(224, 169, 58, 0.10);      /* tinted background for amber pills */
   --rs-status-error: #B23A48;                     /* error red — desaturated for paper theme */
   --rs-status-error-soft: rgba(178, 58, 72, 0.08);
+
+  /* Brief → Building hero (Phase Hero V3, 2026-05-19) */
+  --rs-red-margin:    #C04545;                    /* PDF-brief vertical margin line */
+  --rs-pencil-line:   rgba(28, 20, 16, 0.06);     /* ruled-paper horizontal lines */
 }

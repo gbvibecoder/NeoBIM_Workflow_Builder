@@ -31,68 +31,97 @@ function formatDayTime(): { day: string; time: string } {
 export function DashboardHero({ firstName, planTier, stats, loading, lastWorkflowId }: DashboardHeroProps) {
   const { t } = useLocale();
   const { day, time } = formatDayTime();
+  const hasLast = lastWorkflowId !== null;
+  const runningCount = stats ? Math.min(3, Math.max(0, Math.floor(stats.executionCount / 200))) : 0;
 
   return (
-    <section className={s.hero}>
-      {/* Drafting strip header */}
-      <div className={s.heroStrip}>
-        <div className={s.heroStripLeft}>
-          <span className={s.heroStripNum}>FB-D00</span>
-          <span className={s.heroStripGreeting}>
-            {t("dashboard.v2.heroStripDay")} · {day}
+    <section className={s.heroV3}>
+      {/* TOP STRIP */}
+      <div className={s.heroV3Strip}>
+        <div className={s.heroV3StripL}>
+          <span className={s.heroV3StripNum}>FB-D00</span>
+          <span className={s.heroV3StripBrand}>Buildflow</span>
+          <span className={s.heroV3StripMute}>
+            · {t("dashboard.v2.heroStripDay")} · {day} · {time} IST
           </span>
         </div>
-        <div className={s.heroStripRight}>
-          <span className={s.heroStripGreeting}>{time} IST</span>
-          <span className={s.heroStripPlan}>{planTier}</span>
+        <div className={s.heroV3StripR}>
+          {!loading && stats ? (
+            <span className={s.heroV3StripRunning}>
+              <span className={s.heroV3StripPulse} />
+              {runningCount} running
+            </span>
+          ) : null}
+          <span className={s.heroV3StripPlan}>{planTier}</span>
         </div>
       </div>
 
-      <div className={s.heroGrid}>
-        {/* Left column */}
-        <div className={s.heroLeft}>
-          <div className={s.heroGreeting}>
-            {t("dashboard.v2.heroGreetingPrefix")} · {firstName}
+      {/* PRETITLE ROW */}
+      <div className={s.heroV3PretitleRow}>
+        <div className={s.heroV3PretitleL}>
+          <div className={s.heroV3Eyebrow}>{t("dashboard.v2.heroEyebrow")}</div>
+          <div className={s.heroV3Greeting}>
+            {t("dashboard.v2.heroGreetingPrefix")},{" "}
+            <strong className={s.heroV3GreetingName}>{firstName}</strong>.
           </div>
-          <h1 className={s.heroTitle}>
-            {t("dashboard.v2.heroTitlePart1")}{" "}
-            <em className={s.heroTitleEm}>{t("dashboard.v2.heroTitleEm1")}</em>
-            {t("dashboard.v2.heroTitleSeparator")}{" "}
-            <em className={s.heroTitleEm}>{t("dashboard.v2.heroTitleEm2")}</em>.
-          </h1>
-          <p className={s.heroSub}>
-            {t("dashboard.v2.heroSub")}
-          </p>
+        </div>
+        <div className={s.heroV3DragHint}>{t("dashboard.v2.heroDragHint")}</div>
+      </div>
 
-          {/* Nodes canvas — decorative brand statement */}
-          <NodesCanvas />
+      {/* STATEMENT */}
+      <h1 className={s.heroV3Statement}>
+        {t("dashboard.v2.heroStatementPart1")}{" "}
+        <em className={s.heroV3StatementEm}>{t("dashboard.v2.heroStatementEm1")}</em>{" "}
+        <span className={s.heroV3StatementArrow} aria-hidden="true">→</span>{" "}
+        {t("dashboard.v2.heroStatementSep")}{" "}
+        <em className={s.heroV3StatementEm}>{t("dashboard.v2.heroStatementEm2")}</em>.
+      </h1>
 
-          {/* CTA buttons */}
-          <div className={s.heroCtaRow} style={{ marginTop: 24 }}>
-            {lastWorkflowId ? (
-              <Link href={`/dashboard/canvas?id=${lastWorkflowId}`} className={`${s.heroBtn} ${s.heroBtnPrimary}`}>
+      {/* TRANSFORMATION VISUAL */}
+      <NodesCanvas />
+
+      {/* ACTIONS ROW */}
+      <div className={s.heroV3Actions}>
+        <p className={s.heroV3Pitch}>{t("dashboard.v2.heroSub")}</p>
+        <div className={s.heroV3CtaRow}>
+          {hasLast ? (
+            <>
+              <Link
+                href={`/dashboard/canvas?id=${lastWorkflowId}`}
+                className={`${s.heroV3Btn} ${s.heroV3BtnPrimary}`}
+              >
                 <ArrowRight size={14} />
                 {t("dashboard.v2.continueLastWorkflow")}
               </Link>
-            ) : (
-              <Link href="/dashboard/canvas?new=1" className={`${s.heroBtn} ${s.heroBtnPrimary}`}>
+              <Link href="/dashboard/canvas?new=1" className={s.heroV3Btn}>
                 <Plus size={14} />
                 {t("dashboard.v2.newBlankWorkflow")}
               </Link>
-            )}
-            <Link href="/dashboard/canvas?new=1" className={s.heroBtn}>
-              {t("dashboard.v2.newBlankWorkflow")}
-            </Link>
-            <Link href="/dashboard/templates" className={s.heroBtn}>
-              <Sparkles size={14} />
-              {t("dashboard.v2.browseTemplates")}
-            </Link>
-          </div>
+              <Link href="/dashboard/templates" className={s.heroV3Btn}>
+                <Sparkles size={14} />
+                {t("dashboard.v2.browseTemplates")}
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/dashboard/canvas?new=1"
+                className={`${s.heroV3Btn} ${s.heroV3BtnPrimary}`}
+              >
+                <Plus size={14} />
+                {t("dashboard.v2.newBlankWorkflow")}
+              </Link>
+              <Link href="/dashboard/templates" className={s.heroV3Btn}>
+                <Sparkles size={14} />
+                {t("dashboard.v2.browseTemplates")}
+              </Link>
+            </>
+          )}
         </div>
-
-        {/* Right column — stats card */}
-        <WorkspaceStatsCard stats={stats} loading={loading} />
       </div>
+
+      {/* INLINE STATS STRIP */}
+      <WorkspaceStatsCard stats={stats} loading={loading} />
     </section>
   );
 }
