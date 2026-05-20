@@ -1367,94 +1367,46 @@
   background: var(--rs-ink, #0E1218);
 }
 
-/* ── Pretitle row ──────────────────────────────────────────────────── */
-.heroV3PretitleRow {
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-  gap: clamp(24px, 4vw, 60px);
-  align-items: center;
-  margin-bottom: 14px;
-  animation: heroV3FadeUp 0.5s var(--ease) both;
-  animation-delay: 0.05s;
-}
-.heroV3PretitleL {
+/* ── Quiet greeting line (V5 declutter) ────────────────────────────── */
+.heroV3GreetingLine {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-.heroV3Eyebrow {
-  position: relative;
-  padding-left: 36px;
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--rs-blueprint, #1A4D5C);
-}
-.heroV3Eyebrow::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 24px;
-  height: 1px;
-  background: var(--rs-blueprint, #1A4D5C);
-  opacity: 0.6;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  animation: heroV3FadeUp 0.7s 0.05s ease-out both;
 }
 .heroV3Greeting {
-  font-family: var(--display);
+  font-family: var(--display, 'Fraunces', serif);
   font-style: italic;
   font-weight: 300;
-  font-size: 18px;
-  letter-spacing: -0.005em;
+  font-size: 17px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   color: var(--rs-text, #5A6478);
+  margin: 0;
 }
-.heroV3GreetingName {
-  font-weight: 600;
+.heroV3Greeting b {
+  font-weight: 500;
+  font-style: italic;
   color: var(--rs-ink, #0E1218);
 }
-.heroV3DragHint {
-  flex-shrink: 0;
-  font-family: var(--mono);
+.heroV3GreetingSub {
+  font-family: var(--mono, 'JetBrains Mono', monospace);
   font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--rs-text-mute, #9AA1B0);
-  padding-top: 6px;
 }
 
-/* ── Statement (the giant italic) ─────────────────────────────────── */
-.heroV3Statement {
-  font-family: var(--display);
-  font-style: italic;
-  font-weight: 300;
-  font-size: clamp(28px, 3.6vw, 46px);
-  font-variation-settings: "opsz" 72;
-  line-height: 1;
-  letter-spacing: -0.022em;
-  color: var(--rs-ink, #0E1218);
-  margin: 0;
-  text-align: right;
-  white-space: nowrap;
-  animation: heroV3FadeUp 0.55s var(--ease) both;
-  animation-delay: 0.12s;
-}
-.heroV3StatementEm {
-  font-style: italic;
-  font-weight: 500;
-  color: var(--rs-blueprint, #1A4D5C);
-}
-.heroV3StatementArrow {
-  display: inline-block;
-  font-style: normal;
-  font-weight: 400;
-  color: var(--rs-burnt, #C26A3B);
-  transform: translateY(-0.08em);
-  padding: 0 0.08em;
-}
+/* V4-era classes that are no longer referenced by JSX (V5 declutter
+   removed the eyebrow-as-headline, the giant statement, and the
+   helper containers). Kept in source as dead CSS so a future diff
+   reviewer can see what was removed; the rules themselves emit no
+   matching elements anymore.
+   Dead: .heroV3PretitleRow, .heroV3PretitleL, .heroV3GreetingName,
+         .heroV3DragHint, .heroV3Statement, .heroV3StatementEm,
+         .heroV3StatementArrow */
 
 /* ── Transformation card ──────────────────────────────────────────── */
 .heroV3Transform {
@@ -1709,24 +1661,16 @@
   left: calc(100% + 14px);
 }
 
-/* ── Actions row ──────────────────────────────────────────────────── */
+/* ── Actions row — V5: flex, CTAs left · stats right (pitch removed) ── */
 .heroV3Actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 24px;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  gap: 24px;
   margin-bottom: 8px;
-  animation: heroV3FadeUp 0.5s var(--ease) both;
-  animation-delay: 0.32s;
+  animation: heroV3FadeUp 0.7s 0.22s ease-out both;
 }
-.heroV3Pitch {
-  font-family: var(--ui);
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--rs-text, #5A6478);
-  max-width: 520px;
-  margin: 0;
-}
+/* .heroV3Pitch rule retired in V5 — paragraph no longer rendered in JSX. */
 .heroV3CtaRow,
 .heroV3CtaCluster {
   display: flex;
@@ -1830,32 +1774,27 @@
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .heroV3CanvasRow { height: 300px; }
-  .heroV3PretitleRow { grid-template-columns: 1fr; gap: 12px; }
-  .heroV3Statement { text-align: left; white-space: normal; font-size: clamp(32px, 5.5vw, 52px); }
-  .heroV3Actions { grid-template-columns: 1fr auto; }
   .heroV3InlineStats { display: none; }
 }
 @media (max-width: 720px) {
   .heroV3 { padding: 16px 0 28px; }
   .heroV3Strip { flex-direction: column; align-items: flex-start; gap: 6px; }
   .heroV3StripR { width: 100%; justify-content: space-between; }
-  .heroV3PretitleRow { grid-template-columns: 1fr; gap: 10px; }
+  .heroV3GreetingLine { gap: 6px; }
   .heroV3CanvasRow { height: 280px; }
-  .heroV3Actions { grid-template-columns: 1fr; gap: 14px; }
+  .heroV3Actions { flex-direction: column; align-items: stretch; gap: 14px; }
   .heroV3CtaRow,
   .heroV3CtaCluster { justify-content: flex-start; flex-wrap: wrap; }
   .heroV3PaneBrief { padding: 24px 32px 24px 56px; }
   .heroV3BriefP { font-size: 13px; line-height: 24px; }
   .heroV3HandleLabelL, .heroV3HandleLabelR { display: none; }
-  .heroV3Statement { font-size: clamp(28px, 7vw, 42px); }
 }
 
 /* ── Reduced motion ───────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .heroV3,
   .heroV3Strip,
-  .heroV3PretitleRow,
-  .heroV3Statement,
+  .heroV3GreetingLine,
   .heroV3Transform,
   .heroV3Actions,
   .heroV3InlineStats { animation: none !important; }

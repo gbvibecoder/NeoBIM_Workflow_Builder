@@ -57,30 +57,21 @@ export function DashboardHero({ firstName, planTier, stats, loading, lastWorkflo
         </div>
       </div>
 
-      {/* HEADER ROW — greeting LEFT · statement RIGHT (side by side) */}
-      <div className={s.heroV3PretitleRow}>
-        <div className={s.heroV3PretitleL}>
-          <div className={s.heroV3Eyebrow}>{t("dashboard.v2.heroEyebrow")}</div>
-          <div className={s.heroV3Greeting}>
-            {t("dashboard.v2.heroGreetingPrefix")},{" "}
-            <strong className={s.heroV3GreetingName}>{firstName}</strong>.
-          </div>
-        </div>
-        <h1 className={s.heroV3Statement}>
-          {t("dashboard.v2.heroStatementPart1")}{" "}
-          <em className={s.heroV3StatementEm}>{t("dashboard.v2.heroStatementEm1")}</em>{" "}
-          <span className={s.heroV3StatementArrow} aria-hidden="true">→</span>{" "}
-          {t("dashboard.v2.heroStatementSep")}{" "}
-          <em className={s.heroV3StatementEm}>{t("dashboard.v2.heroStatementEm2")}</em>.
+      {/* QUIET GREETING — single line; statement + pitch removed (V5 declutter) */}
+      <div className={s.heroV3GreetingLine}>
+        <h1 className={s.heroV3Greeting}>
+          {t("dashboard.v2.heroGreetingPrefix")}, <b>{firstName}</b>.
         </h1>
+        <span className={s.heroV3GreetingSub}>
+          — {t("dashboard.v2.heroEyebrow")}
+        </span>
       </div>
 
       {/* TRANSFORMATION VISUAL — unchanged (C12 lock) */}
       <NodesCanvas />
 
-      {/* ACTIONS ROW — pitch + CTA cluster + inline stats (3-col grid) */}
+      {/* ACTIONS ROW — CTAs left · inline stats right (flex; pitch removed) */}
       <div className={s.heroV3Actions}>
-        <p className={s.heroV3Pitch}>{t("dashboard.v2.heroSub")}</p>
         <div className={s.heroV3CtaCluster}>
           {hasLast ? (
             <>
