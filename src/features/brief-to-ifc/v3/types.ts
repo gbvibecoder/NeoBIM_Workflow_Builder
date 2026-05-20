@@ -15,6 +15,36 @@
 
 import { z } from "zod";
 
+// ─── Tolerant numeric vector schemas ─────────────────────────────────
+//
+// Opus occasionally emits 2-element arrays for fields that require 3
+// (e.g. [width, depth] without height). Rather than reject the entire
+// spec, we accept 2 or 3 elements and normalize to 3.
+
+/** Tolerant 3D dimensions [width, depth, height] in metres.
+ *  Accepts 2 or 3 positive numbers. Missing height defaults to
+ *  min(width, depth) — a conservative cube-ish fallback. */
+const tolerantDims3Schema = z
+  .array(z.number().positive())
+  .min(2)
+  .max(3)
+  .transform((arr): [number, number, number] => {
+    if (arr.length === 3) return arr as [number, number, number];
+    const [w, d] = arr;
+    return [w, d, Math.max(0.01, Math.min(w, d))];
+  });
+
+/** Tolerant 3D position/offset [x, y, z] in metres.
+ *  Accepts 2 or 3 numbers (may be negative). Missing z defaults to 0. */
+const tolerantVec3Schema = z
+  .array(z.number())
+  .min(2)
+  .max(3)
+  .transform((arr): [number, number, number] => {
+    if (arr.length === 3) return arr as [number, number, number];
+    return [...arr, 0] as [number, number, number];
+  });
+
 // ─── BriefSpec — leaf schemas ───────────────────────────────────────
 
 export const briefProjectSchema = z.object({
@@ -61,10 +91,8 @@ export const briefElementSchema = z.object({
     "door",
     "window",
   ]),
-  origin_world_m: z.tuple([z.number(), z.number(), z.number()]),
-  dims_m: z
-    .tuple([z.number().positive(), z.number().positive(), z.number().positive()])
-    .optional(),
+  origin_world_m: tolerantVec3Schema,
+  dims_m: tolerantDims3Schema.optional(),
   radius_m: z.number().positive().optional(),
   polygon_local_m: z.array(z.tuple([z.number(), z.number()])).min(3).optional(),
   rotation_z_rad: z.number().optional(),
@@ -158,12 +186,8 @@ export const furnitureLayoutSchema = z.object({
 export const furniturePartSchema = z.object({
   id: z.string().min(1).max(64),
   subtype: z.string().max(200),
-  origin_local_m: z.tuple([z.number(), z.number(), z.number()]),
-  dims_m: z.tuple([
-    z.number().positive(),
-    z.number().positive(),
-    z.number().positive(),
-  ]),
+  origin_local_m: tolerantVec3Schema,
+  dims_m: tolerantDims3Schema,
   shape: z.enum(["box", "cylinder"]).default("box"),
   rotation_z_rad: z.number().default(0),
   material_id: z.string().min(1),
@@ -186,11 +210,7 @@ export const briefFurnitureSchema = z.object({
   count: z.number().int().positive().default(1),
   layout: furnitureLayoutSchema.optional(),
   anchor_space_id: z.string().max(64).optional(),
-  bounding_box: z.tuple([
-    z.number().positive(),
-    z.number().positive(),
-    z.number().positive(),
-  ]).optional(),
+  bounding_box: tolerantDims3Schema.optional(),
   /** Decomposed physical parts — populated by the Item Decomposer
    *  (TR-028) between enrichment and agent building. When present, the
    *  agent builder creates a parent + child IfcFurnishingElements linked
@@ -251,7 +271,7 @@ export const assumptionSchema = z.object({
 
 export const designRationaleSchema = z.object({
   itemId: z.string().min(1).max(64),
-  position: z.tuple([z.number(), z.number(), z.number()]),
+  position: tolerantVec3Schema,
   rotation_z_rad: z.number().default(0),
   rationale: z.string().min(1).max(500),
 });
@@ -267,10 +287,8 @@ export const trimItemSchema = z.object({
     "door_sill", "wall_corner_protector",
   ]),
   hostId: z.string().min(1),
-  dims_m: z.tuple([
-    z.number().positive(), z.number().positive(), z.number().positive(),
-  ]).optional(),
-  origin_local_m: z.tuple([z.number(), z.number(), z.number()]).optional(),
+  dims_m: tolerantDims3Schema.optional(),
+  origin_local_m: tolerantVec3Schema.optional(),
   rotation_z_rad: z.number().default(0),
   material_id: z.string().min(1),
   ifc_class: z
