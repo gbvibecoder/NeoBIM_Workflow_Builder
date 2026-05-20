@@ -144,8 +144,9 @@ describe("v3 /runs route — QStash dispatch (gamma.2)", () => {
     const body = await response.json();
     expect(body.runId).toBe("test-run-id");
 
-    // (2) QStash was called with the runId
+    // (2) QStash was called with a payload containing the runId
     expect(scheduleAgentBuildWorker).toHaveBeenCalledTimes(1);
-    expect(scheduleAgentBuildWorker).toHaveBeenCalledWith("test-run-id");
+    const callArg = (scheduleAgentBuildWorker as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(callArg).toMatchObject({ runId: "test-run-id" });
   });
 });

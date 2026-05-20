@@ -222,18 +222,25 @@ export async function scheduleBriefToIfcWorker(
 
 /**
  * Schedule the v3 agent build worker. QStash POSTs to
- * `/api/brief-to-ifc/v3/agent-job` with `{ runId }`. The worker loads
- * the briefSpec from the DB, runs the generator loop, and writes the
- * result back. Runs in its own Vercel invocation (800s budget) —
- * uncapped from the user's perspective because the frontend polls
- * the run status rather than holding a synchronous request.
+ * `/api/brief-to-ifc/v3/agent-job` with the full γ.1 Direct Agent Mode
+ * payload: runId + briefText + suggestions + iteration. The worker loads
+ * briefSpec from the DB, combines with the payload fields, and runs the
+ * generator loop with the verify→hint→iterate quality loop.
  *
- * Mirrors the VIP pipeline pattern exactly: retries=0 (the generator
- * has its own cost-cap circuit breaker), timeout=15m (QStash delivery
- * timeout, NOT the Vercel function timeout).
+ * Phase gamma.3: payload now carries ALL γ.1 fields (briefText,
+ * suggestions, iteration) — γ.2 only passed runId and the agent ran
+ * blind on spec-only input (quality 45, proven on cmpdqhfx).
  */
+export interface AgentBuildWorkerPayload {
+  runId: string;
+  briefText?: string;
+  suggestions?: Record<string, unknown>;
+  previousFeedback?: string;
+  iteration?: number;
+}
+
 export async function scheduleAgentBuildWorker(
-  runId: string,
+  payload: AgentBuildWorkerPayload,
 ): Promise<string> {
   const client = getClient();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -241,7 +248,7 @@ export async function scheduleAgentBuildWorker(
 
   const result = await client.publishJSON({
     url: workerUrl,
-    body: { runId },
+    body: payload,
     retries: 0,
     timeout: "15m",
   });

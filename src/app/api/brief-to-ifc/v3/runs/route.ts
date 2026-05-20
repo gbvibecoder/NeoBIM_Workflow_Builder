@@ -253,7 +253,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // The agent needs 15-25 min. QStash gives each invocation a fresh
   // Vercel budget.
   try {
-    const messageId = await scheduleAgentBuildWorker(run.id);
+    // Phase gamma.3: pass the full γ.1 Direct Agent Mode payload
+    const messageId = await scheduleAgentBuildWorker({
+      runId: run.id,
+      briefText: body.brief_text,
+      suggestions: body.suggestions as Record<string, unknown> | undefined,
+      previousFeedback: body.previous_feedback,
+      iteration: body.iteration,
+    });
     await appendLog(prisma, {
       executionId: run.id, level: "INFO", source: "LIFECYCLE",
       message: `QStash worker dispatched (messageId: ${messageId}).`,
