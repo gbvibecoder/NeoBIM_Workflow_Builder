@@ -227,8 +227,8 @@ const OPUS_OUTPUT_COST_PER_MILLION = 25;
 /** Phase gamma.1: Direct Agent Mode — 200 turns, imported from constants. */
 const DEFAULT_MAX_TURNS = AGENT_MAX_TURNS_DIRECT_MODE;
 const DEFAULT_TURN_MAX_TOKENS = 8_000;
-const DEFAULT_TURN_TIMEOUT_MS = 60_000;
-const DEFAULT_EXEC_TIMEOUT_MS = 30_000;
+const DEFAULT_TURN_TIMEOUT_MS = 180_000;
+const DEFAULT_EXEC_TIMEOUT_MS = 60_000;
 /** Phase gamma.1: raised to $5.00 for Direct Agent Mode. */
 export const DEFAULT_COST_CAP_USD = AGENT_DEFAULT_COST_CAP_USD;
 
