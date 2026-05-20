@@ -1814,9 +1814,54 @@ class BuildFlowIFC:
             if tag and tag in wanted_tags:
                 instance._elements_by_id[tag] = p
 
-        # Re-resolve materials by name (best-effort).
+        # Re-resolve materials by *brief mat_id* (e.g. "mat-walnut"),
+        # NOT by IfcMaterial.Name (e.g. "Walnut Veneer").
+        # _bootstrap_materials keys _materials_by_id by mat_id, but
+        # IfcMaterial.Name is the display name.  Without this reverse
+        # mapping every bf.add_* call after the first session restore
+        # silently skips material assignment (the "gray IFC" bug).
+        brief_materials = instance._brief.get("materials") or []
+        _name_to_ids: Dict[str, list] = {}
+        for bm in brief_materials:
+            mid = str(bm.get("id", ""))
+            mname = str(bm.get("name", mid))
+            if mid:
+                _name_to_ids.setdefault(mname, []).append(mid)
+
+        _name_idx: Dict[str, int] = {}
         for m in instance._ifc.by_type("IfcMaterial"):
-            instance._materials_by_id[m.Name] = m
+            ids = _name_to_ids.get(m.Name)
+            if ids:
+                i = _name_idx.get(m.Name, 0)
+                mat_id = ids[i] if i < len(ids) else m.Name
+                _name_idx[m.Name] = i + 1
+            else:
+                mat_id = m.Name  # fallback for materials not in brief
+            instance._materials_by_id[mat_id] = m
+
+        # Re-resolve material styles by walking the IFC entity graph:
+        # IfcMaterial → IfcMaterialDefinitionRepresentation →
+        # IfcStyledRepresentation → IfcStyledItem → Styles[0].
+        # Without this, _style_solid_internal silently skips per-solid
+        # IfcStyledItem creation after session restore.
+        for mat_id, material in instance._materials_by_id.items():
+            try:
+                for inv in instance._ifc.get_inverse(material):
+                    if not inv.is_a("IfcMaterialDefinitionRepresentation"):
+                        continue
+                    for rep in (inv.Representations or []):
+                        if not rep.is_a("IfcStyledRepresentation"):
+                            continue
+                        for item in (rep.Items or []):
+                            if item.is_a("IfcStyledItem") and item.Styles:
+                                instance._material_styles[mat_id] = item.Styles[0]
+                                break
+                        if mat_id in instance._material_styles:
+                            break
+                    if mat_id in instance._material_styles:
+                        break
+            except Exception:
+                pass  # Non-critical — element colour, not structural
 
         # Re-resolve project / storey / contexts.
         projects = instance._ifc.by_type("IfcProject")
