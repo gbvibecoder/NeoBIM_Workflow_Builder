@@ -28,6 +28,9 @@ export interface DeckTemplate {
   id: string;
   category: string;
   title: string;
+  /** Short mono-caps caption rendered below each card title (e.g.
+   *  ["Floor Plan","Render + Video Walkthrough"] joined with " → "). */
+  chain: string[];
   chips: string[];
   /** A `--rs-*` CSS variable name (with leading `--`), e.g. "--rs-burnt". */
   accentVar: string;
@@ -407,6 +410,9 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
                     {tpl.Illus ? <tpl.Illus /> : <FallbackViz accentVar={tpl.accentVar} />}
                   </div>
                   <div className={s.cardTitle}>{tpl.title}</div>
+                  {tpl.chain.length > 0 && (
+                    <div className={s.cardChain}>{tpl.chain.slice(0, 4).join(" → ")}</div>
+                  )}
                 </button>
               );
             })}
@@ -506,6 +512,9 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
                     {tpl.Illus ? <tpl.Illus /> : <FallbackViz accentVar={tpl.accentVar} />}
                   </div>
                   <div className={s.cardTitle}>{tpl.title}</div>
+                  {tpl.chain.length > 0 && (
+                    <div className={s.cardChain}>{tpl.chain.slice(0, 4).join(" → ")}</div>
+                  )}
                 </button>
               );
             })}

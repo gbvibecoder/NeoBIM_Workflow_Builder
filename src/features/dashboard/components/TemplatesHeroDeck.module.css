@@ -361,8 +361,16 @@
   font-variation-settings: "opsz" 144, "SOFT" 50;
 }
 
-/* .cardChain — removed Phase Z.2.2 (chain caption beneath card title
-   was redundant with the serif title). */
+.cardChain {
+  font-family: var(--font-jetbrains, monospace);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rs-text-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── Floating spec tags ──────────────────────────────────────────── */
 .floatTag {

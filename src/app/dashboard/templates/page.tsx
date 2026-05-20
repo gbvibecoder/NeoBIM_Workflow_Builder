@@ -671,6 +671,30 @@ function titleCase(s: string): string {
     .join(" ");
 }
 
+function deriveChain(wf: WorkflowTemplate): string[] {
+  // Prefer the "X → Y → Z" pattern that most template names already use.
+  if (wf.name.includes("→")) {
+    return wf.name
+      .split("→")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+  }
+  // Fallback: first 3-4 unique node labels (Title-Cased), no internal IDs.
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of wf.tileGraph.nodes) {
+    const lbl = String(n.data?.label ?? "").trim();
+    if (!lbl) continue;
+    const key = lbl.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(titleCase(lbl));
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
 function deriveChips(wf: WorkflowTemplate): string[] {
   const chips: string[] = [];
   chips.push(`${wf.tileGraph.nodes.length} nodes`);
@@ -812,6 +836,7 @@ export default function TemplatesPage() {
           id: w.id,
           category: w.category,
           title: w.name,
+          chain: deriveChain(w),
           chips: deriveChips(w),
           accentVar,
           badge: badge || undefined,
