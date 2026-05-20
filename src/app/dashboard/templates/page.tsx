@@ -1246,7 +1246,10 @@ export default function TemplatesPage() {
               </>
             }
             copy={deckCopy}
-            showFilters
+            /* showFilters intentionally omitted Phase Z.2.5 — the
+               sticky filter bar below the hero already covers category
+               filtering for the grid; the in-hero pill row was visual
+               duplication. The deck simply renders all `templates`. */
           />
         </section>
 
