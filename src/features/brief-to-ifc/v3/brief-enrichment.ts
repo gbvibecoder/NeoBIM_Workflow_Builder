@@ -105,7 +105,7 @@ export interface EnrichmentArgs {
   /** Hint for the project type. Passed through to the system prompt
    *  so Opus knows what kind of spec to produce when the brief is
    *  ambiguous. */
-  projectType?: "exhibition_booth" | "office" | "residential" | "retail";
+  projectType?: "exhibition_booth" | "office" | "residential" | "retail" | "gym" | "restaurant" | "classroom" | "studio" | "hotel" | "warehouse" | "hospital" | "other";
 }
 
 export async function enrichBrief(

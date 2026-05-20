@@ -49,7 +49,11 @@ const tolerantVec3Schema = z
 
 export const briefProjectSchema = z.object({
   name: z.string().min(1).max(200),
-  type: z.enum(["exhibition_booth", "office", "residential", "retail"]),
+  type: z.enum([
+    "exhibition_booth", "office", "residential", "retail",
+    "gym", "restaurant", "classroom", "studio", "hotel",
+    "warehouse", "hospital", "other",
+  ]),
   location: z.string().max(200),
   description: z.string().max(4000),
 });
@@ -97,9 +101,9 @@ export const briefElementSchema = z.object({
   polygon_local_m: z.array(z.tuple([z.number(), z.number()])).min(3).optional(),
   rotation_z_rad: z.number().optional(),
   material_id: z.string().min(1),
-  description: z.string().max(1000),
-  object_type: z.string().max(200),
-  tag: z.string().max(200),
+  description: z.string().max(1000).optional().default(""),
+  object_type: z.string().max(200).optional().default(""),
+  tag: z.string().max(200).optional().default(""),
   contained_in_space_id: z.string().optional(),
 });
 
@@ -407,7 +411,7 @@ export const briefSpecSchema = z.object({
   spaces: z.array(briefSpaceSchema).max(64),
   elements: z.array(briefElementSchema).max(2000),
   materials: z.array(briefMaterialSchema).min(1).max(64),
-  brand_language: briefBrandLanguageSchema,
+  brand_language: briefBrandLanguageSchema.optional(),
   // Phase EFG extensions — all optional for backward compat with
   // existing Opus outputs that don't know about these fields yet.
   archetype: archetypeSchema.optional(),
