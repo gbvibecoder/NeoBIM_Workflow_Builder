@@ -84,7 +84,10 @@ interface RunStatusView {
 const POLL_INITIAL_MS = 3_000;
 const POLL_INTERVAL_MS = 5_000;
 const POLL_MAX_INTERVAL_MS = 8_000;
-const DEFAULT_POLL_TIMEOUT_MS = 500_000;
+// Phase gamma.1: raised from 500s to 750s. Must fire BEFORE the
+// frontend timeout (780s) so TR-026 returns a clean error rather
+// than the frontend's generic AbortError.
+const DEFAULT_POLL_TIMEOUT_MS = 750_000;
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
