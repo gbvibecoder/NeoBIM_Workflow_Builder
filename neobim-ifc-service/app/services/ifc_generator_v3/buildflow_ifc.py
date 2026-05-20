@@ -1006,6 +1006,19 @@ class BuildFlowIFC:
                 host_wall_id, offset_m, dims[0], depth, sill_m,
             )
             self.fill_opening(opening, element)
+            # Re-parent door to the opening so it renders IN the wall,
+            # not as a freestanding slab at world coordinates.
+            element.ObjectPlacement = self._ifc.create_entity(
+                "IfcLocalPlacement",
+                PlacementRelTo=opening.ObjectPlacement,
+                RelativePlacement=self._ifc.create_entity(
+                    "IfcAxis2Placement3D",
+                    Location=self._ifc.create_entity(
+                        "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0),
+                    ),
+                    Axis=None, RefDirection=None,
+                ),
+            )
         return element
 
     def add_window(
@@ -1053,6 +1066,19 @@ class BuildFlowIFC:
                 host_wall_id, offset_m, dims[0], depth, sill_m,
             )
             self.fill_opening(opening, element)
+            # Re-parent window to the opening so it renders IN the wall,
+            # not as a freestanding slab at world coordinates.
+            element.ObjectPlacement = self._ifc.create_entity(
+                "IfcLocalPlacement",
+                PlacementRelTo=opening.ObjectPlacement,
+                RelativePlacement=self._ifc.create_entity(
+                    "IfcAxis2Placement3D",
+                    Location=self._ifc.create_entity(
+                        "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0),
+                    ),
+                    Axis=None, RefDirection=None,
+                ),
+            )
         return element
 
     # ── property sets / quantities ───────────────────────────────────
