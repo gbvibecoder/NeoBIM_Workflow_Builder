@@ -194,6 +194,7 @@ class BuildFlowIFC:
         self._materials_by_id: Dict[str, Any] = {}
         self._material_styles: Dict[str, Any] = {}
         self._spaces_by_id: Dict[str, Any] = {}
+        self._storeys_by_id: Dict[str, Any] = {}
 
         self._bootstrap_project()
         self._bootstrap_materials()
@@ -366,6 +367,67 @@ class BuildFlowIFC:
                 # writes.
                 pass
 
+    # ── storeys ───────────────────────────────────────────────────────
+
+    def add_storey(
+        self,
+        storey_id: str,
+        name: str,
+        elevation: float,
+    ) -> Any:
+        """Create an additional IfcBuildingStorey at the given elevation.
+
+        The bootstrap creates "Ground Floor" at 0.0 — call this for each
+        additional floor. Elements assigned to a storey via `storey_id`
+        parameter on `add_*` methods are contained in that storey's
+        IfcRelContainedInSpatialStructure.
+
+        `elevation` is in metres (e.g. 3.1 for the first floor of a
+        building with 3.1m floor-to-floor height).
+        """
+        storey_id = str(_ascii_safe(storey_id))
+        name = str(_ascii_safe(name))
+        if storey_id in self._storeys_by_id:
+            return self._storeys_by_id[storey_id]
+
+        api = ifcopenshell.api
+        storey = api.run(
+            "root.create_entity", self._ifc,
+            ifc_class="IfcBuildingStorey",
+            name=name,
+        )
+        try:
+            storey.Elevation = float(elevation)
+        except (AttributeError, RuntimeError):
+            pass
+
+        # Aggregate under the building
+        api.run(
+            "aggregate.assign_object", self._ifc,
+            products=[storey], relating_object=self._building,
+        )
+        # Create placement at the elevation
+        api.run(
+            "geometry.edit_object_placement", self._ifc,
+            product=storey,
+        )
+        # Move placement to the correct elevation
+        loc = self._ifc.create_entity(
+            "IfcCartesianPoint", Coordinates=(0.0, 0.0, float(elevation)),
+        )
+        placement_axis = self._ifc.create_entity(
+            "IfcAxis2Placement3D",
+            Location=loc, Axis=None, RefDirection=None,
+        )
+        storey.ObjectPlacement = self._ifc.create_entity(
+            "IfcLocalPlacement",
+            PlacementRelTo=self._building.ObjectPlacement,
+            RelativePlacement=placement_axis,
+        )
+
+        self._storeys_by_id[storey_id] = storey
+        return storey
+
     # ── spaces ────────────────────────────────────────────────────────
 
     def add_space(
@@ -446,6 +508,7 @@ class BuildFlowIFC:
         predefined_type: str = "FLOOR",
         description: str = "",
         tag: str = "",
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcSlab` — DOES have PredefinedType in 2X3."""
         return self._add_box_element(
@@ -453,6 +516,7 @@ class BuildFlowIFC:
             element_id=slab_id, origin=origin, dims=dims, depth=depth,
             material=material, predefined_type=predefined_type,
             description=description, tag=tag,
+            storey_id=storey_id,
         )
 
     def add_wall(
@@ -465,6 +529,7 @@ class BuildFlowIFC:
         rotation: float = 0.0,
         description: str = "",
         tag: str = "",
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcWall` — does NOT have PredefinedType in 2X3 (only IfcWallStandardCase
         does in 4+). We deliberately skip the predefined-type assignment."""
@@ -473,6 +538,7 @@ class BuildFlowIFC:
             element_id=wall_id, origin=origin, dims=dims, depth=depth,
             material=material, predefined_type=None, rotation=rotation,
             description=description, tag=tag,
+            storey_id=storey_id,
         )
 
     def add_column(
@@ -484,6 +550,7 @@ class BuildFlowIFC:
         material: str,
         description: str = "",
         tag: str = "",
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcColumn` — no PredefinedType slot in 2X3."""
         return self._add_box_element(
@@ -491,6 +558,7 @@ class BuildFlowIFC:
             element_id=col_id, origin=origin, dims=dims, depth=depth,
             material=material, predefined_type=None,
             description=description, tag=tag,
+            storey_id=storey_id,
         )
 
     def add_circular_column(
@@ -502,12 +570,14 @@ class BuildFlowIFC:
         material: str,
         description: str = "",
         tag: str = "",
+        storey_id: Optional[str] = None,
     ) -> Any:
         """Round-section `IfcColumn` — circular profile extruded vertically."""
         return self._add_circle_element(
             ifc_class="IfcColumn",
             element_id=col_id, origin=origin, radius=radius, depth=depth,
             material=material, description=description, tag=tag,
+            storey_id=storey_id,
         )
 
     def add_beam(
@@ -519,6 +589,7 @@ class BuildFlowIFC:
         material: str,
         description: str = "",
         tag: str = "",
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcBeam` — no PredefinedType slot in 2X3."""
         return self._add_box_element(
@@ -526,6 +597,7 @@ class BuildFlowIFC:
             element_id=beam_id, origin=origin, dims=dims, depth=depth,
             material=material, predefined_type=None,
             description=description, tag=tag,
+            storey_id=storey_id,
         )
 
     # ── coverings ────────────────────────────────────────────────────
@@ -540,6 +612,7 @@ class BuildFlowIFC:
         predefined_type: str = "FLOORING",
         description: str = "",
         tag: str = "",
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcCovering` — DOES have PredefinedType in 2X3."""
         return self._add_box_element(
@@ -547,6 +620,32 @@ class BuildFlowIFC:
             element_id=cov_id, origin=origin, dims=dims, depth=depth,
             material=material, predefined_type=predefined_type,
             description=description, tag=tag,
+            storey_id=storey_id,
+        )
+
+    # ── railings ─────────────────────────────────────────────────────
+
+    def add_railing(
+        self,
+        railing_id: str,
+        origin: Tuple[float, float, float],
+        dims: Tuple[float, float],
+        depth: float,
+        material: str,
+        predefined_type: str = "GUARDRAIL",
+        description: str = "",
+        tag: str = "",
+        contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
+    ) -> Any:
+        """`IfcRailing` — PredefinedType DOES exist in IFC2X3 and IFC4."""
+        return self._add_box_element(
+            ifc_class="IfcRailing",
+            element_id=railing_id, origin=origin, dims=dims, depth=depth,
+            material=material, predefined_type=predefined_type,
+            description=description, tag=tag,
+            contained_in_space_id=contained_in_space_id,
+            storey_id=storey_id,
         )
 
     # ── proxies / furniture / lighting ───────────────────────────────
@@ -562,6 +661,7 @@ class BuildFlowIFC:
         composition: str = "ELEMENT",
         description: str = "",
         tag: str = "",
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcBuildingElementProxy` — catches everything non-standard.
 
@@ -583,6 +683,7 @@ class BuildFlowIFC:
             object_type=object_type,
             composition_type=composition,
             description=description, tag=tag,
+            storey_id=storey_id,
         )
 
     def add_furniture(
@@ -596,6 +697,7 @@ class BuildFlowIFC:
         description: str = "",
         tag: str = "",
         contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcFurnishingElement` — no PredefinedType slot in 2X3."""
         return self._add_box_element(
@@ -605,6 +707,7 @@ class BuildFlowIFC:
             object_type=object_type,
             description=description, tag=tag,
             contained_in_space_id=contained_in_space_id,
+            storey_id=storey_id,
         )
 
     def add_furniture_part(
@@ -613,6 +716,7 @@ class BuildFlowIFC:
         part_spec: Dict[str, Any],
         item_world_origin: Tuple[float, float, float],
         item_rotation: float = 0.0,
+        storey_id: Optional[str] = None,
     ) -> Any:
         """Build a single furniture part as an IfcFurnishingElement.
 
@@ -651,11 +755,14 @@ class BuildFlowIFC:
             box_dims = (dims_m[0], dims_m[1])
             box_depth = dims_m[2]
 
+        _PART_ALLOWED_CLASSES = (
+            "IfcFurnishingElement", "IfcSystemFurnitureElement",
+            "IfcDiscreteAccessory", "IfcCovering", "IfcFlowTerminal",
+            "IfcFlowSegment", "IfcRailing", "IfcLightFixture",
+            "IfcSanitaryTerminal", "IfcBuildingElementProxy",
+        )
         return self._add_box_element(
-            ifc_class=ifc_class if ifc_class in (
-                "IfcFurnishingElement", "IfcSystemFurnitureElement",
-                "IfcDiscreteAccessory",
-            ) else "IfcFurnishingElement",
+            ifc_class=ifc_class if ifc_class in _PART_ALLOWED_CLASSES else "IfcFurnishingElement",
             element_id=part_id, origin=world_origin,
             dims=box_dims, depth=box_depth,
             material=mat_id, predefined_type=None,
@@ -663,6 +770,7 @@ class BuildFlowIFC:
             description=part_spec.get("notes", f"Part of {parent_id}"),
             tag=part_id,
             contained_in_space_id=None,
+            storey_id=storey_id,
         )
 
     def aggregate_parts(
@@ -837,6 +945,7 @@ class BuildFlowIFC:
         description: str = "",
         tag: str = "",
         contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcLightFixture` — no PredefinedType slot in 2X3."""
         return self._add_box_element(
@@ -846,6 +955,7 @@ class BuildFlowIFC:
             object_type=object_type,
             description=description, tag=tag,
             contained_in_space_id=contained_in_space_id,
+            storey_id=storey_id,
         )
 
     def add_door(
@@ -862,6 +972,7 @@ class BuildFlowIFC:
         host_wall_id: Optional[str] = None,
         offset_m: Optional[float] = None,
         sill_m: float = 0.0,
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcDoor` — typed opening, NOT a proxy.
 
@@ -888,6 +999,7 @@ class BuildFlowIFC:
             object_type=object_type,
             description=description, tag=tag,
             contained_in_space_id=contained_in_space_id,
+            storey_id=storey_id,
         )
         if host_wall_id and offset_m is not None:
             opening = self.add_opening_in_wall(
@@ -910,6 +1022,7 @@ class BuildFlowIFC:
         host_wall_id: Optional[str] = None,
         offset_m: Optional[float] = None,
         sill_m: float = 0.9,
+        storey_id: Optional[str] = None,
     ) -> Any:
         """`IfcWindow` — typed opening, NOT a proxy.
 
@@ -933,6 +1046,7 @@ class BuildFlowIFC:
             object_type=object_type,
             description=description, tag=tag,
             contained_in_space_id=contained_in_space_id,
+            storey_id=storey_id,
         )
         if host_wall_id and offset_m is not None:
             opening = self.add_opening_in_wall(
@@ -1774,6 +1888,7 @@ class BuildFlowIFC:
             "element_tags": sorted(self._elements_by_id.keys()),
             "material_ids": sorted(self._materials_by_id.keys()),
             "space_tags": sorted(self._spaces_by_id.keys()),
+            "storey_tags": sorted(self._storeys_by_id.keys()),
             "schema": self.SCHEMA,
         }
         with open(meta_path, "w", encoding="ascii") as f:
@@ -1795,6 +1910,7 @@ class BuildFlowIFC:
         instance._spaces_by_id = {}
         instance._materials_by_id = {}
         instance._material_styles = {}
+        instance._storeys_by_id = {}
 
         # Re-resolve element references. Spaces in IFC2X3 have no `Tag`
         # attribute — they're keyed by Name. Other IfcElement descendants
@@ -1876,6 +1992,12 @@ class BuildFlowIFC:
         storeys = instance._ifc.by_type("IfcBuildingStorey")
         if storeys:
             instance._storey = storeys[0]
+        # Re-resolve additional storeys by Name (matching saved storey_tags).
+        wanted_storey_names = set(meta.get("storey_tags", []))
+        for s in storeys:
+            name = getattr(s, "Name", None)
+            if name and name in wanted_storey_names:
+                instance._storeys_by_id[name] = s
         # GeometricRepresentationContext bodies — the first Model context
         # with a Body subcontext.
         ctxs = instance._ifc.by_type("IfcGeometricRepresentationContext")
@@ -1888,6 +2010,18 @@ class BuildFlowIFC:
         return instance
 
     # ── internal helpers ─────────────────────────────────────────────
+
+    def _fallback_material_id(self) -> Optional[str]:
+        """Return the first available material id, or None if empty."""
+        if self._materials_by_id:
+            return next(iter(self._materials_by_id))
+        return None
+
+    def _resolve_storey(self, storey_id: Optional[str]) -> Any:
+        """Return the IfcBuildingStorey for the given id, or the default."""
+        if storey_id and storey_id in self._storeys_by_id:
+            return self._storeys_by_id[storey_id]
+        return self._storey
 
     def _add_box_element(
         self,
@@ -1904,6 +2038,7 @@ class BuildFlowIFC:
         description: str = "",
         tag: str = "",
         contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
     ) -> Any:
         element_id = str(_ascii_safe(element_id))
         material = str(_ascii_safe(material))
@@ -2034,9 +2169,10 @@ class BuildFlowIFC:
             Axis=self._ifc.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0)),
             RefDirection=ref_dir,
         )
+        target_storey = self._resolve_storey(storey_id)
         local_placement = self._ifc.create_entity(
             "IfcLocalPlacement",
-            PlacementRelTo=self._storey.ObjectPlacement,
+            PlacementRelTo=target_storey.ObjectPlacement,
             RelativePlacement=placement_axis,
         )
         element.ObjectPlacement = local_placement
@@ -2046,15 +2182,16 @@ class BuildFlowIFC:
         if contained_in_space_id and contained_in_space_id in self._spaces_by_id:
             self._contain_in_space(element, contained_in_space_id)
         else:
-            self._contain_in_storey(element)
+            self._contain_in_storey(element, target_storey)
 
-        if material in self._materials_by_id:
+        resolved_mat_id = material if material in self._materials_by_id else self._fallback_material_id()
+        if resolved_mat_id and resolved_mat_id in self._materials_by_id:
             api.run(
                 "material.assign_material", self._ifc,
-                products=[element], material=self._materials_by_id[material],
+                products=[element], material=self._materials_by_id[resolved_mat_id],
             )
             # Per-solid IfcStyledItem so web-ifc renders colours (Phase C fix).
-            self._style_solid_internal(element, material)
+            self._style_solid_internal(element, resolved_mat_id)
 
         self._elements_by_id[element_id] = element
         return element
@@ -2070,6 +2207,7 @@ class BuildFlowIFC:
         description: str = "",
         tag: str = "",
         contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
     ) -> Any:
         element_id = str(_ascii_safe(element_id))
         material = str(_ascii_safe(material))
@@ -2140,9 +2278,10 @@ class BuildFlowIFC:
             ),
             Axis=None, RefDirection=None,
         )
+        target_storey = self._resolve_storey(storey_id)
         element.ObjectPlacement = self._ifc.create_entity(
             "IfcLocalPlacement",
-            PlacementRelTo=self._storey.ObjectPlacement,
+            PlacementRelTo=target_storey.ObjectPlacement,
             RelativePlacement=placement_axis,
         )
 
@@ -2150,15 +2289,16 @@ class BuildFlowIFC:
         if contained_in_space_id and contained_in_space_id in self._spaces_by_id:
             self._contain_in_space(element, contained_in_space_id)
         else:
-            self._contain_in_storey(element)
+            self._contain_in_storey(element, target_storey)
 
-        if material in self._materials_by_id:
+        resolved_mat_id = material if material in self._materials_by_id else self._fallback_material_id()
+        if resolved_mat_id and resolved_mat_id in self._materials_by_id:
             api.run(
                 "material.assign_material", self._ifc,
-                products=[element], material=self._materials_by_id[material],
+                products=[element], material=self._materials_by_id[resolved_mat_id],
             )
             # Per-solid IfcStyledItem so web-ifc renders colours (Phase C fix).
-            self._style_solid_internal(element, material)
+            self._style_solid_internal(element, resolved_mat_id)
 
         self._elements_by_id[element_id] = element
         return element
@@ -2228,16 +2368,17 @@ class BuildFlowIFC:
             ),
         )
 
-    def _contain_in_storey(self, element: Any) -> None:
-        """Wire an element into the storey's containment relationship.
+    def _contain_in_storey(self, element: Any, storey: Any = None) -> None:
+        """Wire an element into a storey's containment relationship.
 
         We piggy-back on `ifcopenshell.api.spatial.assign_container` — it
         handles creating or extending an `IfcRelContainedInSpatialStructure`.
         """
+        target = storey if storey is not None else self._storey
         try:
             ifcopenshell.api.run(
                 "spatial.assign_container", self._ifc,
-                products=[element], relating_structure=self._storey,
+                products=[element], relating_structure=target,
             )
         except Exception:
             # Fallback for older ifcopenshell.api versions that took
@@ -2245,7 +2386,7 @@ class BuildFlowIFC:
             try:
                 ifcopenshell.api.run(
                     "spatial.assign_container", self._ifc,
-                    product=element, relating_structure=self._storey,
+                    product=element, relating_structure=target,
                 )
             except Exception:
                 pass

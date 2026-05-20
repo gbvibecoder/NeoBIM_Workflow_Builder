@@ -99,10 +99,15 @@ The `bf` helper has methods for every common building element. Key ones:
 - `bf.add_opening_in_wall(host_wall_id, offset_m, width_m, height_m, sill_m=0)` — manual opening cut, returns opening entity.
 - `bf.fill_opening(opening, fill_element)` — links opening to door/window.
 
-**Furniture + lighting:**
-- `bf.add_furniture(f_id, origin, dims, depth, material, object_type="", contained_in_space_id=None)` — single-box furniture.
+**Furniture + lighting + railings:**
+- `bf.add_furniture(f_id, origin, dims, depth, material, object_type="", contained_in_space_id=None)` — single-box furniture (IfcFurnishingElement).
 - `bf.add_light_fixture(l_id, origin, dims, depth, material, object_type="", contained_in_space_id=None)` — real IfcLightFixture.
-- `bf.add_proxy(proxy_id, origin, dims, depth, material, object_type="", composition="ELEMENT")` — catch-all for non-standard items.
+- `bf.add_railing(railing_id, origin, dims, depth, material, predefined_type="GUARDRAIL", contained_in_space_id=None)` — IfcRailing. Use for balustrades, handrails, guards.
+- `bf.add_proxy(proxy_id, origin, dims, depth, material, object_type="", composition="ELEMENT")` — LAST RESORT for items with no IFC class. Prefer typed methods above.
+
+**Storeys (multi-floor buildings):**
+- `bf.add_storey(storey_id, name, elevation)` — creates an additional IfcBuildingStorey at the given elevation (metres). The bootstrap creates "Ground Floor" at 0.0. For multi-storey buildings, add one storey per floor BEFORE creating elements on that floor.
+- All `bf.add_*` methods accept `storey_id=None` (default = ground floor). Pass `storey_id="floor-1"` to assign an element to that storey.
 
 **Spaces:**
 - `bf.add_space(space_id, polygon, height, long_name="", occupancy="Internal")` — IfcSpace from polygon. Bootstrap already creates spaces from brief.spaces — do NOT duplicate.
@@ -126,6 +131,18 @@ The `bf` helper has methods for every common building element. Key ones:
 
 When unsure of a method signature, run a small Python probe like
 `help(bf.method_name)`.
+
+## MULTI-STOREY BUILDINGS
+
+For buildings with multiple floors:
+1. Call `bf.add_storey(storey_id, name, elevation)` for EACH floor above ground BEFORE creating elements on that floor. Example for a 4-storey building with 3.1m floor-to-floor:
+   - Ground Floor: already created by bootstrap at elevation 0.0
+   - `bf.add_storey("floor-1", "First Floor", 3.1)`
+   - `bf.add_storey("floor-2", "Second Floor", 6.2)`
+   - `bf.add_storey("floor-3", "Third Floor", 9.3)`
+2. Pass `storey_id="floor-1"` to every `bf.add_*` call for elements on that floor.
+3. Elements with no `storey_id` go to Ground Floor (the default).
+4. Geometry Z-coordinates are WORLD-ABSOLUTE (e.g. a first-floor slab at z=3.1). The storey_id controls the IFC containment hierarchy, not the position.
 
 ## IFC SCHEMA NOTES
 
