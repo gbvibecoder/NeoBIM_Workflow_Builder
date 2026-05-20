@@ -1822,8 +1822,8 @@
 
 .heroV4Pipeline {
   position: relative;
-  padding: 16px 0 4px;
-  margin-top: 4px;
+  padding: 22px 0 4px;
+  margin-top: 36px;
   border-top: 1px dashed var(--rs-rule-strong, rgba(14,18,24,0.14));
   animation: heroV3FadeUp 0.7s 0.32s ease-out both;
 }
