@@ -68,10 +68,16 @@ export interface TemplatesHeroDeckProps {
 
 const AUTO_DRIFT_MS = 3500;
 const POST_INTERACTION_MS = 5000;
-const X_STEP = 180;
-const Z_STEP = 240;
-const ROT_DEG = 44;
-const VISIBLE = 2.5;
+/* Phase Z.2.4 — wider coverflow ring. Was X_STEP=180, Z_STEP=240,
+ * ROT_DEG=44, VISIBLE=2.5 which clipped to ~1 visible side card per
+ * side. New values surface 2 cards each side (≈5 on screen), with a
+ * gentler rotation so off=2 cards stay readable, shallower depth per
+ * step so they don't blur into the background, and VISIBLE bumped so
+ * the |off|=2 card stays mounted through transitions. */
+const X_STEP = 230;
+const Z_STEP = 160;
+const ROT_DEG = 30;
+const VISIBLE = 2.6;
 const NARROW_BREAKPOINT = 1100;
 const SWIPE_THRESHOLD = 50;
 const WHEEL_DEBOUNCE_MS = 380;
@@ -477,7 +483,10 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
                 cardZ = -abs * Z_STEP;
                 cardRot = off * -ROT_DEG;
                 cardY = abs * 4;
-                cardOpacity = Math.max(0, 1 - abs * 0.18);
+                /* Phase Z.2.4 — gentler falloff (was 0.18). At new
+                 * VISIBLE=2.6: off=1 → 0.85, off=2 → 0.70 (clearly
+                 * visible, not bleached). */
+                cardOpacity = Math.max(0, 1 - abs * 0.15);
               }
 
               const cardStyle: React.CSSProperties = {
