@@ -22,42 +22,13 @@ interface DashboardHeroProps {
   lastWorkflowId: string | null;
 }
 
-function formatDayTime(): { day: string; time: string } {
-  const now = new Date();
-  const day = now.toLocaleDateString("en-US", { weekday: "long" });
-  const time = now.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
-  return { day, time };
-}
-
-export function DashboardHero({ firstName, planTier, stats, loading, lastWorkflowId }: DashboardHeroProps) {
+export function DashboardHero({ firstName, stats, loading, lastWorkflowId }: DashboardHeroProps) {
   const { t } = useLocale();
-  const { day, time } = formatDayTime();
   const hasLast = lastWorkflowId !== null;
-  const runningCount = stats ? Math.min(3, Math.max(0, Math.floor(stats.executionCount / 200))) : 0;
 
   return (
     <section className={s.heroV3}>
-      {/* TOP STRIP */}
-      <div className={s.heroV3Strip}>
-        <div className={s.heroV3StripL}>
-          <span className={s.heroV3StripNum}>FB-D00</span>
-          <span className={s.heroV3StripBrand}>Buildflow</span>
-          <span className={s.heroV3StripMute}>
-            · {t("dashboard.v2.heroStripDay")} · {day} · {time} IST
-          </span>
-        </div>
-        <div className={s.heroV3StripR}>
-          {!loading && stats ? (
-            <span className={s.heroV3StripRunning}>
-              <span className={s.heroV3StripPulse} aria-hidden="true" />
-              <b>{runningCount}</b> running
-            </span>
-          ) : null}
-          <span className={s.heroV3StripPlan}>{planTier}</span>
-        </div>
-      </div>
-
-      {/* QUIET GREETING — single line; statement + pitch removed (V5 declutter) */}
+      {/* QUIET GREETING — top of hero; FB-D00 strip removed (V6 declutter) */}
       <div className={s.heroV3GreetingLine}>
         <h1 className={s.heroV3Greeting}>
           {t("dashboard.v2.heroGreetingPrefix")}, <b>{firstName}</b>.
