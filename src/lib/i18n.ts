@@ -933,6 +933,18 @@ const en = {
   'templates.statNodeTypes': 'Node Types',
   'templates.statNativeExport': 'Native Export',
 
+  // ===== TEMPLATES HERO DECK (Phase Z.2) =====
+  'templates.heroEyebrowSuffix': 'live pipelines',
+  'templates.heroUseTemplate': 'Use this template',
+  'templates.heroPreview': 'Preview',
+  'templates.heroHint': 'Drag · scroll · ← → keys',
+  'templates.heroBadgeNew': 'New',
+  'templates.heroPrev': 'Previous template',
+  'templates.heroNext': 'Next template',
+  'templates.heroHeadlineLead': 'Pick a',
+  'templates.heroHeadlineAccent': 'proven pipeline',
+  'templates.heroHeadlineTrail': '. Run it in seconds.',
+
   // ===== COMPARE =====
   'compare.title': 'Compare Executions',
   'compare.subtitle': 'Side-by-side comparison of two workflow runs',
@@ -4345,6 +4357,18 @@ const de: Record<keyof typeof en, string | string[]> = {
   'templates.statDisciplines': 'Disziplinen',
   'templates.statNodeTypes': 'Node-Typen',
   'templates.statNativeExport': 'Nativer Export',
+
+  // ===== TEMPLATES HERO DECK (Phase Z.2) =====
+  'templates.heroEyebrowSuffix': 'aktive Pipelines',
+  'templates.heroUseTemplate': 'Diese Vorlage verwenden',
+  'templates.heroPreview': 'Vorschau',
+  'templates.heroHint': 'Ziehen · scrollen · ← → Tasten',
+  'templates.heroBadgeNew': 'Neu',
+  'templates.heroPrev': 'Vorherige Vorlage',
+  'templates.heroNext': 'Nächste Vorlage',
+  'templates.heroHeadlineLead': 'Wählen Sie eine',
+  'templates.heroHeadlineAccent': 'bewährte Pipeline',
+  'templates.heroHeadlineTrail': '. In Sekunden starten.',
 
   // ===== COMPARE =====
   'compare.title': 'Ausführungen vergleichen',

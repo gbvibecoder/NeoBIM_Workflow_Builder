@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap, Crown } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
+import { NODE_CATALOGUE } from "@/features/workflows/constants/node-catalogue";
+import TemplatesHeroDeck, { type DeckTemplate } from "@/features/dashboard/components/TemplatesHeroDeck";
 import { useWorkflowStore, selectLoadFromTemplate } from "@/features/workflows/stores/workflow-store";
 import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
@@ -644,6 +646,74 @@ const ILLUS_MAP: Record<string, React.FC> = {
 };
 
 /* ══════════════════════════════════════════════════════════════════════
+   DECK MAPPING — PREBUILT_WORKFLOWS → DeckTemplate[]
+   Lives outside the component so React.useMemo + module cache play nicely.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Category → --rs-* accent token. Spec called for --rs-plum / --rs-rust which
+ * do NOT exist in render-studio-tokens.css; substituted closest existing
+ * tokens (see PHASE_TEMPLATES_HERO_DECK_REPORT_2026-05-20.md §2 for the map). */
+const CATEGORY_ACCENT_VAR: Record<string, string> = {
+  "Concept Design":  "--rs-blueprint-2",
+  "Visualization":   "--rs-amber-mark",
+  "Cost Estimation": "--rs-burnt",
+  "BIM Export":      "--rs-blueprint",
+  "3D Modeling":     "--rs-ember",
+  "BIM Analysis":    "--rs-status-error",
+  "AI BIM":          "--rs-blueprint",
+  "Full Pipeline":   "--rs-blueprint",
+  "Site Analysis":   "--rs-sage",
+};
+
+function titleCase(s: string): string {
+  return s
+    .split(/\s+/)
+    .map((w) => (w.length === 0 ? w : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+    .join(" ");
+}
+
+function deriveChain(wf: WorkflowTemplate): string[] {
+  // Prefer the "X → Y → Z" pattern that most template names already use.
+  if (wf.name.includes("→")) {
+    return wf.name
+      .split("→")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+  }
+  // Fallback: first 3-4 unique node labels (Title-Cased), no internal IDs.
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of wf.tileGraph.nodes) {
+    const lbl = String(n.data?.label ?? "").trim();
+    if (!lbl) continue;
+    const key = lbl.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(titleCase(lbl));
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
+function deriveChips(wf: WorkflowTemplate): string[] {
+  const chips: string[] = [];
+  chips.push(`${wf.tileGraph.nodes.length} nodes`);
+  // Output hints — scan expectedOutputs for canonical tokens.
+  const outs = (wf.expectedOutputs ?? []).join(" ").toLowerCase();
+  if (outs.includes("ifc")) chips.push("IFC");
+  if (outs.includes("boq") || outs.includes("quantit") || outs.includes("xlsx")) chips.push("BOQ XLSX");
+  if (outs.includes("video") || outs.includes("walkthrough") || outs.includes("cinematic")) chips.push("Video");
+  if (outs.includes("3d") || outs.includes("massing")) chips.push("3D");
+  if (outs.includes("render") || outs.includes("photoreal")) chips.push("Photoreal");
+  if (outs.includes("floor plan") || outs.includes("svg")) chips.push("Floor Plan");
+  // Complexity → label (only one word — keeps chips short).
+  chips.push(titleCase(wf.complexity));
+  // Cap to 5 to never overflow the info band.
+  return chips.slice(0, 5);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    MAIN PAGE COMPONENT
    ══════════════════════════════════════════════════════════════════════ */
 
@@ -746,6 +816,67 @@ export default function TemplatesPage() {
     if (sortBy === "nodes") list.sort((a, b) => a.tileGraph.nodes.length - b.tileGraph.nodes.length);
     return list;
   }, [activeCategory, sortBy]);
+
+  /* ── Hero deck data (Phase Z.2 — circular coverflow) ──────────────── */
+  // Hoisted above the dark-theme conditional return so hook order is stable
+  // (react-hooks/rules-of-hooks). Sidebar shows 9 by filtering wf-12; mirror
+  // that here so the hero/deck count agrees with the sidebar badge.
+  const deckSource = useMemo(
+    () => PREBUILT_WORKFLOWS.filter((w) => w.id !== "wf-12"),
+    [],
+  );
+  const deckTemplates: DeckTemplate[] = useMemo(
+    () =>
+      deckSource.map((w) => {
+        const accentVar = CATEGORY_ACCENT_VAR[w.category] ?? "--rs-blueprint";
+        const badge =
+          w.id === FEATURED_ID ? t("templates.popular")
+          : w.id === "wf-ai-ifc-v3" ? t("templates.heroBadgeNew")
+          : "";
+        return {
+          id: w.id,
+          category: w.category,
+          title: w.name,
+          chain: deriveChain(w),
+          time: w.estimatedRunTime,
+          desc: w.description,
+          chips: deriveChips(w),
+          accentVar,
+          badge: badge || undefined,
+          Illus: ILLUS_MAP[w.id],
+          locked: !canAccessTemplate(userRole, w.requiredTier),
+        };
+      }),
+    [deckSource, userRole, t],
+  );
+  // Derived stats — replaces the old hardcoded "5 / 31" with real counts.
+  const deckStats = useMemo(
+    () => ({
+      workflows: PREBUILT_WORKFLOWS.length,
+      disciplines: new Set(PREBUILT_WORKFLOWS.map((w) => w.category)).size,
+      nodeTypes: NODE_CATALOGUE.length,
+    }),
+    [],
+  );
+  const deckCopy = useMemo(
+    () => ({
+      useTemplate: t("templates.heroUseTemplate"),
+      preview: t("templates.heroPreview"),
+      hint: t("templates.heroHint"),
+      empty: t("templates.noTemplates"),
+      eyebrowSuffix: t("templates.heroEyebrowSuffix"),
+      badgeNew: t("templates.heroBadgeNew"),
+      badgePopular: t("templates.popular"),
+      prev: t("templates.heroPrev"),
+      next: t("templates.heroNext"),
+      filterAll: t("templates.allWorkflows"),
+      statWorkflows: t("templates.statWorkflows"),
+      statDisciplines: t("templates.statDisciplines"),
+      statNodeTypes: t("templates.statNodeTypes"),
+      statNative: t("templates.statNativeExport"),
+    }),
+    [t],
+  );
 
   // Funnel telemetry — fire `template_lock_seen` once per locked template
   // per page mount. The Set survives until full unmount, so re-renders
@@ -1086,131 +1217,29 @@ export default function TemplatesPage() {
       <main ref={mainRef} className={s.main}>
 
         {/* ════════════════════════ HERO ════════════════════════ */}
+        {/* heroRef stays on the section: page.tsx:724-736 reads
+            heroRef.getBoundingClientRect().bottom to flip the sticky
+            filter-bar styling. The deck mounts INSIDE the section so the
+            scroll-stick boundary remains the hero's true bottom edge. */}
         <section ref={heroRef} className={s.hero}>
-          <div className={s.heroInner}>
-            <div className={s.heroLeft}>
-              <div className={s.heroEyebrow}>
-                <span className={s.heroEyebrowDot} />
-                <span className={s.heroEyebrowText}>Workflow Templates</span>
-              </div>
-              <h1 className={s.heroTitle}>
-                From brief to <em>building</em> in minutes
-              </h1>
-              <p className={s.heroLead}>
-                {t("templates.fromBriefDesc")}
-              </p>
-              <div className={s.heroStats}>
-                {AEC_STATS.map(stat => (
-                  <div key={stat.labelKey} className={s.stat}>
-                    <div className={s.statNum}><em>{stat.value}</em></div>
-                    <div className={s.statLabel}>{t(stat.labelKey)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Hero moodboard (right column) ── */}
-            <div className={s.heroBoard} aria-hidden="true">
-              {/* Floating tag pills */}
-              <div className={`${s.heroTag} ${s.heroTag1}`}>
-                <span className={s.heroTagDot} />
-                Photoreal in 3 min
-              </div>
-              <div className={`${s.heroTag} ${s.heroTag2}`}>
-                <span className={`${s.heroTagDot} ${s.heroTagDotBlueprint}`} />
-                QS-grade BOQ
-              </div>
-
-              {/* Moodcard 1: BOQ cost estimate */}
-              <div className={`${s.moodcard} ${s.moodcard1}`}>
-                <div className={s.moodcardImg}>
-                  <div className={s.mood1Illus}>
-                    <div className={s.mood1Card}>
-                      <div className={s.mood1Label}>Total Cost</div>
-                      <div className={s.mood1Num}><span className={s.mood1NumEm}>{"\u20B9"}9.03</span> Cr</div>
-                      <div className={s.mood1Rows}>
-                        {[
-                          { name: "Concrete", val: "\u20B93.42 Cr", color: "var(--rs-blueprint)" },
-                          { name: "Brick", val: "\u20B91.18 Cr", color: "var(--rs-burnt)" },
-                          { name: "MEP", val: "\u20B92.84 Cr", color: "var(--rs-sage)" },
-                        ].map(r => (
-                          <div key={r.name} className={s.mood1Row}>
-                            <div className={s.mood1RowName}><span className={s.mood1RowDot} style={{ background: r.color }} />{r.name}</div>
-                            <div className={s.mood1RowVal}>{r.val}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className={s.moodcardMeta}>
-                  <div className={s.moodcardCat}><span className={s.moodcardCatDot} style={{ background: "var(--rs-burnt)" }} />Cost Estimation</div>
-                  <div className={s.moodcardTitle}>IFC &rarr; <em className={s.moodcardTitleEm}>BOQ</em></div>
-                </div>
-              </div>
-
-              {/* Moodcard 2: 3D wireframe building */}
-              <div className={`${s.moodcard} ${s.moodcard2}`}>
-                <div className={s.moodcardImg}>
-                  <div className={s.mood2Illus}>
-                    <svg viewBox="0 0 280 200" fill="none">
-                      <g stroke="rgba(229,168,120,.85)" strokeWidth="1.4" fill="none">
-                        <polygon points="60,150 140,110 220,150 140,190" />
-                        <polygon points="60,80 140,40 220,80 140,120" />
-                        <line x1="60" y1="150" x2="60" y2="80" />
-                        <line x1="220" y1="150" x2="220" y2="80" />
-                        <line x1="140" y1="190" x2="140" y2="120" />
-                        <line x1="140" y1="110" x2="140" y2="40" />
-                        <line x1="60" y1="130" x2="220" y2="130" strokeOpacity=".5" strokeDasharray="3,3" />
-                        <line x1="60" y1="105" x2="220" y2="105" strokeOpacity=".5" strokeDasharray="3,3" />
-                      </g>
-                      <g fill="rgba(229,168,120,.5)">
-                        {[[60,150],[220,150],[60,80],[220,80],[140,40],[140,190]].map(([cx,cy], i) => <circle key={i} cx={cx} cy={cy} r="2.5" />)}
-                      </g>
-                      <text x="240" y="50" fontFamily="JetBrains Mono" fontSize="9" fill="rgba(229,168,120,.7)" letterSpacing="2">IFC4</text>
-                    </svg>
-                  </div>
-                </div>
-                <div className={s.moodcardMeta}>
-                  <div className={s.moodcardCat}><span className={s.moodcardCatDot} style={{ background: "var(--rs-ember)" }} />BIM Export</div>
-                  <div className={s.moodcardTitle}>Text &rarr; <em className={s.moodcardTitleEm}>3D + IFC</em></div>
-                </div>
-              </div>
-
-              {/* Moodcard 3: Floor plan */}
-              <div className={`${s.moodcard} ${s.moodcard3}`}>
-                <div className={s.moodcardImg}>
-                  <div className={s.mood3Illus}>
-                    <svg viewBox="0 0 240 130" fill="none">
-                      <g stroke="var(--rs-ink)" strokeWidth="1.6" fill="none" opacity=".7">
-                        <rect x="20" y="20" width="200" height="90" />
-                        <line x1="120" y1="20" x2="120" y2="60" />
-                        <line x1="80" y1="60" x2="220" y2="60" />
-                        <line x1="120" y1="60" x2="120" y2="110" />
-                      </g>
-                      <g stroke="var(--rs-blueprint)" strokeWidth="1.2" fill="rgba(26,77,92,.15)">
-                        <path d="M 90 20 A 12 12 0 0 1 102 32 L 90 32 Z" />
-                      </g>
-                      <g stroke="var(--rs-burnt)" strokeWidth="1.4">
-                        <line x1="140" y1="20" x2="180" y2="20" />
-                        <line x1="20" y1="40" x2="20" y2="70" />
-                      </g>
-                      <g fontFamily="JetBrains Mono" fontSize="6" fill="var(--rs-text)" letterSpacing="1">
-                        <text x="68" y="48">LIVING</text>
-                        <text x="155" y="48">KITCHEN</text>
-                        <text x="68" y="92">BEDROOM</text>
-                        <text x="155" y="92">BATH</text>
-                      </g>
-                    </svg>
-                  </div>
-                </div>
-                <div className={s.moodcardMeta}>
-                  <div className={s.moodcardCat}><span className={s.moodcardCatDot} />Concept Design</div>
-                  <div className={s.moodcardTitle}>Text &rarr; <em className={s.moodcardTitleEm}>Floor Plan</em></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <TemplatesHeroDeck
+            templates={deckTemplates}
+            stats={deckStats}
+            onUse={(id) => {
+              const wf = PREBUILT_WORKFLOWS.find((w) => w.id === id);
+              if (wf) handleUse(wf);
+            }}
+            eyebrow={t("templates.startWithProven")}
+            headline={
+              <>
+                {t("templates.heroHeadlineLead")}{" "}
+                <em>{t("templates.heroHeadlineAccent")}</em>
+                {t("templates.heroHeadlineTrail")}
+              </>
+            }
+            copy={deckCopy}
+            showFilters
+          />
         </section>
 
         {/* Brief Renders Beta (canary-gated) */}
