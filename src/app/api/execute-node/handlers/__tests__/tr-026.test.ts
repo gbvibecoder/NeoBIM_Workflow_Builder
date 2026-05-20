@@ -64,7 +64,7 @@ describe("TR-026 handler — IFC Agent Builder", () => {
     );
   });
 
-  it("kicks off /runs then polls /status until COMPLETED and surfaces ifcUrl", async () => {
+  it("submits to /runs and returns immediately with pendingRunId (gamma.2 async)", async () => {
     const fetchMock = mockResponses(
       () =>
         new Response(
@@ -75,36 +75,6 @@ describe("TR-026 handler — IFC Agent Builder", () => {
           }),
           { status: 202 },
         ),
-      () =>
-        new Response(
-          JSON.stringify({
-            id: "run-abc",
-            status: "RUNNING",
-            ifcUrl: null,
-            entityCount: null,
-            errorCode: null,
-            errorMessage: null,
-            generatorCostUsd: 0.05,
-            generatorMs: 5_000,
-            turns: 2,
-          }),
-          { status: 200 },
-        ),
-      () =>
-        new Response(
-          JSON.stringify({
-            id: "run-abc",
-            status: "COMPLETED",
-            ifcUrl: "https://r2.example/sol.ifc",
-            entityCount: 754,
-            errorCode: null,
-            errorMessage: null,
-            generatorCostUsd: 0.196,
-            generatorMs: 44_000,
-            turns: 10,
-          }),
-          { status: 200 },
-        ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -113,7 +83,8 @@ describe("TR-026 handler — IFC Agent Builder", () => {
       inputData: { briefSpec: BRIEF_SPEC, cost_cap_usd: 3 },
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // Phase gamma.2: only ONE fetch call (the POST to /runs). No polling.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const [createUrl, createInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(createUrl).toBe("https://trybuildflow.in/api/brief-to-ifc/v3/runs");
     expect(createInit?.method).toBe("POST");
@@ -121,42 +92,20 @@ describe("TR-026 handler — IFC Agent Builder", () => {
     expect(body.briefSpec).toEqual(BRIEF_SPEC);
     expect(body.cost_cap_usd).toBe(3);
 
-    // The /runs endpoint uses a zod `.strict()` schema — any unknown
-    // key (e.g. analytics-style `source: "canvas"`) would 400 before
-    // the agent starts. Lock in the allow-list of permitted keys so a
-    // future "let's tag every request with metadata" patch can't
-    // silently re-break prod canvas runs the way the original ship did.
-    const ALLOWED_KEYS = new Set([
-      "brief",
-      "briefSpec",
-      "project_type",
-      "max_turns",
-      "cost_cap_usd",
-      "workflow_id",
-      // Phase gamma.1: Direct Agent Mode fields
-      "brief_text",
-      "suggestions",
-      "previous_feedback",
-      "iteration",
-    ]);
-    for (const key of Object.keys(body)) {
-      expect(ALLOWED_KEYS.has(key), `unexpected key "${key}" in /runs body`).toBe(true);
-    }
-
     if (!("type" in result) || !("data" in result)) {
       throw new Error("expected an ExecutionArtifact, got a NextResponse");
     }
     const artifact = result as {
       type: string;
-      dataUri?: string;
+      dataUri?: unknown;
       data: Record<string, unknown>;
     };
     expect(artifact.type).toBe("file");
-    expect(artifact.dataUri).toBe("https://r2.example/sol.ifc");
+    // dataUri is undefined until the build completes (frontend polls)
+    expect(artifact.dataUri).toBeUndefined();
     expect(artifact.data.runId).toBe("run-abc");
-    expect(artifact.data.entityCount).toBe(754);
-    expect(artifact.data.turns).toBe(10);
-    expect(artifact.data.generatorCostUsd).toBe(0.196);
+    expect(artifact.data.pendingRunId).toBe("run-abc");
+    expect(artifact.data.statusUrl).toBe("/api/brief-to-ifc/v3/runs/run-abc/status");
   });
 
   it("throws when briefSpec is missing", async () => {
@@ -165,31 +114,20 @@ describe("TR-026 handler — IFC Agent Builder", () => {
     ).rejects.toThrow(/requires a `briefSpec`/);
   });
 
-  it("throws when the run ends with FAILED status", async () => {
+  it("throws when /runs endpoint returns HTTP error", async () => {
+    // Phase gamma.2: TR-026 no longer polls — it submits and returns.
+    // Failure detection is now client-side. But a /runs submission
+    // failure (HTTP 500) still throws from the handler.
     const fetchMock = mockResponses(
       () =>
         new Response(
           JSON.stringify({
-            runId: "run-fail",
-            status: "PENDING",
-            statusUrl: "/api/brief-to-ifc/v3/runs/run-fail/status",
+            error: {
+              message: "Enrichment failed",
+              code: "ENRICHMENT_FAILED",
+            },
           }),
-          { status: 202 },
-        ),
-      () =>
-        new Response(
-          JSON.stringify({
-            id: "run-fail",
-            status: "FAILED",
-            ifcUrl: null,
-            entityCount: 0,
-            errorCode: "VISUAL_GEOMETRY_INVALID",
-            errorMessage: "world bbox 0.005x0.005m",
-            generatorCostUsd: 0.05,
-            generatorMs: 5_000,
-            turns: 3,
-          }),
-          { status: 200 },
+          { status: 500 },
         ),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -199,6 +137,6 @@ describe("TR-026 handler — IFC Agent Builder", () => {
         ...baseCtx,
         inputData: { briefSpec: BRIEF_SPEC },
       }),
-    ).rejects.toThrow(/FAILED|VISUAL_GEOMETRY_INVALID/);
+    ).rejects.toThrow(/submission failed/);
   });
 });

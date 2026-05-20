@@ -218,6 +218,37 @@ export async function scheduleBriefToIfcWorker(
   return result.messageId;
 }
 
+// ─── Brief-to-IFC v3 Agent Build (Phase gamma.2) ───────────────────
+
+/**
+ * Schedule the v3 agent build worker. QStash POSTs to
+ * `/api/brief-to-ifc/v3/agent-job` with `{ runId }`. The worker loads
+ * the briefSpec from the DB, runs the generator loop, and writes the
+ * result back. Runs in its own Vercel invocation (800s budget) —
+ * uncapped from the user's perspective because the frontend polls
+ * the run status rather than holding a synchronous request.
+ *
+ * Mirrors the VIP pipeline pattern exactly: retries=0 (the generator
+ * has its own cost-cap circuit breaker), timeout=15m (QStash delivery
+ * timeout, NOT the Vercel function timeout).
+ */
+export async function scheduleAgentBuildWorker(
+  runId: string,
+): Promise<string> {
+  const client = getClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const workerUrl = `${appUrl}/api/brief-to-ifc/v3/agent-job`;
+
+  const result = await client.publishJSON({
+    url: workerUrl,
+    body: { runId },
+    retries: 0,
+    timeout: "15m",
+  });
+
+  return result.messageId;
+}
+
 /**
  * Verify that a request came from QStash (signature validation).
  * Returns true if valid, false otherwise.

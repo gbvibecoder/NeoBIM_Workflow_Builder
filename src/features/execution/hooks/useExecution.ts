@@ -872,6 +872,80 @@ async function executeNode(
     }
 
     const { artifact } = await res.json() as { artifact: ExecutionArtifact };
+    const artData = artifact.data as Record<string, unknown> | undefined;
+
+    // Phase gamma.2: TR-026 returns immediately with a pendingRunId.
+    // Poll the run status client-side until COMPLETED/FAILED. This
+    // replaces the old server-side polling that held the execute-node
+    // function for 10-25 minutes (and hit Vercel's 800s ceiling).
+    const pendingRunId = artData?.pendingRunId;
+    if (typeof pendingRunId === "string" && pendingRunId.length > 0) {
+      console.info(`[tr-026-poll] Agent build queued — polling run ${pendingRunId}...`);
+      const POLL_INTERVAL = 8_000;
+      const POLL_TIMEOUT = 30 * 60_000; // 30 min safety cap
+      const pollStart = Date.now();
+
+      while (Date.now() - pollStart < POLL_TIMEOUT) {
+        await new Promise(r => setTimeout(r, POLL_INTERVAL));
+        try {
+          const statusRes = await fetch(
+            `/api/brief-to-ifc/v3/runs/${pendingRunId}/status`,
+          );
+          if (!statusRes.ok) continue;
+          const status = await statusRes.json() as {
+            status: string; ifcUrl: string | null;
+            entityCount: number | null; turns: number;
+            generatorCostUsd: number; generatorMs: number;
+            errorMessage: string | null;
+          };
+
+          if (status.status === "COMPLETED" && status.ifcUrl) {
+            const completedArtifact: ExecutionArtifact = {
+              ...artifact,
+              dataUri: status.ifcUrl,
+              data: {
+                ...artData,
+                ifcUrl: status.ifcUrl,
+                entityCount: status.entityCount ?? 0,
+                turns: status.turns,
+                generatorCostUsd: status.generatorCostUsd,
+                generatorMs: status.generatorMs,
+                pendingRunId: undefined,
+                summary: `IFC generated — ${status.entityCount ?? 0} entities, ` +
+                  `${status.turns} turn${status.turns === 1 ? "" : "s"}, ` +
+                  `$${status.generatorCostUsd.toFixed(3)}.`,
+              },
+              metadata: {
+                ...(artifact.metadata as Record<string, unknown>),
+                stage: "agent-builder",
+                entityCount: status.entityCount ?? 0,
+                costUsd: status.generatorCostUsd,
+                durationMs: status.generatorMs,
+              },
+            };
+            console.info(`[tr-026-poll] Agent build completed — ${status.entityCount} entities`);
+            return { ...completedArtifact, createdAt: new Date() };
+          }
+
+          if (status.status === "FAILED") {
+            throw new Error(
+              `Agent build failed: ${status.errorMessage ?? "unknown error"}`,
+            );
+          }
+          // RUNNING / PENDING — keep polling
+        } catch (pollErr) {
+          if (pollErr instanceof Error && pollErr.message.startsWith("Agent build failed")) {
+            throw pollErr;
+          }
+          console.warn("[tr-026-poll] Poll error (retrying):", pollErr);
+        }
+      }
+
+      throw new Error(
+        `Agent build timed out after ${Math.round(POLL_TIMEOUT / 60000)} minutes (run ${pendingRunId})`,
+      );
+    }
+
     return { ...artifact, createdAt: new Date() };
   }
 

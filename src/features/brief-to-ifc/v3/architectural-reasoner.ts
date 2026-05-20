@@ -280,6 +280,19 @@ export async function applyArchitecturalReasoning(
       metrics.cost_usd = Math.round(runningCost * 1_000_000) / 1_000_000;
       metrics.rationale_count = result.rationale.length;
       metrics.wall_time_ms = Date.now() - startedAt;
+
+      // gamma.2: warn on suspiciously fast "success" — Opus can't reason
+      // about 5+ furniture items in under 2s. This catches cached/stub
+      // responses that pass JSON validation but aren't real reasoning.
+      if (metrics.wall_time_ms < 2000 && furniture.length >= 3) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[architectural-reasoner] Suspiciously fast: ${metrics.wall_time_ms}ms for ` +
+          `${furniture.length} items. Result has ${result.rationale.length} entries. ` +
+          `Possible cached/stub response — quality may be degraded.`,
+        );
+      }
+
       return { spec: updatedSpec, metrics };
     }
 
