@@ -416,13 +416,16 @@ export const briefSpecSchema = z.object({
   // existing Opus outputs that don't know about these fields yet.
   archetype: archetypeSchema.optional(),
   global_parameters: globalParametersSchema.optional(),
-  openings: z.array(briefOpeningSchema).max(200).optional(),
-  furniture: z.array(briefFurnitureSchema).max(500).optional(),
-  lighting: briefLightingSchema.optional(),
-  assumptions_made: z.array(assumptionSchema).max(100).optional(),
+  // .catch(undefined) — Opus occasionally emits a description string
+  // instead of an array for optional fields. Catch coerces bad types
+  // to undefined rather than rejecting the entire spec.
+  openings: z.array(briefOpeningSchema).max(200).optional().catch(undefined),
+  furniture: z.array(briefFurnitureSchema).max(500).optional().catch(undefined),
+  lighting: briefLightingSchema.optional().catch(undefined),
+  assumptions_made: z.array(assumptionSchema).max(100).optional().catch(undefined),
   // Phase Beta 2 extensions
-  designRationale: z.array(designRationaleSchema).optional(),
-  trim: z.array(trimItemSchema).max(500).optional(),
+  designRationale: z.array(designRationaleSchema).optional().catch(undefined),
+  trim: z.array(trimItemSchema).max(500).optional().catch(undefined),
 });
 
 export type BriefSpec = z.infer<typeof briefSpecSchema>;
