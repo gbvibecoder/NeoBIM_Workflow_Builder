@@ -348,7 +348,7 @@ export interface PatchAndIterateOptions {
   qualityThreshold?: number;    // default 75
   partsThreshold?: number;      // default 0.85
   costBudgetUsd?: number;       // default 0.50
-  timeoutMs?: number;           // default 780_000 (13 min)
+  timeoutMs?: number;           // default 600_000 (10 min)
   /** HTTP origin for agent build. */
   origin?: string;
   /** Cookie for auth forwarding. */

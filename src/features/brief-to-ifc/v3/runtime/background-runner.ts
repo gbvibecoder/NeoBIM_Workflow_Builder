@@ -46,9 +46,7 @@ import {
 } from "../lifecycle/transitions";
 import { appendLog } from "./append-log";
 
-// Phase gamma.1: raised from 600s to 780s — 20s below the 800s Vercel
-// Fluid Compute ceiling so the graceful timeout fires before the hard kill.
-export const DEFAULT_EXECUTION_TIMEOUT_MS = 780_000; // 13 minutes
+export const DEFAULT_EXECUTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 export interface RunBackgroundArgs<TSuccess> {
   prisma: PrismaClient;

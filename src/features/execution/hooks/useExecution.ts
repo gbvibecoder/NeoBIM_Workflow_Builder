@@ -340,11 +340,8 @@ async function executeNode(
     const nd = node.data as Record<string, unknown>;
     if (nd.viewType != null) nodeConfig.viewType = nd.viewType;
 
-    // Generous timeout for all nodes — AI generation can take minutes.
-    // Phase gamma.1: Direct Agent Mode runs 200 turns which can take 13+ min.
-    // 780s = 20s below the 800s Vercel maxDuration ceiling, ensuring the
-    // graceful client-side abort fires before Vercel hard-kills the function.
-    const timeoutMs = 780_000; // 13 min
+    // Generous timeout for all nodes — AI generation (DALL-E, Claude QA, Kling, Meshy) can take minutes
+    const timeoutMs = 600_000; // 10 min
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 

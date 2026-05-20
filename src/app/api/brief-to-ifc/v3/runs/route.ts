@@ -266,11 +266,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     await runBackground({
       prisma,
       runId: run.id,
-      // Phase gamma.1: raised from 700s to 780s to match the 800s Vercel
-      // maxDuration ceiling (20s safety margin). The /runs route uses
-      // after() so this runs in its OWN Vercel invocation, separate from
-      // the execute-node polling invocation.
-      timeoutMs: 780_000,
+      timeoutMs: 700_000,
       fn: async (ctx) => {
         await ctx.log("INFO", "GENERATE", "Generator agent loop starting.");
         const result = await runGenerator({
