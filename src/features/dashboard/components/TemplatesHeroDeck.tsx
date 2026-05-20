@@ -28,9 +28,6 @@ export interface DeckTemplate {
   id: string;
   category: string;
   title: string;
-  chain: string[];
-  time?: string;
-  desc: string;
   chips: string[];
   /** A `--rs-*` CSS variable name (with leading `--`), e.g. "--rs-burnt". */
   accentVar: string;
@@ -50,15 +47,10 @@ export interface TemplatesHeroDeckCopy {
   prev: string;
   next: string;
   filterAll: string;
-  statWorkflows: string;
-  statDisciplines: string;
-  statNodeTypes: string;
-  statNative: string;
 }
 
 export interface TemplatesHeroDeckProps {
   templates: DeckTemplate[];
-  stats: { workflows: number; disciplines: number; nodeTypes: number };
   onUse: (id: string) => void;
   onPreview?: (id: string) => void;
   eyebrow: string;
@@ -97,7 +89,7 @@ function FallbackViz({ accentVar }: { accentVar: string }) {
 }
 
 export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
-  const { templates, stats, onUse, onPreview, eyebrow, headline, copy, showFilters } = props;
+  const { templates, onUse, onPreview, eyebrow, headline, copy, showFilters } = props;
 
   // ── In-hero category filter (deck-local; does NOT affect the grid below) ──
   // Derived from actual template categories so empty-after-filter is impossible
@@ -343,7 +335,7 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
       onBlurCapture={onBlurCapture}
       data-narrow={isNarrow ? "true" : undefined}
     >
-      {/* Top bar */}
+      {/* Top bar — eyebrow only (stats row removed Phase Z.2.2) */}
       <div className={s.topBar}>
         <div className={s.eyebrow}>
           <span className={s.eyebrowDot} />
@@ -352,24 +344,6 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
           <span className={s.eyebrowCount}>
             {N} {copy.eyebrowSuffix}
           </span>
-        </div>
-        <div className={s.stats}>
-          <div className={s.stat}>
-            <em>{stats.workflows}</em>
-            <span>{copy.statWorkflows}</span>
-          </div>
-          <div className={s.stat}>
-            <em>{stats.disciplines}</em>
-            <span>{copy.statDisciplines}</span>
-          </div>
-          <div className={s.stat}>
-            <em>{stats.nodeTypes}</em>
-            <span>{copy.statNodeTypes}</span>
-          </div>
-          <div className={s.stat}>
-            <em>IFC</em>
-            <span>{copy.statNative}</span>
-          </div>
         </div>
       </div>
 
@@ -433,9 +407,6 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
                     {tpl.Illus ? <tpl.Illus /> : <FallbackViz accentVar={tpl.accentVar} />}
                   </div>
                   <div className={s.cardTitle}>{tpl.title}</div>
-                  {tpl.chain.length > 0 && (
-                    <div className={s.cardChain}>{tpl.chain.slice(0, 4).join(" → ")}</div>
-                  )}
                 </button>
               );
             })}
@@ -535,9 +506,6 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
                     {tpl.Illus ? <tpl.Illus /> : <FallbackViz accentVar={tpl.accentVar} />}
                   </div>
                   <div className={s.cardTitle}>{tpl.title}</div>
-                  {tpl.chain.length > 0 && (
-                    <div className={s.cardChain}>{tpl.chain.slice(0, 4).join(" → ")}</div>
-                  )}
                 </button>
               );
             })}
@@ -559,10 +527,10 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
         </div>
       )}
 
-      {/* Info band — synced to front */}
+      {/* Info band — synced to front (description paragraph removed
+          Phase Z.2.2; chips + buttons only). */}
       {front0 && (
         <div className={s.info} key={`info-${activeCat}-${safeFront}`}>
-          <p className={s.infoDesc}>{front0.desc}</p>
           {front0.chips.length > 0 && (
             <div className={s.infoChips}>
               {front0.chips.slice(0, 5).map((chip, i) => (

@@ -109,48 +109,8 @@
   color: var(--rs-text-mute);
 }
 
-.stats {
-  display: flex;
-  align-items: stretch;
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  padding: 0 20px;
-  border-right: 1px solid var(--rs-rule);
-}
-
-.stat:last-child {
-  border-right: none;
-  padding-right: 0;
-}
-
-.stat:first-child {
-  padding-left: 0;
-}
-
-.stat em {
-  font-style: normal;
-  font-family: var(--font-display, Georgia, serif);
-  font-weight: 500;
-  /* Phase Z.2.1 — was 26px; 22 trims top-bar height a touch */
-  font-size: 22px;
-  line-height: 1;
-  letter-spacing: -0.025em;
-  color: var(--rs-ink);
-}
-
-.stat span {
-  font-family: var(--font-jetbrains, monospace);
-  font-size: 8.5px;
-  font-weight: 500;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--rs-text-mute);
-}
+/* .stats / .stat / .stat em / .stat span — removed Phase Z.2.2 (stats
+   row dropped from the hero per design simplification). */
 
 /* ── Headline ────────────────────────────────────────────────────── */
 .headline {
@@ -401,16 +361,8 @@
   font-variation-settings: "opsz" 144, "SOFT" 50;
 }
 
-.cardChain {
-  font-family: var(--font-jetbrains, monospace);
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--rs-text-mute);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* .cardChain — removed Phase Z.2.2 (chain caption beneath card title
+   was redundant with the serif title). */
 
 /* ── Floating spec tags ──────────────────────────────────────────── */
 .floatTag {
@@ -474,20 +426,9 @@
   animation: infoFade 0.4s var(--rs-ease);
 }
 
-.infoDesc {
-  font-family: var(--font-ui, var(--font-dm-sans), system-ui, sans-serif);
-  /* Phase Z.2.1 — was 15.5/1.55; 14/1.5 + 2-line clamp keeps long
-     descriptions from pushing the Use button below the fold. */
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--rs-text);
-  max-width: 620px;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+/* .infoDesc — removed Phase Z.2.2 (per-template description text
+   below the cards was visual noise; the title + chips communicate
+   the workflow at a glance). */
 
 .infoChips {
   display: flex;

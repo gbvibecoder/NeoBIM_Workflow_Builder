@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap, Crown } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
-import { NODE_CATALOGUE } from "@/features/workflows/constants/node-catalogue";
 import TemplatesHeroDeck, { type DeckTemplate } from "@/features/dashboard/components/TemplatesHeroDeck";
 import { useWorkflowStore, selectLoadFromTemplate } from "@/features/workflows/stores/workflow-store";
 import { useRouter } from "next/navigation";
@@ -672,30 +671,6 @@ function titleCase(s: string): string {
     .join(" ");
 }
 
-function deriveChain(wf: WorkflowTemplate): string[] {
-  // Prefer the "X → Y → Z" pattern that most template names already use.
-  if (wf.name.includes("→")) {
-    return wf.name
-      .split("→")
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .slice(0, 5);
-  }
-  // Fallback: first 3-4 unique node labels (Title-Cased), no internal IDs.
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const n of wf.tileGraph.nodes) {
-    const lbl = String(n.data?.label ?? "").trim();
-    if (!lbl) continue;
-    const key = lbl.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(titleCase(lbl));
-    if (out.length >= 4) break;
-  }
-  return out;
-}
-
 function deriveChips(wf: WorkflowTemplate): string[] {
   const chips: string[] = [];
   chips.push(`${wf.tileGraph.nodes.length} nodes`);
@@ -837,9 +812,6 @@ export default function TemplatesPage() {
           id: w.id,
           category: w.category,
           title: w.name,
-          chain: deriveChain(w),
-          time: w.estimatedRunTime,
-          desc: w.description,
           chips: deriveChips(w),
           accentVar,
           badge: badge || undefined,
@@ -848,15 +820,6 @@ export default function TemplatesPage() {
         };
       }),
     [deckSource, userRole, t],
-  );
-  // Derived stats — replaces the old hardcoded "5 / 31" with real counts.
-  const deckStats = useMemo(
-    () => ({
-      workflows: PREBUILT_WORKFLOWS.length,
-      disciplines: new Set(PREBUILT_WORKFLOWS.map((w) => w.category)).size,
-      nodeTypes: NODE_CATALOGUE.length,
-    }),
-    [],
   );
   const deckCopy = useMemo(
     () => ({
@@ -870,10 +833,6 @@ export default function TemplatesPage() {
       prev: t("templates.heroPrev"),
       next: t("templates.heroNext"),
       filterAll: t("templates.allWorkflows"),
-      statWorkflows: t("templates.statWorkflows"),
-      statDisciplines: t("templates.statDisciplines"),
-      statNodeTypes: t("templates.statNodeTypes"),
-      statNative: t("templates.statNativeExport"),
     }),
     [t],
   );
@@ -1224,7 +1183,6 @@ export default function TemplatesPage() {
         <section ref={heroRef} className={s.hero}>
           <TemplatesHeroDeck
             templates={deckTemplates}
-            stats={deckStats}
             onUse={(id) => {
               const wf = PREBUILT_WORKFLOWS.find((w) => w.id === id);
               if (wf) handleUse(wf);
@@ -1242,8 +1200,9 @@ export default function TemplatesPage() {
           />
         </section>
 
-        {/* Brief Renders Beta (canary-gated) */}
-        <BriefRendersTemplateCard />
+        {/* Brief Renders Beta canary banner removed Phase Z.2.2 — the
+            entry point still exists in the sidebar nav and on the
+            /dashboard/brief-renders page itself. */}
 
         {/* ════════════════════════ FILTER BAR ════════════════════════ */}
         <div className={s.filterbar}>
