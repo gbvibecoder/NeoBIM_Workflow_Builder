@@ -32,6 +32,9 @@ export interface DeckTemplate {
    *  ["Floor Plan","Render + Video Walkthrough"] joined with " → "). */
   chain: string[];
   chips: string[];
+  /** Single-line humorous subtitle rendered in the info band above the
+   *  chips. Optional — when absent, the line is simply not rendered. */
+  tagline?: string;
   /** A `--rs-*` CSS variable name (with leading `--`), e.g. "--rs-burnt". */
   accentVar: string;
   badge?: string;
@@ -536,10 +539,13 @@ export default function TemplatesHeroDeck(props: TemplatesHeroDeckProps) {
         </div>
       )}
 
-      {/* Info band — synced to front (description paragraph removed
-          Phase Z.2.2; chips + buttons only). */}
+      {/* Info band — synced to front. Optional one-liner tagline above
+          the chips (Phase Z.2.3 — humor pass). */}
       {front0 && (
         <div className={s.info} key={`info-${activeCat}-${safeFront}`}>
+          {front0.tagline && (
+            <p className={s.tagline}>{front0.tagline}</p>
+          )}
           {front0.chips.length > 0 && (
             <div className={s.infoChips}>
               {front0.chips.slice(0, 5).map((chip, i) => (

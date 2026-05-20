@@ -434,9 +434,26 @@
   animation: infoFade 0.4s var(--rs-ease);
 }
 
-/* .infoDesc — removed Phase Z.2.2 (per-template description text
-   below the cards was visual noise; the title + chips communicate
-   the workflow at a glance). */
+/* .infoDesc — removed Phase Z.2.2. Replaced Phase Z.2.3 with a
+   single-line italic tagline (a wry one-liner about each template),
+   not a multi-line description. */
+
+.tagline {
+  font-family: var(--font-display, Georgia, serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--rs-ink-soft);
+  max-width: 680px;
+  margin: 0;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-variation-settings: "opsz" 144, "SOFT" 80;
+}
 
 .infoChips {
   display: flex;

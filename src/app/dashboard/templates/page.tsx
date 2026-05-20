@@ -671,6 +671,30 @@ function titleCase(s: string): string {
     .join(" ");
 }
 
+/* Per-template humor taglines (Phase Z.2.3). Single line, wry, written
+ * to the AEC audience who's tired of slow tools. Keep ≤110 chars so the
+ * info band doesn't truncate at common widths. */
+const HUMOR_TAGLINES: Record<string, string> = {
+  "wf-ai-ifc-v3":
+    "Like hiring a junior BIM modeler who never sleeps, complains, or asks for overtime.",
+  "wf-08":
+    "Drop a PDF brief. Get a cinematic walkthrough. Skip the four “design review” meetings.",
+  "wf-01":
+    "Type “a 3BHK with vibes”. Get walls, doors, dimensions. We won’t tell anyone.",
+  "wf-06":
+    "Upload a flat 2D plan. Get the render your client will screenshot for Instagram.",
+  "wf-09":
+    "QS-grade quantities. Without the QS. Without the spreadsheets. Without the existential dread.",
+  "wf-11":
+    "Your boring “before” becomes an aspirational “after”. Realtor not included.",
+  "wf-03":
+    "Describe a building. Get a building. We’re as surprised as you are.",
+  "wf-05":
+    "Click, drag, rotate. The 3D model your client thinks took you a week.",
+  "wf-04":
+    "Move some sliders. Out comes a mass. Architecture, but with significantly less arguing.",
+};
+
 function deriveChain(wf: WorkflowTemplate): string[] {
   // Prefer the "X → Y → Z" pattern that most template names already use.
   if (wf.name.includes("→")) {
@@ -838,6 +862,7 @@ export default function TemplatesPage() {
           title: w.name,
           chain: deriveChain(w),
           chips: deriveChips(w),
+          tagline: HUMOR_TAGLINES[w.id],
           accentVar,
           badge: badge || undefined,
           Illus: ILLUS_MAP[w.id],
