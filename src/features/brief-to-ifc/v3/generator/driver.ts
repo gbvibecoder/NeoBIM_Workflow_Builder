@@ -197,6 +197,62 @@ When unsure of a method signature, run a small Python probe like
 - IfcLightFixture is a real IFC4 class — no proxy fallback needed.
 - String values must be pure ASCII. The helpers auto-sanitize.
 
+## MATERIAL ASSOCIATIONS (CRITICAL — without this everything is gray)
+
+The \`bf.add_*\` methods create IfcMaterial + IfcStyledItem (visual),
+but they do NOT create IfcRelAssociatesMaterial (the semantic link
+IFC viewers need to display colors). You MUST create these yourself
+in a final \`run_python\` block BEFORE calling \`finalize_ifc\`.
+
+Pattern — run this AFTER all elements are built:
+
+\`\`\`python
+f = bf._file  # the underlying ifcopenshell file object
+owner = f.by_type("IfcOwnerHistory")[0]
+
+# Build a map: material name → IfcMaterial entity
+mat_map = {}
+for m in f.by_type("IfcMaterial"):
+    mat_map[m.Name] = m
+
+# For each product, find its material from the styled item chain
+# and create the association
+products = [p for p in f.by_type("IfcProduct") if hasattr(p, "Representation") and p.Representation]
+for product in products:
+    # Walk representation → styled item → surface style → name
+    for rep in (product.Representation.Representations if product.Representation else []):
+        for item in (rep.Items or []):
+            for style in (f.get_inverse(item) if hasattr(f, 'get_inverse') else []):
+                if style.is_a("IfcStyledItem"):
+                    for s in (style.Styles or []):
+                        if s.is_a("IfcPresentationStyleAssignment"):
+                            for ps in (s.Styles or []):
+                                if ps.is_a("IfcSurfaceStyle") and ps.Name in mat_map:
+                                    f.create_entity("IfcRelAssociatesMaterial",
+                                        GlobalId=ifcopenshell.guid.new(),
+                                        OwnerHistory=owner,
+                                        RelatedObjects=[product],
+                                        RelatingMaterial=mat_map[ps.Name])
+\`\`\`
+
+If this exact pattern fails (API differences), try a simpler approach:
+\`\`\`python
+# Simpler fallback: associate ALL products with the first matching material
+for product in f.by_type("IfcProduct"):
+    tag = getattr(product, "Tag", "") or ""
+    for mat in f.by_type("IfcMaterial"):
+        if mat.Name and mat.Name.lower() in tag.lower():
+            f.create_entity("IfcRelAssociatesMaterial",
+                GlobalId=ifcopenshell.guid.new(),
+                OwnerHistory=owner,
+                RelatedObjects=[product],
+                RelatingMaterial=mat)
+            break
+\`\`\`
+
+Verify with: \`print("IfcRelAssociatesMaterial count:", len(f.by_type("IfcRelAssociatesMaterial")))\`.
+If the count is 0 after your attempt, debug and retry. Gray IFC = broken output.
+
 ## FINALIZE
 
 When done, call \`finalize_ifc()\`. This writes the .ifc file and
@@ -204,6 +260,7 @@ completes the build. After finalize, you cannot make more changes.
 
 Do not call \`finalize_ifc\` until you have:
 - Built every item in the brief
+- Created IfcRelAssociatesMaterial for every product (see above)
 - Used \`render_preview\` at least once on the final state
 - Confirmed via \`render_preview\` that nothing is missing or wrong
 - Added property sets + quantities to every element
