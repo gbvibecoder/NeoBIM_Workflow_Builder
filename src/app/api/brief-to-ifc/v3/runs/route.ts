@@ -57,8 +57,8 @@ import {
 // import { classifyBrief } from "@/features/brief-to-ifc/v3/archetype-classifier";
 
 // Phase gamma.1: Direct Agent Mode — 200 turns can take 10-15 min.
-// 900s is the Vercel Pro ceiling for serverless functions.
-export const maxDuration = 900;
+// 800s is the Vercel Fluid Compute Pro ceiling (900 rejected at deploy).
+export const maxDuration = 800;
 
 const RATE_LIMIT_PER_HOUR = 10;
 

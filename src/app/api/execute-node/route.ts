@@ -31,10 +31,10 @@ const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", 
 // Per-workflow rate-limit dedup is handled by isExecutionAlreadyCounted() in
 // src/lib/rate-limit.ts (Redis-backed, 30-day TTL). No in-memory cache needed.
 
-// Allow up to 900s for heavy AI generation chains. Phase gamma.1 Direct Agent
-// Mode runs 200 turns which can take 10-15 min for complex briefs. 900s is the
-// Vercel Pro ceiling for serverless functions.
-export const maxDuration = 900;
+// Allow up to 800s for heavy AI generation chains. Phase gamma.1 Direct Agent
+// Mode runs 200 turns which can take 10-15 min for complex briefs. 800s is the
+// Vercel Fluid Compute Pro ceiling (900 rejected at deploy time).
+export const maxDuration = 800;
 
 export async function POST(req: NextRequest) {
   const session = await auth();

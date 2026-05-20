@@ -53,23 +53,23 @@ describe("Agent Turn Budget (Phase gamma.1)", () => {
     expect(driverSrc).toMatch(/args\.maxTurns\s*\?\?\s*DEFAULT_MAX_TURNS/);
   });
 
-  it("maxDuration on execute-node route is >= 900", () => {
+  it("maxDuration on execute-node route is >= 800 (Vercel Fluid Compute ceiling)", () => {
     const routeSrc = fs.readFileSync(
       path.join(__dirname, "..", "..", "..", "..", "app", "api", "execute-node", "route.ts"),
       "utf-8",
     );
     const match = routeSrc.match(/export const maxDuration\s*=\s*(\d+)/);
     expect(match).not.toBeNull();
-    expect(Number(match![1])).toBeGreaterThanOrEqual(900);
+    expect(Number(match![1])).toBeGreaterThanOrEqual(800);
   });
 
-  it("maxDuration on runs route is >= 900", () => {
+  it("maxDuration on runs route is >= 800 (Vercel Fluid Compute ceiling)", () => {
     const routeSrc = fs.readFileSync(
       path.join(__dirname, "..", "..", "..", "..", "app", "api", "brief-to-ifc", "v3", "runs", "route.ts"),
       "utf-8",
     );
     const match = routeSrc.match(/export const maxDuration\s*=\s*(\d+)/);
     expect(match).not.toBeNull();
-    expect(Number(match![1])).toBeGreaterThanOrEqual(900);
+    expect(Number(match![1])).toBeGreaterThanOrEqual(800);
   });
 });
