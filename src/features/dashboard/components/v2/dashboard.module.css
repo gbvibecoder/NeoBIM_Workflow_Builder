@@ -1613,38 +1613,87 @@
   flex-wrap: nowrap;
   justify-content: flex-end;
 }
+/* Action-band restyle (Hero V7 aura) — base pill, variant tints,
+   primary keeps dark ink + animated multi-color aura on hover. */
 .heroV3Btn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   padding: 10px 16px;
-  border-radius: 8px;
+  border-radius: 999px;
   font-family: var(--ui);
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: -0.005em;
   text-decoration: none;
   cursor: pointer;
-  border: 1px solid var(--rs-rule-strong, rgba(14, 18, 24, 0.14));
-  background: var(--rs-paper, #FFFFFF);
+  border: none;
+  background: transparent;
   color: var(--rs-ink, #0E1218);
-  transition: transform 0.2s var(--ease), border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease);
   white-space: nowrap;
 }
-.heroV3Btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--rs-ink-soft, #2A3142);
-  box-shadow: 0 6px 18px -8px rgba(14, 18, 24, 0.18);
-}
 .heroV3BtnPrimary {
+  position: relative;
+  z-index: 1;
   background: var(--rs-ink, #0E1218);
-  border-color: var(--rs-ink, #0E1218);
-  color: var(--rs-bone, #F6F4EE);
+  color: #FFFFFF;
+}
+.heroV3BtnPrimary::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  z-index: -1;
+  background: linear-gradient(120deg, #3D5C40, #1A4D5C, #B87333, #A0521C);
+  background-size: 300% 300%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  animation: heroV5AuraShift 6s ease infinite;
 }
 .heroV3BtnPrimary:hover {
-  background: var(--rs-ink-soft, #2A3142);
-  border-color: var(--rs-ink-soft, #2A3142);
-  color: var(--rs-bone, #F6F4EE);
+  transform: translateY(-2px);
+}
+.heroV3BtnPrimary:hover::before {
+  opacity: 1;
+}
+@keyframes heroV5AuraShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* Live pulse dot inside primary, before the label */
+.heroV5LiveDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #56794A;
+  box-shadow: 0 0 8px #56794A;
+  flex-shrink: 0;
+  animation: heroV5LivePulse 2s ease infinite;
+}
+@keyframes heroV5LivePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+/* Secondary pill variants — soft-tinted, fully rounded */
+.heroV5PillGreen {
+  background: rgba(61, 92, 64, 0.08);
+  color: #3D5C40;
+}
+.heroV5PillGreen:hover {
+  background: rgba(61, 92, 64, 0.16);
+  transform: translateY(-1px);
+}
+.heroV5PillPlum {
+  background: rgba(107, 69, 102, 0.08);
+  color: #6B4566;
+}
+.heroV5PillPlum:hover {
+  background: rgba(107, 69, 102, 0.16);
+  transform: translateY(-1px);
 }
 
 /* ── Inline stats strip (V4: 3-stat horizontal pill at right of actions) ── */
@@ -1680,6 +1729,10 @@
   color: var(--rs-ink, #0E1218);
   line-height: 1.1;
 }
+/* Stat-value tints (pipeline palette) — stable order is workflows / executions / xp */
+.heroV3InlineStats .heroV3InlineStat:nth-child(1) .heroV3InlineStatVal { color: #3D5C40; }
+.heroV3InlineStats .heroV3InlineStat:nth-child(2) .heroV3InlineStatVal { color: #1A4D5C; }
+.heroV3InlineStats .heroV3InlineStat:nth-child(3) .heroV3InlineStatVal { color: #B87333; }
 .heroV3InlineStatSuffix {
   font-style: italic;
   font-size: 16px;
@@ -1732,6 +1785,8 @@
   .heroV3PaneRender { transition: none !important; }
   .heroV3DotSagePulse { animation: none !important; }
   .heroV3Btn { transition: none !important; }
+  .heroV3BtnPrimary::before { animation: none !important; }
+  .heroV5LiveDot { animation: none !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

@@ -50,14 +50,15 @@ export function DashboardHero({ firstName, stats, loading, lastWorkflowId }: Das
                 href={`/dashboard/canvas?id=${lastWorkflowId}`}
                 className={`${s.heroV3Btn} ${s.heroV3BtnPrimary}`}
               >
+                <span className={s.heroV5LiveDot} aria-hidden="true" />
                 <ArrowRight size={14} />
                 {t("dashboard.v2.continueLastWorkflow")}
               </Link>
-              <Link href="/dashboard/canvas?new=1" className={s.heroV3Btn}>
+              <Link href="/dashboard/canvas?new=1" className={`${s.heroV3Btn} ${s.heroV5PillGreen}`}>
                 <Plus size={14} />
                 {t("dashboard.v2.newBlankWorkflow")}
               </Link>
-              <Link href="/dashboard/templates" className={s.heroV3Btn}>
+              <Link href="/dashboard/templates" className={`${s.heroV3Btn} ${s.heroV5PillPlum}`}>
                 <Sparkles size={14} />
                 {t("dashboard.v2.browseTemplates")}
               </Link>
@@ -68,10 +69,11 @@ export function DashboardHero({ firstName, stats, loading, lastWorkflowId }: Das
                 href="/dashboard/canvas?new=1"
                 className={`${s.heroV3Btn} ${s.heroV3BtnPrimary}`}
               >
+                <span className={s.heroV5LiveDot} aria-hidden="true" />
                 <Plus size={14} />
                 {t("dashboard.v2.newBlankWorkflow")}
               </Link>
-              <Link href="/dashboard/templates" className={s.heroV3Btn}>
+              <Link href="/dashboard/templates" className={`${s.heroV3Btn} ${s.heroV5PillPlum}`}>
                 <Sparkles size={14} />
                 {t("dashboard.v2.browseTemplates")}
               </Link>
