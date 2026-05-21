@@ -116,9 +116,24 @@ export interface BuildTelemetrySnapshot {
   generatorCostUsd: number;
   entityCount: number;
   renderPreviewCalls: number;
-  /** Recorded quality score from the existing (known-broken) metric —
-   *  preserved as-is so δ.2's replacement can compare. */
+  /** The quality score that gated the δ.3 iteration loop's decision
+   *  for this iteration. Pre-δ.2: the legacy `parts_coverage * 80 +
+   *  verified * 20` formula. Post-δ.2: the composite from
+   *  `computeQualityScore`. */
   finalQualityScore: number | null;
+  /**
+   * Phase δ.2 — backward-compat side-by-side scoring (Rule 6).
+   *
+   * `legacyQualityScore` is the OLD broken formula recomputed for the
+   * SAME build so we can validate on real runs that the new composite
+   * tracks reality better than the old metric.
+   *
+   * `qualityBreakdown` is the structured composite output — per
+   * sub-signal raw value + renormalized weight + contribution. Answers
+   * "why did this build score X" without re-reading code.
+   */
+  legacyQualityScore: number | null;
+  qualityBreakdown: Record<string, unknown> | null;
 
   // Counts (always authoritative even when event arrays are capped).
   counts: {
@@ -236,6 +251,8 @@ export class BuildTelemetryCollector {
   private _entityCount = 0;
   private _renderPreviewCalls = 0;
   private _finalQualityScore: number | null = null;
+  private _legacyQualityScore: number | null = null;
+  private _qualityBreakdown: Record<string, unknown> | null = null;
 
   private readonly _schemaCoercions: SchemaCoercionEvent[] = [];
   private readonly _schemaRejections: SchemaRejectionEvent[] = [];
@@ -404,6 +421,24 @@ export class BuildTelemetryCollector {
     } catch { /* swallow */ }
   }
 
+  /** Phase δ.2 — record the OLD formula's score alongside the new one
+   *  during the transition window. */
+  setLegacyQualityScore(score: number): void {
+    try {
+      if (typeof score === "number" && Number.isFinite(score)) this._legacyQualityScore = score;
+    } catch { /* swallow */ }
+  }
+
+  /** Phase δ.2 — record the structured breakdown so we can answer
+   *  "why did this build score X" from telemetry alone. Caller passes
+   *  a plain JSON-serialisable record (e.g. QualityScoreBreakdown
+   *  cast to Record<string, unknown>). */
+  setQualityBreakdown(breakdown: Record<string, unknown> | null): void {
+    try {
+      this._qualityBreakdown = breakdown;
+    } catch { /* swallow */ }
+  }
+
   setBriefType(type: string | null): void {
     try { this._briefType = type ?? null; } catch { /* swallow */ }
   }
@@ -485,6 +520,8 @@ export class BuildTelemetryCollector {
       entityCount: this._entityCount,
       renderPreviewCalls: this._renderPreviewCalls,
       finalQualityScore: this._finalQualityScore,
+      legacyQualityScore: this._legacyQualityScore,
+      qualityBreakdown: this._qualityBreakdown,
       counts: {
         schemaCoercions: this._schemaCoercionsCount,
         schemaRejections: this._schemaRejectionsCount,

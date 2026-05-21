@@ -110,7 +110,24 @@ function makeBriefSpec() {
       height_limit_m: 10,
       coordinate_origin: "sw_corner",
     },
-    spaces: [],
+    // Phase δ.2 — give the brief one space so structural_completeness
+    // has a denominator. The PASS-fixture validation reports it
+    // present; the RETRY-fixture validation reports it missing.
+    spaces: [
+      {
+        id: "space-1",
+        name: "S1",
+        long_name: "Space 1",
+        polygon_world_m: [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+          [0, 10],
+        ],
+        height_m: 3,
+        occupancy_type: "Office",
+      },
+    ],
     elements: [
       { id: "wall-1", type: "wall", origin_world_m: [0, 0, 0], material_id: "m1" },
     ],
@@ -127,6 +144,90 @@ function makeBriefSpec() {
   };
 }
 
+/** Phase δ.2 — finalValidation that produces a HIGH composite score
+ *  (structural ≈ 1.0, sanity = 1.0). Used for PASS-path tests. */
+function makeGoodValidation() {
+  return {
+    session_id: "s1",
+    schema_name: "IFC4",
+    entity_count: 1500,
+    refs_resolve: true,
+    spaces_present: ["space-1"],
+    spaces_missing: [],
+    errors: [],
+    web_ifc_load_test: "PASS",
+    ascii_only: true,
+    ascii_first_bad_offset: null,
+    world_bbox: {
+      verdict: "OK",
+      expected_extent: [10, 10, 3],
+      actual_bbox: { xmin: 0, ymin: 0, zmin: 0, xmax: 10, ymax: 10, zmax: 3 },
+      actual_extent: [10, 10, 3],
+      extent_ratio: [1, 1, 1],
+      suggested_unit_fix: null,
+    },
+    space_polygons: null,
+    element_coverage: {
+      verdict: "OK",
+      total_expected: 20,
+      total_actual_in_expected_classes: 20,
+      by_class_expected: { IfcWall: 20 },
+      by_class_actual: { IfcWall: 20 },
+      missing_ids: [],
+      missing_id_count: 0,
+    },
+    origin_collapse: {
+      verdict: "OK",
+      total_elements: 20,
+      at_origin_count: 0,
+      fraction_at_origin: 0,
+      collapsed: false,
+    },
+  };
+}
+
+/** Phase δ.2 — finalValidation that produces a LOW composite score
+ *  (structural ≈ 0.2, sanity = 0.5). Used for RETRY-path tests. */
+function makeBadValidation() {
+  return {
+    session_id: "s1",
+    schema_name: "IFC4",
+    entity_count: 100,
+    refs_resolve: true,
+    spaces_present: [],
+    spaces_missing: ["space-1"],
+    errors: [],
+    web_ifc_load_test: "PASS",
+    ascii_only: true,
+    ascii_first_bad_offset: null,
+    world_bbox: {
+      verdict: "SCALED_TOO_SMALL",
+      expected_extent: [10, 10, 3],
+      actual_bbox: null,
+      actual_extent: null,
+      extent_ratio: null,
+      suggested_unit_fix: null,
+    },
+    space_polygons: null,
+    element_coverage: {
+      verdict: "MISSING_ELEMENTS",
+      total_expected: 20,
+      total_actual_in_expected_classes: 4,
+      by_class_expected: { IfcWall: 20 },
+      by_class_actual: { IfcWall: 4 },
+      missing_ids: [],
+      missing_id_count: 16,
+    },
+    origin_collapse: {
+      verdict: "OK",
+      total_elements: 4,
+      at_origin_count: 0,
+      fraction_at_origin: 0,
+      collapsed: false,
+    },
+  };
+}
+
 function makeGeneratorResult(overrides: Record<string, unknown> = {}) {
   return {
     ok: true,
@@ -137,22 +238,7 @@ function makeGeneratorResult(overrides: Record<string, unknown> = {}) {
     turns: 50,
     ledger: [],
     turnRecords: [],
-    finalValidation: {
-      session_id: "s1",
-      schema_name: "IFC4",
-      entity_count: 1500,
-      refs_resolve: true,
-      spaces_present: ["space-1"],
-      spaces_missing: [],
-      errors: [],
-      web_ifc_load_test: "PASS",
-      ascii_only: true,
-      ascii_first_bad_offset: null,
-      world_bbox: null,
-      space_polygons: null,
-      element_coverage: null,
-      origin_collapse: null,
-    },
+    finalValidation: makeGoodValidation(),
     error: null,
     ...overrides,
   };
@@ -260,8 +346,11 @@ describe("agent-job worker — iteration 1 RETRY", () => {
       bestIteration: null,
     });
     mocks.prisma.briefToIfcV3Run.updateMany.mockResolvedValue({ count: 1 });
-    mocks.runGenerator.mockResolvedValue(makeGeneratorResult());
-    // parts=0.5, verified=false → score = 40 → RETRY
+    // Generator produces a BAD build: validation reports most elements
+    // missing + bbox scaled wrong → δ.2 composite scores < threshold.
+    mocks.runGenerator.mockResolvedValue(
+      makeGeneratorResult({ finalValidation: makeBadValidation() }),
+    );
     mocks.verifyBuild.mockResolvedValue(makeVerifierReport(0.5, false));
     mocks.generateRetryHint.mockResolvedValue({
       hint: "Decompose the cutting table into a top plus 4 legs.",
@@ -274,7 +363,9 @@ describe("agent-job worker — iteration 1 RETRY", () => {
 
     expect(res.status).toBe(200);
     expect(body.nextIteration).toBe(2);
-    expect(body.qualityScore).toBe(40);
+    // δ.2 composite: structural ≈ 0.1, sanity = 0.75 → renormalized
+    // score should be clearly below QUALITY_THRESHOLD=80.
+    expect(body.qualityScore).toBeLessThan(80);
 
     // No COMPLETED transition yet.
     expect(mocks.transitionStatus).not.toHaveBeenCalled();
@@ -297,7 +388,7 @@ describe("agent-job worker — iteration 1 RETRY", () => {
     const history = updateCall.data.iterationHistory;
     expect(history).toHaveLength(1);
     expect(history[0].iteration).toBe(1);
-    expect(history[0].qualityScore).toBe(40);
+    expect(history[0].qualityScore).toBeLessThan(80);
     expect(history[0].forwardFeedback).toContain("ITERATION 1 RESULT");
     expect(history[0].forwardFeedback).toContain("Decompose the cutting table");
 
@@ -320,7 +411,8 @@ describe("agent-job worker — iteration 1 RETRY", () => {
 
 describe("agent-job worker — MAX_ITERATIONS reached", () => {
   it("transitions to COMPLETED using best iteration's artifacts (not the latest)", async () => {
-    // Prior history: [70, 81]. This iteration scores 68 → regression.
+    // Prior history: [70, 85]. This iteration scores < threshold →
+    // regression. Best stays at iteration 2.
     const priorHistory = [
       {
         iteration: 1,
@@ -336,7 +428,7 @@ describe("agent-job worker — MAX_ITERATIONS reached", () => {
       },
       {
         iteration: 2,
-        qualityScore: 81,
+        qualityScore: 85,
         ifcUrl: "https://r2.example/iter-2.ifc",
         entityCount: 1300,
         costUsd: 0.45,
@@ -360,10 +452,17 @@ describe("agent-job worker — MAX_ITERATIONS reached", () => {
       bestIteration: 2,
     });
     mocks.prisma.briefToIfcV3Run.updateMany.mockResolvedValue({ count: 1 });
+    // Iteration 3's generator returns a BAD build (lower than prior
+    // iteration 2's 85). Under δ.2 composite this scores well below
+    // threshold; combined with iteration=3 (max), should COMPLETE
+    // with iteration 2 as best.
     mocks.runGenerator.mockResolvedValue(
-      makeGeneratorResult({ ifcUrl: "https://r2.example/iter-3.ifc", entityCount: 900 }),
+      makeGeneratorResult({
+        ifcUrl: "https://r2.example/iter-3.ifc",
+        entityCount: 900,
+        finalValidation: makeBadValidation(),
+      }),
     );
-    // parts=0.85, verified=false → score = 68 → REGRESSION
     mocks.verifyBuild.mockResolvedValue(makeVerifierReport(0.85, false));
 
     const res = await POST(makeRequest({ runId: "run-1", iteration: 3 }));
@@ -451,7 +550,10 @@ describe("agent-job worker — QStash enqueue failure fallback", () => {
       bestIteration: null,
     });
     mocks.prisma.briefToIfcV3Run.updateMany.mockResolvedValue({ count: 1 });
-    mocks.runGenerator.mockResolvedValue(makeGeneratorResult());
+    // Below-threshold build so the worker tries to enqueue iter 2.
+    mocks.runGenerator.mockResolvedValue(
+      makeGeneratorResult({ finalValidation: makeBadValidation() }),
+    );
     mocks.verifyBuild.mockResolvedValue(makeVerifierReport(0.5, false));
     mocks.generateRetryHint.mockResolvedValue({
       hint: "Try again.",

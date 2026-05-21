@@ -214,7 +214,12 @@ describe("Direct Agent Mode — E2E Integration (Phase gamma.1)", () => {
   });
 
   it("quality threshold and max iterations match constants", () => {
-    expect(QUALITY_THRESHOLD).toBe(75);
+    // δ.2 raised the threshold from 75 → 80 alongside the new composite
+    // quality formula (see PHASE_DELTA_2_2026-05-21.md §0.4). The old
+    // value (75) was tuned to the broken legacy parts_coverage-only
+    // formula; the new value is calibrated to the composite's
+    // distribution (perfect ≈ 96, borderline ≈ 70-79, gray box ≈ 45).
+    expect(QUALITY_THRESHOLD).toBe(80);
     expect(RENDER_PREVIEW_BUDGET).toBe(10);
     expect(AGENT_MAX_TURNS_DIRECT_MODE).toBe(200);
   });

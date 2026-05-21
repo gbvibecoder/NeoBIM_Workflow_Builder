@@ -35,8 +35,29 @@ export const RENDER_PREVIEW_BUDGET = 10;
 
 // ─── Retry / iteration ────────────────────────────────────────────
 
-/** Quality threshold below which the pipeline iterates. */
-export const QUALITY_THRESHOLD = 75;
+/**
+ * Quality threshold below which the δ.3 iteration loop retries.
+ *
+ * Pre-δ.2 value: 75, tuned to the broken legacy formula
+ *   `parts_coverage * 80 + (verified ? 20 : 0)`
+ * which defaulted to 1.0 when the brief had no decomposed furniture
+ * — so the loop almost always passed on iteration 1 regardless of
+ * build quality.
+ *
+ * δ.2 value: 80. Re-derived against the new composite metric in
+ * `quality-score.ts` (PHASE_DELTA_2_2026-05-21.md §0.4). The new
+ * formula's natural distribution:
+ *   - Truly perfect build → 96
+ *   - Good with minor issues → 82-91
+ *   - Borderline good → 70-79  ← threshold sits at the top of this band
+ *   - Gray box → 45-50
+ *   - Broken → 0-25
+ * Threshold 80 lets unambiguously-good builds pass on iteration 1
+ * (no wasted spend) and forces borderline cases to retry once with the
+ * retry hint — they either improve to ≥80 or get accepted as
+ * best-so-far at MAX_ITERATIONS=3.
+ */
+export const QUALITY_THRESHOLD = 80;
 
 /** Maximum total iterations (initial build + retries). */
 export const MAX_ITERATIONS = 3;

@@ -78,6 +78,10 @@ import {
   decideIteration,
   findBestIterationIdx,
 } from "@/features/brief-to-ifc/v3/iteration-decisions";
+import {
+  computeLegacyQualityScore,
+  computeQualityScore,
+} from "@/features/brief-to-ifc/v3/quality-score";
 
 export const maxDuration = 800;
 
@@ -328,7 +332,15 @@ export async function POST(req: NextRequest) {
       telemetry.setGeneratorCostUsd(built.result.costUsd);
       telemetry.setEntityCount(built.result.entityCount);
       telemetry.setFinalized(built.result.ok);
+      // δ.2 — record BOTH scores side-by-side (Rule 6).
+      // `finalQualityScore` is the NEW composite (what the loop gates
+      // on); `legacyQualityScore` is the OLD broken formula recomputed
+      // for validation that the new metric tracks reality better.
       telemetry.setFinalQualityScore(built.qualityScore);
+      telemetry.setLegacyQualityScore(built.legacyQualityScore);
+      telemetry.setQualityBreakdown(
+        built.qualityBreakdown as unknown as Record<string, unknown>,
+      );
       if (built.verifierReport && built.verifierReport.source !== "railway") {
         telemetry.recordRailwayError({
           endpoint: "/api/v3/verifier/check-build",
@@ -613,7 +625,18 @@ export async function POST(req: NextRequest) {
 
 interface BuiltIteration {
   result: GeneratorResult;
+  /** Phase δ.2 — the composite quality score (0-100) from
+   *  `computeQualityScore`. This is what the δ.3 iteration loop
+   *  gates on. */
   qualityScore: number;
+  /** Phase δ.2 — the legacy `parts_coverage * 80 + verified * 20`
+   *  score, recomputed in parallel for backward-compat telemetry
+   *  validation. The loop does NOT gate on this. */
+  legacyQualityScore: number;
+  /** Phase δ.2 — structured breakdown of every sub-signal that fed
+   *  the composite. Persisted in BuildTelemetry so we can answer
+   *  "why did this build score X" from logs alone. */
+  qualityBreakdown: ReturnType<typeof computeQualityScore>;
   verifierReport: VerifierReport | null;
 }
 
@@ -636,30 +659,61 @@ async function runIterationAndVerify(args: {
     onTurn: args.onTurn,
   });
 
-  // Generator failed — no verifier call; return zero score.
+  // Generator failed — no verifier call; return zero score on both
+  // metrics. The empty breakdown signals "no signals available" so
+  // the loop will retry or accept-best as appropriate.
   if (!result.ok || !result.ifcUrl) {
-    return { result, qualityScore: 0, verifierReport: null };
+    const emptyBreakdown = computeQualityScore({
+      briefSpec: args.briefSpec,
+      finalValidation: null,
+      verifierReport: null,
+      visionReport: null,
+    });
+    return {
+      result,
+      qualityScore: 0,
+      legacyQualityScore: 0,
+      qualityBreakdown: emptyBreakdown,
+      verifierReport: null,
+    };
   }
 
   let verifierReport: VerifierReport | null = null;
-  let qualityScore = 0;
   try {
     verifierReport = await verifyBuild(result.ifcUrl, args.briefSpec);
-    qualityScore = Math.round(
-      verifierReport.parts_coverage * 80 +
-        (verifierReport.verified ? 20 : 0),
-    );
   } catch (err) {
-    // Verifier blew up. Accept the build as-is with score 0 (will
-    // typically trigger a retry); never mask the IFC artifact.
+    // Verifier blew up. Score from whatever signals remain — the
+    // structural+sanity signals come from finalValidation (already
+    // present on result), so the composite still produces a meaningful
+    // number. Never mask the IFC artifact.
     console.warn(
-      `[agent-job] verifier threw, accepting build as-is: ${
+      `[agent-job] verifier threw, scoring from validation only: ${
         err instanceof Error ? err.message : String(err)
       }`,
     );
   }
 
-  return { result, qualityScore, verifierReport };
+  // Phase δ.2 — composite score (gate) + legacy score (telemetry).
+  // The δ.3 loop now gates on `qualityScore`; `legacyQualityScore` is
+  // logged side-by-side for real-run validation that the new metric
+  // tracks reality better. Vision is null this phase — wiring the
+  // post-finalize vision call is a follow-on integration (the metric
+  // architecture accepts it whenever wired).
+  const qualityBreakdown = computeQualityScore({
+    briefSpec: args.briefSpec,
+    finalValidation: result.finalValidation,
+    verifierReport,
+    visionReport: null,
+  });
+  const legacyQualityScore = computeLegacyQualityScore(verifierReport);
+
+  return {
+    result,
+    qualityScore: qualityBreakdown.score,
+    legacyQualityScore,
+    qualityBreakdown,
+    verifierReport,
+  };
 }
 
 /**
@@ -793,6 +847,8 @@ async function emitChainSummary(args: {
       entityCount: best?.entityCount ?? 0,
       renderPreviewCalls: 0,
       finalQualityScore: best?.qualityScore ?? null,
+      legacyQualityScore: null,
+      qualityBreakdown: null,
       counts: {
         schemaCoercions: 0,
         schemaRejections: 0,
