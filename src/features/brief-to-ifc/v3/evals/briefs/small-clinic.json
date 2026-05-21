@@ -1,0 +1,61 @@
+{
+  "project": {
+    "name": "Small Medical Clinic",
+    "type": "hospital",
+    "location": "Mumbai Andheri",
+    "description": "A single-storey 12x10m medical clinic: reception, 3 consult rooms, a small lab, and a restroom. Single floor with flat roof. Phase ε regression brief — exercises 'hospital' project type (previously enum-only, never tested live), room subdivision via internal partitions, and small-scale healthcare layout."
+  },
+  "site": {
+    "bounds_m": [12.0, 10.0],
+    "height_limit_m": 4.0,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    { "id": "SP-RECEPTION", "name": "SP-RECEPTION", "long_name": "Reception and Waiting", "polygon_world_m": [[0.0, 0.0], [6.0, 0.0], [6.0, 4.0], [0.0, 4.0]], "height_m": 3.0, "occupancy_type": "Reception/Waiting" },
+    { "id": "SP-CONSULT-1", "name": "SP-CONSULT-1", "long_name": "Consult Room 1", "polygon_world_m": [[0.0, 4.0], [3.5, 4.0], [3.5, 7.0], [0.0, 7.0]], "height_m": 3.0, "occupancy_type": "Consult Room" },
+    { "id": "SP-CONSULT-2", "name": "SP-CONSULT-2", "long_name": "Consult Room 2", "polygon_world_m": [[0.0, 7.0], [3.5, 7.0], [3.5, 10.0], [0.0, 10.0]], "height_m": 3.0, "occupancy_type": "Consult Room" },
+    { "id": "SP-CONSULT-3", "name": "SP-CONSULT-3", "long_name": "Consult Room 3", "polygon_world_m": [[3.5, 4.0], [7.0, 4.0], [7.0, 7.0], [3.5, 7.0]], "height_m": 3.0, "occupancy_type": "Consult Room" },
+    { "id": "SP-LAB", "name": "SP-LAB", "long_name": "Pathology Lab", "polygon_world_m": [[7.0, 0.0], [12.0, 0.0], [12.0, 6.0], [7.0, 6.0]], "height_m": 3.0, "occupancy_type": "Laboratory" },
+    { "id": "SP-RESTROOM", "name": "SP-RESTROOM", "long_name": "Restroom", "polygon_world_m": [[7.0, 6.0], [12.0, 6.0], [12.0, 10.0], [7.0, 10.0]], "height_m": 3.0, "occupancy_type": "Toilet" }
+  ],
+  "elements": [
+    { "id": "SLAB-FLOOR", "type": "slab", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [12.0, 10.0, 0.15], "material_id": "mat-concrete", "description": "Ground floor slab", "object_type": "Floor Slab", "tag": "SLAB-FLOOR" },
+    { "id": "WALL-EXT-N", "type": "wall", "origin_world_m": [0.0, 9.85, 0.0], "dims_m": [12.0, 0.15, 3.0], "material_id": "mat-paint-white", "description": "External north wall", "object_type": "External Wall", "tag": "WALL-EXT-N" },
+    { "id": "WALL-EXT-S", "type": "wall", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [12.0, 0.15, 3.0], "material_id": "mat-paint-white", "description": "External south wall", "object_type": "External Wall", "tag": "WALL-EXT-S" },
+    { "id": "WALL-EXT-E", "type": "wall", "origin_world_m": [11.85, 0.0, 0.0], "dims_m": [0.15, 10.0, 3.0], "material_id": "mat-paint-white", "description": "External east wall", "object_type": "External Wall", "tag": "WALL-EXT-E" },
+    { "id": "WALL-EXT-W", "type": "wall", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [0.15, 10.0, 3.0], "material_id": "mat-paint-white", "description": "External west wall", "object_type": "External Wall", "tag": "WALL-EXT-W" },
+
+    { "id": "WALL-INT-A", "type": "wall", "origin_world_m": [0.0, 4.0, 0.0], "dims_m": [7.0, 0.1, 3.0], "material_id": "mat-paint-white", "description": "Partition between reception and consult rooms", "object_type": "Partition", "tag": "WALL-INT-A" },
+    { "id": "WALL-INT-B", "type": "wall", "origin_world_m": [0.0, 7.0, 0.0], "dims_m": [3.5, 0.1, 3.0], "material_id": "mat-paint-white", "description": "Partition between consult 1 and consult 2", "object_type": "Partition", "tag": "WALL-INT-B" },
+    { "id": "WALL-INT-C", "type": "wall", "origin_world_m": [3.5, 4.0, 0.0], "dims_m": [0.1, 3.0, 3.0], "material_id": "mat-paint-white", "description": "Partition between consult 1/2 and consult 3", "object_type": "Partition", "tag": "WALL-INT-C" },
+    { "id": "WALL-INT-D", "type": "wall", "origin_world_m": [7.0, 0.0, 0.0], "dims_m": [0.1, 10.0, 3.0], "material_id": "mat-paint-white", "description": "Partition reception/consult vs lab/restroom", "object_type": "Partition", "tag": "WALL-INT-D" },
+    { "id": "WALL-INT-E", "type": "wall", "origin_world_m": [7.0, 6.0, 0.0], "dims_m": [5.0, 0.1, 3.0], "material_id": "mat-paint-white", "description": "Partition between lab and restroom", "object_type": "Partition", "tag": "WALL-INT-E" },
+
+    { "id": "DOOR-MAIN", "type": "door", "origin_world_m": [3.0, 0.0, 0.0], "dims_m": [1.2, 0.15, 2.1], "material_id": "mat-glass", "description": "Main entrance glass door", "object_type": "Entrance Door", "tag": "DOOR-MAIN" },
+    { "id": "DOOR-C1", "type": "door", "origin_world_m": [1.5, 4.0, 0.0], "dims_m": [0.9, 0.1, 2.1], "material_id": "mat-wood", "description": "Consult room 1 door", "object_type": "Interior Door", "tag": "DOOR-C1" },
+    { "id": "DOOR-C2", "type": "door", "origin_world_m": [1.5, 7.0, 0.0], "dims_m": [0.9, 0.1, 2.1], "material_id": "mat-wood", "description": "Consult room 2 door", "object_type": "Interior Door", "tag": "DOOR-C2" },
+    { "id": "DOOR-C3", "type": "door", "origin_world_m": [5.0, 4.0, 0.0], "dims_m": [0.9, 0.1, 2.1], "material_id": "mat-wood", "description": "Consult room 3 door", "object_type": "Interior Door", "tag": "DOOR-C3" },
+
+    { "id": "FURN-RECEP-DESK", "type": "furniture", "origin_world_m": [4.0, 0.5, 0.0], "dims_m": [1.8, 0.6, 1.1], "material_id": "mat-laminate", "description": "Reception desk", "object_type": "Reception Desk", "tag": "FURN-RECEP-DESK", "contained_in_space_id": "SP-RECEPTION" },
+    { "id": "FURN-EXAM-1", "type": "furniture", "origin_world_m": [0.5, 5.0, 0.0], "dims_m": [1.9, 0.7, 0.75], "material_id": "mat-laminate", "description": "Exam table consult 1", "object_type": "Exam Table", "tag": "FURN-EXAM-1", "contained_in_space_id": "SP-CONSULT-1" },
+    { "id": "FURN-LAB-BENCH", "type": "furniture", "origin_world_m": [7.5, 0.5, 0.0], "dims_m": [4.0, 0.7, 0.9], "material_id": "mat-laminate", "description": "Lab bench", "object_type": "Lab Bench", "tag": "FURN-LAB-BENCH", "contained_in_space_id": "SP-LAB" },
+
+    { "id": "ROOF-CLINIC", "type": "roof", "origin_world_m": [0.0, 0.0, 3.0], "dims_m": [12.0, 10.0, 0.15], "material_id": "mat-concrete", "description": "Flat RCC roof over the clinic footprint", "object_type": "Flat Roof", "tag": "ROOF-CLINIC" },
+
+    { "id": "LIGHT-R", "type": "lighting", "origin_world_m": [3.0, 2.0, 2.9], "dims_m": [0.6, 0.6, 0.05], "material_id": "mat-aluminium", "description": "Reception LED panel", "object_type": "LED Panel", "tag": "LIGHT-R" },
+    { "id": "LIGHT-LAB", "type": "lighting", "origin_world_m": [9.5, 3.0, 2.9], "dims_m": [0.6, 0.6, 0.05], "material_id": "mat-aluminium", "description": "Lab LED panel", "object_type": "LED Panel", "tag": "LIGHT-LAB" }
+  ],
+  "materials": [
+    { "id": "mat-concrete", "name": "RCC Concrete", "rgb": [0.7, 0.7, 0.7], "roughness": 0.85, "method": "MATT", "category": "concrete" },
+    { "id": "mat-paint-white", "name": "White Paint", "rgb": [0.95, 0.95, 0.93], "roughness": 0.75, "method": "MATT", "category": "paint" },
+    { "id": "mat-glass", "name": "Float Glass", "rgb": [0.7, 0.85, 0.95], "roughness": 0.05, "method": "PHONG", "category": "glass" },
+    { "id": "mat-wood", "name": "Solid Wood", "rgb": [0.62, 0.45, 0.32], "roughness": 0.6, "method": "MATT", "category": "wood" },
+    { "id": "mat-laminate", "name": "Laminate", "rgb": [0.88, 0.85, 0.78], "roughness": 0.5, "method": "MATT", "category": "finish" },
+    { "id": "mat-aluminium", "name": "Brushed Aluminium", "rgb": [0.82, 0.82, 0.85], "roughness": 0.35, "method": "METAL", "category": "metal" }
+  ],
+  "brand_language": {
+    "primary_text": "Medical Clinic",
+    "approved_terms": ["Clinic", "Consult", "Reception", "Lab"],
+    "forbidden_terms": []
+  }
+}
