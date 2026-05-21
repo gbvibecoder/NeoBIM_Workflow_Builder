@@ -545,6 +545,52 @@ export const specPatchSchema = z.object({
   payload: z.unknown(),
 });
 
+// ─── Phase δ.3: Per-iteration QStash chain state ─────────────────────
+
+/**
+ * One entry in `BriefToIfcV3Run.iterationHistory` (Json column, added
+ * by migration `20260521120000_v3_iteration_chain`). Persisted across
+ * QStash hops so each worker invocation can compute best-so-far and
+ * the final COMPLETED transition can lift the best iteration's
+ * artifacts into the user-facing row fields. Append-only — never
+ * mutated after write.
+ */
+export interface IterationHistoryEntry {
+  /** 1-based iteration number. Matches the QStash payload's iteration. */
+  iteration: number;
+  /** Quality score from the existing (known-broken) verifier metric.
+   *  δ.3 chains around whichever score the metric returns; δ.2 swaps
+   *  the formula later. */
+  qualityScore: number;
+  /** R2 URL of the IFC produced by this iteration. Empty string only
+   *  when the iteration's generator failed before finalize_ifc. */
+  ifcUrl: string;
+  /** Entity count from this iteration's IFC. 0 if generator failed. */
+  entityCount: number;
+  /** Cost in USD for this iteration's generator run (single iteration). */
+  costUsd: number;
+  /** Wall-clock duration of this iteration in ms (worker entry → exit). */
+  durationMs: number;
+  /** Number of agent turns this iteration consumed. */
+  turns: number;
+  /** Verifier source — "railway" | "heuristic_fallback" | "unavailable". */
+  verifierSource: string;
+  /** ISO timestamp when this iteration finished. */
+  finishedAt: string;
+  /** Compressed prior-state summary forwarded to iteration N+1 (if
+   *  any). Empty string when this is the terminal iteration. */
+  forwardFeedback?: string;
+  /** Full SandboxValidateResult — lifted to the run's `finalValidation`
+   *  column when this iteration is selected as best on COMPLETED. */
+  finalValidation?: SandboxValidateResult | null;
+  /** Per-turn token+cost ledger — lifted to the run's `ledger` column
+   *  on COMPLETED if this iteration is best. */
+  ledger?: AgentTokenLedgerEntry[];
+  /** Per-turn tool records — lifted to the run's `turnRecords` column
+   *  on COMPLETED if this iteration is best. */
+  turnRecords?: AgentTurnRecord[];
+}
+
 export const iterationResultSchema = z.object({
   iteration: z.number().int().min(1).max(3),
   ifcUrl: z.string(),

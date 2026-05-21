@@ -4,43 +4,100 @@
  * QStash-triggered background worker for ONE iteration of the v3 agent
  * build. Each iteration gets its own Vercel invocation (800s budget).
  *
- * Phase gamma.3 fix: the iteration loop was originally inlined in a
- * single function (780s wall-clock cap killed it at 787s). Now each
- * iteration is a separate QStash job:
+ * Phase δ.3 — per-iteration QStash chaining (kills the dead loop).
  *
- *   Iteration 1: QStash → agent-job → build → verify
- *     quality < 75? → save hint + enqueue iteration 2 → return 200
- *   Iteration 2: QStash → agent-job → build with feedback → verify
- *     quality >= 75? → finalize → return 200
+ *   Iteration 1: QStash → agent-job → atomic counter=1 → build → verify
+ *     - quality ≥ threshold       → COMPLETED with this iteration's result
+ *     - quality < threshold       → append to iterationHistory, enqueue
+ *                                   iteration 2 with compressed prior state
+ *   Iteration N: QStash → agent-job → atomic counter=N → build → verify
+ *     - quality ≥ threshold OR N == MAX_ITERATIONS → COMPLETED with BEST
+ *       iteration's artifacts (never a regressed later iteration)
+ *     - quality < threshold and iterations remain → enqueue iteration N+1
  *
- * State between iterations: the run DB row carries the IFC URL and
- * quality from each iteration. The QStash payload carries briefText,
- * suggestions, previousFeedback, iteration counter.
+ * Idempotency (Rule 8): the atomic counter check-and-set against
+ * `BriefToIfcV3Run.currentIteration` is the authoritative guard. A
+ * duplicate QStash delivery of iteration N finds `currentIteration`
+ * already at N (or beyond), the conditional `updateMany` reports
+ * `count: 0`, and the worker returns 200 OK without doing the work.
+ * The `Upstash-Deduplication-Id` header is a belt-and-braces measure
+ * at the queue layer.
+ *
+ * Runaway guard (Rule 3): three independent stop conditions, all
+ * enforced — quality ≥ threshold, iteration ≥ MAX_ITERATIONS, hard
+ * failure. The runaway-guard assertion at the top refuses any
+ * iteration > MAX_ITERATIONS even with a logic bug elsewhere.
+ *
+ * Best-so-far (Rule 5): each iteration appends its result to
+ * iterationHistory. The bestIteration field tracks the highest-quality
+ * entry. The final COMPLETED transition lifts the best iteration's
+ * IFC/entityCount/finalValidation/ledger/turnRecords into the run's
+ * user-facing columns — never a worse later iteration.
+ *
+ * Compressed prior state (Rule 6): when re-enqueueing iteration N+1,
+ * we build a compact summary of iteration N's IFC state + verifier
+ * findings via `buildPriorStateSummary`, prepend it to the retry hint,
+ * and pass it as `previousFeedback` in the new QStash payload. The
+ * agent's existing slot in driver.ts:391-396 renders it under
+ * "## PREVIOUS ITERATION FEEDBACK".
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-// scheduleAgentBuildWorker imported for future per-iteration chaining (δ.3)
-import { verifyQstashSignature } from "@/lib/qstash";
+import {
+  verifyQstashSignature,
+  scheduleAgentBuildWorker,
+} from "@/lib/qstash";
 import type { AgentBuildWorkerPayload } from "@/lib/qstash";
-import { runBackground } from "@/features/brief-to-ifc/v3/runtime/background-runner";
 import { runGenerator } from "@/features/brief-to-ifc/v3/generator/driver";
-import type { GeneratorResult } from "@/features/brief-to-ifc/v3/types";
+import type {
+  AgentInputSuggestions,
+  BriefSpec,
+  GeneratorResult,
+  IterationHistoryEntry,
+  VerifierReport,
+} from "@/features/brief-to-ifc/v3/types";
 import { appendLog } from "@/features/brief-to-ifc/v3/runtime/append-log";
-import { toBriefToIfcV3ErrorCode } from "@/features/brief-to-ifc/v3/lifecycle/error-codes";
+import {
+  toBriefToIfcV3ErrorCode,
+  type BriefToIfcV3ErrorCode,
+} from "@/features/brief-to-ifc/v3/lifecycle/error-codes";
 import { verifyBuild } from "@/features/brief-to-ifc/v3/hard-verifier";
 import { generateRetryHint } from "@/features/brief-to-ifc/v3/retry-hint";
+import { transitionStatus } from "@/features/brief-to-ifc/v3/lifecycle/transitions";
+import { startHeartbeat } from "@/features/brief-to-ifc/v3/lifecycle/heartbeat";
 import { QUALITY_THRESHOLD, MAX_ITERATIONS } from "@/features/brief-to-ifc/v3/constants";
-import type { BriefSpec, AgentInputSuggestions } from "@/features/brief-to-ifc/v3/types";
 import {
   BuildTelemetryCollector,
+  emitBuildTelemetry,
   snapshotAndEmit,
 } from "@/features/brief-to-ifc/v3/telemetry";
+import { buildPriorStateSummary } from "@/features/brief-to-ifc/v3/prior-state-summary";
+import {
+  assertSafeEnqueue,
+  decideIteration,
+  findBestIterationIdx,
+} from "@/features/brief-to-ifc/v3/iteration-decisions";
 
 export const maxDuration = 800;
 
+/** Per-iteration wall-clock budget. 50s below Vercel's 800s ceiling to
+ *  leave room for the post-build verifier + retry-hint LLM call + QStash
+ *  re-enqueue before the function is killed. */
+const ITERATION_TIMEOUT_MS = 750_000;
+
+/** Sentinel error used by the timeout race so the worker can distinguish
+ *  a generator timeout from other failures. */
+class IterationTimeoutError extends Error {
+  readonly code = "EXECUTION_TIMEOUT";
+  constructor(timeoutMs: number) {
+    super(`Iteration exceeded ${timeoutMs} ms wall-clock budget.`);
+    this.name = "IterationTimeoutError";
+  }
+}
+
 export async function POST(req: NextRequest) {
-  // ── QStash signature verification ──
+  // ── 1. QStash signature verification (unchanged from γ.3) ──
   const rawBody = await req.text();
   const signature = req.headers.get("upstash-signature");
 
@@ -51,7 +108,6 @@ export async function POST(req: NextRequest) {
   if (!skipVerify) {
     const valid = await verifyQstashSignature(signature, rawBody);
     if (!valid) {
-      // eslint-disable-next-line no-console
       console.warn("[agent-job] rejected — invalid or missing QStash signature");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -71,13 +127,46 @@ export async function POST(req: NextRequest) {
 
   const briefText = typeof payload.briefText === "string" ? payload.briefText : undefined;
   const suggestions = payload.suggestions as AgentInputSuggestions | undefined;
-  const iteration = typeof payload.iteration === "number" ? payload.iteration : 1;
-  const previousFeedback = typeof payload.previousFeedback === "string" ? payload.previousFeedback : undefined;
+  const rawIteration = typeof payload.iteration === "number" ? payload.iteration : 1;
+  const iteration = Math.max(1, Math.floor(rawIteration));
+  const previousFeedback =
+    typeof payload.previousFeedback === "string" ? payload.previousFeedback : undefined;
 
-  // ── Load run from DB ──
+  // ── 2. RUNAWAY GUARD (Rule 3) — hard ceiling assertion ──
+  // No code path may enqueue past MAX_ITERATIONS, but the worker itself
+  // refuses to act on a payload that already breached the ceiling. This
+  // is the inner-circle defense against an upstream logic bug billing
+  // an infinite QStash chain.
+  if (iteration > MAX_ITERATIONS) {
+    console.warn(
+      `[agent-job] runaway guard: iteration ${iteration} > MAX_ITERATIONS=${MAX_ITERATIONS}. ` +
+        `Refusing run ${runId}.`,
+    );
+    await appendLog(prisma, {
+      executionId: runId,
+      level: "ERROR",
+      source: "LIFECYCLE",
+      message: `Runaway guard tripped: iteration=${iteration}, max=${MAX_ITERATIONS}`,
+      metadata: { iteration, max: MAX_ITERATIONS, runawayGuard: true },
+    });
+    return NextResponse.json(
+      { error: "iteration > MAX_ITERATIONS", iteration, max: MAX_ITERATIONS },
+      { status: 400 },
+    );
+  }
+
+  // ── 3. Load run from DB ──
   const run = await prisma.briefToIfcV3Run.findUnique({
     where: { id: runId },
-    select: { id: true, status: true, briefSpec: true, costCapUsd: true },
+    select: {
+      id: true,
+      status: true,
+      briefSpec: true,
+      costCapUsd: true,
+      currentIteration: true,
+      iterationHistory: true,
+      bestIteration: true,
+    },
   });
 
   if (!run) {
@@ -92,12 +181,56 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Run has no briefSpec snapshot" }, { status: 400 });
   }
 
-  // ── Phase δ.0 — BuildTelemetry collector ─────────────────────────
-  // Per-iteration structured record of what happens during this build
-  // (proxy fallbacks, schema coercions, tool errors, turn counts, etc.).
-  // Construction never throws (constructor is pure assignment), but
-  // every method on the collector is internally try/caught so a
-  // telemetry failure can never propagate up and abort the build.
+  // ── 4. ATOMIC counter check-and-set (Rule 8 — primary idempotency) ──
+  // Only proceed if currentIteration is exactly N-1. Duplicate / stale
+  // QStash deliveries find a mismatch and drop silently. Iteration 1
+  // additionally accepts PENDING → RUNNING; iteration N>1 requires
+  // status to already be RUNNING.
+  const claim = await prisma.briefToIfcV3Run.updateMany({
+    where: {
+      id: runId,
+      currentIteration: iteration - 1,
+      status: iteration === 1 ? { in: ["PENDING", "RUNNING"] } : "RUNNING",
+    },
+    data: {
+      currentIteration: iteration,
+      status: "RUNNING",
+      lastHeartbeatAt: new Date(),
+      ...(iteration === 1 ? { startedAt: new Date() } : {}),
+    },
+  });
+
+  if (claim.count === 0) {
+    // Duplicate or out-of-order delivery. Log and ack — never throw,
+    // never enqueue, never bill.
+    await appendLog(prisma, {
+      executionId: runId,
+      level: "WARN",
+      source: "LIFECYCLE",
+      message:
+        `iteration ${iteration} dropped — atomic counter mismatch ` +
+        `(observed currentIteration=${run.currentIteration}, status=${run.status})`,
+      metadata: {
+        iteration,
+        observedCounter: run.currentIteration,
+        observedStatus: run.status,
+        droppedReason: "duplicate_or_stale",
+      },
+    });
+    return NextResponse.json({ status: "duplicate", iteration });
+  }
+
+  // ── 5. Build the agent's "previousFeedback" (compressed prior state
+  //      + retry hint). On iteration 1 it stays whatever the original
+  //      enqueuer set (typically undefined). On iteration N>1 the
+  //      QStash payload already carries the compressed string produced
+  //      by iteration N-1's worker. ──
+  const effectivePreviousFeedback = previousFeedback;
+  const iterationHistory: IterationHistoryEntry[] = Array.isArray(run.iterationHistory)
+    ? (run.iterationHistory as unknown as IterationHistoryEntry[])
+    : [];
+
+  // ── 6. Per-iteration BuildTelemetryCollector (δ.0 reuse) ──
   const telemetry = new BuildTelemetryCollector({
     runId,
     iteration,
@@ -111,241 +244,609 @@ export async function POST(req: NextRequest) {
     /* swallow — telemetry never crashes the build */
   }
 
-  // ── Run ONE iteration of the agent build ──
+  // ── 7. Heartbeat + timeout race ──
+  const heartbeat = startHeartbeat(prisma, runId, {});
+  const iterationStartMs = Date.now();
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
   try {
-    await runBackground({
-      prisma,
-      runId,
-      // Single iteration budget: 750s (50s below Vercel's 800s ceiling,
-      // leaving room for the post-build verify + hint generation + QStash
-      // re-enqueue before Vercel kills the function).
-      timeoutMs: 750_000,
-      fn: async (ctx) => {
-        await ctx.log("INFO", "GENERATE",
-          `Iteration ${iteration} starting (γ.3 worker). ` +
-          `briefText=${briefText ? `${briefText.length}ch` : "absent"}, ` +
-          `hasFeedback=${!!previousFeedback}`);
+    await appendLog(prisma, {
+      executionId: runId,
+      level: "INFO",
+      source: "GENERATE",
+      message:
+        `Iteration ${iteration} starting (δ.3 chained worker). ` +
+        `briefText=${briefText ? `${briefText.length}ch` : "absent"}, ` +
+        `hasFeedback=${!!effectivePreviousFeedback}, ` +
+        `historyLength=${iterationHistory.length}`,
+      metadata: {
+        iteration,
+        max: MAX_ITERATIONS,
+        priorIterations: iterationHistory.length,
+      },
+    });
 
-        // ── 1. Run the generator for this iteration ──
-        const result = await runGenerator({
-          brief: briefSpec,
-          briefText,
-          suggestions,
-          previousFeedback,
-          iteration,
-          telemetry,
-          onTurn: (record) => {
-            // Record render_preview calls and tool errors into
-            // BuildTelemetry alongside the existing per-turn log row.
-            try {
-              if (record.toolName === "render_preview") {
-                telemetry.recordRenderPreviewCall();
-              }
-              if (!record.toolOk) {
-                telemetry.recordToolError();
-              }
-            } catch {
-              /* swallow — telemetry never crashes the build */
-            }
-            void appendLog(prisma, {
-              executionId: runId,
-              level: "INFO",
-              source: "TOOL_CALL",
-              message:
-                `[iter${iteration}] Turn ${record.turn}: ${record.toolName ?? "<no tool>"} ` +
-                `(${record.toolDurationMs}ms, ` +
-                `${record.toolOk ? "ok" : "FAIL " + (record.toolErrorType ?? "?")})`,
-              metadata: {
-                turn: record.turn,
-                toolName: record.toolName,
-                toolDurationMs: record.toolDurationMs,
-                toolOk: record.toolOk,
-                toolErrorType: record.toolErrorType,
-                iteration,
-              },
-            });
-          },
-        });
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new IterationTimeoutError(ITERATION_TIMEOUT_MS));
+      }, ITERATION_TIMEOUT_MS);
+      if (timeoutHandle && typeof timeoutHandle.unref === "function") {
+        timeoutHandle.unref();
+      }
+    });
 
-        // δ.0 — record generator stats into telemetry. Done BEFORE the
-        // error check so failed builds still produce a telemetry row.
-        try {
-          telemetry.setTurns(result.turns);
-          telemetry.setGeneratorCostUsd(result.costUsd);
-          telemetry.setEntityCount(result.entityCount);
-          telemetry.setFinalized(result.ok);
-        } catch {
-          /* swallow */
-        }
-
-        if (!result.ok) {
-          throw Object.assign(
-            new Error(result.error?.message ?? "generator failed"),
-            { code: toBriefToIfcV3ErrorCode(result.error?.code) },
-          );
-        }
-
-        await ctx.log("INFO", "GENERATE",
-          `Iteration ${iteration} build done: ${result.entityCount} entities, ` +
-          `${result.turns} turns, $${result.costUsd.toFixed(3)}`);
-
-        // ── 2. Post-build: Hard Verifier ──
-        let qualityScore = 0;
-        let shouldIterate = false;
-        let hint = "";
-
-        try {
-          const verifierReport = await verifyBuild(result.ifcUrl!, briefSpec);
-          qualityScore = Math.round(
-            verifierReport.parts_coverage * 80 +
-            (verifierReport.verified ? 20 : 0),
-          );
-
-          // δ.0 — preserve the existing (known-broken) score in telemetry
-          // so δ.2's replacement metric can compare side-by-side.
+    // ── 8. Run generator + verifier (raced against the timeout) ──
+    const built = await Promise.race([
+      runIterationAndVerify({
+        briefSpec,
+        briefText,
+        suggestions,
+        previousFeedback: effectivePreviousFeedback,
+        iteration,
+        telemetry,
+        onTurn: (record) => {
           try {
-            telemetry.setFinalQualityScore(qualityScore);
-            if (verifierReport.source !== "railway") {
-              telemetry.recordRailwayError({
-                endpoint: "/api/v3/verifier/check-build",
-                kind: verifierReport.source,
-                message: verifierReport.summary,
-              });
+            if (record.toolName === "render_preview") {
+              telemetry.recordRenderPreviewCall();
+            }
+            if (!record.toolOk) {
+              telemetry.recordToolError();
             }
           } catch {
             /* swallow */
           }
-
-          await ctx.log("INFO", "GENERATE",
-            `Iteration ${iteration} verified: quality=${qualityScore}, ` +
-            `parts=${verifierReport.parts_coverage}, trim=${verifierReport.trim_coverage}`);
-
-          // ── 3. Quality gate ──
-          if (qualityScore < QUALITY_THRESHOLD && iteration < MAX_ITERATIONS) {
-            const hintResult = await generateRetryHint({
-              brief: briefText || briefSpec.project?.description || "",
+          void appendLog(prisma, {
+            executionId: runId,
+            level: "INFO",
+            source: "TOOL_CALL",
+            message:
+              `[iter${iteration}] Turn ${record.turn}: ${record.toolName ?? "<no tool>"} ` +
+              `(${record.toolDurationMs}ms, ` +
+              `${record.toolOk ? "ok" : "FAIL " + (record.toolErrorType ?? "?")})`,
+            metadata: {
+              turn: record.turn,
+              toolName: record.toolName,
+              toolDurationMs: record.toolDurationMs,
+              toolOk: record.toolOk,
+              toolErrorType: record.toolErrorType,
               iteration,
-              previousIfcUrl: result.ifcUrl!,
-              verifierReport,
-              visionReport: {
-                quality_score: qualityScore,
-                pass: false,
-                issues: [],
-                summary: `Quality ${qualityScore} below threshold`,
-                inspected_at: new Date().toISOString(),
-              },
-              qualityScore,
-            });
-
-            if (hintResult.shouldIterate && hintResult.hint) {
-              shouldIterate = true;
-              hint = hintResult.hint;
-              await ctx.log("INFO", "GENERATE",
-                `Retry hint generated (${hint.length}ch). Will enqueue iteration ${iteration + 1}.`);
-            }
-          } else {
-            await ctx.log("INFO", "GENERATE",
-              qualityScore >= QUALITY_THRESHOLD
-                ? `Quality ${qualityScore} >= ${QUALITY_THRESHOLD}. Build accepted.`
-                : `Max iterations (${MAX_ITERATIONS}) reached. Accepting quality ${qualityScore}.`);
-          }
-        } catch (verifyErr) {
-          await ctx.log("WARN", "GENERATE",
-            `Verification error: ${verifyErr instanceof Error ? verifyErr.message : String(verifyErr)}. Accepting build as-is.`);
-        }
-
-        // ── 4. If iterating, DON'T finalize — let runBackground write
-        //    a partial COMPLETED, then we'll re-enqueue. Actually: we
-        //    return the result so runBackground marks COMPLETED, then
-        //    AFTER that we enqueue the next iteration which creates a
-        //    fresh run or re-uses this one. ──
-        //
-        // Simpler approach: if iterating, we store this result but
-        // re-enqueue OUTSIDE runBackground (see below).
-        (result as GeneratorResult & { _shouldIterate?: boolean; _hint?: string })._shouldIterate = shouldIterate;
-        (result as GeneratorResult & { _hint?: string })._hint = hint;
-
-        return result;
-      },
-      toCompletedPayload: (result) => ({
-        ifcUrl: result.ifcUrl ?? "",
-        entityCount: result.entityCount,
-        finalValidation: result.finalValidation ?? undefined,
-        generatorCostUsd: result.costUsd,
-        generatorMs: result.durationMs,
-        turns: result.turns,
-        ledger: result.ledger,
-        turnRecords: result.turnRecords,
+            },
+          });
+        },
       }),
-    });
+      timeoutPromise,
+    ]);
 
-    // ── 5. After runBackground completes: check if we need another iteration ──
-    // Re-read the run to get the stored result and check the iterate flag.
-    // The runBackground already wrote COMPLETED. If we need to iterate,
-    // we transition back to RUNNING and enqueue the next iteration.
-    //
-    // Note: we can't easily pass _shouldIterate out of runBackground since
-    // it returns void. Instead, check the quality from the DB.
-    // But we stored it on the result. Let's use a simpler pattern:
-    // Read the logs to detect whether retry was triggered.
-    //
-    // Simplest: just read the log we wrote above with "Will enqueue iteration".
-    // Actually even simpler: we check quality from the completed row.
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+      timeoutHandle = null;
+    }
 
-    const completedRun = await prisma.briefToIfcV3Run.findUnique({
-      where: { id: runId },
-      select: { status: true, ifcUrl: true, entityCount: true },
-    });
+    // ── 9. Record stats into telemetry ──
+    try {
+      telemetry.setTurns(built.result.turns);
+      telemetry.setGeneratorCostUsd(built.result.costUsd);
+      telemetry.setEntityCount(built.result.entityCount);
+      telemetry.setFinalized(built.result.ok);
+      telemetry.setFinalQualityScore(built.qualityScore);
+      if (built.verifierReport && built.verifierReport.source !== "railway") {
+        telemetry.recordRailwayError({
+          endpoint: "/api/v3/verifier/check-build",
+          kind: built.verifierReport.source,
+          message: built.verifierReport.summary,
+        });
+      }
+    } catch {
+      /* swallow */
+    }
 
-    // If we need to iterate: the last log entry contains "Will enqueue iteration"
-    // For a robust check, query the execution logs.
-    // But the simplest approach: always check quality from verifier report.
-    // We don't have it easily here. Let's use a flag approach instead.
-
-    // For now, the quality loop works WITHIN runBackground for iteration 1.
-    // If hint was generated, we need to re-enqueue. But runBackground has
-    // already written COMPLETED. We need a different signaling approach.
-    //
-    // PRAGMATIC FIX: check if a hint was logged, and if so, revert status
-    // to RUNNING and enqueue the next iteration.
-
-    // Actually, let me use a much simpler pattern. Read the last few logs
-    // for this run and check for the "Will enqueue" marker.
-
-    // The quality loop across iterations (re-enqueue when score below
-    // threshold) is scheduled for Phase δ.3 — until then iterations 2-3
-    // are not wired, and MAX_ITERATIONS=3 is held in code but inactive.
-    // BuildTelemetry above truthfully records iteration=1 so the
-    // observability layer reflects the runtime reality, not the
-    // documented architecture.
-
-    // δ.0 — emit the final telemetry snapshot. Never crashes the build:
-    // snapshotAndEmit / emitBuildTelemetry / appendLog all swallow.
-    void snapshotAndEmit(prisma, telemetry).catch((err) => {
-      console.warn(
-        `[agent-job] telemetry emit swallowed unexpected error for run ${runId}: ` +
-          `${err instanceof Error ? err.message : String(err)}`,
+    // If the generator failed (ok=false), abort this iteration as a
+    // hard failure. We do NOT try to chain past a generator failure —
+    // that's a SEV that needs human attention, not more LLM spend.
+    if (!built.result.ok) {
+      throw Object.assign(
+        new Error(built.result.error?.message ?? "generator failed"),
+        { code: toBriefToIfcV3ErrorCode(built.result.error?.code) },
       );
+    }
+
+    await appendLog(prisma, {
+      executionId: runId,
+      level: "INFO",
+      source: "GENERATE",
+      message:
+        `Iteration ${iteration} verified: quality=${built.qualityScore}, ` +
+        `entities=${built.result.entityCount}, turns=${built.result.turns}, ` +
+        `$${built.result.costUsd.toFixed(3)}`,
+      metadata: {
+        iteration,
+        qualityScore: built.qualityScore,
+        verifierSource: built.verifierReport?.source ?? "unavailable",
+      },
     });
 
-    return NextResponse.json({ status: "ok", runId });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // eslint-disable-next-line no-console
-    console.error(`[agent-job] Worker failed for run ${runId}:`, msg);
+    // ── 10. DECISION: pass / retry / max (Rule 3 — three stop conditions) ──
+    const decision = decideIteration({
+      qualityScore: built.qualityScore,
+      iteration,
+      maxIterations: MAX_ITERATIONS,
+      qualityThreshold: QUALITY_THRESHOLD,
+    });
+    const passed = decision.kind === "completed" && decision.reason === "quality_passed";
+    const shouldRetry = decision.kind === "retry";
 
-    // δ.0 — emit telemetry on the failure path too. The collector has
-    // recorded everything up to the point of failure (turns, tool
-    // errors, partial render previews), so a failed build still
-    // produces an observable record. Fire-and-forget; do not let a
-    // telemetry-emit failure mask the original error.
+    // Build this iteration's history entry.
+    const iterationDurationMs = Date.now() - iterationStartMs;
+    const thisEntry: IterationHistoryEntry = {
+      iteration,
+      qualityScore: built.qualityScore,
+      ifcUrl: built.result.ifcUrl ?? "",
+      entityCount: built.result.entityCount,
+      costUsd: built.result.costUsd,
+      durationMs: iterationDurationMs,
+      turns: built.result.turns,
+      verifierSource: built.verifierReport?.source ?? "unavailable",
+      finishedAt: new Date().toISOString(),
+      finalValidation: built.result.finalValidation ?? null,
+      ledger: built.result.ledger,
+      turnRecords: built.result.turnRecords,
+    };
+
+    // If retrying, generate the retry hint + compressed prior-state
+    // BEFORE persisting iterationHistory, so the forwardFeedback is
+    // captured in the same write.
+    let forwardFeedback = "";
+    if (shouldRetry) {
+      const hint = await generateRetryHint({
+        brief: briefText || briefSpec.project?.description || "",
+        iteration,
+        previousIfcUrl: thisEntry.ifcUrl,
+        verifierReport: built.verifierReport ?? {
+          verified: false,
+          parts_coverage: 0,
+          trim_coverage: 0,
+          mismatches: [],
+          summary: "verifier report unavailable",
+          verified_at: new Date().toISOString(),
+          source: "unavailable",
+        },
+        visionReport: {
+          quality_score: built.qualityScore,
+          pass: false,
+          issues: [],
+          summary: `Quality ${built.qualityScore} below threshold`,
+          inspected_at: new Date().toISOString(),
+        },
+        qualityScore: built.qualityScore,
+      });
+      forwardFeedback = buildPriorStateSummary({
+        iteration,
+        qualityScore: built.qualityScore,
+        finalValidation: built.result.finalValidation,
+        verifierReport: built.verifierReport,
+        visionReport: null,
+        retryHint: hint.hint,
+      });
+      thisEntry.forwardFeedback = forwardFeedback;
+    }
+
+    // Compute the new bestIteration via the shared pure helper. Ties
+    // go to the earlier iteration so a regression cannot replace an
+    // equally-good earlier result (Rule 5).
+    const newHistory = [...iterationHistory, thisEntry];
+    const bestIdx = findBestIterationIdx(newHistory);
+    const bestIteration = newHistory[bestIdx].iteration;
+
+    // Persist iterationHistory + bestIteration. Plain update (not a
+    // status transition) — status stays RUNNING.
+    await prisma.briefToIfcV3Run.update({
+      where: { id: runId },
+      data: {
+        iterationHistory: newHistory as unknown as object,
+        bestIteration,
+        lastHeartbeatAt: new Date(),
+      },
+    });
+
+    // Emit this iteration's δ.0 telemetry. Fire-and-forget; never crashes.
     void snapshotAndEmit(prisma, telemetry).catch(() => {
-      /* swallow — original error already reported to the caller */
+      /* swallow — telemetry never crashes the build */
+    });
+
+    if (shouldRetry && decision.kind === "retry") {
+      // ── 10a. RE-ENQUEUE iteration N+1 ──
+      const nextIteration = decision.nextIteration;
+
+      // Runaway guard re-check (Rule 3 — defense in depth). The pure
+      // assertion refuses any nextIteration that breaches the ceiling
+      // even if `decideIteration` had a logic bug.
+      try {
+        assertSafeEnqueue(nextIteration, MAX_ITERATIONS);
+      } catch (guardErr) {
+        console.error(
+          `[agent-job] runaway guard caught: ${
+            guardErr instanceof Error ? guardErr.message : String(guardErr)
+          }. Forcing COMPLETED with best-so-far for run ${runId}.`,
+        );
+        await finalizeWithBest({
+          runId,
+          history: newHistory,
+          bestIdx,
+          completedReason: "runaway_guard_tripped",
+        });
+        heartbeat.stop();
+        return NextResponse.json({ status: "ok", runId, completedReason: "runaway_guard_tripped" });
+      }
+
+      try {
+        const messageId = await scheduleAgentBuildWorker(
+          {
+            runId,
+            briefText,
+            suggestions: suggestions as Record<string, unknown> | undefined,
+            previousFeedback: forwardFeedback,
+            iteration: nextIteration,
+          },
+          {
+            dedupId: `${runId}-iter-${nextIteration}`,
+          },
+        );
+        await appendLog(prisma, {
+          executionId: runId,
+          level: "INFO",
+          source: "LIFECYCLE",
+          message:
+            `Iteration ${nextIteration} enqueued (messageId=${messageId}, ` +
+            `quality=${built.qualityScore} < ${QUALITY_THRESHOLD}).`,
+          metadata: {
+            iteration: nextIteration,
+            previousScore: built.qualityScore,
+            dedupId: `${runId}-iter-${nextIteration}`,
+            messageId,
+          },
+        });
+        heartbeat.stop();
+        return NextResponse.json({
+          status: "ok",
+          runId,
+          iteration,
+          nextIteration,
+          qualityScore: built.qualityScore,
+        });
+      } catch (enqueueErr) {
+        // QStash enqueue failed. Rather than leave the run RUNNING
+        // forever (until the stuck-sweep), fall back to COMPLETED
+        // with the best-so-far. The user gets the best build we
+        // managed; the operator sees the QStash failure in logs.
+        const errMsg = enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr);
+        console.error(
+          `[agent-job] QStash enqueue failed for run ${runId} iter ${nextIteration}: ${errMsg}`,
+        );
+        await appendLog(prisma, {
+          executionId: runId,
+          level: "ERROR",
+          source: "LIFECYCLE",
+          message:
+            `Iteration ${nextIteration} enqueue FAILED: ${errMsg.slice(0, 300)}. ` +
+            `Finalizing with best-so-far (iteration ${bestIteration}, quality=${newHistory[bestIdx].qualityScore}).`,
+          metadata: { iteration: nextIteration, enqueueError: errMsg.slice(0, 500) },
+        });
+        await finalizeWithBest({
+          runId,
+          history: newHistory,
+          bestIdx,
+          completedReason: "enqueue_failed",
+        });
+        heartbeat.stop();
+        return NextResponse.json({
+          status: "ok",
+          runId,
+          completedReason: "enqueue_failed",
+        });
+      }
+    }
+
+    // ── 10b. PASS or MAX_ITERATIONS reached — COMPLETED with best ──
+    await finalizeWithBest({
+      runId,
+      history: newHistory,
+      bestIdx,
+      completedReason: passed ? "quality_passed" : "max_iterations",
+    });
+    heartbeat.stop();
+    return NextResponse.json({
+      status: "ok",
+      runId,
+      iteration,
+      bestIteration,
+      qualityScore: built.qualityScore,
+      completedReason: passed ? "quality_passed" : "max_iterations",
+    });
+  } catch (err) {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+      timeoutHandle = null;
+    }
+    heartbeat.stop();
+
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errCode: BriefToIfcV3ErrorCode =
+      err instanceof IterationTimeoutError
+        ? "EXECUTION_TIMEOUT"
+        : toBriefToIfcV3ErrorCode(err);
+    console.error(
+      `[agent-job] Worker failed for run ${runId} iter ${iteration}: ${errCode} — ${errMsg}`,
+    );
+
+    // Transition to FAILED. If a prior iteration succeeded, the best
+    // record stays in iterationHistory for diagnostics — but FAILED is
+    // FAILED; the user-facing fields will be cleared per the
+    // transitionStatus invariant.
+    try {
+      await transitionStatus(prisma, runId, "RUNNING", {
+        to: "FAILED",
+        payload: {
+          errorCode: errCode,
+          errorMessage: errMsg.slice(0, 1000),
+        },
+      });
+    } catch (transitionErr) {
+      console.error(
+        `[agent-job] FAILED transition itself failed for ${runId}: ${
+          transitionErr instanceof Error ? transitionErr.message : String(transitionErr)
+        }`,
+      );
+    }
+
+    void snapshotAndEmit(prisma, telemetry).catch(() => {
+      /* swallow */
     });
 
     return NextResponse.json(
-      { error: "worker error", detail: msg.slice(0, 500) },
+      { error: "worker error", detail: errMsg.slice(0, 500), iteration, errorCode: errCode },
       { status: 500 },
+    );
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+interface BuiltIteration {
+  result: GeneratorResult;
+  qualityScore: number;
+  verifierReport: VerifierReport | null;
+}
+
+async function runIterationAndVerify(args: {
+  briefSpec: BriefSpec;
+  briefText: string | undefined;
+  suggestions: AgentInputSuggestions | undefined;
+  previousFeedback: string | undefined;
+  iteration: number;
+  telemetry: BuildTelemetryCollector;
+  onTurn: NonNullable<Parameters<typeof runGenerator>[0]["onTurn"]>;
+}): Promise<BuiltIteration> {
+  const result = await runGenerator({
+    brief: args.briefSpec,
+    briefText: args.briefText,
+    suggestions: args.suggestions,
+    previousFeedback: args.previousFeedback,
+    iteration: args.iteration,
+    telemetry: args.telemetry,
+    onTurn: args.onTurn,
+  });
+
+  // Generator failed — no verifier call; return zero score.
+  if (!result.ok || !result.ifcUrl) {
+    return { result, qualityScore: 0, verifierReport: null };
+  }
+
+  let verifierReport: VerifierReport | null = null;
+  let qualityScore = 0;
+  try {
+    verifierReport = await verifyBuild(result.ifcUrl, args.briefSpec);
+    qualityScore = Math.round(
+      verifierReport.parts_coverage * 80 +
+        (verifierReport.verified ? 20 : 0),
+    );
+  } catch (err) {
+    // Verifier blew up. Accept the build as-is with score 0 (will
+    // typically trigger a retry); never mask the IFC artifact.
+    console.warn(
+      `[agent-job] verifier threw, accepting build as-is: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+
+  return { result, qualityScore, verifierReport };
+}
+
+/**
+ * Lift the best iteration's artifacts into the user-facing COMPLETED
+ * row. Also emits a chain-summary telemetry log so the full iteration
+ * timeline is visible in one query.
+ *
+ * Never throws (the COMPLETED transition is atomic + idempotent; the
+ * telemetry emit is fire-and-forget). On transition race-loss (e.g.
+ * the cancel sweep won) the chain summary still gets logged.
+ */
+async function finalizeWithBest(args: {
+  runId: string;
+  history: IterationHistoryEntry[];
+  bestIdx: number;
+  completedReason: string;
+}): Promise<void> {
+  const { runId, history, bestIdx, completedReason } = args;
+  const best = history[bestIdx];
+
+  const cumulativeCost = history.reduce((s, e) => s + (e.costUsd ?? 0), 0);
+  const cumulativeMs = history.reduce((s, e) => s + (e.durationMs ?? 0), 0);
+  const cumulativeTurns = history.reduce((s, e) => s + (e.turns ?? 0), 0);
+
+  // Validate that we have a usable ifcUrl from the best iteration. If
+  // not (rare — all iterations failed before finalize), transition to
+  // FAILED instead.
+  if (!best || !best.ifcUrl) {
+    try {
+      await transitionStatus(prisma, runId, "RUNNING", {
+        to: "FAILED",
+        payload: {
+          errorCode: "UNKNOWN",
+          errorMessage: "All iterations produced no IFC URL",
+        },
+      });
+    } catch {
+      /* swallow — race with cancel or already terminal */
+    }
+    await emitChainSummary({
+      runId,
+      history,
+      bestIdx,
+      completedReason: "all_failed",
+    });
+    return;
+  }
+
+  try {
+    await transitionStatus(prisma, runId, "RUNNING", {
+      to: "COMPLETED",
+      payload: {
+        ifcUrl: best.ifcUrl,
+        entityCount: best.entityCount,
+        finalValidation: best.finalValidation ?? undefined,
+        generatorCostUsd: cumulativeCost,
+        generatorMs: cumulativeMs,
+        turns: cumulativeTurns,
+        ledger: best.ledger,
+        turnRecords: best.turnRecords,
+      },
+    });
+    await appendLog(prisma, {
+      executionId: runId,
+      level: "INFO",
+      source: "LIFECYCLE",
+      message:
+        `Run COMPLETED via chain. bestIteration=${best.iteration}/${history.length}, ` +
+        `quality=${best.qualityScore}, reason=${completedReason}, ` +
+        `cumulativeCost=$${cumulativeCost.toFixed(3)}.`,
+      metadata: {
+        bestIteration: best.iteration,
+        totalIterations: history.length,
+        bestQualityScore: best.qualityScore,
+        completedReason,
+        cumulativeCostUsd: cumulativeCost,
+      },
+    });
+  } catch (err) {
+    // Race with cancel, or already terminal. Don't throw — the run is
+    // in whatever state someone else put it.
+    console.warn(
+      `[agent-job] finalize transition race for ${runId}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+
+  await emitChainSummary({ runId, history, bestIdx, completedReason });
+}
+
+/**
+ * Emit a single DIAGNOSTIC log row summarising the full chain. δ.0's
+ * per-iteration BuildTelemetry rows give you each step; this row gives
+ * you the chain at a glance: which iteration won, how many ran, total
+ * cost, why we stopped. One query:
+ *
+ *   SELECT created_at, metadata FROM execution_logs
+ *   WHERE execution_id = $1 AND source = 'DIAGNOSTIC'
+ *         AND message LIKE 'BuildTelemetryChain%';
+ */
+async function emitChainSummary(args: {
+  runId: string;
+  history: IterationHistoryEntry[];
+  bestIdx: number;
+  completedReason: string;
+}): Promise<void> {
+  const { runId, history, bestIdx, completedReason } = args;
+  const cumulativeCost = history.reduce((s, e) => s + (e.costUsd ?? 0), 0);
+  const cumulativeMs = history.reduce((s, e) => s + (e.durationMs ?? 0), 0);
+  const cumulativeTurns = history.reduce((s, e) => s + (e.turns ?? 0), 0);
+  const best = history[bestIdx];
+
+  // The chain summary reuses the DIAGNOSTIC source + a recognisable
+  // message prefix so the existing telemetry-query convention picks it
+  // up alongside the per-iteration snapshots. The snapshot collector
+  // is per-iteration, so we synthesize a minimal pseudo-snapshot here
+  // — only chain-level fields are populated.
+  try {
+    await emitBuildTelemetry(prisma, {
+      schemaVersion: "v1",
+      runId,
+      iteration: 0, // sentinel — 0 means "chain summary, not a single iteration"
+      briefType: null,
+      startedAt: history[0]?.finishedAt ?? new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      durationMs: cumulativeMs,
+      finalized: true,
+      turns: cumulativeTurns,
+      generatorCostUsd: cumulativeCost,
+      entityCount: best?.entityCount ?? 0,
+      renderPreviewCalls: 0,
+      finalQualityScore: best?.qualityScore ?? null,
+      counts: {
+        schemaCoercions: 0,
+        schemaRejections: 0,
+        proxyFallbacks: 0,
+        droppedElements: 0,
+        materialMisses: 0,
+        railwayErrors: 0,
+        toolErrors: 0,
+      },
+      elementTypeCounts: { requested: {}, built: {} },
+      schemaCoercions: [],
+      schemaRejections: [],
+      proxyFallbacks: [],
+      droppedElements: [],
+      materialMisses: [],
+      railwayErrors: [],
+    });
+
+    // Also emit a separate plain DIAGNOSTIC row with the iteration
+    // history packed into metadata — that's the canonical chain view
+    // for the dashboard / diagnostic CLI.
+    await appendLog(prisma, {
+      executionId: runId,
+      level: "INFO",
+      source: "DIAGNOSTIC",
+      message:
+        `BuildTelemetryChain iterations=${history.length} ` +
+        `bestIteration=${best?.iteration ?? "-"} ` +
+        `bestQuality=${best?.qualityScore ?? "-"} ` +
+        `cumulativeCost=$${cumulativeCost.toFixed(3)} ` +
+        `reason=${completedReason}`,
+      metadata: {
+        chainSummary: true,
+        totalIterations: history.length,
+        bestIteration: best?.iteration ?? null,
+        bestQualityScore: best?.qualityScore ?? null,
+        cumulativeCostUsd: cumulativeCost,
+        cumulativeDurationMs: cumulativeMs,
+        cumulativeTurns,
+        completedReason,
+        perIterationScores: history.map((e) => ({
+          iteration: e.iteration,
+          qualityScore: e.qualityScore,
+          turns: e.turns,
+          costUsd: e.costUsd,
+          verifierSource: e.verifierSource,
+        })),
+      },
+    });
+  } catch (err) {
+    console.warn(
+      `[agent-job] emitChainSummary swallowed error for ${runId}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
     );
   }
 }

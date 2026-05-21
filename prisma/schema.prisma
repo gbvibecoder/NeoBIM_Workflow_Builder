@@ -1236,6 +1236,27 @@ model BriefToIfcV3Run {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
+  // Phase δ.3 — per-iteration chaining state.
+  //
+  // currentIteration is the atomic check-and-set counter that
+  // serialises QStash hops: each worker invocation only proceeds if it
+  // can atomically advance the counter from N-1 to N via a conditional
+  // updateMany. Duplicate QStash deliveries fail the update and become
+  // no-ops, giving exactly-once iteration semantics at the DB layer.
+  //
+  // iterationHistory carries per-iteration results across hops so the
+  // worker can compute best-so-far and the final COMPLETED transition
+  // can write the highest-quality iteration's artifacts (never a
+  // regressed later iteration).
+  //
+  // bestIteration is the 1-based iteration number of the best result
+  // (matches iterationHistory[i].iteration). Authoritative for which
+  // ifcUrl/entityCount/finalValidation got written into the COMPLETED
+  // row's user-facing fields.
+  currentIteration  Int                   @default(0)
+  iterationHistory  Json                  @default("[]")
+  bestIteration     Int?
+
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
   @@index([workflowId])
