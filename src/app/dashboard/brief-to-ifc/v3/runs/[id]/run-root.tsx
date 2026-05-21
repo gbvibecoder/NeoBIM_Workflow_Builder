@@ -213,6 +213,26 @@ function CompletedState({ view }: { view: StatusView }) {
               Open in viewer
             </a>
           )}
+          {/*
+            Phase ε.2 — the Enhance button. Links to the same IFC viewer
+            but with the `autoEnhance=1` URL param so the viewer opens
+            with the Edit/Enhance panel expanded rather than the raw
+            IFC. Visually distinguished as a primary CTA — completing a
+            brief-to-IFC build naturally flows into the photoreal pass,
+            and ε.2's premise is that NOW the model is structurally
+            complete (δ.4 stairs + ε.1 roof/balcony/parapet), the
+            photoreal skin amplifies a real building rather than a
+            collection of proxy blobs.
+          */}
+          {view.ifcUrl && (
+            <a
+              href={`/dashboard/ifc-viewer?url=${encodeURIComponent(view.ifcUrl)}&autoEnhance=1`}
+              data-testid="enhance-link"
+              style={primaryButtonStyle}
+            >
+              Enhance ✨
+            </a>
+          )}
           <a
             href="/dashboard/templates"
             data-testid="try-another-link"

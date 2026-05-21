@@ -61,10 +61,20 @@ function useBreakpoint() {
   return bp;
 }
 
-/* `autoEnhance` prop is intentionally accepted-and-ignored (2026-05-18: raw IFC
-   by default, auto-apply removed). Page-level callers still pass it; keeping
-   the signature stable avoids breaking the public contract. */
-export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhance?: boolean; restoreFromCache?: boolean }) {
+/* `autoEnhance` prop — Phase ε.2 (2026-05-21) re-enabled, opt-in only.
+   2026-05-18 baseline was "raw IFC by default, auto-apply removed"; that
+   was the right call for the generic upload + share-link flows (users
+   want to see what they uploaded). Phase ε.2 adds a deliberate
+   "Enhance ✨" CTA on the brief-to-IFC v3 run results page that
+   passes `?autoEnhance=1` — when that param is present, the viewer
+   opens with the Edit/Enhance panel expanded so the photoreal pass is
+   one click away. Other callers (executionId hydration, plain URL
+   loads) continue to receive `autoEnhance={false}` and see the raw IFC.
+   ε.2's premise: after δ.4 + ε.1 the freshly-generated model is
+   structurally complete (stairs + roof + balconies + parapets all
+   real), so the photoreal skin amplifies a real building rather than
+   a collection of proxy blobs. */
+export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = false }: { autoEnhance?: boolean; restoreFromCache?: boolean }) {
   const t = useLocale((s) => s.t);
   /* State */
   const [modelInfo, setModelInfo] = useState<IFCModelInfo | null>(null);
@@ -78,7 +88,13 @@ export default function IFCViewerPage({ restoreFromCache = false }: { autoEnhanc
      the `[` keyboard shortcut, OR by picking an element in the viewport
      (auto-opens to Inspect — see handleSelect). Canvas-first UX: the 3D
      model gets full horizontal width on first load. */
-  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
+  // Phase ε.2 — initial bottom-panel state honours the autoEnhance
+  // prop. When the viewer is opened from the brief-to-IFC v3 results
+  // page's "Enhance ✨" button (which sets ?autoEnhance=1), open the
+  // Edit/Enhance panel on first render so the photoreal pass is
+  // already visible. Other entry paths (manual upload, plain ?url=)
+  // start with the panel closed so the 3D canvas gets the full width.
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(autoEnhance);
   const [bottomTab, setBottomTab] = useState<SidebarTab>("edit");
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
