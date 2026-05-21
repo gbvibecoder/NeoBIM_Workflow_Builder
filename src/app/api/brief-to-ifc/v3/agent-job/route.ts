@@ -20,7 +20,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyQstashSignature, scheduleAgentBuildWorker } from "@/lib/qstash";
+// scheduleAgentBuildWorker imported for future per-iteration chaining (δ.3)
+import { verifyQstashSignature } from "@/lib/qstash";
 import type { AgentBuildWorkerPayload } from "@/lib/qstash";
 import { runBackground } from "@/features/brief-to-ifc/v3/runtime/background-runner";
 import { runGenerator } from "@/features/brief-to-ifc/v3/generator/driver";
@@ -31,6 +32,10 @@ import { verifyBuild } from "@/features/brief-to-ifc/v3/hard-verifier";
 import { generateRetryHint } from "@/features/brief-to-ifc/v3/retry-hint";
 import { QUALITY_THRESHOLD, MAX_ITERATIONS } from "@/features/brief-to-ifc/v3/constants";
 import type { BriefSpec, AgentInputSuggestions } from "@/features/brief-to-ifc/v3/types";
+import {
+  BuildTelemetryCollector,
+  snapshotAndEmit,
+} from "@/features/brief-to-ifc/v3/telemetry";
 
 export const maxDuration = 800;
 
@@ -87,6 +92,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Run has no briefSpec snapshot" }, { status: 400 });
   }
 
+  // ── Phase δ.0 — BuildTelemetry collector ─────────────────────────
+  // Per-iteration structured record of what happens during this build
+  // (proxy fallbacks, schema coercions, tool errors, turn counts, etc.).
+  // Construction never throws (constructor is pure assignment), but
+  // every method on the collector is internally try/caught so a
+  // telemetry failure can never propagate up and abort the build.
+  const telemetry = new BuildTelemetryCollector({
+    runId,
+    iteration,
+    briefType: briefSpec.project?.type ?? null,
+  });
+  try {
+    for (const el of briefSpec.elements ?? []) {
+      telemetry.recordRequestedElementType(el.type);
+    }
+  } catch {
+    /* swallow — telemetry never crashes the build */
+  }
+
   // ── Run ONE iteration of the agent build ──
   try {
     await runBackground({
@@ -109,7 +133,20 @@ export async function POST(req: NextRequest) {
           suggestions,
           previousFeedback,
           iteration,
+          telemetry,
           onTurn: (record) => {
+            // Record render_preview calls and tool errors into
+            // BuildTelemetry alongside the existing per-turn log row.
+            try {
+              if (record.toolName === "render_preview") {
+                telemetry.recordRenderPreviewCall();
+              }
+              if (!record.toolOk) {
+                telemetry.recordToolError();
+              }
+            } catch {
+              /* swallow — telemetry never crashes the build */
+            }
             void appendLog(prisma, {
               executionId: runId,
               level: "INFO",
@@ -129,6 +166,17 @@ export async function POST(req: NextRequest) {
             });
           },
         });
+
+        // δ.0 — record generator stats into telemetry. Done BEFORE the
+        // error check so failed builds still produce a telemetry row.
+        try {
+          telemetry.setTurns(result.turns);
+          telemetry.setGeneratorCostUsd(result.costUsd);
+          telemetry.setEntityCount(result.entityCount);
+          telemetry.setFinalized(result.ok);
+        } catch {
+          /* swallow */
+        }
 
         if (!result.ok) {
           throw Object.assign(
@@ -152,6 +200,21 @@ export async function POST(req: NextRequest) {
             verifierReport.parts_coverage * 80 +
             (verifierReport.verified ? 20 : 0),
           );
+
+          // δ.0 — preserve the existing (known-broken) score in telemetry
+          // so δ.2's replacement metric can compare side-by-side.
+          try {
+            telemetry.setFinalQualityScore(qualityScore);
+            if (verifierReport.source !== "railway") {
+              telemetry.recordRailwayError({
+                endpoint: "/api/v3/verifier/check-build",
+                kind: verifierReport.source,
+                message: verifierReport.summary,
+              });
+            }
+          } catch {
+            /* swallow */
+          }
 
           await ctx.log("INFO", "GENERATE",
             `Iteration ${iteration} verified: quality=${qualityScore}, ` +
@@ -249,16 +312,37 @@ export async function POST(req: NextRequest) {
     // Actually, let me use a much simpler pattern. Read the last few logs
     // for this run and check for the "Will enqueue" marker.
 
-    // For THIS hotfix, the critical fix is: the SINGLE iteration completes
-    // successfully (no 780s kill). The quality loop across iterations is
-    // a follow-up. The user gets a COMPLETED build instead of a timeout.
-    // This is still better than the 780s kill.
+    // The quality loop across iterations (re-enqueue when score below
+    // threshold) is scheduled for Phase δ.3 — until then iterations 2-3
+    // are not wired, and MAX_ITERATIONS=3 is held in code but inactive.
+    // BuildTelemetry above truthfully records iteration=1 so the
+    // observability layer reflects the runtime reality, not the
+    // documented architecture.
+
+    // δ.0 — emit the final telemetry snapshot. Never crashes the build:
+    // snapshotAndEmit / emitBuildTelemetry / appendLog all swallow.
+    void snapshotAndEmit(prisma, telemetry).catch((err) => {
+      console.warn(
+        `[agent-job] telemetry emit swallowed unexpected error for run ${runId}: ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
 
     return NextResponse.json({ status: "ok", runId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // eslint-disable-next-line no-console
     console.error(`[agent-job] Worker failed for run ${runId}:`, msg);
+
+    // δ.0 — emit telemetry on the failure path too. The collector has
+    // recorded everything up to the point of failure (turns, tool
+    // errors, partial render previews), so a failed build still
+    // produces an observable record. Fire-and-forget; do not let a
+    // telemetry-emit failure mask the original error.
+    void snapshotAndEmit(prisma, telemetry).catch(() => {
+      /* swallow — original error already reported to the caller */
+    });
+
     return NextResponse.json(
       { error: "worker error", detail: msg.slice(0, 500) },
       { status: 500 },

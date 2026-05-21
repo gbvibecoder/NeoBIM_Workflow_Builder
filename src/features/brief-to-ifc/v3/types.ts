@@ -15,6 +15,15 @@
 
 import { z } from "zod";
 
+import {
+  tolerantBoundsTuple,
+  tolerantEnum,
+  tolerantOptionalRgb,
+  tolerantPositive,
+  tolerantRgbNamed,
+} from "./schema-helpers";
+import type { SchemaCoercionEvent } from "./telemetry";
+
 // ─── Tolerant numeric vector schemas ─────────────────────────────────
 //
 // Opus occasionally emits 2-element arrays for fields that require 3
@@ -47,21 +56,88 @@ const tolerantVec3Schema = z
 
 // ─── BriefSpec — leaf schemas ───────────────────────────────────────
 
+/** Canonical project.type values. Opus occasionally emits near-misses
+ *  ("office_building", "co-working", "mixed_use") which the previous
+ *  hard enum rejected outright. `tolerantEnum` normalises common
+ *  near-misses and falls back to `"other"` for genuinely unknown
+ *  values — the build proceeds, the coercion is recorded into
+ *  telemetry, and δ.2's quality metric can still gate. */
+export const PROJECT_TYPE_VALUES = [
+  "exhibition_booth", "office", "residential", "retail",
+  "gym", "restaurant", "classroom", "studio", "hotel",
+  "warehouse", "hospital", "other",
+] as const;
+export type ProjectType = (typeof PROJECT_TYPE_VALUES)[number];
+
 export const briefProjectSchema = z.object({
   name: z.string().min(1).max(200),
-  type: z.enum([
-    "exhibition_booth", "office", "residential", "retail",
-    "gym", "restaurant", "classroom", "studio", "hotel",
-    "warehouse", "hospital", "other",
-  ]),
+  type: tolerantEnum<ProjectType>({
+    fieldName: "project.type",
+    values: PROJECT_TYPE_VALUES,
+    fallback: "other",
+    synonyms: {
+      office_building: "office",
+      coworking: "office",
+      "co_working": "office",
+      shared_office: "office",
+      apartment: "residential",
+      house: "residential",
+      flat: "residential",
+      villa: "residential",
+      shop: "retail",
+      store: "retail",
+      boutique: "retail",
+      cafe: "restaurant",
+      coffee_shop: "restaurant",
+      bar: "restaurant",
+      fitness: "gym",
+      health_club: "gym",
+      school: "classroom",
+      training_room: "classroom",
+      lecture_hall: "classroom",
+      clinic: "hospital",
+      medical: "hospital",
+      lodging: "hotel",
+      hostel: "hotel",
+      storage: "warehouse",
+      industrial: "warehouse",
+      mixed_use: "other",
+      booth: "exhibition_booth",
+      exhibition: "exhibition_booth",
+      stand: "exhibition_booth",
+    },
+  }),
   location: z.string().max(200),
   description: z.string().max(4000),
 });
 
 export const briefSiteSchema = z.object({
-  bounds_m: z.tuple([z.number().positive(), z.number().positive()]),
-  height_limit_m: z.number().positive(),
-  coordinate_origin: z.literal("sw_corner"),
+  /** Site bounds [width, depth] in metres. Tolerant of 0-element,
+   *  3-element (drops Z), or non-positive inputs. Falls back to a
+   *  reasonable default + records the coercion. */
+  bounds_m: tolerantBoundsTuple({
+    fieldName: "site.bounds_m",
+    fallbackWidth: 10,
+    fallbackDepth: 10,
+    minimum: 0.5,
+  }),
+  /** Height limit. `0` is a sentinel meaning "uncapped"; any negative
+   *  or junk value coerces to the fallback. */
+  height_limit_m: tolerantPositive({
+    fieldName: "site.height_limit_m",
+    fallback: 100,
+    minimum: 0,
+    maximum: 10_000,
+    acceptZero: true,
+  }),
+  /** Always sw_corner in the current pipeline. Tolerant of casing
+   *  variations and absent values — never rejects. */
+  coordinate_origin: tolerantEnum<"sw_corner">({
+    fieldName: "site.coordinate_origin",
+    values: ["sw_corner"] as const,
+    fallback: "sw_corner",
+    synonyms: { southwest_corner: "sw_corner", origin: "sw_corner", sw: "sw_corner" },
+  }),
 });
 
 export const briefSpaceSchema = z.object({
@@ -76,25 +152,70 @@ export const briefSpaceSchema = z.object({
   occupancy_type: z.string().max(200),
 });
 
+/** Canonical element types. Phase δ.1b added `stair`, `roof`,
+ *  `balcony`, `canopy`, `parapet`, `railing` — these were previously
+ *  rejected at the schema layer, silently dropping any geometry the
+ *  brief asked for. They are now valid; geometry-less ones fall back
+ *  to a typed-but-proxy element in buildflow_ifc.py, and the proxy
+ *  fallback is recorded in BuildTelemetry so δ.4 can prioritise
+ *  implementing real geometry for the most-requested types. */
+export const ELEMENT_TYPE_VALUES = [
+  "slab", "wall", "column", "beam", "space",
+  "covering", "furniture", "lighting", "proxy",
+  // Typed openings — added 2026-05-17 (Gap B).
+  "door", "window",
+  // Phase δ.1b — previously silently rejected at the schema layer.
+  "stair", "roof", "balcony", "canopy", "parapet", "railing",
+] as const;
+export type ElementType = (typeof ELEMENT_TYPE_VALUES)[number];
+
 export const briefElementSchema = z.object({
   id: z.string().min(1).max(64),
-  type: z.enum([
-    "slab",
-    "wall",
-    "column",
-    "beam",
-    "space",
-    "covering",
-    "furniture",
-    "lighting",
-    "proxy",
-    // Typed openings — added 2026-05-17 (Gap B). The agent dispatches
-    // these to `bf.add_door` / `bf.add_window` so the IFC carries
-    // IfcDoor / IfcWindow entities visible to downstream BIM tools.
-    // Emitting them as `proxy` or `furniture` was the v6 failure mode.
-    "door",
-    "window",
-  ]),
+  type: tolerantEnum<ElementType>({
+    fieldName: "elements[].type",
+    values: ELEMENT_TYPE_VALUES,
+    fallback: "proxy",
+    synonyms: {
+      // Common near-misses observed in Opus output.
+      floor: "slab",
+      ceiling: "slab",
+      partition: "wall",
+      partition_wall: "wall",
+      post: "column",
+      pillar: "column",
+      girder: "beam",
+      joist: "beam",
+      room: "space",
+      zone: "space",
+      flooring: "covering",
+      finish: "covering",
+      finishes: "covering",
+      furnishing: "furniture",
+      fixture: "furniture",
+      light: "lighting",
+      lamp: "lighting",
+      fitting: "lighting",
+      luminaire: "lighting",
+      doorway: "door",
+      entrance: "door",
+      glazing: "window",
+      // δ.1b additions — near-misses for the new types.
+      stairway: "stair",
+      staircase: "stair",
+      steps: "stair",
+      stairs: "stair",
+      roof_slab: "roof",
+      ceiling_roof: "roof",
+      terrace: "balcony",
+      veranda: "balcony",
+      awning: "canopy",
+      overhang: "canopy",
+      parapet_wall: "parapet",
+      handrail: "railing",
+      guardrail: "railing",
+      balustrade: "railing",
+    },
+  }),
   origin_world_m: tolerantVec3Schema,
   dims_m: tolerantDims3Schema.optional(),
   radius_m: z.number().positive().optional(),
@@ -107,15 +228,59 @@ export const briefElementSchema = z.object({
   contained_in_space_id: z.string().optional(),
 });
 
+/** Canonical material-shading methods. `tolerantEnum` accepts casing
+ *  variants ("matte", "metallic") and semantic near-misses ("wood",
+ *  "concrete" → "MATT"); unknown values fall back to "MATT" so the
+ *  build never fails on a missed material-method classification. */
+export const MATERIAL_METHOD_VALUES = ["MATT", "METAL", "PHONG", "PLASTIC"] as const;
+export type MaterialMethod = (typeof MATERIAL_METHOD_VALUES)[number];
+
 export const briefMaterialSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(200),
-  rgb: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]),
-  specular_rgb: z
-    .tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)])
-    .optional(),
-  roughness: z.number().min(0).max(1),
-  method: z.enum(["MATT", "METAL", "PHONG", "PLASTIC"]),
+  /** RGB triple in [0,1]. Tolerant: 0-255 inputs auto-rescaled, RGBA
+   *  truncated to RGB, missing components padded to gray, junk values
+   *  fall back to (0.5, 0.5, 0.5). Never rejects. */
+  rgb: tolerantRgbNamed("materials[].rgb"),
+  specular_rgb: tolerantOptionalRgb.optional(),
+  /** Roughness in [0,1]. Tolerant: clamps to range, accepts numeric
+   *  strings, falls back to 0.5 on junk. */
+  roughness: tolerantPositive({
+    fieldName: "materials[].roughness",
+    fallback: 0.5,
+    minimum: 0,
+    maximum: 1,
+    acceptZero: true,
+  }),
+  method: tolerantEnum<MaterialMethod>({
+    fieldName: "materials[].method",
+    values: MATERIAL_METHOD_VALUES,
+    fallback: "MATT",
+    synonyms: {
+      matte: "MATT",
+      flat: "MATT",
+      diffuse: "MATT",
+      wood: "MATT",
+      concrete: "MATT",
+      stone: "MATT",
+      fabric: "MATT",
+      leather: "MATT",
+      rubber: "MATT",
+      metallic: "METAL",
+      steel: "METAL",
+      aluminum: "METAL",
+      aluminium: "METAL",
+      brass: "METAL",
+      chrome: "METAL",
+      glossy: "PHONG",
+      polished: "PHONG",
+      glass: "PHONG",
+      shiny: "PHONG",
+      plastic_finish: "PLASTIC",
+      vinyl: "PLASTIC",
+      laminate: "PLASTIC",
+    },
+  }),
   category: z.string().max(200),
 });
 
@@ -563,6 +728,36 @@ export interface SandboxFinalizeResult {
   ifc_size_bytes: number;
   entity_count: number;
   validation: SandboxValidateResult;
+  /** Phase δ.0 — optional structured telemetry from the BuildFlowIFC
+   *  session: proxy fallbacks, material misses, dropped elements, and
+   *  actually-built element-type counts. Absent when the Python service
+   *  is pre-δ.0 (forwards-compatible). Always shape-tolerant on the
+   *  TS side — the merge helper guards against missing or junk fields. */
+  telemetry?: SandboxFinalizeTelemetry | null;
+}
+
+/** Shape mirrored from buildflow_ifc.py's `get_telemetry()` /
+ *  `telemetry.json`. Every field is optional from the wire side because
+ *  older Python builds may omit it; `BuildTelemetryCollector.mergePythonTelemetry`
+ *  validates each slot defensively. */
+export interface SandboxFinalizeTelemetry {
+  proxy_fallbacks?: Array<{
+    requested_type: string;
+    ifc_class: string;
+    element_id?: string;
+    reason: string;
+  }>;
+  material_misses?: Array<{
+    element_id?: string;
+    requested_material_id: string;
+    fallback_material_id: string;
+  }>;
+  dropped_elements?: Array<{
+    type: string;
+    element_id?: string;
+    reason: string;
+  }>;
+  built_element_counts?: Record<string, number>;
 }
 
 // ─── Generator outcome ──────────────────────────────────────────────
@@ -609,6 +804,12 @@ export interface BriefEnrichmentResult {
   durationMs: number;
   inputTokens: number;
   outputTokens: number;
+  /** Phase δ.1a — schema-tolerance coercions captured during the
+   *  briefSpec parse. Empty when no coercions fired or when the parse
+   *  failed before any tolerant helper ran. Callers persist these as
+   *  BuildTelemetry.schemaCoercions (or their own diagnostic log) so
+   *  the recovery rate is observable. */
+  coercions?: SchemaCoercionEvent[];
   error: {
     code: string;
     message: string;

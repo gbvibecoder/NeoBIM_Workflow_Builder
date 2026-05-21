@@ -18,6 +18,8 @@
 
 import { type ZodTypeAny } from "zod";
 
+import { getOpusSchemaHint } from "./schema-helpers";
+
 type JsonSchema = Record<string, unknown>;
 
 // Zod v4 check internal structure
@@ -46,6 +48,18 @@ function def(schema: ZodTypeAny): Record<string, unknown> {
 }
 
 function convert(schema: ZodTypeAny): JsonSchema {
+  // Phase δ.1a — tolerant helpers (tolerantEnum, tolerantRgb,
+  // tolerantPositive, etc.) wrap `z.unknown().transform(...)` for
+  // runtime tolerance. That choice intentionally opacifies the inner
+  // shape — the WeakMap-based hint mechanism in `schema-helpers.ts`
+  // restores the canonical contract here so Opus's tool schema still
+  // advertises the strict enum / number / tuple. The model emits
+  // canonical values most of the time; tolerance recovers when it
+  // deviates. Returning the hint as a fresh object keeps the WeakMap
+  // entry immutable from the caller's perspective.
+  const hint = getOpusSchemaHint(schema);
+  if (hint) return { ...hint };
+
   const d = def(schema);
   const type = d.type as string;
 

@@ -152,6 +152,28 @@ _PREDEFINED_TYPE_ENUMS: Dict[str, frozenset] = {
 }
 
 
+# ── Phase δ.0 — BuildTelemetry caps and defaults ──────────────────────
+#
+# Per-build counters and fallback-event arrays mirror the TS-side
+# `BuildTelemetryCollector` (see src/features/brief-to-ifc/v3/telemetry.ts).
+# The cap stops a pathological build from bloating the FinalizeResponse
+# or meta.json payload past the JSON practical limits — counts in
+# `built_element_counts` remain authoritative even when events cap out.
+
+_TELEMETRY_MAX_EVENTS = 200
+
+
+def _empty_telemetry() -> Dict[str, Any]:
+    """Fresh telemetry shape. Mirrors the TS-side `SandboxFinalizeTelemetry`
+    interface so the merge on the TypeScript side is field-for-field."""
+    return {
+        "proxy_fallbacks": [],
+        "material_misses": [],
+        "dropped_elements": [],
+        "built_element_counts": {},
+    }
+
+
 class BuildFlowIFCError(Exception):
     """Raised for schema-strictness violations caught at the helper API.
 
@@ -196,8 +218,107 @@ class BuildFlowIFC:
         self._spaces_by_id: Dict[str, Any] = {}
         self._storeys_by_id: Dict[str, Any] = {}
 
+        # Phase δ.0 — BuildTelemetry. Per-build structured record of
+        # silent fallbacks the agent code triggered. Every recorder is
+        # wrapped in try/except so telemetry collection NEVER aborts
+        # the build (instrumentation that breaks the thing it observes
+        # is worse than no instrumentation).
+        self._telemetry: Dict[str, Any] = _empty_telemetry()
+
         self._bootstrap_project()
         self._bootstrap_materials()
+
+    # ── Phase δ.0 — telemetry recorders ──────────────────────────────
+
+    def _record_proxy_fallback(
+        self,
+        requested_type: str,
+        ifc_class: str,
+        element_id: Optional[str] = None,
+        reason: str = "agent_chose_proxy",
+    ) -> None:
+        """Record that the agent fell back to IfcBuildingElementProxy
+        (or a generic class) for an element type we cannot type properly.
+        Safe to call from any add_* helper — never raises."""
+        try:
+            evs = self._telemetry.setdefault("proxy_fallbacks", [])
+            if len(evs) >= _TELEMETRY_MAX_EVENTS:
+                return
+            evs.append({
+                "requested_type": str(requested_type or "unknown")[:120],
+                "ifc_class": str(ifc_class or "IfcBuildingElementProxy")[:64],
+                "element_id": str(element_id)[:120] if element_id else None,
+                "reason": str(reason or "unspecified")[:120],
+            })
+        except Exception:
+            # Swallow — telemetry never crashes the build.
+            pass
+
+    def _record_material_miss(
+        self,
+        element_id: Optional[str],
+        requested_material_id: str,
+        fallback_material_id: str,
+    ) -> None:
+        """Record that an element referenced a material id absent from
+        the catalog and silently fell back to another material. Safe
+        to call from any add_* helper — never raises."""
+        try:
+            evs = self._telemetry.setdefault("material_misses", [])
+            if len(evs) >= _TELEMETRY_MAX_EVENTS:
+                return
+            evs.append({
+                "element_id": str(element_id)[:120] if element_id else None,
+                "requested_material_id": str(requested_material_id or "")[:120],
+                "fallback_material_id": str(fallback_material_id or "")[:120],
+            })
+        except Exception:
+            pass
+
+    def _record_dropped_element(
+        self,
+        type_: str,
+        element_id: Optional[str],
+        reason: str,
+    ) -> None:
+        """Record that an element produced no IFC geometry (validation
+        failure pre-creation, missing required dim, etc.). Safe — never
+        raises."""
+        try:
+            evs = self._telemetry.setdefault("dropped_elements", [])
+            if len(evs) >= _TELEMETRY_MAX_EVENTS:
+                return
+            evs.append({
+                "type": str(type_ or "unknown")[:64],
+                "element_id": str(element_id)[:120] if element_id else None,
+                "reason": str(reason or "unspecified")[:200],
+            })
+        except Exception:
+            pass
+
+    def _record_built_class(self, ifc_class: str) -> None:
+        """Increment the count of built elements per IFC class. Safe."""
+        try:
+            counts = self._telemetry.setdefault("built_element_counts", {})
+            key = str(ifc_class or "Unknown")[:64]
+            counts[key] = int(counts.get(key, 0)) + 1
+        except Exception:
+            pass
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Return a deep-copied snapshot of the build telemetry. The
+        sandbox finalize endpoint surfaces this to the TS caller, which
+        merges it into BuildTelemetry.snapshot. Safe — always returns
+        a dict (empty on internal error)."""
+        try:
+            return {
+                "proxy_fallbacks": list(self._telemetry.get("proxy_fallbacks", [])),
+                "material_misses": list(self._telemetry.get("material_misses", [])),
+                "dropped_elements": list(self._telemetry.get("dropped_elements", [])),
+                "built_element_counts": dict(self._telemetry.get("built_element_counts", {})),
+            }
+        except Exception:
+            return _empty_telemetry()
 
     # ── bootstrap ─────────────────────────────────────────────────────
 
@@ -676,6 +797,16 @@ class BuildFlowIFC:
                 f"{sorted(_VALID_PROXY_COMPOSITION)}, got {composition!r}. "
                 "Note: NOTDEFINED is INVALID for IfcBuildingElementProxy.CompositionType in IFC2X3."
             )
+        # δ.0 — every add_proxy call is a deliberate "I cannot type this"
+        # signal from the agent. Recording these tells us which element
+        # types are most-often demoted to untyped geometry, so δ.4 can
+        # prioritise add_stair/add_balcony/etc. implementations.
+        self._record_proxy_fallback(
+            requested_type=object_type or "unspecified",
+            ifc_class="IfcBuildingElementProxy",
+            element_id=proxy_id,
+            reason="agent_called_add_proxy",
+        )
         return self._add_box_element(
             ifc_class="IfcBuildingElementProxy",
             element_id=proxy_id, origin=origin, dims=dims, depth=depth,
@@ -761,6 +892,18 @@ class BuildFlowIFC:
             "IfcFlowSegment", "IfcRailing", "IfcLightFixture",
             "IfcSanitaryTerminal", "IfcBuildingElementProxy",
         )
+        # δ.0 — when the agent asks for an IFC class not in the
+        # furniture-parts whitelist, we silently coerce to
+        # IfcFurnishingElement. Record the coercion so the whitelist
+        # gap is visible in telemetry rather than hidden behind a
+        # successful build.
+        if ifc_class not in _PART_ALLOWED_CLASSES:
+            self._record_proxy_fallback(
+                requested_type=ifc_class or subtype or "part",
+                ifc_class="IfcFurnishingElement",
+                element_id=part_id,
+                reason="part_class_not_in_whitelist",
+            )
         return self._add_box_element(
             ifc_class=ifc_class if ifc_class in _PART_ALLOWED_CLASSES else "IfcFurnishingElement",
             element_id=part_id, origin=world_origin,
@@ -1909,6 +2052,11 @@ class BuildFlowIFC:
         ifc_path = os.path.join(dir_path, "state.ifc")
         meta_path = os.path.join(dir_path, "meta.json")
         self._ifc.write(ifc_path)
+        # δ.0 — persist BuildTelemetry alongside the IFC + meta so it
+        # survives the FastAPI request/response boundary. The Python
+        # /finalize endpoint reads this back and forwards it to the TS
+        # caller. Wrapped in try/except inside `get_telemetry()` so a
+        # corrupt telemetry dict cannot break save_state.
         meta = {
             "brief": self._brief,
             "element_tags": sorted(self._elements_by_id.keys()),
@@ -1916,6 +2064,7 @@ class BuildFlowIFC:
             "space_tags": sorted(self._spaces_by_id.keys()),
             "storey_tags": sorted(self._storeys_by_id.keys()),
             "schema": self.SCHEMA,
+            "telemetry": self.get_telemetry(),
         }
         with open(meta_path, "w", encoding="ascii") as f:
             json.dump(meta, f, ensure_ascii=True)
@@ -1937,6 +2086,24 @@ class BuildFlowIFC:
         instance._materials_by_id = {}
         instance._material_styles = {}
         instance._storeys_by_id = {}
+        # δ.0 — restore accumulated BuildTelemetry across exec calls.
+        # Tolerant of pre-δ.0 sessions (no telemetry key in meta.json)
+        # and of corrupted telemetry payloads (anything non-dict resets
+        # to an empty snapshot — counters start from zero, never crash).
+        loaded_tel = meta.get("telemetry")
+        if isinstance(loaded_tel, dict):
+            instance._telemetry = {
+                "proxy_fallbacks": list(loaded_tel.get("proxy_fallbacks", [])
+                                        if isinstance(loaded_tel.get("proxy_fallbacks"), list) else []),
+                "material_misses": list(loaded_tel.get("material_misses", [])
+                                        if isinstance(loaded_tel.get("material_misses"), list) else []),
+                "dropped_elements": list(loaded_tel.get("dropped_elements", [])
+                                         if isinstance(loaded_tel.get("dropped_elements"), list) else []),
+                "built_element_counts": dict(loaded_tel.get("built_element_counts", {})
+                                             if isinstance(loaded_tel.get("built_element_counts"), dict) else {}),
+            }
+        else:
+            instance._telemetry = _empty_telemetry()
 
         # Re-resolve element references. Spaces in IFC2X3 have no `Tag`
         # attribute — they're keyed by Name. Other IfcElement descendants
@@ -2211,6 +2378,16 @@ class BuildFlowIFC:
             self._contain_in_storey(element, target_storey)
 
         resolved_mat_id = material if material in self._materials_by_id else self._fallback_material_id()
+        # δ.0 — record material misses (requested mat id not in catalog,
+        # silently substituted with the fallback). This is the precise
+        # signal for "the agent referenced materials that don't exist"
+        # which manifested as "gray IFC" in earlier phases.
+        if material and resolved_mat_id and material != resolved_mat_id:
+            self._record_material_miss(
+                element_id=element_id,
+                requested_material_id=material,
+                fallback_material_id=resolved_mat_id,
+            )
         if resolved_mat_id and resolved_mat_id in self._materials_by_id:
             api.run(
                 "material.assign_material", self._ifc,
@@ -2220,6 +2397,9 @@ class BuildFlowIFC:
             self._style_solid_internal(element, resolved_mat_id)
 
         self._elements_by_id[element_id] = element
+        # δ.0 — count built elements by IFC class. Authoritative even
+        # when individual event arrays cap out.
+        self._record_built_class(ifc_class)
         return element
 
     def _add_circle_element(
@@ -2318,6 +2498,15 @@ class BuildFlowIFC:
             self._contain_in_storey(element, target_storey)
 
         resolved_mat_id = material if material in self._materials_by_id else self._fallback_material_id()
+        # δ.0 — same material-miss telemetry as _add_box_element so
+        # circular elements (e.g. add_circular_column) are observable
+        # on the same axis as box elements.
+        if material and resolved_mat_id and material != resolved_mat_id:
+            self._record_material_miss(
+                element_id=element_id,
+                requested_material_id=material,
+                fallback_material_id=resolved_mat_id,
+            )
         if resolved_mat_id and resolved_mat_id in self._materials_by_id:
             api.run(
                 "material.assign_material", self._ifc,
@@ -2325,6 +2514,8 @@ class BuildFlowIFC:
             )
             # Per-solid IfcStyledItem so web-ifc renders colours (Phase C fix).
             self._style_solid_internal(element, resolved_mat_id)
+        # δ.0 — count built circular elements by IFC class.
+        self._record_built_class(ifc_class)
 
         self._elements_by_id[element_id] = element
         return element

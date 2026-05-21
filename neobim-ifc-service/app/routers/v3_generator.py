@@ -132,6 +132,31 @@ class FinalizeResponse(BaseModel):
     ifc_size_bytes: int
     entity_count: int
     validation: Dict[str, Any]
+    # Phase δ.0 — BuildTelemetry payload assembled by BuildFlowIFC
+    # during the session (proxy fallbacks, material misses, dropped
+    # elements, built element-type counts). Always emitted as a dict
+    # (empty when the session had no telemetry events); never `null`
+    # so the TS client can rely on the field's presence.
+    telemetry: Dict[str, Any] = Field(default_factory=dict)
+
+
+def _load_telemetry_from_handle(handle) -> Dict[str, Any]:
+    """Read the persisted BuildTelemetry blob from the session's
+    `meta.json`. Returns an empty dict when the file is missing,
+    malformed, or pre-δ.0 (no `telemetry` key). Never raises."""
+    meta_path = os.path.join(handle.path, "meta.json")
+    if not os.path.isfile(meta_path):
+        return {}
+    try:
+        with open(meta_path, "r", encoding="ascii") as f:
+            meta = json.load(f)
+        tel = meta.get("telemetry")
+        if isinstance(tel, dict):
+            return tel
+    except Exception:
+        # Swallow — telemetry transport never breaks finalize.
+        pass
+    return {}
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -387,6 +412,11 @@ def finalize(
         ascii_only=validation.get("ascii_only"),
     )
 
+    # δ.0 — load the BuildTelemetry blob BEFORE discarding the session
+    # (discard wipes the on-disk meta.json). The blob is empty for
+    # pre-δ.0 sessions, so this is backwards-compatible.
+    telemetry_payload = _load_telemetry_from_handle(handle)
+
     # Discard the session — finalize is terminal.
     _store.discard(handle)
 
@@ -396,6 +426,7 @@ def finalize(
         ifc_size_bytes=ifc_size,
         entity_count=validation.get("entity_count", 0),
         validation=validation,
+        telemetry=telemetry_payload,
     )
 
 

@@ -48,6 +48,7 @@ import {
   AGENT_MAX_TURNS_DIRECT_MODE,
   AGENT_DEFAULT_COST_CAP_USD,
 } from "../constants";
+import type { BuildTelemetryCollector } from "../telemetry";
 
 // System prompt — canonical .md copy at `./system-prompt.md`; the
 // inline const below MUST stay byte-equal to that file. A vitest
@@ -301,6 +302,11 @@ export interface RunGeneratorArgs {
   /** Optional logger — invoked per turn for SSE / canvas streaming.
    *  Never blocks the loop; errors are swallowed. */
   onTurn?: (record: AgentTurnRecord) => void;
+  /** Phase δ.0 — optional BuildTelemetry collector. When provided, the
+   *  driver merges Python-side telemetry from the finalize response.
+   *  All telemetry calls are internally try/caught; a telemetry failure
+   *  can never abort the build. */
+  telemetry?: BuildTelemetryCollector;
 }
 
 export async function runGenerator(
@@ -611,6 +617,15 @@ export async function runGenerator(
               finalIfcUrl = res.data.ifc_url;
               finalEntityCount = res.data.entity_count;
               finalValidation = res.data.validation;
+              // δ.0 — merge Python-side telemetry (proxy fallbacks,
+              // material misses, built element counts) into the
+              // collector. Safe to call on undefined / malformed
+              // payloads; merge helper is shape-tolerant.
+              try {
+                args.telemetry?.mergePythonTelemetry(res.data.telemetry);
+              } catch {
+                /* swallow — telemetry never crashes the build */
+              }
             }
             break;
           }
