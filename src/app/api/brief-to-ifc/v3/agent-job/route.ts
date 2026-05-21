@@ -82,6 +82,9 @@ import {
   computeLegacyQualityScore,
   computeQualityScore,
 } from "@/features/brief-to-ifc/v3/quality-score";
+import { renderFinalizedIfcPreviews } from "@/features/brief-to-ifc/v3/runtime/sandbox-render";
+import { inspectIFC } from "@/features/brief-to-ifc/v3/vision-inspector";
+import type { VisionReport } from "@/features/brief-to-ifc/v3/types";
 
 export const maxDuration = 800;
 
@@ -693,17 +696,58 @@ async function runIterationAndVerify(args: {
     );
   }
 
+  // Phase ε.3 — post-finalize vision pass. Closes the δ.2 follow-on:
+  // the composite metric's vision_quality sub-signal (0.25 weight when
+  // available) was previously hardcoded null because finalize_ifc
+  // destroys the agent's sandbox session, so render_preview (which
+  // needs a session) couldn't be used post-finalize. ε.3 uses the
+  // existing /api/v3/generator/render-previews Railway endpoint which
+  // renders directly from R2 URL — no session needed.
+  //
+  // The metric's existing graceful-degradation (computeVisionQuality
+  // detects the inspector's degraded-failure shape and drops the
+  // signal) handles every failure mode without crashing the build.
+  // The render call adds ~5-15s + the inspector call adds ~30-90s +
+  // ~$0.20 per iteration — significant cost, justified because vision
+  // catches what structural+sanity signals miss (collapsed furniture,
+  // wrong proportions, ugly geometry that LOOKS broken).
+  let visionReport: VisionReport | null = null;
+  try {
+    const previews = await renderFinalizedIfcPreviews(result.ifcUrl);
+    if (previews.ok && previews.topPngB64 && previews.isoPngB64) {
+      const inspection = await inspectIFC(
+        args.briefSpec,
+        previews.topPngB64,
+        previews.isoPngB64,
+      );
+      visionReport = inspection.report;
+    } else {
+      console.warn(
+        `[agent-job] post-finalize render-previews failed; vision sub-signal will degrade: ${previews.error ?? "unknown"}`,
+      );
+    }
+  } catch (err) {
+    // Either render or inspect threw — vision drops out of the metric
+    // gracefully. Never crashes the build.
+    console.warn(
+      `[agent-job] post-finalize vision pass swallowed error: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+
   // Phase δ.2 — composite score (gate) + legacy score (telemetry).
-  // The δ.3 loop now gates on `qualityScore`; `legacyQualityScore` is
+  // The δ.3 loop gates on `qualityScore`; `legacyQualityScore` is
   // logged side-by-side for real-run validation that the new metric
-  // tracks reality better. Vision is null this phase — wiring the
-  // post-finalize vision call is a follow-on integration (the metric
-  // architecture accepts it whenever wired).
+  // tracks reality better. ε.3 — vision is now wired (was null
+  // pre-ε.3); when vision succeeds the sub-signal contributes 0.25
+  // weight; when it fails the metric's graceful degradation drops it
+  // and renormalizes the remaining signals.
   const qualityBreakdown = computeQualityScore({
     briefSpec: args.briefSpec,
     finalValidation: result.finalValidation,
     verifierReport,
-    visionReport: null,
+    visionReport,
   });
   const legacyQualityScore = computeLegacyQualityScore(verifierReport);
 
