@@ -1157,6 +1157,419 @@ class BuildFlowIFC:
         self._record_built_class("IfcStairFlight")
         return stair
 
+    # ── Phase ε.1 — roof / balcony / parapet (kill the last proxies) ──
+    #
+    # The benchmark residential brief asks for "flat RCC roof",
+    # "projecting balcony", "parapet". Pre-ε.1 all three fell through
+    # to `add_proxy(object_type=...)` because no typed builders
+    # existed — δ.0 telemetry was recording the proxy_fallback events
+    # explicitly so we'd know to build these next. ε.1 closes the gap.
+    # Each follows the SAME storey-placement discipline as δ.4's
+    # add_stair (line 2351-2371 pattern from _add_box_element); none
+    # re-parent after creation (the γ.10 freestanding-slab trap).
+
+    def add_balcony(
+        self,
+        balcony_id: str,
+        origin: Tuple[float, float, float],
+        length: float,
+        projection: float,
+        thickness: float = 0.15,
+        material: str = "",
+        rotation_z_rad: float = 0.0,
+        description: str = "",
+        tag: str = "",
+        contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
+    ) -> Optional[Any]:
+        """A projecting balcony slab — `IfcSlab` with
+        `PredefinedType=USERDEFINED` and `ObjectType="Balcony"`.
+
+        IFC has no dedicated IfcBalcony class. The standard convention
+        is IfcSlab + USERDEFINED PredefinedType + ObjectType discriminator;
+        downstream BIM tools filter for "slabs with ObjectType=Balcony"
+        when generating balcony schedules. The previous fallback —
+        `add_proxy(object_type="balcony")` — created an
+        IfcBuildingElementProxy that those tools entirely miss.
+
+        Args:
+          origin: storey-local SW corner of the balcony where it MEETS
+            the host wall (the building edge). The balcony extends
+            outward (along the rotation_z_rad direction's +Y axis local
+            to the rotation) by `projection`.
+          length: along-the-host-wall dimension in metres (the balcony's
+            visible width from outside the building).
+          projection: outward cantilever distance in metres.
+          thickness: slab thickness, default 0.15 m (residential RCC).
+          rotation_z_rad: orientation of the balcony's local axes; 0 →
+            balcony length is +X, projection is +Y. Use π/2 to rotate.
+
+        Edge cases (graceful — never crash):
+          - length or projection <= 0 → dropped_element + None
+          - thickness <= 0 → coerced to 0.05 m
+          - duplicate id → BuildFlowIFCError
+
+        Returns the IfcSlab entity (registered in `_elements_by_id`)
+        or None on graceful skip.
+        """
+        try:
+            length_f = float(length)
+            projection_f = float(projection)
+        except (TypeError, ValueError):
+            self._record_dropped_element(
+                type_="balcony",
+                element_id=balcony_id,
+                reason=f"non-numeric length={length!r} or projection={projection!r}",
+            )
+            return None
+        if length_f <= 0 or projection_f <= 0:
+            self._record_dropped_element(
+                type_="balcony",
+                element_id=balcony_id,
+                reason=f"non-positive length={length_f} or projection={projection_f}",
+            )
+            return None
+        thickness_f = max(0.05, float(thickness) if thickness else 0.15)
+
+        # The balcony is structurally just a USERDEFINED IfcSlab — wrap
+        # _add_box_element exactly as add_railing wraps it (γ.8
+        # discipline). The ObjectType="Balcony" carries the semantic
+        # discriminator that downstream tools filter on.
+        return self._add_box_element(
+            ifc_class="IfcSlab",
+            element_id=balcony_id,
+            origin=origin,
+            dims=(length_f, projection_f),
+            depth=thickness_f,
+            material=material,
+            predefined_type="USERDEFINED",
+            rotation=rotation_z_rad,
+            object_type="Balcony",
+            description=description or "Projecting balcony slab",
+            tag=tag,
+            contained_in_space_id=contained_in_space_id,
+            storey_id=storey_id,
+        )
+
+    def add_parapet(
+        self,
+        parapet_id: str,
+        origin: Tuple[float, float, float],
+        length: float,
+        height: float = 1.0,
+        thickness: float = 0.1,
+        material: str = "",
+        rotation_z_rad: float = 0.0,
+        description: str = "",
+        tag: str = "",
+        contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
+    ) -> Optional[Any]:
+        """A low perimeter wall around a roof edge — `IfcWall` with
+        `PredefinedType=PARAPET` in IFC4 (the predefined-type slot does
+        not exist on IfcWall in IFC2X3; the helper sets ObjectType
+        instead for that schema so downstream tools still see the
+        semantic discriminator).
+
+        Args:
+          origin: storey-local SW corner of the parapet wall, at the
+            roof level (caller passes oz = roof_top_z so the parapet
+            sits ON the roof).
+          length: along-the-roof-edge dimension in metres.
+          height: vertical height above the roof, default 1.0 m
+            (residential safety / IBC minimum is ~1.07 m).
+          thickness: wall thickness, default 0.1 m.
+
+        Edge cases (graceful — never crash):
+          - length or height <= 0 → dropped_element + None
+          - thickness <= 0 → coerced to 0.05 m
+          - duplicate id → BuildFlowIFCError
+        """
+        try:
+            length_f = float(length)
+            height_f = float(height)
+        except (TypeError, ValueError):
+            self._record_dropped_element(
+                type_="parapet",
+                element_id=parapet_id,
+                reason=f"non-numeric length={length!r} or height={height!r}",
+            )
+            return None
+        if length_f <= 0 or height_f <= 0:
+            self._record_dropped_element(
+                type_="parapet",
+                element_id=parapet_id,
+                reason=f"non-positive length={length_f} or height={height_f}",
+            )
+            return None
+        thickness_f = max(0.05, float(thickness) if thickness else 0.1)
+
+        element = self._add_box_element(
+            ifc_class="IfcWall",
+            element_id=parapet_id,
+            origin=origin,
+            dims=(length_f, thickness_f),
+            depth=height_f,
+            material=material,
+            # PARAPET is a valid PredefinedType on IFC4 IfcWall
+            # (canonical_psets.py:142). On IFC2X3 IfcWall has no
+            # PredefinedType — _add_box_element's schema-aware
+            # allow-list silently skips, the ObjectType below carries
+            # the semantic discriminator instead.
+            predefined_type="PARAPET",
+            rotation=rotation_z_rad,
+            object_type="Parapet",
+            description=description or "Roof perimeter parapet",
+            tag=tag,
+            contained_in_space_id=contained_in_space_id,
+            storey_id=storey_id,
+        )
+        return element
+
+    def add_roof(
+        self,
+        roof_id: str,
+        origin: Tuple[float, float, float],
+        dims: Tuple[float, float],
+        thickness: float = 0.15,
+        material: str = "",
+        predefined_type: str = "FLAT_ROOF",
+        rotation_z_rad: float = 0.0,
+        description: str = "",
+        tag: str = "",
+        contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
+    ) -> Optional[Any]:
+        """A roof over the top storey — `IfcRoof` (the assembly) +
+        `IfcSlab` (the geometry) aggregated via `IfcRelAggregates`.
+
+        Follows the same pattern as δ.4's add_stair: the IfcRoof is the
+        building-element-level assembly that BIM tools treat as the
+        roof, and the IfcSlab carries the actual geometry. Multiple
+        slabs CAN be aggregated for pitched / multi-section roofs;
+        ε.1's scope is flat single-slab (covers the benchmark
+        residential RCC roof — pitched and gabled are future, the data
+        trigger will be telemetry showing the agent calling add_proxy
+        with predefined_type="GABLE_ROOF" / etc.).
+
+        Args:
+          origin: storey-local SW corner of the roof slab. Pass oz =
+            ceiling_height so the slab sits ON TOP of the top storey's
+            ceiling (or 0 if storey_id is the top storey and the agent
+            wants the roof in the storey's own frame).
+          dims: (width, depth) — the building footprint in metres.
+          thickness: roof slab thickness, default 0.15 m (RCC).
+          predefined_type: `IfcRoof.PredefinedType` (IFC4) or `.ShapeType`
+            (IFC2X3, attribute renamed — same δ.4 stair lesson).
+            FLAT_ROOF is the only one ε.1 produces geometry for.
+          storey_id: target storey id (defaults to ground). For a
+            multi-storey building the caller should pass the TOP storey
+            id, with oz = floor-to-floor height so the roof sits on top.
+
+        Edge cases (graceful — never crash):
+          - dims (w, d) any <=0 → dropped_element + None
+          - thickness <= 0 → coerced to 0.05 m
+          - duplicate id → BuildFlowIFCError
+
+        Returns the IfcRoof entity (registered in `_elements_by_id` for
+        save/load + downstream addressing), or None on graceful skip.
+        """
+        import math as _math
+        import ifcopenshell.guid as _guid
+
+        roof_id = str(_ascii_safe(roof_id))
+        material = str(_ascii_safe(material))
+        description = str(_ascii_safe(description))
+        tag = str(_ascii_safe(tag)) or roof_id
+
+        if roof_id in self._elements_by_id:
+            raise BuildFlowIFCError(
+                f"add_roof({roof_id!r}): id already taken — "
+                "every element id must be unique within the session."
+            )
+
+        try:
+            dx, dy = float(dims[0]), float(dims[1])
+        except (TypeError, ValueError, IndexError):
+            self._record_dropped_element(
+                type_="roof",
+                element_id=roof_id,
+                reason=f"non-numeric dims={dims!r}",
+            )
+            return None
+        if dx <= 0 or dy <= 0:
+            self._record_dropped_element(
+                type_="roof",
+                element_id=roof_id,
+                reason=f"non-positive dims=({dx}, {dy})",
+            )
+            return None
+        thickness_f = max(0.05, float(thickness) if thickness else 0.15)
+        ox, oy, oz = float(origin[0]), float(origin[1]), float(origin[2])
+
+        api = ifcopenshell.api
+
+        # ── 1. IfcRoof assembly ──
+        roof = api.run("root.create_entity", self._ifc, ifc_class="IfcRoof")
+        roof.Name = roof_id
+        roof.Tag = tag
+        if description:
+            roof.Description = description
+
+        # IFC2X3 → ShapeType; IFC4 → PredefinedType (same δ.4 stair
+        # discipline). The IFC4 enum lives in canonical_psets.py
+        # (added in ε.1); IFC2X3 in _PREDEFINED_TYPE_ENUMS at the top
+        # of this file.
+        try:
+            from .canonical_psets import IFC4_PREDEFINED_TYPES
+            if self.SCHEMA == "IFC4":
+                allowed = IFC4_PREDEFINED_TYPES.get("IfcRoof")
+                attr_name = "PredefinedType"
+            else:
+                allowed = _PREDEFINED_TYPE_ENUMS.get("IfcRoof")
+                attr_name = "ShapeType"
+            requested = str(predefined_type).upper()
+            if allowed and requested in allowed:
+                try:
+                    setattr(roof, attr_name, requested)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # ── 2. Storey-parented placement (canonical pattern) ──
+        ref_dir = self._ifc.create_entity(
+            "IfcDirection",
+            DirectionRatios=(_math.cos(rotation_z_rad), _math.sin(rotation_z_rad), 0.0),
+        )
+        location = self._ifc.create_entity(
+            "IfcCartesianPoint", Coordinates=(ox, oy, oz),
+        )
+        placement_axis = self._ifc.create_entity(
+            "IfcAxis2Placement3D",
+            Location=location,
+            Axis=self._ifc.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0)),
+            RefDirection=ref_dir,
+        )
+        target_storey = self._resolve_storey(storey_id)
+        roof.ObjectPlacement = self._ifc.create_entity(
+            "IfcLocalPlacement",
+            PlacementRelTo=target_storey.ObjectPlacement,
+            RelativePlacement=placement_axis,
+        )
+
+        # ── 3. The roof slab (IfcSlab PredefinedType=ROOF) ──
+        slab = api.run("root.create_entity", self._ifc, ifc_class="IfcSlab")
+        slab.Name = f"{roof_id}-slab"
+        slab.Tag = f"{roof_id}-slab"
+        try:
+            slab.PredefinedType = "ROOF"
+        except Exception:
+            pass
+
+        # Slab placement: roof-relative (0,0,0) so geometry coords are
+        # roof-frame; rectangle profile (dx × dy) extruded upward by
+        # thickness.
+        slab.ObjectPlacement = self._ifc.create_entity(
+            "IfcLocalPlacement",
+            PlacementRelTo=roof.ObjectPlacement,
+            RelativePlacement=self._ifc.create_entity(
+                "IfcAxis2Placement3D",
+                Location=self._ifc.create_entity(
+                    "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0),
+                ),
+                Axis=None, RefDirection=None,
+            ),
+        )
+        rect = self._ifc.create_entity(
+            "IfcRectangleProfileDef",
+            ProfileType="AREA",
+            ProfileName=None,
+            Position=self._ifc.create_entity(
+                "IfcAxis2Placement2D",
+                Location=self._ifc.create_entity(
+                    "IfcCartesianPoint",
+                    Coordinates=(dx / 2.0, dy / 2.0),
+                ),
+                RefDirection=None,
+            ),
+            XDim=dx,
+            YDim=dy,
+        )
+        solid = self._ifc.create_entity(
+            "IfcExtrudedAreaSolid",
+            SweptArea=rect,
+            Position=self._ifc.create_entity(
+                "IfcAxis2Placement3D",
+                Location=self._ifc.create_entity(
+                    "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0),
+                ),
+                Axis=None, RefDirection=None,
+            ),
+            ExtrudedDirection=self._ifc.create_entity(
+                "IfcDirection", DirectionRatios=(0.0, 0.0, 1.0),
+            ),
+            Depth=thickness_f,
+        )
+        rep = self._ifc.create_entity(
+            "IfcShapeRepresentation",
+            ContextOfItems=self._body_ctx,
+            RepresentationIdentifier="Body",
+            RepresentationType="SweptSolid",
+            Items=[solid],
+        )
+        slab.Representation = self._ifc.create_entity(
+            "IfcProductDefinitionShape",
+            Representations=[rep],
+        )
+
+        # ── 4. Aggregate slab under roof ──
+        oh_list = self._ifc.by_type("IfcOwnerHistory")
+        oh = oh_list[0] if oh_list else None
+        self._ifc.create_entity(
+            "IfcRelAggregates",
+            GlobalId=_guid.new(),
+            OwnerHistory=oh,
+            Name=f"Aggregates {roof_id}",
+            RelatingObject=roof,
+            RelatedObjects=[slab],
+        )
+
+        # ── 5. Spatial containment + material (γ.5) ──
+        if contained_in_space_id and contained_in_space_id in self._spaces_by_id:
+            self._contain_in_space(roof, contained_in_space_id)
+        else:
+            self._contain_in_storey(roof, target_storey)
+
+        resolved_mat_id = (
+            material if material in self._materials_by_id else self._fallback_material_id()
+        )
+        if material and resolved_mat_id and material != resolved_mat_id:
+            self._record_material_miss(
+                element_id=roof_id,
+                requested_material_id=material,
+                fallback_material_id=resolved_mat_id,
+            )
+        if resolved_mat_id and resolved_mat_id in self._materials_by_id:
+            mat_entity = self._materials_by_id[resolved_mat_id]
+            try:
+                api.run(
+                    "material.assign_material", self._ifc,
+                    products=[roof, slab], material=mat_entity,
+                )
+            except Exception:
+                pass
+            try:
+                self._style_solid_internal(slab, resolved_mat_id)
+            except Exception:
+                pass
+
+        # ── 6. Register + telemeter as BUILT (not proxy) ──
+        self._elements_by_id[roof_id] = roof
+        self._record_built_class("IfcRoof")
+        self._record_built_class("IfcSlab")
+        return roof
+
     # ── proxies / furniture / lighting ───────────────────────────────
 
     def add_proxy(

@@ -195,6 +195,17 @@ IFC4_PREDEFINED_TYPES: Dict[str, frozenset] = {
         "STRAIGHT", "WINDER", "SPIRAL", "CURVED", "FREEFORM",
         "USERDEFINED", "NOTDEFINED",
     }),
+    # Phase ε.1 — IfcRoof for IFC4 (add_roof). The IFC2X3 enum already
+    # lives in buildflow_ifc.py:_PREDEFINED_TYPE_ENUMS; this mirror
+    # closes the IFC4 path that add_roof's _add_box_element-style
+    # schema-aware predefined-type setting needs.
+    "IfcRoof": frozenset({
+        "FLAT_ROOF", "SHED_ROOF", "GABLE_ROOF", "HIP_ROOF",
+        "HIPPED_GABLE_ROOF", "GAMBREL_ROOF", "MANSARD_ROOF",
+        "BARREL_ROOF", "RAINBOW_ROOF", "BUTTERFLY_ROOF",
+        "PAVILION_ROOF", "DOME_ROOF", "FREEFORM",
+        "USERDEFINED", "NOTDEFINED",
+    }),
 }
 
 
