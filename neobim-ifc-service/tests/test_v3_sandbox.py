@@ -57,6 +57,45 @@ def test_sandbox_runs_simple_print():
     assert r.error_type is None
 
 
+# ── Phase ε.5 (forensic-audit FIX 4): startup-check coverage ────────
+
+
+def test_sandbox_startup_check_covers_new_geometry_methods():
+    """The Sandbox(__init__) MUST fast-fail on a stale Railway image
+    that lacks any of δ.4 + ε.1 + ε.5's new geometry helpers
+    (add_stair, add_roof, add_balcony, add_parapet, add_canopy).
+    Pre-ε.5 the startup check only covered the β.2 trim/hardware
+    methods, so a stale image would silently AttributeError per-call
+    when the agent tried to call the new methods → silent proxy
+    fallbacks. With this check, the stale-image diagnosis is the
+    canonical 'Redeploy neobim-ifc-service' on first Sandbox(bf)."""
+    bf = _bf()
+    # Sanity check: a current-image bf passes the startup check.
+    Sandbox(bf)  # no raise = pass
+
+    # Now simulate stale-image bf instances missing each new method —
+    # the startup check must raise for each one, with the canonical
+    # "Redeploy neobim-ifc-service" message.
+    for missing_method in (
+        "add_stair", "add_roof", "add_balcony",
+        "add_parapet", "add_canopy",
+    ):
+        stale_bf = _bf()
+        # Remove the method from the instance to simulate stale image.
+        # Using object.__setattr__ to override since BuildFlowIFC doesn't
+        # bind these specially.
+        original = getattr(stale_bf, missing_method)
+        try:
+            # Replace with a non-callable so `callable(...)` returns
+            # False (the startup check uses `callable(getattr(...))`).
+            object.__setattr__(stale_bf, missing_method, None)
+            with pytest.raises(RuntimeError, match="Redeploy neobim-ifc-service"):
+                Sandbox(stale_bf)
+        finally:
+            # Restore so the test fixture stays clean.
+            object.__setattr__(stale_bf, missing_method, original)
+
+
 def test_sandbox_exposes_bf_global():
     sb = Sandbox(_bf())
     r = sb.execute(

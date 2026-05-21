@@ -96,7 +96,12 @@ function makeVerifier(): VerifierReport {
 }
 
 describe("buildPriorStateSummary — happy path", () => {
-  it("includes iteration number, score, and the 'build ON your prior work' instruction", () => {
+  it("includes iteration number, score, and the honest 'rebuild incorporating fixes' instruction (ε.5 wording fix)", () => {
+    // Phase ε.5 — the previous wording "Build ON your prior work — do
+    // not start over" was misleading: the sandbox session IS destroyed
+    // at finalize_ifc, so iteration N+1 starts with a fresh sandbox.
+    // The honest framing tells the agent to address the issues by
+    // rebuilding, not to look for nonexistent prior state.
     const out = buildPriorStateSummary({
       iteration: 1,
       qualityScore: 55,
@@ -108,7 +113,9 @@ describe("buildPriorStateSummary — happy path", () => {
     expect(out).toContain("ITERATION 1 RESULT");
     expect(out).toContain("55/100");
     expect(out).toContain("iteration 2 of up to 3");
-    expect(out).toContain("Build ON your prior work");
+    expect(out).toContain("Address the issues from your prior iteration");
+    expect(out).toContain("rebuild");
+    expect(out).not.toContain("Build ON your prior work");
   });
 
   it("includes entity count + spaces present + world bbox extent", () => {

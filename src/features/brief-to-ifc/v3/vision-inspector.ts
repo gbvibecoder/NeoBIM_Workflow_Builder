@@ -24,7 +24,15 @@ const INSPECTOR_MODEL = "claude-opus-4-7";
 const OPUS_INPUT_COST_PER_MILLION = 5;
 const OPUS_OUTPUT_COST_PER_MILLION = 25;
 
-const DEFAULT_TIMEOUT_MS = 90_000;
+/**
+ * Inspect timeout. Phase ε.5 (forensic-audit FIX 5): tightened from
+ * 90s → 75s. Anthropic vision calls typically return in 20-60s; 75s
+ * is still well above the median. Tighter cap defends the iteration's
+ * 750s wall-clock budget — combined with the render-previews 45s
+ * cap, vision adds at most ~120s post-finalize per iteration (vs
+ * 150s pre-ε.5).
+ */
+const DEFAULT_TIMEOUT_MS = 75_000;
 const DEFAULT_MAX_COST_USD = 0.20;
 const MAX_TOKENS_PER_CALL = 4_000;
 

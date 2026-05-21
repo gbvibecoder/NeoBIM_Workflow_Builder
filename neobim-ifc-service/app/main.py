@@ -226,6 +226,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 from app.routers import health, export, audit, design, builder_script  # noqa: E402
 from app.routers import v3_generator  # noqa: E402  — Phase v3 generator agent tools.
 from app.routers import v3_previews  # noqa: E402  — Canvas EX-007 preview renderer.
+from app.routers import v3_verifier  # noqa: E402  — Phase ε.5 hard verifier endpoint.
 
 app.include_router(health.router)
 app.include_router(export.router, prefix="/api/v1")
@@ -234,6 +235,13 @@ app.include_router(design.router, prefix="/api/v1")
 app.include_router(builder_script.router, prefix="/api/v1")
 app.include_router(v3_generator.router, prefix="/api/v3/generator")
 app.include_router(v3_previews.router, prefix="/api/v3/generator")
+# Phase ε.5 — mount the verifier router (TS hard-verifier was hitting
+# /api/v3/verifier/check-build → 404 in production for the entire ε
+# phase). build_verifier.check_build had the logic since β.3+4 but no
+# router was ever exposing it. Mount fixes the side-by-side telemetry
+# (ε.3) and re-activates the parts_decomposition sub-signal of the
+# composite quality metric (δ.2).
+app.include_router(v3_verifier.router, prefix="/api/v3/verifier")
 
 
 @app.get("/")

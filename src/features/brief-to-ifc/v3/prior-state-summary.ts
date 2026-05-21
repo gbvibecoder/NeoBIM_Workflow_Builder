@@ -239,8 +239,12 @@ export function buildPriorStateSummary(data: PriorIterationData): string {
       `\nYou just finished iteration ${iteration}. This is iteration ${
         iteration + 1
       } of up to 3. ` +
-      `**Build ON your prior work — do not start over.** The session sandbox ` +
-      `already holds the IFC you produced; iterate from there.`,
+      `**Address the issues from your prior iteration listed below; rebuild ` +
+      `the model incorporating these fixes.** The sandbox you start with ` +
+      `is fresh — the prior IFC has been finalized to R2 and the agent ` +
+      `session was destroyed. Re-author every \`bf.add_*\` call as if this ` +
+      `were a new build, but use the diagnostic data below to make ` +
+      `different choices this time.`,
   );
 
   if (finalValidation) {

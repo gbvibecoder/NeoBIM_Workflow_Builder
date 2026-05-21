@@ -133,6 +133,27 @@ class Sandbox:
                     f"BuildFlowIFC is missing {_method}() — "
                     "Railway image may be stale. Redeploy neobim-ifc-service."
                 )
+        # Phase ε.5 (forensic-audit FIX 4): δ.4 add_stair + ε.1
+        # add_roof/balcony/parapet + ε.5 add_canopy. Without this
+        # check, a stale Railway image (missing the new methods) would
+        # silently AttributeError per-call when the agent tried to
+        # build stairs/roofs/balconies/parapets/canopies — the agent
+        # would proxy them and we'd see proxy_fallback counts climb
+        # without a fail-fast diagnostic. Adding to the startup
+        # assertion makes "redeploy neobim-ifc-service" the clear
+        # diagnosis on first boot.
+        for _method in (
+            "add_stair",
+            "add_roof",
+            "add_balcony",
+            "add_parapet",
+            "add_canopy",
+        ):
+            if not callable(getattr(bf_instance, _method, None)):
+                raise RuntimeError(
+                    f"BuildFlowIFC is missing {_method}() — "
+                    "Railway image may be stale. Redeploy neobim-ifc-service."
+                )
 
     def execute(self, code: str) -> SandboxResult:
         """Execute the agent-authored Python. Returns captured stdout +

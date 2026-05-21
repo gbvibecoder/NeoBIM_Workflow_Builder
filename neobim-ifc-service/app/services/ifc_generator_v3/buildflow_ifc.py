@@ -1251,6 +1251,96 @@ class BuildFlowIFC:
             storey_id=storey_id,
         )
 
+    def add_canopy(
+        self,
+        canopy_id: str,
+        origin: Tuple[float, float, float],
+        length: float,
+        projection: float,
+        thickness: float = 0.1,
+        material: str = "",
+        rotation_z_rad: float = 0.0,
+        description: str = "",
+        tag: str = "",
+        contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
+    ) -> Optional[Any]:
+        """An overhead canopy / awning — `IfcSlab` with
+        `PredefinedType=USERDEFINED` and `ObjectType="Canopy"`.
+
+        Phase ε.5 (forensic-audit FIX 3) — closes the silent proxy
+        gap left after ε.1. The element-type enum already accepts
+        `"canopy"` (with `awning` / `overhang` synonyms via δ.1b);
+        without this method the agent fell back to `add_proxy` and
+        the canopy became a geometry-less IfcBuildingElementProxy.
+
+        IFC4 has `IfcShadingDevice(PredefinedType=AWNING)` which is
+        the semantically-strictest representation, BUT IFC2X3 has no
+        such class. The IfcSlab + ObjectType convention works in BOTH
+        schemas and matches the discipline already used by
+        `add_balcony` (no IfcBalcony class either — same situation).
+        Downstream tools that filter `IfcSlab.ObjectType="Canopy"`
+        pick it up cleanly. Future enhancement could route to
+        IfcShadingDevice when SCHEMA="IFC4"; not in ε.5 scope.
+
+        Args:
+          origin: storey-local SW corner of the canopy where it MEETS
+            the host wall (typically high on the wall — caller passes
+            oz = lintel_z or roof_overhang_z). The canopy extends
+            outward (along the rotation_z_rad direction's +Y axis local
+            to the rotation) by `projection`.
+          length: along-the-host-wall dimension in metres.
+          projection: outward cantilever distance in metres.
+          thickness: slab thickness, default 0.1 m (canopies are
+            typically thinner than balconies — they don't bear human
+            load).
+          rotation_z_rad: orientation; 0 → length is +X, projection +Y.
+
+        Edge cases (graceful — never crash):
+          - length or projection <= 0 → dropped_element + None
+          - thickness <= 0 → coerced to 0.03 m minimum
+          - duplicate id → BuildFlowIFCError
+        """
+        try:
+            length_f = float(length)
+            projection_f = float(projection)
+        except (TypeError, ValueError):
+            self._record_dropped_element(
+                type_="canopy",
+                element_id=canopy_id,
+                reason=f"non-numeric length={length!r} or projection={projection!r}",
+            )
+            return None
+        if length_f <= 0 or projection_f <= 0:
+            self._record_dropped_element(
+                type_="canopy",
+                element_id=canopy_id,
+                reason=f"non-positive length={length_f} or projection={projection_f}",
+            )
+            return None
+        thickness_f = max(0.03, float(thickness) if thickness else 0.1)
+
+        # Wrap _add_box_element exactly as add_balcony does (γ.8
+        # discipline) — same storey-placement, same material handling,
+        # same telemetry, same persistence. The ObjectType="Canopy"
+        # discriminator distinguishes it from balcony at the IfcSlab
+        # level for downstream filtering.
+        return self._add_box_element(
+            ifc_class="IfcSlab",
+            element_id=canopy_id,
+            origin=origin,
+            dims=(length_f, projection_f),
+            depth=thickness_f,
+            material=material,
+            predefined_type="USERDEFINED",
+            rotation=rotation_z_rad,
+            object_type="Canopy",
+            description=description or "Overhead canopy",
+            tag=tag,
+            contained_in_space_id=contained_in_space_id,
+            storey_id=storey_id,
+        )
+
     def add_parapet(
         self,
         parapet_id: str,

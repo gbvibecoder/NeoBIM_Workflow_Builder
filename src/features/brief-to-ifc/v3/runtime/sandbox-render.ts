@@ -27,7 +27,16 @@
  * the build).
  */
 
-const RENDER_PREVIEW_TIMEOUT_MS = 60_000;
+/**
+ * Render timeout. Phase ε.5 (forensic-audit FIX 5): tightened from
+ * 60s → 45s. Real Railway render-previews typically completes in
+ * 5-15s; 45s is still generous. Tighter cap defends the iteration's
+ * 750s wall-clock budget — combined with vision-inspector's tightened
+ * 75s inspect timeout, vision adds at most 120s post-finalize
+ * (vs the 150s pre-ε.5 budget), giving the agent ~30s more headroom
+ * before the IterationTimeoutError fires.
+ */
+const RENDER_PREVIEW_TIMEOUT_MS = 45_000;
 
 export interface RenderPreviewsResult {
   ok: boolean;

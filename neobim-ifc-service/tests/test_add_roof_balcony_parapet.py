@@ -351,6 +351,73 @@ def test_roof_balcony_parapet_survive_save_load():
     assert slab.PredefinedType == "ROOF"
 
 
+# ─── ε.5 FIX 3 — add_canopy ─────────────────────────────────────────
+
+
+def test_canopy_emits_ifcslab_userdefined_with_objecttype_canopy():
+    """Phase ε.5 — closes the silent proxy gap for canopies that
+    survived ε.1. A canopy is an IfcSlab + PredefinedType=USERDEFINED
+    + ObjectType='Canopy' (same convention as balcony — there's no
+    IfcCanopy class). Downstream tools filter on ObjectType."""
+    bf = BuildFlowIFC(_brief())
+    c = bf.add_canopy(
+        "canopy-1", origin=(0, 0, 2.4),
+        length=3.0, projection=1.2, material="mat-concrete",
+    )
+    assert c is not None
+    assert c.is_a("IfcSlab")
+    assert c.PredefinedType == "USERDEFINED"
+    assert c.ObjectType == "Canopy"
+
+
+def test_canopy_telemetry_records_built_not_proxy():
+    """ε.5 acceptance: canopies move OUT of proxy_fallbacks and INTO
+    built_element_counts. Pre-ε.5 the agent would `add_proxy(object_
+    type="canopy")` and the audit would show that requested_type in
+    proxy_fallbacks. Post-ε.5: zero proxies, IfcSlab count includes
+    the canopy."""
+    bf = BuildFlowIFC(_brief())
+    bf.add_canopy(
+        "canopy-1", origin=(0, 0, 2.4),
+        length=3.0, projection=1.2, material="mat-concrete",
+    )
+    tel = bf.get_telemetry()
+    assert tel["proxy_fallbacks"] == [], (
+        "canopy must NOT proxy — that was the ε.5 audit bug"
+    )
+    assert tel["built_element_counts"].get("IfcSlab", 0) >= 1
+
+
+def test_canopy_storey_parented():
+    """Canopies attach to a wall on a specific floor. Storey-parented
+    placement (γ.10 frame discipline) puts the canopy at the storey's
+    floor level + oz."""
+    bf = BuildFlowIFC(_brief())
+    floor_1 = bf.add_storey("floor-1", "First Floor", 3.1)
+    c = bf.add_canopy(
+        "canopy-1", origin=(2, 0, 2.4),
+        length=2.0, projection=1.0, material="mat-concrete",
+        storey_id="floor-1",
+    )
+    assert c.ObjectPlacement.PlacementRelTo == floor_1.ObjectPlacement
+
+
+@pytest.mark.parametrize("length,projection", [
+    (0, 1.0), (-1.0, 1.0), (3.0, 0), (3.0, -0.5),
+    ("garbage", 1.0), (3.0, None),
+])
+def test_canopy_invalid_dims_skip_gracefully(length, projection):
+    """Same graceful-degradation discipline as balcony/parapet."""
+    bf = BuildFlowIFC(_brief())
+    result = bf.add_canopy(
+        "canopy-bad", origin=(0, 0, 2.4),
+        length=length, projection=projection, material="mat-concrete",
+    )
+    assert result is None
+    tel = bf.get_telemetry()
+    assert any(e["type"] == "canopy" for e in tel["dropped_elements"])
+
+
 # ─── Integration: a multi-storey villa with stair+balcony+roof+parapet ─
 
 

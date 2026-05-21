@@ -290,6 +290,7 @@ export async function POST(req: NextRequest) {
         suggestions,
         previousFeedback: effectivePreviousFeedback,
         iteration,
+        iterationStartMs,
         telemetry,
         onTurn: (record) => {
           try {
@@ -651,6 +652,12 @@ async function runIterationAndVerify(args: {
   iteration: number;
   telemetry: BuildTelemetryCollector;
   onTurn: NonNullable<Parameters<typeof runGenerator>[0]["onTurn"]>;
+  /** Phase ε.5 (forensic-audit FIX 5): wall-clock start of THIS
+   *  iteration. Used by the vision-skip guard to compare elapsed
+   *  generator+verifier time against the 600s safe-budget threshold;
+   *  past that, vision is skipped to keep the iteration under the
+   *  750s ITERATION_TIMEOUT_MS cap. */
+  iterationStartMs: number;
 }): Promise<BuiltIteration> {
   const result = await runGenerator({
     brief: args.briefSpec,
@@ -711,29 +718,49 @@ async function runIterationAndVerify(args: {
   // ~$0.20 per iteration — significant cost, justified because vision
   // catches what structural+sanity signals miss (collapsed furniture,
   // wrong proportions, ugly geometry that LOOKS broken).
+  //
+  // Phase ε.5 (forensic-audit FIX 5) — elapsed-budget guard. The
+  // iteration has a 750_000ms hard cap (ITERATION_TIMEOUT_MS). If the
+  // generator already ate 600s+, attempting vision (~120s worst case
+  // post-ε.5 tightening) could push past the cap and trigger a
+  // false EXECUTION_TIMEOUT that wastes the build. Skip vision when
+  // elapsed is past the safe threshold; the composite metric drops
+  // the vision sub-signal cleanly via its existing graceful
+  // degradation. The agent's IFC is still produced + finalized;
+  // we just score it on structural+sanity (no vision input).
+  const VISION_SKIP_ELAPSED_MS = 600_000; // 600s — leaves 150s buffer
+  const elapsedBeforeVisionMs = Date.now() - args.iterationStartMs;
   let visionReport: VisionReport | null = null;
-  try {
-    const previews = await renderFinalizedIfcPreviews(result.ifcUrl);
-    if (previews.ok && previews.topPngB64 && previews.isoPngB64) {
-      const inspection = await inspectIFC(
-        args.briefSpec,
-        previews.topPngB64,
-        previews.isoPngB64,
-      );
-      visionReport = inspection.report;
-    } else {
+  if (elapsedBeforeVisionMs > VISION_SKIP_ELAPSED_MS) {
+    console.warn(
+      `[agent-job] skipping vision pass — iteration already at ${
+        elapsedBeforeVisionMs
+      }ms (cap ${VISION_SKIP_ELAPSED_MS}ms); composite metric will degrade`,
+    );
+  } else {
+    try {
+      const previews = await renderFinalizedIfcPreviews(result.ifcUrl);
+      if (previews.ok && previews.topPngB64 && previews.isoPngB64) {
+        const inspection = await inspectIFC(
+          args.briefSpec,
+          previews.topPngB64,
+          previews.isoPngB64,
+        );
+        visionReport = inspection.report;
+      } else {
+        console.warn(
+          `[agent-job] post-finalize render-previews failed; vision sub-signal will degrade: ${previews.error ?? "unknown"}`,
+        );
+      }
+    } catch (err) {
+      // Either render or inspect threw — vision drops out of the metric
+      // gracefully. Never crashes the build.
       console.warn(
-        `[agent-job] post-finalize render-previews failed; vision sub-signal will degrade: ${previews.error ?? "unknown"}`,
+        `[agent-job] post-finalize vision pass swallowed error: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
     }
-  } catch (err) {
-    // Either render or inspect threw — vision drops out of the metric
-    // gracefully. Never crashes the build.
-    console.warn(
-      `[agent-job] post-finalize vision pass swallowed error: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-    );
   }
 
   // Phase δ.2 — composite score (gate) + legacy score (telemetry).

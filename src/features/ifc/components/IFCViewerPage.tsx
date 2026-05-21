@@ -166,6 +166,39 @@ export default function IFCViewerPage({ autoEnhance = false, restoreFromCache = 
 
   const hasModel = modelInfo !== null;
 
+  /* Phase ε.5 (forensic-audit FIX 2) — when autoEnhance is set, actually
+     trigger the photoreal pass once the model has loaded. The audit caught
+     that ε.2 only opened the Enhance panel but never called applyAll(),
+     so the button labeled "Enhance ✨" was leaving the user with a raw
+     concrete IFC waiting for a second click. This effect closes the gap.
+
+     Guarded by `autoEnhanceTriggeredRef` so the apply runs EXACTLY ONCE
+     per page mount even if `modelInfo` rebuilds (e.g. user uploads a
+     different file on top of the autoEnhance one). Failures are swallowed
+     — the model is still viewable, the user can apply manually if the
+     auto-apply throws. */
+  const autoEnhanceTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (!autoEnhance) return;
+    if (!hasModel) return;
+    if (autoEnhanceTriggeredRef.current) return;
+    autoEnhanceTriggeredRef.current = true;
+    void (async () => {
+      try {
+        await enhancePanelRef.current?.applyAll();
+      } catch (err) {
+        // Auto-apply must NEVER break the viewer. Worst case: user sees
+        // the raw model + the Enhance panel expanded, can click Apply
+        // manually. Log so the failure shows in console.
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[ε.5 autoEnhance] applyAll failed; model still viewable:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    })();
+  }, [autoEnhance, hasModel]);
+
   /* Directly hand an already-read buffer to the 3D viewer. Used both by the
      normal upload flow (after FileReader finishes) and by the refresh-time
      cache restore (no FileReader needed — we persisted the bytes). */
