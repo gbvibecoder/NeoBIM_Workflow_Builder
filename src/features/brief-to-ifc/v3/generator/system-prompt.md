@@ -107,6 +107,7 @@ The `bf` helper has methods for every common building element. Key ones:
 
 **Storeys (multi-floor buildings):**
 - `bf.add_storey(storey_id, name, elevation)` — creates an additional IfcBuildingStorey at the given elevation (metres). The bootstrap creates "Ground Floor" at 0.0. For multi-storey buildings, add one storey per floor BEFORE creating elements on that floor.
+- `bf.add_stair(stair_id, origin, total_rise, width=1.0, run=None, step_count=None, material="", predefined_type="STRAIGHT_RUN_STAIR", rotation_z_rad=0.0, storey_id=None)` — real IfcStair + IfcStairFlight assembly that physically connects two floors. `total_rise` is the floor-to-floor height in metres; the top of the last step lands at exactly `origin[2] + total_rise` (no rounding error). With `storey_id="floor-N"` and `origin=(x, y, 0)` and `total_rise = elevation(floor-N+1) - elevation(floor-N)`, the stair connects floor-N to floor-N+1. NEVER use `bf.add_proxy` for stairs — use this method so downstream BIM tools see the stair as a stair.
 - All `bf.add_*` methods accept `storey_id=None` (default = ground floor). Pass `storey_id="floor-1"` to assign an element to that storey.
 
 **Spaces:**

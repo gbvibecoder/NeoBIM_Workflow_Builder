@@ -769,6 +769,394 @@ class BuildFlowIFC:
             storey_id=storey_id,
         )
 
+    # ── Phase δ.4 — IfcStair (straight-run flight, multi-storey link) ──
+
+    def add_stair(
+        self,
+        stair_id: str,
+        origin: Tuple[float, float, float],
+        total_rise: float,
+        width: float = 1.0,
+        run: Optional[float] = None,
+        step_count: Optional[int] = None,
+        material: str = "",
+        predefined_type: str = "STRAIGHT_RUN_STAIR",
+        rotation_z_rad: float = 0.0,
+        description: str = "",
+        tag: str = "",
+        contained_in_space_id: Optional[str] = None,
+        storey_id: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Build a straight-run stair connecting two floors.
+
+        Phase δ.4 — replaces the prior `bf.add_proxy(object_type="stair")`
+        fallback with real `IfcStair` + `IfcStairFlight` geometry. Multi-
+        storey buildings now have a way to physically connect floors;
+        downstream BIM tools that filter by IFC class (Revit import,
+        IDS validation, schedule generation, clash detection) see the
+        stair as a stair.
+
+        Geometry:
+          - `IfcStair` (the assembly) with PredefinedType set per the
+            schema-aware allow-list (IFC2X3 + IFC4 differ; both supported).
+          - One `IfcStairFlight` aggregated under the stair via
+            `IfcRelAggregates`. PredefinedType="STRAIGHT" in IFC4.
+          - The flight's geometry: `step_count` rectangular extrusions
+            stacked into a staircase silhouette. Step i is a box of
+            footprint `tread_depth × width` extruded upward to
+            `(i+1) * riser_height`. The top of the last step lands at
+            EXACTLY `origin[2] + total_rise` so the stair connects to
+            the next storey's floor level (the acceptance invariant).
+
+        Placement: storey-relative, following the canonical
+        `_add_box_element` pattern (lines 2351-2371). The stair's local
+        `(ox, oy, oz)` lives in the target storey's frame; with `oz=0`
+        the bottom step sits at the storey floor, the top step lands at
+        the next storey floor (the storey deltas come from
+        `bf.add_storey(..., elevation)`). Avoids the γ.10 freestanding-
+        slab trap by NEVER re-parenting after creation.
+
+        Args:
+          stair_id: unique element id (also used as IFC Tag).
+          origin: storey-local (x, y, z) of the bottom-front-left corner
+            of the first step. Pass z=0 to land on the storey's floor.
+          total_rise: floor-to-floor height in metres. The top of the
+            stair lands at exactly `origin[2] + total_rise` regardless of
+            step count rounding.
+          width: tread width (perpendicular to the run direction). Default
+            1.0 m (standard residential).
+          run: total horizontal run in metres. Auto-derived as
+            `step_count * 0.28` when omitted.
+          step_count: number of risers (and steps). Auto-derived from
+            `total_rise` targeting ~0.17 m risers when omitted. Always
+            >= 2.
+          material: material id from the catalog. Falls back per γ.5 when
+            not in the catalog (records a material_miss in δ.0 telemetry).
+          predefined_type: IFC `IfcStair.PredefinedType`. Default
+            `STRAIGHT_RUN_STAIR` — the only one this method physically
+            implements; other values are stored on the entity but the
+            geometry is always straight-run for δ.4.
+          rotation_z_rad: rotation about Z. Default 0 → stair runs along
+            +X. Pass `math.pi/2` to run along +Y, etc.
+          contained_in_space_id: optionally route spatial containment to
+            a specific IfcSpace (the stairwell) instead of the storey.
+          storey_id: target storey id (defaults to ground). The stair's
+            origin is in this storey's frame.
+
+        Edge cases (graceful — never crash):
+          - `total_rise <= 0` or `width <= 0`: records dropped_element
+            telemetry with the reason and returns None. No IFC entity
+            created.
+          - `step_count` overridden too low (<2): clamped to 2.
+          - `run` overridden too small (<0.1m total): clamped.
+          - Non-even rise/step division: `riser_height = total_rise /
+            step_count` is exact; the top of step N-1 lands at exactly
+            `total_rise`, never overshoots.
+
+        Returns the IfcStair entity (registered in `_elements_by_id` for
+        save/load persistence and downstream reference), or None on
+        graceful skip.
+        """
+        import math as _math
+        import ifcopenshell.guid as _guid
+
+        # ── Inputs: sanitise + validate ──
+        stair_id = str(_ascii_safe(stair_id))
+        material = str(_ascii_safe(material))
+        description = str(_ascii_safe(description))
+        tag = str(_ascii_safe(tag)) or stair_id
+
+        if stair_id in self._elements_by_id:
+            raise BuildFlowIFCError(
+                f"add_stair({stair_id!r}): id already taken — "
+                "every element id must be unique within the session."
+            )
+
+        # Edge case: missing / non-positive dims → graceful skip,
+        # telemetered, no IFC entity created.
+        try:
+            total_rise_f = float(total_rise)
+            width_f = float(width)
+        except (TypeError, ValueError):
+            self._record_dropped_element(
+                type_="stair",
+                element_id=stair_id,
+                reason=f"non-numeric total_rise={total_rise!r} or width={width!r}",
+            )
+            return None
+        if total_rise_f <= 0 or width_f <= 0:
+            self._record_dropped_element(
+                type_="stair",
+                element_id=stair_id,
+                reason=f"non-positive total_rise={total_rise_f} or width={width_f}",
+            )
+            return None
+
+        # Auto-derive step_count targeting ~0.17 m risers, min 2. Caller
+        # may override.
+        if step_count is None:
+            derived = max(2, int(round(total_rise_f / 0.17)))
+        else:
+            try:
+                derived = max(2, int(step_count))
+            except (TypeError, ValueError):
+                derived = max(2, int(round(total_rise_f / 0.17)))
+        n_steps = derived
+
+        # Auto-derive run targeting ~0.28 m treads, min 0.1m per tread.
+        if run is None:
+            run_f = n_steps * 0.28
+        else:
+            try:
+                run_f = float(run)
+                if run_f < n_steps * 0.1:
+                    run_f = n_steps * 0.1
+            except (TypeError, ValueError):
+                run_f = n_steps * 0.28
+
+        # Exact riser + tread dimensions — top of step n-1 lands at EXACTLY
+        # total_rise so the stair connects to the next storey's floor Z.
+        riser_height = total_rise_f / n_steps
+        tread_depth = run_f / n_steps
+
+        ox, oy, oz = float(origin[0]), float(origin[1]), float(origin[2])
+
+        api = ifcopenshell.api
+
+        # ── 1. Create the IfcStair assembly entity ──
+        stair = api.run("root.create_entity", self._ifc, ifc_class="IfcStair")
+        stair.Name = stair_id
+        stair.Tag = tag
+        if description:
+            stair.Description = description
+
+        # Stair-type enum — schema-aware. IFC4 renamed the attribute:
+        # IFC2X3.IfcStair.ShapeType → IFC4.IfcStair.PredefinedType
+        # (same set of allowed values: STRAIGHT_RUN_STAIR etc.). The
+        # _add_box_element discipline (lines 2269-2280) only handles
+        # PredefinedType, which silently swallows on IFC2X3 stairs; for
+        # add_stair we want the type SET on both schemas so downstream
+        # tools (Solibri, IDS validation) read the stair shape
+        # correctly. Match the right attribute name per schema.
+        try:
+            from .canonical_psets import IFC4_PREDEFINED_TYPES
+            if self.SCHEMA == "IFC4":
+                allowed = IFC4_PREDEFINED_TYPES.get("IfcStair")
+                attr_name = "PredefinedType"
+            else:
+                allowed = _PREDEFINED_TYPE_ENUMS.get("IfcStair")
+                attr_name = "ShapeType"
+            requested = str(predefined_type).upper()
+            if allowed and requested in allowed:
+                try:
+                    setattr(stair, attr_name, requested)
+                except Exception:
+                    pass
+        except Exception:
+            # Never let stair-type setting abort stair creation.
+            pass
+
+        # ── 2. Storey-parented placement (the canonical pattern) ──
+        # Quoting the _add_box_element discipline (lines 2351-2371):
+        # IfcLocalPlacement(PlacementRelTo=target_storey.ObjectPlacement,
+        # RelativePlacement=IfcAxis2Placement3D(Location=(ox,oy,oz))).
+        # This puts the stair's local origin at world Z =
+        # storey.elevation + oz. With oz=0 → world Z = storey.elevation,
+        # i.e. on the storey's floor. The top of the last step (at local
+        # z = total_rise) lands at world Z = storey.elevation +
+        # total_rise → the next storey's floor when total_rise equals
+        # the storey delta. This is the connect-the-floors invariant.
+        ref_dir = self._ifc.create_entity(
+            "IfcDirection",
+            DirectionRatios=(_math.cos(rotation_z_rad), _math.sin(rotation_z_rad), 0.0),
+        )
+        location = self._ifc.create_entity(
+            "IfcCartesianPoint", Coordinates=(ox, oy, oz),
+        )
+        placement_axis = self._ifc.create_entity(
+            "IfcAxis2Placement3D",
+            Location=location,
+            Axis=self._ifc.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0)),
+            RefDirection=ref_dir,
+        )
+        target_storey = self._resolve_storey(storey_id)
+        stair.ObjectPlacement = self._ifc.create_entity(
+            "IfcLocalPlacement",
+            PlacementRelTo=target_storey.ObjectPlacement,
+            RelativePlacement=placement_axis,
+        )
+
+        # ── 3. Build the IfcStairFlight + step geometry ──
+        flight = api.run(
+            "root.create_entity", self._ifc, ifc_class="IfcStairFlight",
+        )
+        flight.Name = f"{stair_id}-flight-1"
+        flight.Tag = f"{stair_id}-flight-1"
+
+        # IfcStairFlight schema-specific attributes:
+        # - IFC2X3: NumberOfRiser, NumberOfTreads, RiserHeight, TreadLength
+        # - IFC4:   NumberOfRisers (note plural), NumberOfTreads,
+        #           RiserHeight, TreadLength, PredefinedType
+        # Set defensively — older / newer ifcopenshell may name fields
+        # slightly differently. Never let an attribute-set failure abort
+        # the stair build.
+        for attr_name, attr_val in (
+            ("NumberOfRisers", n_steps),
+            ("NumberOfRiser", n_steps),  # IFC2X3 singular
+            ("NumberOfTreads", n_steps - 1),  # N risers => N-1 full treads
+            ("RiserHeight", float(riser_height)),
+            ("TreadLength", float(tread_depth)),
+        ):
+            try:
+                if hasattr(flight, attr_name):
+                    setattr(flight, attr_name, attr_val)
+            except Exception:
+                pass
+        # Flight PredefinedType (IFC4 only — IFC2X3 IfcStairFlight has none).
+        if self.SCHEMA == "IFC4":
+            try:
+                flight.PredefinedType = "STRAIGHT"
+            except Exception:
+                pass
+
+        # Flight placement: stair-relative origin (0, 0, 0) so the flight
+        # inherits the stair's storey-relative position. Same pattern as
+        # γ.10's re-parenting BUT for assembly composition, not for an
+        # opening-fill relationship.
+        flight.ObjectPlacement = self._ifc.create_entity(
+            "IfcLocalPlacement",
+            PlacementRelTo=stair.ObjectPlacement,
+            RelativePlacement=self._ifc.create_entity(
+                "IfcAxis2Placement3D",
+                Location=self._ifc.create_entity(
+                    "IfcCartesianPoint", Coordinates=(0.0, 0.0, 0.0),
+                ),
+                Axis=None, RefDirection=None,
+            ),
+        )
+
+        # ── 4. Build the step geometry — N stacked boxes ──
+        # Each step i is a rectangular slab of footprint
+        # (tread_depth × width) extruded upward by (i+1) * riser_height,
+        # located at local (i * tread_depth, 0, 0). The result, viewed
+        # from the side (X-Z plane), is a staircase silhouette: each
+        # successive step rises one riser higher than the last. Top of
+        # step n-1 reaches z = n * riser_height = total_rise (exactly).
+        step_items: List[Any] = []
+        for i in range(n_steps):
+            step_x = i * tread_depth
+            step_height = (i + 1) * riser_height
+            # Rectangle profile, SW-corner convention (matches
+            # _add_box_element's centering offset, lines 2299-2308).
+            rect = self._ifc.create_entity(
+                "IfcRectangleProfileDef",
+                ProfileType="AREA",
+                ProfileName=None,
+                Position=self._ifc.create_entity(
+                    "IfcAxis2Placement2D",
+                    Location=self._ifc.create_entity(
+                        "IfcCartesianPoint",
+                        Coordinates=(tread_depth / 2.0, width_f / 2.0),
+                    ),
+                    RefDirection=None,
+                ),
+                XDim=tread_depth,
+                YDim=width_f,
+            )
+            solid = self._ifc.create_entity(
+                "IfcExtrudedAreaSolid",
+                SweptArea=rect,
+                Position=self._ifc.create_entity(
+                    "IfcAxis2Placement3D",
+                    Location=self._ifc.create_entity(
+                        "IfcCartesianPoint",
+                        Coordinates=(step_x, 0.0, 0.0),
+                    ),
+                    Axis=None, RefDirection=None,
+                ),
+                ExtrudedDirection=self._ifc.create_entity(
+                    "IfcDirection", DirectionRatios=(0.0, 0.0, 1.0),
+                ),
+                Depth=step_height,
+            )
+            step_items.append(solid)
+
+        rep = self._ifc.create_entity(
+            "IfcShapeRepresentation",
+            ContextOfItems=self._body_ctx,
+            RepresentationIdentifier="Body",
+            RepresentationType="SweptSolid",
+            Items=step_items,
+        )
+        flight.Representation = self._ifc.create_entity(
+            "IfcProductDefinitionShape",
+            Representations=[rep],
+        )
+
+        # ── 5. Aggregate the flight under the stair (IfcRelAggregates) ──
+        # Real IFC stair semantics: IfcStair is the assembly, sub-parts
+        # (flights, landings) are aggregated via IfcRelAggregates. This
+        # also helps δ.2's structural signal pick the stair up as one
+        # element rather than N loose solids.
+        oh_list = self._ifc.by_type("IfcOwnerHistory")
+        oh = oh_list[0] if oh_list else None
+        self._ifc.create_entity(
+            "IfcRelAggregates",
+            GlobalId=_guid.new(),
+            OwnerHistory=oh,
+            Name=f"Aggregates {stair_id}",
+            RelatingObject=stair,
+            RelatedObjects=[flight],
+        )
+
+        # ── 6. Spatial containment (storey OR space) ──
+        if contained_in_space_id and contained_in_space_id in self._spaces_by_id:
+            self._contain_in_space(stair, contained_in_space_id)
+        else:
+            self._contain_in_storey(stair, target_storey)
+
+        # ── 7. Material assignment (γ.5 discipline) ──
+        # Stairs in residential are typically concrete; the catalog's
+        # fallback material is fine if the agent doesn't name one. Apply
+        # to both the assembly and the flight so renders pick up colour.
+        resolved_mat_id = (
+            material if material in self._materials_by_id else self._fallback_material_id()
+        )
+        if material and resolved_mat_id and material != resolved_mat_id:
+            self._record_material_miss(
+                element_id=stair_id,
+                requested_material_id=material,
+                fallback_material_id=resolved_mat_id,
+            )
+        if resolved_mat_id and resolved_mat_id in self._materials_by_id:
+            mat_entity = self._materials_by_id[resolved_mat_id]
+            try:
+                api.run(
+                    "material.assign_material", self._ifc,
+                    products=[stair, flight], material=mat_entity,
+                )
+            except Exception:
+                # Non-critical — colour-only. The stair geometry still
+                # exists; downstream tools will render in default colour.
+                pass
+            # Per-solid IfcStyledItem so web-ifc renders colours. The
+            # canonical helper walks the flight's Representation Items
+            # and styles each IfcExtrudedAreaSolid — covering every step
+            # in one call.
+            try:
+                self._style_solid_internal(flight, resolved_mat_id)
+            except Exception:
+                pass
+
+        # ── 8. Register + telemeter as BUILT (not proxy fallback) ──
+        # The whole point of δ.4: stairs move OUT of proxyFallbacks and
+        # INTO built_element_counts. After this ships, telemetry should
+        # show IfcStair counts climbing on multi-storey briefs.
+        self._elements_by_id[stair_id] = stair
+        self._record_built_class("IfcStair")
+        self._record_built_class("IfcStairFlight")
+        return stair
+
     # ── proxies / furniture / lighting ───────────────────────────────
 
     def add_proxy(
