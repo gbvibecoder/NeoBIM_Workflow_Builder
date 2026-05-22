@@ -118,6 +118,7 @@ import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-work
 import type { WorkflowTemplate } from "@/types/workflow";
 import { SaveWorkflowModal } from "@/features/canvas/components/modals/SaveWorkflowModal";
 import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
+import { StopBuildConfirmModal } from "@/features/canvas/components/modals/StopBuildConfirmModal";
 import {
   useExecutionStore,
   selectArtifacts,
@@ -536,55 +537,76 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
     return out;
   }, [artifacts]);
 
-  const handleStop = useCallback(async () => {
-    if (!isExecuting) {
-      return;
-    }
+  /* ── STOP UX (2026-05-22) — confirm modal, then INSTANT reset.
+     handleStop now just opens the confirm modal. The actual cancel +
+     reset happens in `handleConfirmStop` below. This prevents a misclick
+     from nuking a long-running build while still giving the user an
+     instant-feeling cancel: confirm → blank canvas → background worker
+     dies within ≤30s (≤~$0.30) on its own. */
+  const [isStopConfirmOpen, setIsStopConfirmOpen] = useState(false);
+
+  const handleStop = useCallback(() => {
+    if (!isExecuting) return;
+    setIsStopConfirmOpen(true);
+  }, [isExecuting]);
+
+  const handleConfirmStop = useCallback(() => {
+    // Capture the in-flight runIds BEFORE we clear the store. After the
+    // reset call below the artifacts Map is empty so a re-read would
+    // collect nothing — same bug pattern the cancel-fix already
+    // remediated for the polling window.
     const pendingRunIds = collectPendingRunIds();
-    if (pendingRunIds.length === 0) {
-      toast.info("Workflow stop requested — nothing in-flight to cancel server-side.", {
-        duration: 4000,
+    setIsStopConfirmOpen(false);
+
+    // Fire-and-forget cancel POSTs. We DO NOT await — the user must
+    // not wait the ≤30s halt window. The server cancel chain is the
+    // proven-working path from ζ.1; we only re-issue the same POST.
+    // Each error is swallowed per-runId so a flaky network on one
+    // doesn't suppress the others or block the reset.
+    for (const runId of pendingRunIds) {
+      void fetch(`/api/brief-to-ifc/v3/runs/${runId}/cancel`, {
+        method: "POST",
+        credentials: "include",
+      }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[stop] cancel ${runId} failed:`,
+          err instanceof Error ? err.message : err,
+        );
       });
-      return;
     }
-    toast.info(
-      `Cancelling ${pendingRunIds.length} active AI build${pendingRunIds.length === 1 ? "" : "s"}…`,
+
+    // Optimistic reset — mirrors the canonical "New blank workflow"
+    // path (this same trio fires from the `?new=1` effect at the top
+    // of this component, lines ~348-354). Wipes nodes/edges/brief input
+    // (resetCanvas) + execution artifacts (clearArtifacts) + the
+    // currentExecution row (clearCurrentExecution → also flips
+    // isExecuting=false, which the stale-poll guard in useExecution
+    // checks). The URL is replaced so a refresh / back doesn't reload
+    // the just-stopped workflow.
+    resetCanvas();
+    clearArtifacts();
+    clearCurrentExecution();
+    useUIStore.getState().setSelectedNodeIds([]);
+    router.replace("/dashboard/canvas", { scroll: false });
+
+    toast.success(
+      pendingRunIds.length === 0
+        ? "Build cancelled — fresh canvas ready."
+        : `Build cancelled — fresh canvas ready. The worker is wrapping up in the background (≤30s).`,
       { duration: 5000 },
     );
-    const results = await Promise.all(
-      pendingRunIds.map(async (runId) => {
-        try {
-          const res = await fetch(`/api/brief-to-ifc/v3/runs/${runId}/cancel`, {
-            method: "POST",
-            credentials: "include",
-          });
-          if (!res.ok) {
-            console.warn(`[stop] cancel ${runId} returned HTTP ${res.status}`);
-            return { runId, ok: false };
-          }
-          return { runId, ok: true };
-        } catch (err) {
-          console.warn(
-            `[stop] cancel ${runId} failed:`,
-            err instanceof Error ? err.message : err,
-          );
-          return { runId, ok: false };
-        }
-      }),
-    );
-    const cancelledCount = results.filter((r) => r.ok).length;
-    if (cancelledCount === pendingRunIds.length) {
-      toast.success(
-        `Cancellation sent for ${cancelledCount} build${cancelledCount === 1 ? "" : "s"}. The worker will halt on its next turn (≤ ~30s).`,
-        { duration: 6000 },
-      );
-    } else {
-      toast.warning(
-        `${cancelledCount}/${pendingRunIds.length} cancellations succeeded; the rest may already be terminal.`,
-        { duration: 6000 },
-      );
-    }
-  }, [isExecuting, collectPendingRunIds]);
+  }, [
+    collectPendingRunIds,
+    resetCanvas,
+    clearArtifacts,
+    clearCurrentExecution,
+    router,
+  ]);
+
+  const handleStopCancel = useCallback(() => {
+    setIsStopConfirmOpen(false);
+  }, []);
 
   /* ── Phase η.1 — KILL-ON-ABANDON (the user almost never clicks STOP).
      ζ.1 wired the explicit STOP button. This effect closes the implicit
@@ -1577,6 +1599,15 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
       <ExecutionBlockModal
         rateLimitHit={rateLimitHit}
         onDismiss={clearRateLimitError}
+      />
+
+      {/* STOP-build confirmation (2026-05-22). Opens from handleStop;
+          confirm fires fire-and-forget cancel POSTs + optimistic reset. */}
+      <StopBuildConfirmModal
+        isOpen={isStopConfirmOpen}
+        onClose={handleStopCancel}
+        onConfirm={handleConfirmStop}
+        pendingRunCount={collectPendingRunIds().length}
       />
     </div>
   );
