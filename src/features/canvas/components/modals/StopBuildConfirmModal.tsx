@@ -80,10 +80,10 @@ export function StopBuildConfirmModal({
 
   const buildsCopy =
     pendingRunCount === 0
-      ? "This will halt the current execution and reset the canvas to a blank state."
+      ? "This will halt the current execution. The template stays — every node resets to idle and the brief is emptied."
       : pendingRunCount === 1
-        ? "1 active AI build will be cancelled and the canvas will be reset to a blank state."
-        : `${pendingRunCount} active AI builds will be cancelled and the canvas will be reset to a blank state.`;
+        ? "1 active AI build will be cancelled. The template stays — every node resets to idle and the brief is emptied."
+        : `${pendingRunCount} active AI builds will be cancelled. The template stays — every node resets to idle and the brief is emptied.`;
 
   return (
     <AnimatePresence>
@@ -196,8 +196,8 @@ export function StopBuildConfirmModal({
                 lineHeight: 1.55,
               }}
             >
-              Progress will be discarded. {buildsCopy} You&apos;ll land on a
-              fresh canvas, ready for a new brief.
+              Progress will be discarded. {buildsCopy} You can immediately
+              type a new brief and run again.
             </p>
 
             <div

@@ -170,12 +170,33 @@ describe("STOP UX — confirm-then-reset (2026-05-22)", () => {
 
   // ─── (b) ──────────────────────────────────────────────────────────────
 
-  it("(b) on confirm, resetCanvas + clearArtifacts + clearCurrentExecution wipe both stores (nodes empty, artifacts empty, brief gone, isExecuting false)", () => {
-    // Seed: a workflow with an IN-009 holding briefText, plus a running
-    // execution + an artifact.
+  it("(b) on confirm, SOFT reset KEEPS nodes+edges, resets statuses to idle, empties IN-009 briefText, AND clears execution state — the template stays on screen, ready for a new brief", () => {
+    // Seed: a full 13-node workflow (mimic of what TR-025→TR-026→…→EX-007
+    // looks like on the canvas) with an IN-009 holding briefText, plus
+    // some nodes in mid-run states (running / success) and an active
+    // execution row + artifacts.
+    const briefNode = inputNodeWithBrief("Modern 2BHK in Mumbai with a balcony");
+    // Stamp a running status onto the brief node and another node so we
+    // can prove the soft reset clears it.
+    (briefNode.data as Record<string, unknown>).status = "success";
+    const otherNodes: WorkflowNode[] = Array.from({ length: 12 }, (_, i) => ({
+      id: `tile-${i + 2}`,
+      type: "default",
+      position: { x: (i + 1) * 100, y: 0 },
+      data: {
+        catalogueId: i === 0 ? "TR-025" : "TR-026",
+        label: `Node ${i + 2}`,
+        status: i < 2 ? "running" : i < 4 ? "success" : i < 6 ? "error" : undefined,
+        errorMessage: i === 4 ? "boom" : undefined,
+      },
+    } as unknown as WorkflowNode));
+    const seededEdges = [
+      { id: "e1", source: briefNode.id, target: "tile-2" },
+      { id: "e2", source: "tile-2", target: "tile-3" },
+    ];
     useWorkflowStore.setState({
-      nodes: [inputNodeWithBrief("Modern 2BHK in Mumbai with a balcony")],
-      edges: [],
+      nodes: [briefNode, ...otherNodes],
+      edges: seededEdges as unknown as ReturnType<typeof useWorkflowStore.getState>["edges"],
       currentWorkflow: { id: "wf-test", name: "Test", tileGraph: { nodes: [], edges: [] } } as unknown as ReturnType<typeof useWorkflowStore.getState>["currentWorkflow"],
       isDirty: true,
     });
@@ -186,39 +207,93 @@ describe("STOP UX — confirm-then-reset (2026-05-22)", () => {
       executionProgress: 42,
     });
 
-    // Sanity: brief is non-empty before reset.
-    expect(useWorkflowStore.getState().nodes).toHaveLength(1);
+    // Sanity pre-conditions.
+    expect(useWorkflowStore.getState().nodes).toHaveLength(13);
+    expect(useWorkflowStore.getState().edges).toHaveLength(2);
     expect(
       (useWorkflowStore.getState().nodes[0].data as Record<string, unknown>).briefText,
     ).toBe("Modern 2BHK in Mumbai with a balcony");
     expect(useExecutionStore.getState().isExecuting).toBe(true);
     expect(useExecutionStore.getState().artifacts.size).toBe(1);
+    const preCurrentWorkflow = useWorkflowStore.getState().currentWorkflow;
+    expect(preCurrentWorkflow).not.toBeNull();
 
-    // Production reset path — same trio called from
-    // `WorkflowCanvas.tsx:handleConfirmStop` and the existing `?new=1`
-    // effect at lines ~348-354.
-    useWorkflowStore.getState().resetCanvas();
+    // Production SOFT-reset path — exactly what `handleConfirmStop` runs.
+    // `softResetCanvas` preserves nodes/edges/currentWorkflow; only
+    // execution markers + IN-009 brief get wiped. `clearArtifacts` +
+    // `clearCurrentExecution` handle the run-side cleanup.
+    useWorkflowStore.getState().softResetCanvas();
     selectClearArtifacts(useExecutionStore.getState())();
     selectClearCurrentExecution(useExecutionStore.getState())();
 
-    // Workflow store wiped.
-    expect(useWorkflowStore.getState().nodes).toEqual([]);
-    expect(useWorkflowStore.getState().edges).toEqual([]);
-    expect(useWorkflowStore.getState().currentWorkflow).toBeNull();
-    expect(useWorkflowStore.getState().isDirty).toBe(false);
+    // ─── Template stays ────────────────────────────────────────────
+    // The visible canvas is byte-equivalent in shape: same node IDs,
+    // same edges, same currentWorkflow. The user is NOT dumped on
+    // "Sketch your first workflow".
+    const postNodes = useWorkflowStore.getState().nodes;
+    expect(postNodes).toHaveLength(13);
+    expect(postNodes.map((n) => n.id)).toEqual([
+      briefNode.id,
+      ...otherNodes.map((n) => n.id),
+    ]);
+    expect(useWorkflowStore.getState().edges).toEqual(seededEdges);
+    expect(useWorkflowStore.getState().currentWorkflow).toBe(preCurrentWorkflow);
 
-    // Execution store wiped.
+    // ─── Every node is idle ────────────────────────────────────────
+    for (const n of postNodes) {
+      const d = n.data as Record<string, unknown>;
+      expect(d.status).toBeUndefined();
+      expect(d.errorMessage).toBeUndefined();
+    }
+
+    // ─── IN-009 brief is empty ─────────────────────────────────────
+    const postBrief = postNodes[0].data as Record<string, unknown>;
+    expect(postBrief.briefText).toBe("");
+    expect(postBrief.inputValue).toBe("");
+    expect(postBrief.catalogueId).toBe("IN-009"); // unchanged
+
+    // ─── Execution state wiped ─────────────────────────────────────
     expect(useExecutionStore.getState().artifacts.size).toBe(0);
     expect(useExecutionStore.getState().currentExecution).toBeNull();
     expect(useExecutionStore.getState().isExecuting).toBe(false);
     expect(useExecutionStore.getState().executionProgress).toBe(0);
 
-    // collectPendingRunIds is therefore the empty list — the canvas
-    // STOP/pagehide handlers won't find anything to cancel after
-    // reset (no double-fire).
+    // collectPendingRunIds is therefore the empty list — the pagehide
+    // handler post-reset finds nothing to double-cancel.
     expect(
       collectPendingRunIdsFromMap(useExecutionStore.getState().artifacts),
     ).toEqual([]);
+  });
+
+  it("(b2) softResetCanvas does NOT push undo history (system action) and does NOT change currentWorkflow / edges", () => {
+    // Pin the contract that distinguishes soft-reset from a user edit:
+    // it's not undoable (since it's not the user's edit), and it must
+    // leave the workflow identity alone so the URL / save state stays
+    // consistent.
+    const briefNode = inputNodeWithBrief("hello world");
+    (briefNode.data as Record<string, unknown>).status = "running";
+    const seededWorkflow = {
+      id: "wf-x",
+      name: "X",
+      tileGraph: { nodes: [], edges: [] },
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>["currentWorkflow"];
+    useWorkflowStore.setState({
+      nodes: [briefNode],
+      edges: [{ id: "e", source: "a", target: "b" }] as unknown as ReturnType<typeof useWorkflowStore.getState>["edges"],
+      currentWorkflow: seededWorkflow,
+    });
+    const edgesBefore = useWorkflowStore.getState().edges;
+
+    useWorkflowStore.getState().softResetCanvas();
+
+    expect(useWorkflowStore.getState().edges).toBe(edgesBefore); // referential equality preserved
+    expect(useWorkflowStore.getState().currentWorkflow).toBe(seededWorkflow);
+    expect(
+      (useWorkflowStore.getState().nodes[0].data as Record<string, unknown>).status,
+    ).toBeUndefined();
+    expect(
+      (useWorkflowStore.getState().nodes[0].data as Record<string, unknown>).briefText,
+    ).toBe("");
   });
 
   // ─── (c) ──────────────────────────────────────────────────────────────
