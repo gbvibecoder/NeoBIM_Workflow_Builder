@@ -916,6 +916,26 @@ export async function executeNode(
 
       while (Date.now() - pollStart < POLL_TIMEOUT) {
         await new Promise(r => setTimeout(r, POLL_INTERVAL));
+
+        // STOP-UX fix (2026-05-22): bail when the user reset the canvas.
+        // `clearCurrentExecution()` flips `isExecuting` to false; reading
+        // the store via getState() (non-reactive) gives us the freshest
+        // value without re-rendering. Returning here:
+        //   • stops further wasted status fetches (every 8s for up to 30 min),
+        //   • prevents the COMPLETED branch below from RE-ADDING the
+        //     finished artifact to the now-cleared store (which would
+        //     repopulate a "fresh canvas" 8s after STOP).
+        // The outer for-level loop has the matching guard at level entry
+        // + per-node body, so the returned artifact never reaches the
+        // caller's `addArtifact(node.id, artifact)` (line ~2124).
+        if (!useExecutionStore.getState().isExecuting) {
+          // eslint-disable-next-line no-console
+          console.info(
+            `[tr-026-poll] Execution reset — abandoning poll for ${pendingRunId}`,
+          );
+          return { ...artifact, createdAt: new Date() };
+        }
+
         try {
           const statusRes = await fetch(
             `/api/brief-to-ifc/v3/runs/${pendingRunId}/status`,
@@ -1983,12 +2003,26 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     // parallel via Promise.allSettled. Levels execute sequentially.
     for (const level of executionLevels) {
       if (breakExecution) break;
+      // STOP-UX guard (2026-05-22): the user clicked STOP+confirm during a
+      // prior level / await; `clearCurrentExecution()` flipped isExecuting
+      // to false. Treat the remainder of the run as cancelled — no more
+      // node bodies run, no more artifacts get added, the loop exits
+      // cleanly. `completeExecution(...)` below is store-safe with
+      // currentExecution=null (early-returns).
+      if (!useExecutionStore.getState().isExecuting) {
+        breakExecution = true;
+        break;
+      }
 
       // If this level has a single node, run it directly (no overhead).
       // If multiple nodes, run them in parallel.
       const nodePromises = level.map((node) => (async () => {
       // ─── BEGIN PER-NODE BODY (shared for sequential and parallel) ───
       if (breakExecution) return; // another node in this level failed hard
+      // STOP-UX guard (2026-05-22): user clicked STOP+confirm — reset
+      // already wiped the store. Skip the node body entirely so we
+      // neither call the API nor write back to the cleared store.
+      if (!useExecutionStore.getState().isExecuting) return;
 
       updateNodeStatus(node.id, "running");
       log("running", `Running: ${node.data.label}`, node.data.catalogueId);
@@ -2106,6 +2140,13 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         }
 
         const artifact = await executeNode(node, executionId, dbExecutionId, upstreamArtifact, useReal, isDemoMode, addArtifact);
+
+        // STOP-UX guard (2026-05-22): user clicked STOP+confirm WHILE this
+        // node was running. The reset cleared the store; do NOT re-add
+        // this artifact via the local artifactMap or the store writes
+        // below. Returning here exits the per-node closure cleanly so
+        // Promise.allSettled at the level boundary doesn't see a rejection.
+        if (!useExecutionStore.getState().isExecuting) return;
         artifactMap.set(node.id, artifact);
 
         // Diagnostics: capture output summary + fold any node-emitted deep
