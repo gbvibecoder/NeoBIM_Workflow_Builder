@@ -11,6 +11,12 @@ import { TrackingScripts } from "@/shared/components/TrackingScripts";
 import { CookieConsent } from "@/shared/components/CookieConsent";
 import { UTMCapture } from "@/shared/components/UTMCapture";
 import { META_PIXEL_ID } from "@/lib/meta-pixel";
+import { headers } from "next/headers";
+import {
+  KOS_TENANT_HEADER,
+  KOS_TENANT_OVERRIDE_HEADER,
+  resolveTenantSlugFromHost,
+} from "@/features/kos/lib/tenant-host";
 import "./globals.css";
 import "@/lib/env-check";
 
@@ -180,11 +186,55 @@ export const viewport: Viewport = {
   themeColor: "#07070D",
 };
 
-export default function RootLayout({
+// ── KOS (white-label) tracking isolation ────────────────────────────
+// KOS tenant surfaces (kalzen.*) must carry ZERO BuildFlow marketing /
+// analytics tags (privacy + brand isolation). When the request is
+// KOS-bound the root layout skips every tracking block; the non-KOS
+// (BuildFlow) branch is byte-for-byte unchanged — this guard does NOT
+// remove tracking from BuildFlow pages, it only gates it off for KOS.
+//
+// Detection uses THREE independent signals so it fires on every entry
+// path, not just the middleware-rewrite path:
+//   1. KOS_TENANT_HEADER — injected by middleware.ts on the production
+//      rewrite (kalzen.trybuildflow.in). Relies on middleware request-
+//      header propagation reaching the RSC, which is not guaranteed on
+//      every path, so it is only the first of three signals.
+//   2. KOS_TENANT_OVERRIDE_HEADER — sent DIRECTLY by the client (curl /
+//      tests) and therefore always present in headers() regardless of
+//      middleware. Honoured only outside production, mirroring
+//      middleware.ts (an attacker cannot use it to disable prod tags).
+//   3. Host resolution — derives the tenant slug from the Host header
+//      itself, covering kalzen.localhost (dev) and kalzen.trybuildflow.in
+//      (production) with no middleware dependency at all.
+//
+// Reading headers() here intentionally opts the root layout into dynamic
+// rendering; that is the cost of stripping the server-rendered
+// consent/GTM/Meta tags from KOS HTML without a multi-root refactor.
+async function detectKos(): Promise<boolean> {
+  const h = await headers();
+
+  // 1. Middleware-injected tenant header (production rewrite path).
+  if (h.get(KOS_TENANT_HEADER)) return true;
+
+  // 2. Dev override header sent directly by the client.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    h.get(KOS_TENANT_OVERRIDE_HEADER)
+  ) {
+    return true;
+  }
+
+  // 3. Host-based tenant resolution (kalzen.localhost / *.trybuildflow.in).
+  return !!resolveTenantSlugFromHost(h.get("host"));
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isKos = await detectKos();
+
   // 🔍 JSON-LD Structured Data for SEO
   const jsonLd = {
     "@context": "https://schema.org",
@@ -274,34 +324,49 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('bf:canvas:theme')||'light';if(t!=='light'&&t!=='dark')t='light';document.documentElement.setAttribute('data-canvas-theme',t)}catch(e){}})()`,
           }}
         />
-        {/* 🔍 JSON-LD Structured Data */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-        {/* Google Consent Mode v2 — defaults to denied BEFORE any tags load.
-            When user accepts cookies, cookie-consent.ts pushes a consent update.
-            Uses next/script instead of raw <script> so React 19 doesn't try to
-            hoist it during reconciliation (which crashes sibling client refs). */}
-        <Script id="consent-mode-default" strategy="beforeInteractive">
-          {`
-            window.dataLayer=window.dataLayer||[];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('consent','default',{
-              'analytics_storage':'denied',
-              'ad_storage':'denied',
-              'ad_user_data':'denied',
-              'ad_personalization':'denied',
-              'wait_for_update':500
-            });
-          `}
-        </Script>
-        {/* Tracking scripts (GTM + Meta Pixel + GA4 + Clarity) — loaded only after cookie consent */}
-        <TrackingScripts />
+        {/* 🔍 JSON-LD Structured Data — BuildFlow brand schema, skipped on KOS */}
+        {!isKos && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
+        )}
+        {/* Tracking (consent mode + GTM/Meta/GA4/Clarity) — skipped entirely
+            on KOS surfaces so Kalzen customers are never tracked by BuildFlow. */}
+        {!isKos && (
+          <>
+            {/* Google Consent Mode v2 — defaults to denied BEFORE any tags load.
+                When user accepts cookies, cookie-consent.ts pushes a consent update.
+                Uses next/script instead of raw <script> so React 19 doesn't try to
+                hoist it during reconciliation (which crashes sibling client refs). */}
+            <Script id="consent-mode-default" strategy="beforeInteractive">
+              {`
+                window.dataLayer=window.dataLayer||[];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('consent','default',{
+                  'analytics_storage':'denied',
+                  'ad_storage':'denied',
+                  'ad_user_data':'denied',
+                  'ad_personalization':'denied',
+                  'wait_for_update':500
+                });
+              `}
+            </Script>
+            {/* Tracking scripts (GTM + Meta Pixel + GA4 + Clarity) — loaded only after cookie consent */}
+            <TrackingScripts />
+          </>
+        )}
       </head>
+<<<<<<< HEAD
+      <body className={`${dmSans.variable} ${dmSerif.variable} ${jetbrains.variable} ${fraunces.variable} ${geist.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
+        {/* Google Tag Manager (noscript) — fallback for users without JS.
+            Skipped on KOS so no googletagmanager.com iframe lands in the HTML. */}
+        {!isKos && process.env.NEXT_PUBLIC_GTM_ID && (
+=======
       <body className={`${dmSans.variable} ${dmSerif.variable} ${jetbrains.variable} ${fraunces.variable} ${geist.variable} ${caveat.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
         {/* Google Tag Manager (noscript) — fallback for users without JS */}
         {process.env.NEXT_PUBLIC_GTM_ID && (
+>>>>>>> upstream/main
           <noscript>
             <iframe
               src={`https://www.googletagmanager.com/ns.html?id=${process.env.NEXT_PUBLIC_GTM_ID}`}
@@ -314,17 +379,20 @@ export default function RootLayout({
         {/* Meta Pixel <noscript> fallback — part of Meta's official install
             snippet. Lets crawlers and no-JS clients register a PageView even
             when fbevents.js can't load. next/image can't be used inside
-            <noscript> (ships a JS runtime) and adds no value for a 1x1 hit. */}
-        <noscript>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            height="1"
-            width="1"
-            style={{ display: "none" }}
-            src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
-            alt=""
-          />
-        </noscript>
+            <noscript> (ships a JS runtime) and adds no value for a 1x1 hit.
+            Skipped on KOS so no facebook.com/tr pixel lands in the HTML. */}
+        {!isKos && (
+          <noscript>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              height="1"
+              width="1"
+              style={{ display: "none" }}
+              src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+              alt=""
+            />
+          </noscript>
+        )}
         {/* Skip-to-content link for keyboard/screen reader accessibility (#39) */}
         <a
           href="#main-content"
@@ -357,11 +425,17 @@ export default function RootLayout({
             },
           }}
         />
-        {/* 🔥 VERCEL ANALYTICS */}
-        <Analytics />
-        <SpeedInsights />
-        <UTMCapture />
-        <CookieConsent />
+        {/* Vercel analytics + UTM attribution + cookie-consent banner —
+            all BuildFlow telemetry/marketing surfaces, skipped on KOS so
+            Kalzen customers see a clean, untracked surface. */}
+        {!isKos && (
+          <>
+            <Analytics />
+            <SpeedInsights />
+            <UTMCapture />
+            <CookieConsent />
+          </>
+        )}
       </body>
     </html>
   );
