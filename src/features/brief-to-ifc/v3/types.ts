@@ -856,6 +856,10 @@ export interface BriefEnrichmentResult {
    *  BuildTelemetry.schemaCoercions (or their own diagnostic log) so
    *  the recovery rate is observable. */
   coercions?: SchemaCoercionEvent[];
+  /** Set to true when the result was served from the v3 result cache
+   *  (see src/lib/result-cache.ts). On cache hit, `costUsd` is rewritten
+   *  to 0 so per-build cost accounting stays accurate. */
+  cacheHit?: boolean;
   error: {
     code: string;
     message: string;
