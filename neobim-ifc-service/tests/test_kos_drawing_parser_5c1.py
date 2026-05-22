@@ -10,6 +10,7 @@ that happens before any DXF is opened.
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 
 import ezdxf
@@ -20,7 +21,7 @@ from fastapi.testclient import TestClient
 from app.routers.kos_drawing_parser import router
 from app.services.kos_drawing_classifier import classify_drawing
 from app.services.kos_dxf_parser import parse_dxf_walls
-from app.services.kos_title_block_extractor import extract_title_block
+from app.services.kos_title_block_extractor import _valid_drawn_by, extract_title_block
 
 
 # ── helpers ─────────────────────────────────────────────────────────────
@@ -181,3 +182,118 @@ def test_route_rejects_oversized(client: TestClient):
     )
     assert resp.status_code == 413
     assert resp.json()["error"] == "file_too_large"
+
+
+# ── Phase 5C-1 tuning — new tests (PROPOSAL §E) ───────────────────────────
+
+
+def test_classify_title_block_plan_beats_body_section():
+    """Title-block plan title wins even when the body carries 'SECTION A-A'."""
+    doc = ezdxf.new("R2010")
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (5000, 0), (5000, 4000), (0, 4000)], close=True)
+    msp.add_text("SECTION A-A").set_placement((1000, 1000))
+    tb = {"drawing_title": "Concrete Setout Plan", "level": "BASEMENT"}
+
+    result = classify_drawing(doc, msp, tb)
+    assert result["type"] == "FLOOR_PLAN"
+    assert result["confidence"] >= 0.85
+
+
+def test_classify_title_block_optional_backcompat():
+    """classify_drawing still works with no title_block arg (back-compat)."""
+    doc = ezdxf.new("R2010")
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (5000, 0), (5000, 4000), (0, 4000)], close=True)
+    msp.add_text("GROUND FLOOR PLAN").set_placement((1000, 2000))
+
+    result = classify_drawing(doc, msp)  # 2-arg call
+    assert result["type"] == "FLOOR_PLAN"
+
+
+def test_tier1_excludes_hdln_iden_layers():
+    """A-WALL-HDLN / A-WALL-IDEN annotation sub-layers are not walls."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    for ly in ("A-WALL", "A-WALL-HDLN", "A-WALL-IDEN"):
+        doc.layers.add(ly)
+    msp = doc.modelspace()
+    msp.add_line((0, 0), (5000, 0), dxfattribs={"layer": "A-WALL"})
+    msp.add_line((0, 500), (5000, 500), dxfattribs={"layer": "A-WALL-HDLN"})
+    msp.add_line((0, 1000), (5000, 1000), dxfattribs={"layer": "A-WALL-IDEN"})
+    path = _save(doc)
+    try:
+        result = parse_dxf_walls(path, "excl.dxf")
+        assert result["detection_tier"] == 1
+        assert len(result["walls"]) == 1
+        assert all(w["layer"] == "A-WALL" for w in result["walls"])
+    finally:
+        os.remove(path)
+
+
+def test_tier1_drops_sub_threshold_walls():
+    """Tier-1 candidates shorter than 200mm are dropped as noise."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    doc.layers.add("A-WALL")
+    msp = doc.modelspace()
+    msp.add_line((0, 0), (150, 0), dxfattribs={"layer": "A-WALL"})    # 150mm → dropped
+    msp.add_line((0, 0), (0, 5000), dxfattribs={"layer": "A-WALL"})   # 5000mm → kept
+    path = _save(doc)
+    try:
+        result = parse_dxf_walls(path, "lenfloor.dxf")
+        assert result["detection_tier"] == 1
+        assert len(result["walls"]) == 1
+        assert result["walls"][0]["length_mm"] >= 200
+    finally:
+        os.remove(path)
+
+
+def test_thickness_enrichment_parallel_pair():
+    """A 200mm-offset overlapping parallel pair → thickness_mm ≈ 200 on both."""
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    doc.layers.add("A-WALL")
+    msp = doc.modelspace()
+    msp.add_line((0, 0), (5000, 0), dxfattribs={"layer": "A-WALL"})
+    msp.add_line((0, 200), (5000, 200), dxfattribs={"layer": "A-WALL"})
+    path = _save(doc)
+    try:
+        result = parse_dxf_walls(path, "thick.dxf")
+        assert result["detection_tier"] == 1
+        assert len(result["walls"]) == 2
+        thicks = [w["thickness_mm"] for w in result["walls"]]
+        assert all(t is not None and abs(t - 200) < 1 for t in thicks)
+        assert result["any_thickness"] is True
+    finally:
+        os.remove(path)
+
+
+def test_title_block_reviewed_not_revision_iewed():
+    """'REVIEWED' must never yield revision='IEWED' (word-boundary + validator)."""
+    doc = ezdxf.new("R2010")
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (10000, 0), (10000, 8000), (0, 8000)], close=True)
+    msp.add_text("REVIEWED BY OTHERS").set_placement((5000, 4000))
+
+    result = extract_title_block(doc, msp, None)
+    assert result["revision"] != "IEWED"
+    assert result["revision"] is None or re.fullmatch(r"[A-Z]", result["revision"])
+
+
+def test_title_block_bare_ratio_not_scale_in_fallback():
+    """A bare body ratio '1:17' in scan-all mode must not become the scale."""
+    doc = ezdxf.new("R2010")
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (10000, 0), (10000, 8000), (0, 8000)], close=True)
+    msp.add_text("1:17").set_placement((5000, 4000))
+    msp.add_text("BONDEK SLAB").set_placement((5000, 3000))
+
+    result = extract_title_block(doc, msp, None)
+    assert result["scale"] is None
+
+
+def test_title_block_drawn_by_rejects_section_header():
+    """'HYDRAULICS AND' is a section header, not a drawn-by signature."""
+    assert _valid_drawn_by("HYDRAULICS AND") is None
+    assert _valid_drawn_by("J. Smith") == "J. Smith"
