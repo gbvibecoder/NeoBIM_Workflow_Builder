@@ -357,16 +357,10 @@ export default async function RootLayout({
           </>
         )}
       </head>
-<<<<<<< HEAD
       <body className={`${dmSans.variable} ${dmSerif.variable} ${jetbrains.variable} ${fraunces.variable} ${geist.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
         {/* Google Tag Manager (noscript) — fallback for users without JS.
             Skipped on KOS so no googletagmanager.com iframe lands in the HTML. */}
         {!isKos && process.env.NEXT_PUBLIC_GTM_ID && (
-=======
-      <body className={`${dmSans.variable} ${dmSerif.variable} ${jetbrains.variable} ${fraunces.variable} ${geist.variable} ${caveat.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
-        {/* Google Tag Manager (noscript) — fallback for users without JS */}
-        {process.env.NEXT_PUBLIC_GTM_ID && (
->>>>>>> upstream/main
           <noscript>
             <iframe
               src={`https://www.googletagmanager.com/ns.html?id=${process.env.NEXT_PUBLIC_GTM_ID}`}
