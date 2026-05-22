@@ -49,9 +49,9 @@ from app.domain.building_model import (
 )
 from app.services.geometry_resolver import resolve_geometries
 from app.services.placement_resolver import resolve_placements
-from app.templates._2bhk_pune_floor_unit import _perimeter_walls
 from app.templates._common import (
     FloorUnit,
+    _perimeter_walls,
     make_axis_aligned_room,
     make_door_pair,
     make_internal_wall,

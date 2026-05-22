@@ -52,9 +52,9 @@ from app.services.placement_resolver import resolve_placements
 from app.templates._1bhk_pune_floor_unit import (
     make_1bhk_grid_columns_and_footings,
 )
-from app.templates._2bhk_pune_floor_unit import _perimeter_walls
 from app.templates._common import (
     FloorUnit,
+    _perimeter_walls,
     make_axis_aligned_room,
     make_door_pair,
     make_internal_wall,

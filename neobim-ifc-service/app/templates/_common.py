@@ -263,6 +263,65 @@ def make_internal_wall(
     )
 
 
+def _perimeter_walls(
+    *,
+    name_prefix: str,
+    storey_id: str,
+    base_z: float,
+    top_z: float,
+    sw: Vec2,
+    se: Vec2,
+    ne: Vec2,
+    nw: Vec2,
+) -> list:
+    """4 external walls walked CCW (S → E → N → W) around the envelope.
+
+    Phase 1 moved this here verbatim from `_2bhk_pune_floor_unit.py`,
+    where it was the single shared definition imported by every other
+    floor-unit module and the tower assemblers — a cross-cutting Layer-1
+    helper that had simply been living in a feature module.
+    """
+    suffix = name_prefix.upper()
+    return [
+        make_external_wall(
+            wall_id=f"wall-{name_prefix}-S",
+            name=f"External Wall South - {suffix}",
+            host_storey_id=storey_id,
+            start=sw,
+            end=se,
+            base_z=base_z,
+            top_z=top_z,
+        ),
+        make_external_wall(
+            wall_id=f"wall-{name_prefix}-E",
+            name=f"External Wall East - {suffix}",
+            host_storey_id=storey_id,
+            start=se,
+            end=ne,
+            base_z=base_z,
+            top_z=top_z,
+        ),
+        make_external_wall(
+            wall_id=f"wall-{name_prefix}-N",
+            name=f"External Wall North - {suffix}",
+            host_storey_id=storey_id,
+            start=ne,
+            end=nw,
+            base_z=base_z,
+            top_z=top_z,
+        ),
+        make_external_wall(
+            wall_id=f"wall-{name_prefix}-W",
+            name=f"External Wall West - {suffix}",
+            host_storey_id=storey_id,
+            start=nw,
+            end=sw,
+            base_z=base_z,
+            top_z=top_z,
+        ),
+    ]
+
+
 # ─── Opening / Door / Window construction ───────────────────────────
 
 
@@ -455,6 +514,9 @@ def make_rcc_grid_columns_and_footings(
     footing_top_z: float,
     footing_bottom_z: float,
     host_storey_id: str,
+    column_width: float = 0.300,
+    column_depth: float = 0.300,
+    footing_half_side: float = 0.75,
 ) -> tuple[list[Column], list[Footing]]:
     """Build a rectangular grid of RCC columns + 1 isolated footing per column.
 
@@ -464,6 +526,13 @@ def make_rcc_grid_columns_and_footings(
     `column_base_z` should equal `footing_top_z` so the placement resolver's
     footing-overrides-base_z behaviour is idempotent (no z drift between
     schema field and resolved placement).
+
+    `column_width` / `column_depth` / `footing_half_side` default to the
+    2BHK/3BHK sizing (0.300 m columns, 1.5 m pads). Phase 1 added them as
+    parameters so the 1BHK fork (`make_1bhk_grid_columns_and_footings`,
+    0.230 m columns, 1.2 m pads) can delegate here instead of duplicating
+    the grid-construction loop. The defaults keep every pre-existing
+    caller byte-identical.
     """
     if column_base_z != footing_top_z:
         raise ValueError(
@@ -485,6 +554,8 @@ def make_rcc_grid_columns_and_footings(
                     location=location,
                     base_z=column_base_z,
                     top_z=column_top_z,
+                    width=column_width,
+                    depth=column_depth,
                 )
             )
             footings.append(
@@ -494,6 +565,7 @@ def make_rcc_grid_columns_and_footings(
                     location=location,
                     top_z=footing_top_z,
                     bottom_z=footing_bottom_z,
+                    half_side=footing_half_side,
                 )
             )
     columns.sort(key=lambda c: c.id)
@@ -558,6 +630,118 @@ def make_orthogonal_beam_grid(
             )
     beams.sort(key=lambda b: b.id)
     return beams
+
+
+# ─── Layout-region helpers (buildable bounds + column-grid axes) ─────
+
+
+def compute_buildable_bounds(
+    plot_width_m: float,
+    plot_length_m: float,
+    front_setback_m: float,
+    rear_setback_m: float,
+    side_setback_m: float,
+    *,
+    min_width: float,
+    min_depth: float,
+    error_label: str = "",
+    error_tail: str = ".",
+) -> tuple[float, float, float, float, float, float]:
+    """Compute (xmin, xmax, ymin, ymax, width, depth) for the buildable region.
+
+    Phase 1 consolidated three byte-identical per-BHK copies — the
+    `_1bhk` / `_2bhk` / `_3bhk` floor-unit modules each carried their own
+    `_buildable_bounds`. The computation body was identical across all
+    three; only the minimum buildable size and the ValueError message
+    text varied, so both are now parameters and the body is shared
+    verbatim.
+
+    Raises ValueError if the buildable area is below `min_width × min_depth`.
+    `error_label` / `error_tail` reproduce each caller's original message
+    exactly (e.g. ``" (3BHK)"`` / ``" m for 3BHK layout."``).
+    """
+    buildable_x_min = side_setback_m
+    buildable_x_max = plot_width_m - side_setback_m
+    buildable_y_min = rear_setback_m
+    buildable_y_max = plot_length_m - front_setback_m
+    width = buildable_x_max - buildable_x_min
+    depth = buildable_y_max - buildable_y_min
+    if width < min_width or depth < min_depth:
+        raise ValueError(
+            f"_buildable_bounds{error_label}: plot ({plot_width_m:.2f} m × "
+            f"{plot_length_m:.2f} m) with setbacks (front "
+            f"{front_setback_m:.1f}, rear {rear_setback_m:.1f}, side "
+            f"{side_setback_m:.1f}) yields buildable {width:.2f} × "
+            f"{depth:.2f} m; need at least {min_width:.1f} × "
+            f"{min_depth:.1f}{error_tail}"
+        )
+    return (
+        buildable_x_min,
+        buildable_x_max,
+        buildable_y_min,
+        buildable_y_max,
+        width,
+        depth,
+    )
+
+
+def column_grid_axes(
+    buildable_x_min: float,
+    buildable_x_max: float,
+    buildable_y_min: float,
+    buildable_y_max: float,
+    *,
+    column_size: float,
+    y_axis_count: int,
+) -> tuple[list[float], list[float]]:
+    """Return (x_axes, y_axes) for a rectangular RCC column grid.
+
+    Phase 1 consolidated the per-BHK `_column_grid` helpers. They were
+    NOT identical-modulo-constants: 2BHK / 3BHK use a 3×4 grid, 1BHK a
+    3×3 grid with a different X-middle and Y-axis formula. The
+    `y_axis_count` switch selects the grid shape; each branch reproduces
+    the corresponding original helper expression-for-expression, so the
+    output stays byte-identical to the pre-consolidation code.
+
+      * ``y_axis_count == 4`` — 2BHK / 3BHK: X-middle is the midpoint of
+        the buildable edges; 4 Y axes equal-spaced via a y_step interp.
+      * ``y_axis_count == 3`` — 1BHK: X-middle and Y-middle are the
+        midpoint of the inset axes; 3 Y axes.
+    """
+    half_col = column_size / 2.0
+    x_first = buildable_x_min + half_col
+    x_last = buildable_x_max - half_col
+    y_first = buildable_y_min + half_col
+    y_last = buildable_y_max - half_col
+    if y_axis_count == 4:
+        x_axes = [
+            x_first,
+            (buildable_x_min + buildable_x_max) / 2.0,
+            x_last,
+        ]
+        y_step = (y_last - y_first) / 3.0
+        y_axes = [
+            y_first,
+            y_first + y_step,
+            y_first + 2.0 * y_step,
+            y_last,
+        ]
+    elif y_axis_count == 3:
+        x_axes = [
+            x_first,
+            (x_first + x_last) / 2.0,
+            x_last,
+        ]
+        y_axes = [
+            y_first,
+            (y_first + y_last) / 2.0,
+            y_last,
+        ]
+    else:
+        raise ValueError(
+            f"column_grid_axes: y_axis_count must be 3 or 4; got {y_axis_count}"
+        )
+    return x_axes, y_axes
 
 
 # ─── Slice T2.0 — Layer 2 / Layer 3 composition types ───────────────
@@ -674,6 +858,7 @@ __all__ = [
     "make_axis_aligned_room",
     "make_external_wall",
     "make_internal_wall",
+    "_perimeter_walls",
     "make_door_pair",
     "make_window_pair",
     "make_rcc_column",
@@ -681,4 +866,6 @@ __all__ = [
     "make_rcc_beam",
     "make_rcc_grid_columns_and_footings",
     "make_orthogonal_beam_grid",
+    "compute_buildable_bounds",
+    "column_grid_axes",
 ]

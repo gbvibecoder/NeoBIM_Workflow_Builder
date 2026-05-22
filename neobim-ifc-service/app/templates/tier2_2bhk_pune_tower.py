@@ -67,10 +67,10 @@ from app.templates._2bhk_pune_flat_floor_unit import (
 )
 from app.templates._2bhk_pune_floor_unit import (
     TOWER_CORE_LOBBY_SENTINEL,
-    _perimeter_walls,
 )
 from app.templates._2bhk_pune_tower_core import make_2bhk_pune_tower_core
 from app.templates._common import (
+    _perimeter_walls,
     make_axis_aligned_room,
     make_orthogonal_beam_grid,
     make_rcc_grid_columns_and_footings,

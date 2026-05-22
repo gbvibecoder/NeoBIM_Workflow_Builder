@@ -748,7 +748,85 @@ def build_ifc_from_building_model(bm: BuildingModel) -> ifcopenshell.file:
     initial_provenance = bm.project.metadata.provenance
     stamp_provenance(model, initial_provenance, project)
 
+    # ── Cross-process determinism: canonicalise unordered SET order ──
+    # `ifcopenshell.api.run(...)` populates a handful of order-INDEPENDENT
+    # SET-valued attributes in Python-set iteration order, which is keyed
+    # on object id() and therefore varies between processes / machines.
+    # Sorting those members by a stable key here is the final step that
+    # makes the emitted IFC byte-identical for the same BuildingModel
+    # across runs / processes / machines — see
+    # `_canonicalize_set_attribute_order`.
+    _canonicalize_set_attribute_order(model)
+
     return model
+
+
+def _canonical_member_key(entity: ifcopenshell.entity_instance) -> tuple:
+    """Process-stable sort key for one member of an unordered IFC SET.
+
+    Prefers ``GlobalId`` — it is intrinsically deterministic (derived
+    from stable inputs via ``app.utils.guid.derive_guid``) and invariant
+    to the order in which entities happen to be created. Every member of
+    the three ``IfcRel*`` SETs canonicalised below is an ``IfcRoot``
+    subtype, so a GlobalId is always present for those.
+
+    ``IfcUnitAssignment.Units`` members are ``IfcUnit`` (e.g.
+    ``IfcSIUnit``) — not ``IfcRoot``, no GlobalId — so they fall back to
+    the entity's type plus its own attribute tuple. For ``IfcSIUnit``
+    that tuple is ``(Dimensions, UnitType, Prefix, Name)`` — all scalars
+    / enums, no entity references — so the key is a stable, reference-
+    free fingerprint and the (distinct-UnitType) units get a
+    deterministic total order.
+
+    Deliberately does NOT use Python's ``id()`` (process-random) — that
+    is the very thing causing the non-determinism this fixes.
+    """
+    global_id = getattr(entity, "GlobalId", None)
+    if global_id:
+        return (0, global_id)
+    return (1, entity.is_a(), tuple(str(attr) for attr in entity))
+
+
+def _canonicalize_set_attribute_order(model: ifcopenshell.file) -> None:
+    """Sort the members of the order-INDEPENDENT IFC4 SET attributes.
+
+    ``ifcopenshell.api.run(...)`` builds these SET-valued attributes by
+    collecting related entities in a Python ``set``, so their serialised
+    order depends on object ``id()`` and changes from process to process.
+    All four attributes below are declared ``SET OF`` (unordered) in the
+    IFC4 schema, so re-ordering their members is semantics-preserving —
+    it changes the bytes but not the meaning, and it is the last source
+    of cross-process byte non-determinism in this builder:
+
+      * ``IfcUnitAssignment.Units``                  — SET OF IfcUnit
+      * ``IfcRelAggregates.RelatedObjects``          — SET OF IfcObjectDefinition
+      * ``IfcRelContainedInSpatialStructure.RelatedElements``
+                                                     — SET OF IfcProduct
+      * ``IfcRelAssociatesMaterial.RelatedObjects`` (inherited from
+        ``IfcRelAssociates``)                        — SET OF IfcDefinitionSelect
+
+    Order-DEPENDENT aggregations — ``IfcPolyline.Points``, the argument
+    lists of ``IfcExtrudedAreaSolid``, profile curves, etc. — are
+    ``LIST OF`` in the schema and are deliberately left untouched:
+    sorting those would corrupt geometry.
+
+    Idempotent: running it on an already-canonical model is a no-op.
+    """
+    _ORDER_INDEPENDENT_SET_ATTRS = (
+        ("IfcUnitAssignment", "Units"),
+        ("IfcRelAggregates", "RelatedObjects"),
+        ("IfcRelContainedInSpatialStructure", "RelatedElements"),
+        ("IfcRelAssociatesMaterial", "RelatedObjects"),
+    )
+    for ifc_type, attr in _ORDER_INDEPENDENT_SET_ATTRS:
+        for entity in model.by_type(ifc_type):
+            members = getattr(entity, attr)
+            if members and len(members) > 1:
+                setattr(
+                    entity,
+                    attr,
+                    tuple(sorted(members, key=_canonical_member_key)),
+                )
 
 
 def _emit_site_ground(

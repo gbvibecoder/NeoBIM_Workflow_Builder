@@ -67,9 +67,9 @@ from app.templates._1bhk_pune_floor_unit import (
     _buildable_bounds,
     _column_grid,
 )
-from app.templates._2bhk_pune_floor_unit import _perimeter_walls
 from app.templates._common import (
     FloorUnit,
+    _perimeter_walls,
     make_axis_aligned_room,
     make_door_pair,
     make_external_wall,

@@ -101,6 +101,8 @@ app.add_middleware(
         "https://www.trybuildflow.in",
         "http://localhost:3000",
         "http://localhost:3001",
+        # KOS (Kalzen Operating System) dev host — Week 5C drawing parser.
+        "http://kalzen.localhost:3000",
     ],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -226,6 +228,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 from app.routers import health, export, audit, design, builder_script  # noqa: E402
 from app.routers import v3_generator  # noqa: E402  — Phase v3 generator agent tools.
 from app.routers import v3_previews  # noqa: E402  — Canvas EX-007 preview renderer.
+from app.routers import kos_drawing_parser  # noqa: E402  — KOS Week 5C-1 DXF parser.
 
 app.include_router(health.router)
 app.include_router(export.router, prefix="/api/v1")
@@ -234,6 +237,8 @@ app.include_router(design.router, prefix="/api/v1")
 app.include_router(builder_script.router, prefix="/api/v1")
 app.include_router(v3_generator.router, prefix="/api/v3/generator")
 app.include_router(v3_previews.router, prefix="/api/v3/generator")
+# KOS drawing parser — router carries its own /kos prefix, no app prefix.
+app.include_router(kos_drawing_parser.router)
 
 
 @app.get("/")

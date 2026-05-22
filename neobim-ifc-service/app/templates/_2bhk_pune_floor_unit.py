@@ -46,9 +46,11 @@ from app.domain.building_model import (
 )
 from app.templates._common import (
     FloorUnit,
+    _perimeter_walls,
+    column_grid_axes,
+    compute_buildable_bounds,
     make_axis_aligned_room,
     make_door_pair,
-    make_external_wall,
     make_internal_wall,
     make_rectangular_polygon_ccw,
     make_slab_layers,
@@ -89,6 +91,13 @@ TOWER_CORE_LOBBY_SENTINEL: str = "<<TOWER_CORE_LOBBY>>"
 
 
 # ─── Buildable-region computation (shared) ───────────────────────────
+#
+# Phase 1 consolidated the byte-identical computation bodies of
+# `_buildable_bounds` / `_column_grid` into `_common.compute_buildable_bounds`
+# / `_common.column_grid_axes`, and moved the shared `_perimeter_walls`
+# there too. What remains here are thin same-signature adapters that
+# inject this module's 2BHK config — so every call site and every
+# importer (the FLAT floor-unit modules) keeps working unchanged.
 
 
 def _buildable_bounds(
@@ -98,30 +107,17 @@ def _buildable_bounds(
     rear_setback_m: float,
     side_setback_m: float,
 ) -> tuple[float, float, float, float, float, float]:
-    """Compute (xmin, xmax, ymin, ymax, width, depth) for the buildable region.
-
-    Raises ValueError if the buildable area is below the layout's minimum.
-    """
-    buildable_x_min = side_setback_m
-    buildable_x_max = plot_width_m - side_setback_m
-    buildable_y_min = rear_setback_m
-    buildable_y_max = plot_length_m - front_setback_m
-    width = buildable_x_max - buildable_x_min
-    depth = buildable_y_max - buildable_y_min
-    if width < _MIN_BUILDABLE_WIDTH_M or depth < _MIN_BUILDABLE_DEPTH_M:
-        raise ValueError(
-            f"_buildable_bounds: plot ({plot_width_m:.2f} m × {plot_length_m:.2f} m) "
-            f"with setbacks (front {front_setback_m:.1f}, rear {rear_setback_m:.1f}, "
-            f"side {side_setback_m:.1f}) yields buildable {width:.2f} × {depth:.2f} m; "
-            f"need at least {_MIN_BUILDABLE_WIDTH_M:.1f} × {_MIN_BUILDABLE_DEPTH_M:.1f}."
-        )
-    return (
-        buildable_x_min,
-        buildable_x_max,
-        buildable_y_min,
-        buildable_y_max,
-        width,
-        depth,
+    """2BHK buildable-region adapter over `_common.compute_buildable_bounds`."""
+    return compute_buildable_bounds(
+        plot_width_m,
+        plot_length_m,
+        front_setback_m,
+        rear_setback_m,
+        side_setback_m,
+        min_width=_MIN_BUILDABLE_WIDTH_M,
+        min_depth=_MIN_BUILDABLE_DEPTH_M,
+        error_label="",
+        error_tail=".",
     )
 
 
@@ -131,76 +127,15 @@ def _column_grid(
     buildable_y_min: float,
     buildable_y_max: float,
 ) -> tuple[list[float], list[float]]:
-    """Return (x_axes, y_axes) for the 3 × 4 RCC column grid."""
-    half_col = _COLUMN_SIZE_M / 2.0
-    x_axes = [
-        buildable_x_min + half_col,
-        (buildable_x_min + buildable_x_max) / 2.0,
-        buildable_x_max - half_col,
-    ]
-    y_first = buildable_y_min + half_col
-    y_last = buildable_y_max - half_col
-    y_step = (y_last - y_first) / 3.0
-    y_axes = [
-        y_first,
-        y_first + y_step,
-        y_first + 2.0 * y_step,
-        y_last,
-    ]
-    return x_axes, y_axes
-
-
-def _perimeter_walls(
-    *,
-    name_prefix: str,
-    storey_id: str,
-    base_z: float,
-    top_z: float,
-    sw: Vec2,
-    se: Vec2,
-    ne: Vec2,
-    nw: Vec2,
-) -> list:
-    """4 external walls walked CCW (S → E → N → W) around the envelope."""
-    suffix = name_prefix.upper()
-    return [
-        make_external_wall(
-            wall_id=f"wall-{name_prefix}-S",
-            name=f"External Wall South - {suffix}",
-            host_storey_id=storey_id,
-            start=sw,
-            end=se,
-            base_z=base_z,
-            top_z=top_z,
-        ),
-        make_external_wall(
-            wall_id=f"wall-{name_prefix}-E",
-            name=f"External Wall East - {suffix}",
-            host_storey_id=storey_id,
-            start=se,
-            end=ne,
-            base_z=base_z,
-            top_z=top_z,
-        ),
-        make_external_wall(
-            wall_id=f"wall-{name_prefix}-N",
-            name=f"External Wall North - {suffix}",
-            host_storey_id=storey_id,
-            start=ne,
-            end=nw,
-            base_z=base_z,
-            top_z=top_z,
-        ),
-        make_external_wall(
-            wall_id=f"wall-{name_prefix}-W",
-            name=f"External Wall West - {suffix}",
-            host_storey_id=storey_id,
-            start=nw,
-            end=sw,
-            base_z=base_z,
-            top_z=top_z,
-        ),
-    ]
+    """3 × 4 RCC column grid — adapter over `_common.column_grid_axes`."""
+    return column_grid_axes(
+        buildable_x_min,
+        buildable_x_max,
+        buildable_y_min,
+        buildable_y_max,
+        column_size=_COLUMN_SIZE_M,
+        y_axis_count=4,
+    )
 
 
 # ─── GF-style floor unit (kitchen / living / pooja / etc.) ─────────────

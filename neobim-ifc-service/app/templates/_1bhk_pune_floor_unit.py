@@ -57,16 +57,17 @@ from app.domain.building_model import (
 )
 from app.templates._2bhk_pune_floor_unit import (
     TOWER_CORE_LOBBY_SENTINEL,
-    _perimeter_walls,
 )
 from app.templates._common import (
     FloorUnit,
+    _perimeter_walls,
+    column_grid_axes,
+    compute_buildable_bounds,
     make_axis_aligned_room,
     make_door_pair,
     make_external_wall,
     make_internal_wall,
-    make_isolated_pad_footing,
-    make_rcc_column,
+    make_rcc_grid_columns_and_footings,
     make_rectangular_polygon_ccw,
     make_slab_layers,
     make_window_pair,
@@ -122,6 +123,13 @@ _HALF_INT_WALL: float = _INTERNAL_WALL_THICKNESS_M / 2.0
 
 
 # ─── Buildable-region computation ────────────────────────────────────
+#
+# Phase 1 consolidated the byte-identical computation bodies into
+# `_common.compute_buildable_bounds` / `_common.column_grid_axes`. The
+# two functions below are thin same-signature adapters injecting this
+# module's 1BHK config — call sites and importers stay unchanged. Note
+# the 1BHK column grid is a 3×3 (`y_axis_count=3`), unlike the 2BHK/3BHK
+# 3×4: `_common.column_grid_axes` carries both shapes.
 
 
 def _buildable_bounds(
@@ -131,35 +139,17 @@ def _buildable_bounds(
     rear_setback_m: float,
     side_setback_m: float,
 ) -> tuple[float, float, float, float, float, float]:
-    """Compute (xmin, xmax, ymin, ymax, width, depth) for the buildable region.
-
-    Raises ValueError if the buildable area is below the layout's minimum
-    (4.0 × 5.0m). The error includes the offending dimensions so callers
-    get a clear diagnostic before the code reaches degenerate-geometry
-    territory in the invariant checks.
-    """
-    buildable_x_min = side_setback_m
-    buildable_x_max = plot_width_m - side_setback_m
-    buildable_y_min = rear_setback_m
-    buildable_y_max = plot_length_m - front_setback_m
-    width = buildable_x_max - buildable_x_min
-    depth = buildable_y_max - buildable_y_min
-    if width < _MIN_BUILDABLE_WIDTH_M or depth < _MIN_BUILDABLE_DEPTH_M:
-        raise ValueError(
-            f"_buildable_bounds (1BHK): plot ({plot_width_m:.2f} m × "
-            f"{plot_length_m:.2f} m) with setbacks (front "
-            f"{front_setback_m:.1f}, rear {rear_setback_m:.1f}, side "
-            f"{side_setback_m:.1f}) yields buildable {width:.2f} × "
-            f"{depth:.2f} m; need at least {_MIN_BUILDABLE_WIDTH_M:.1f} × "
-            f"{_MIN_BUILDABLE_DEPTH_M:.1f} m."
-        )
-    return (
-        buildable_x_min,
-        buildable_x_max,
-        buildable_y_min,
-        buildable_y_max,
-        width,
-        depth,
+    """1BHK buildable-region adapter over `_common.compute_buildable_bounds`."""
+    return compute_buildable_bounds(
+        plot_width_m,
+        plot_length_m,
+        front_setback_m,
+        rear_setback_m,
+        side_setback_m,
+        min_width=_MIN_BUILDABLE_WIDTH_M,
+        min_depth=_MIN_BUILDABLE_DEPTH_M,
+        error_label=" (1BHK)",
+        error_tail=" m.",
     )
 
 
@@ -169,28 +159,18 @@ def _column_grid(
     buildable_y_min: float,
     buildable_y_max: float,
 ) -> tuple[list[float], list[float]]:
-    """Return (x_axes, y_axes) for the 1BHK 3 × 3 RCC column grid (9 columns).
-
-    Outer axes are inset by `_HALF_COL` from the buildable edges so the
-    column body sits fully inside the buildable rectangle. Middle axis
-    is the midpoint of the inset range. Equal-spaced bays in both
-    directions on the default plot.
+    """1BHK 3 × 3 RCC column grid (9 columns) — adapter over
+    `_common.column_grid_axes`. The 3×3 shape (`y_axis_count=3`) and the
+    230 mm columns distinguish it from the 2BHK/3BHK 3×4 grid.
     """
-    x_first = buildable_x_min + _HALF_COL
-    x_last = buildable_x_max - _HALF_COL
-    x_axes = [
-        x_first,
-        (x_first + x_last) / 2.0,
-        x_last,
-    ]
-    y_first = buildable_y_min + _HALF_COL
-    y_last = buildable_y_max - _HALF_COL
-    y_axes = [
-        y_first,
-        (y_first + y_last) / 2.0,
-        y_last,
-    ]
-    return x_axes, y_axes
+    return column_grid_axes(
+        buildable_x_min,
+        buildable_x_max,
+        buildable_y_min,
+        buildable_y_max,
+        column_size=_COLUMN_SIZE_M,
+        y_axis_count=3,
+    )
 
 
 # ─── 1BHK structural grid (230mm columns, 1.2m pads) ─────────────────
@@ -208,11 +188,15 @@ def make_1bhk_grid_columns_and_footings(
 ) -> tuple[list[Column], list[Footing]]:
     """1BHK column + footing grid: 230×230mm columns, 1.2 × 1.2m pads.
 
-    Mirrors `app.templates._common.make_rcc_grid_columns_and_footings`
-    but threads through the 1BHK column / footing dimensions explicitly
-    (the common helper uses 2BHK defaults of 300mm + 1.5m). Returns
-    (columns, footings) sorted by id; column ids `col-{x_label}{y_label}`,
-    footing ids `ftg-{x_label}{y_label}`.
+    Phase 1 removed the duplicated grid-construction loop: this is now a
+    thin adapter over `_common.make_rcc_grid_columns_and_footings` (which
+    gained `column_width` / `column_depth` / `footing_half_side`
+    parameters) supplying the 1BHK dimensions. Returns (columns, footings)
+    sorted by id; column ids `col-{x_label}{y_label}`, footing ids
+    `ftg-{x_label}{y_label}`.
+
+    The `column_base_z == footing_top_z` guard is kept here (ahead of the
+    delegation) so the diagnostic still names this 1BHK entry point.
     """
     if column_base_z != footing_top_z:
         raise ValueError(
@@ -221,37 +205,18 @@ def make_1bhk_grid_columns_and_footings(
             f"({footing_top_z}) so the placement resolver's footing "
             f"override is idempotent."
         )
-    columns: list[Column] = []
-    footings: list[Footing] = []
-    for x_label, x_pos in x_axes.items():
-        for y_label, y_pos in y_axes.items():
-            location = Vec2(x=x_pos, y=y_pos)
-            col_id = f"col-{x_label}{y_label}"
-            ftg_id = f"ftg-{x_label}{y_label}"
-            columns.append(
-                make_rcc_column(
-                    column_id=col_id,
-                    host_storey_id=host_storey_id,
-                    location=location,
-                    base_z=column_base_z,
-                    top_z=column_top_z,
-                    width=_COLUMN_SIZE_M,
-                    depth=_COLUMN_SIZE_M,
-                )
-            )
-            footings.append(
-                make_isolated_pad_footing(
-                    footing_id=ftg_id,
-                    supports_column_id=col_id,
-                    location=location,
-                    top_z=footing_top_z,
-                    bottom_z=footing_bottom_z,
-                    half_side=_FOOTING_HALF_SIDE_M,
-                )
-            )
-    columns.sort(key=lambda c: c.id)
-    footings.sort(key=lambda f: f.id)
-    return columns, footings
+    return make_rcc_grid_columns_and_footings(
+        x_axes=x_axes,
+        y_axes=y_axes,
+        column_base_z=column_base_z,
+        column_top_z=column_top_z,
+        footing_top_z=footing_top_z,
+        footing_bottom_z=footing_bottom_z,
+        host_storey_id=host_storey_id,
+        column_width=_COLUMN_SIZE_M,
+        column_depth=_COLUMN_SIZE_M,
+        footing_half_side=_FOOTING_HALF_SIDE_M,
+    )
 
 
 # ─── GF floor-unit (kitchen-side of 1BHK duplex) ─────────────────────

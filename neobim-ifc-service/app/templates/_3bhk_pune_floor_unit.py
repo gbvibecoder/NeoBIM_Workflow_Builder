@@ -44,10 +44,12 @@ from app.domain.building_model import (
 )
 from app.templates._2bhk_pune_floor_unit import (
     TOWER_CORE_LOBBY_SENTINEL,
-    _perimeter_walls,
 )
 from app.templates._common import (
     FloorUnit,
+    _perimeter_walls,
+    column_grid_axes,
+    compute_buildable_bounds,
     make_axis_aligned_room,
     make_door_pair,
     make_internal_wall,
@@ -115,6 +117,12 @@ _HALF_INT_WALL: float = _INTERNAL_WALL_THICKNESS_M / 2.0
 
 
 # ─── Buildable-region computation ────────────────────────────────────
+#
+# Phase 1 consolidated the byte-identical computation bodies into
+# `_common.compute_buildable_bounds` / `_common.column_grid_axes`. The
+# two functions below are thin same-signature adapters that inject this
+# module's 3BHK config (larger minimum buildable area, 3BHK-flavoured
+# error text) — call sites and importers stay unchanged.
 
 
 def _buildable_bounds(
@@ -124,34 +132,21 @@ def _buildable_bounds(
     rear_setback_m: float,
     side_setback_m: float,
 ) -> tuple[float, float, float, float, float, float]:
-    """Compute (xmin, xmax, ymin, ymax, width, depth) for the buildable region.
+    """3BHK buildable-region adapter over `_common.compute_buildable_bounds`.
 
-    Raises ValueError if the buildable area is below the layout's
-    minimum (6.0 × 9.0m). Larger min than 1BHK/2BHK because 3BHK
-    needs more rooms.
+    Larger minimum (6.0 × 9.0 m) than 1BHK/2BHK because 3BHK needs more
+    rooms.
     """
-    buildable_x_min = side_setback_m
-    buildable_x_max = plot_width_m - side_setback_m
-    buildable_y_min = rear_setback_m
-    buildable_y_max = plot_length_m - front_setback_m
-    width = buildable_x_max - buildable_x_min
-    depth = buildable_y_max - buildable_y_min
-    if width < _MIN_BUILDABLE_WIDTH_M or depth < _MIN_BUILDABLE_DEPTH_M:
-        raise ValueError(
-            f"_buildable_bounds (3BHK): plot ({plot_width_m:.2f} m × "
-            f"{plot_length_m:.2f} m) with setbacks (front "
-            f"{front_setback_m:.1f}, rear {rear_setback_m:.1f}, side "
-            f"{side_setback_m:.1f}) yields buildable {width:.2f} × "
-            f"{depth:.2f} m; need at least {_MIN_BUILDABLE_WIDTH_M:.1f} × "
-            f"{_MIN_BUILDABLE_DEPTH_M:.1f} m for 3BHK layout."
-        )
-    return (
-        buildable_x_min,
-        buildable_x_max,
-        buildable_y_min,
-        buildable_y_max,
-        width,
-        depth,
+    return compute_buildable_bounds(
+        plot_width_m,
+        plot_length_m,
+        front_setback_m,
+        rear_setback_m,
+        side_setback_m,
+        min_width=_MIN_BUILDABLE_WIDTH_M,
+        min_depth=_MIN_BUILDABLE_DEPTH_M,
+        error_label=" (3BHK)",
+        error_tail=" m for 3BHK layout.",
     )
 
 
@@ -161,28 +156,18 @@ def _column_grid(
     buildable_y_min: float,
     buildable_y_max: float,
 ) -> tuple[list[float], list[float]]:
-    """Return (x_axes, y_axes) for the 3BHK 3 × 4 RCC column grid (12 columns).
-
-    Outer axes inset by half_column from buildable edges. 3 X axes
-    equal-spaced; 4 Y axes equal-spaced. Mirrors the 2BHK grid pattern
-    (same column dimensions).
+    """3BHK 3 × 4 RCC column grid (12 columns) — adapter over
+    `_common.column_grid_axes`. Same 3×4 shape and 300 mm columns as
+    the 2BHK grid.
     """
-    half_col = _COLUMN_SIZE_M / 2.0
-    x_axes = [
-        buildable_x_min + half_col,
-        (buildable_x_min + buildable_x_max) / 2.0,
-        buildable_x_max - half_col,
-    ]
-    y_first = buildable_y_min + half_col
-    y_last = buildable_y_max - half_col
-    y_step = (y_last - y_first) / 3.0
-    y_axes = [
-        y_first,
-        y_first + y_step,
-        y_first + 2.0 * y_step,
-        y_last,
-    ]
-    return x_axes, y_axes
+    return column_grid_axes(
+        buildable_x_min,
+        buildable_x_max,
+        buildable_y_min,
+        buildable_y_max,
+        column_size=_COLUMN_SIZE_M,
+        y_axis_count=4,
+    )
 
 
 # ─── GF floor-unit (kitchen + drawing + living + service-zone side) ──
