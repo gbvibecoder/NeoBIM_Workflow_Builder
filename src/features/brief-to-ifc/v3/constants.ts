@@ -61,3 +61,40 @@ export const QUALITY_THRESHOLD = 80;
 
 /** Maximum total iterations (initial build + retries). */
 export const MAX_ITERATIONS = 3;
+
+/**
+ * Phase ζ.2 — true PER-RUN cost cap.
+ *
+ * `AGENT_DEFAULT_COST_CAP_USD = 5.0` caps a SINGLE `runGenerator`
+ * invocation; with MAX_ITERATIONS=3 and `runGenerator` invoked fresh per
+ * iteration in `agent-job/route.ts`, the de-facto run-level ceiling was
+ * $5 × 3 = $15 on the agent loop alone — confirmed in the prior cost
+ * diagnoses. This constant introduces the missing top-level bound:
+ * cumulative Anthropic spend across all iterations of a single
+ * BriefToIfcV3Run must not exceed `RUN_COST_CAP_USD`.
+ *
+ * The cap is enforced two places:
+ *   1. In `agent-job/route.ts` before each iteration starts: read prior
+ *      iterations' `costUsd` out of `iterationHistory` (already persisted
+ *      per-iteration — no schema change), and skip starting the next
+ *      iteration if the remaining budget is exhausted.
+ *   2. In `driver.ts`'s turn loop: clamp the effective per-turn cap to
+ *      `Math.min(per_iteration_cap, remaining_run_budget)` so a single
+ *      iteration cannot blow what's left of the run's budget.
+ *
+ * Default value rationale ($7.00):
+ *   - One strong, mostly-successful iteration runs ~$2–5 (driver loop)
+ *     + ~$0.20 vision = ~$2.20–5.20.
+ *   - We want room for ONE good iteration + headroom; $7 gives the agent
+ *     loop ~$1.80–4.80 of slack for a second retry attempt if iter 1
+ *     didn't pass quality. After that, finalize-best-so-far rather than
+ *     burn iter 3.
+ *   - Compared to the prior $15 effective ceiling, this is a 2.1× cut.
+ *   - Override per-run via the existing `cost_cap_usd` field on the run
+ *     creation request — but note `cost_cap_usd` historically targeted
+ *     `runGenerator`'s per-iteration cap, NOT the new run-level cap.
+ *     Future API revision can split the two; this phase keeps the
+ *     per-iteration cap configurable as before and lets RUN_COST_CAP_USD
+ *     ride the default.
+ */
+export const RUN_COST_CAP_USD = 7.0;

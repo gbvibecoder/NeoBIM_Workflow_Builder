@@ -312,6 +312,30 @@ export interface RunGeneratorArgs {
    *  All telemetry calls are internally try/caught; a telemetry failure
    *  can never abort the build. */
   telemetry?: BuildTelemetryCollector;
+  /** Phase ζ.1 — optional pre-turn cancellation probe. When provided, the
+   *  driver invokes it at the TOP of every turn (BEFORE the Anthropic
+   *  stream is constructed). Returning `true` short-circuits the loop via
+   *  the existing graceful `failed(...)` return shape with
+   *  `error.code = "CANCELLED_BY_USER"` — no further Anthropic spend.
+   *
+   *  The driver deliberately does NOT import Prisma; the caller (the
+   *  agent-job worker) closes over a DB read and passes it as this
+   *  callback so the driver stays test-mockable and decoupled from the
+   *  storage layer.
+   *
+   *  Errors thrown by the probe are swallowed (treated as "not cancelled")
+   *  so a transient DB blip never aborts a healthy run. */
+  checkCancelled?: () => Promise<boolean>;
+  /** Phase ζ.2 — optional remaining run-level budget in USD. The agent-job
+   *  worker computes this as `RUN_COST_CAP_USD - sum(prior-iteration
+   *  costUsd)` and passes it per iteration so a single iteration cannot
+   *  blow what's left of the whole-run budget. When provided, the
+   *  effective per-turn cap becomes `Math.min(costCapUsd,
+   *  remainingRunBudgetUsd)` and an over-cap exit reports
+   *  `RUN_COST_CAP_EXCEEDED` rather than `COST_CAP_EXCEEDED` when the
+   *  run-budget was the tighter constraint. When undefined (legacy
+   *  callers / tests), per-iteration cap behaviour is unchanged. */
+  remainingRunBudgetUsd?: number;
 }
 
 export async function runGenerator(
@@ -436,7 +460,55 @@ export async function runGenerator(
   // Phase gamma.1: render_preview budget — max 10 calls per build
   const renderBudget = new RenderPreviewBudget();
 
+  // Phase ζ.2 — effective per-turn cap is the smaller of the per-iteration
+  // cap and the remaining run-level budget passed by the worker. Computed
+  // ONCE here (the run budget is fixed for the duration of this iteration);
+  // the existing post-turn cap-circuit check at the bottom of the loop
+  // reads `effectiveCap` instead of `costCapUsd`. When the caller did not
+  // pass `remainingRunBudgetUsd` (legacy / unit tests) `effectiveCap` ==
+  // `costCapUsd` and behaviour is byte-equal to pre-ζ.2.
+  const effectiveCap =
+    args.remainingRunBudgetUsd !== undefined
+      ? Math.min(costCapUsd, args.remainingRunBudgetUsd)
+      : costCapUsd;
+  /** True when the run-level remaining budget is the tighter of the two
+   *  caps (i.e. `remainingRunBudgetUsd < costCapUsd`). Determines whether
+   *  an over-cap exit reports `RUN_COST_CAP_EXCEEDED` (this run has spent
+   *  enough across all its iterations) or `COST_CAP_EXCEEDED` (this single
+   *  iteration overspent its per-iter share). */
+  const runBudgetIsLimiter =
+    args.remainingRunBudgetUsd !== undefined &&
+    args.remainingRunBudgetUsd < costCapUsd;
+
   for (let turn = 1; turn <= maxTurns; turn++) {
+    // ── Phase ζ.1 cancellation gate ──
+    // Runs at the TOP of every turn, BEFORE the Anthropic stream is
+    // constructed. If the caller's probe reports cancelled, we short-
+    // circuit via the same `failed(...)` path used by COST_CAP_EXCEEDED
+    // / MAX_TURNS_EXCEEDED so the worker's downstream handling treats
+    // this as a clean, accounted-for stop. Maximum additional Anthropic
+    // spend after the probe observes cancel = ZERO turns. (If cancel
+    // landed mid-stream of an earlier turn, that turn completes first
+    // — bounded by ONE turn worst-case, ~$0.10–0.30, not a full
+    // iteration.)
+    //
+    // Per-run budget check (P4, next phase) will slot in right here,
+    // alongside this guard, with the same short-circuit shape.
+    try {
+      if (args.checkCancelled && (await args.checkCancelled())) {
+        return failed(
+          startedAt,
+          "CANCELLED_BY_USER",
+          `Run cancelled by user before turn ${turn}.`,
+          { ledger, turnRecords, turns: turn - 1 },
+        );
+      }
+    } catch {
+      /* swallow — a transient DB blip on the cancel probe must never
+       * abort a healthy run. Worst case: cancel signal is missed for
+       * one turn and caught on the next. */
+    }
+
     let message: Anthropic.Messages.Message;
     try {
       const stream = client.messages.stream(
@@ -484,18 +556,36 @@ export async function runGenerator(
       durationMs: turnDurationMs,
     });
 
-    // Cost-cap circuit breaker (Phase v3 completion §D4). Checked AFTER
-    // the ledger entry is recorded so the running total reflects what
-    // we've already committed to. Returning here preserves the partial
-    // ledger + turnRecords for cost-accounting transparency.
-    if (totalCost > costCapUsd) {
+    // Cost-cap circuit breaker (Phase v3 completion §D4 + Phase ζ.2).
+    // Checked AFTER the ledger entry is recorded so the running total
+    // reflects what we've already committed to. Returning here preserves
+    // the partial ledger + turnRecords for cost-accounting transparency.
+    //
+    // ζ.2: the comparison uses `effectiveCap = min(costCapUsd,
+    // remainingRunBudgetUsd)`. When the run-level remaining budget was
+    // the tighter of the two we report `RUN_COST_CAP_EXCEEDED` so the
+    // worker's downstream handling can distinguish "this iteration
+    // overspent" from "this whole run has spent its budget across all
+    // iterations". When `remainingRunBudgetUsd` was not passed, the
+    // computation collapses to the original per-iter `costCapUsd` and
+    // the error code stays `COST_CAP_EXCEEDED` — byte-equal pre-ζ.2.
+    if (totalCost > effectiveCap) {
       return failed(
         startedAt,
-        "COST_CAP_EXCEEDED",
-        `Cumulative cost $${totalCost.toFixed(4)} exceeded the cap ` +
-          `$${costCapUsd.toFixed(2)} after turn ${turn}. ` +
-          "The loop short-circuited to prevent runaway spend; raise " +
-          "`costCapUsd` if you genuinely need more budget per call.",
+        runBudgetIsLimiter && totalCost > (args.remainingRunBudgetUsd ?? Infinity)
+          ? "RUN_COST_CAP_EXCEEDED"
+          : "COST_CAP_EXCEEDED",
+        `Cumulative iteration cost $${totalCost.toFixed(4)} exceeded the ` +
+          `effective cap $${effectiveCap.toFixed(2)} after turn ${turn} ` +
+          `(per-iter $${costCapUsd.toFixed(2)}, remaining-run-budget ` +
+          `${args.remainingRunBudgetUsd === undefined
+              ? "n/a"
+              : "$" + args.remainingRunBudgetUsd.toFixed(2)}). ` +
+          (runBudgetIsLimiter
+            ? "The whole RUN has spent its budget across all iterations; " +
+              "no further turns will be billed in this iteration."
+            : "The loop short-circuited to prevent runaway spend; raise " +
+              "`costCapUsd` if you genuinely need more budget per call."),
         { ledger, turnRecords, turns: turn },
       );
     }
