@@ -33,6 +33,13 @@ export const BRIEF_TO_IFC_V3_ERROR_CODES = [
   "SANDBOX_FAILURE",
   "RAILWAY_UNREACHABLE",
   "SESSION_NOT_INITIALISED",
+  /** Layer-1 session-recovery (AGENT_FAILURE_DIAGNOSIS_2026-05-22.md): the
+   *  Railway Python sandbox lost the agent's in-memory session mid-build
+   *  and the driver's one-shot auto-recovery (reset sessionId + re-issue
+   *  with `brief`) was unable to bootstrap a fresh session. Distinct from
+   *  `AGENT_GAVE_UP` (which used to swallow this case) so telemetry can
+   *  count session-loss events honestly. */
+  "SANDBOX_SESSION_LOST",
   // --- Anthropic API failures ------------------------------------------
   "ANTHROPIC_API_ERROR",
   "MISSING_API_KEY",
@@ -94,6 +101,7 @@ export const USER_ACTIONABLE_CODES: ReadonlySet<BriefToIfcV3ErrorCode> = new Set
   "MAX_TURNS_EXCEEDED",
   "EXECUTION_TIMEOUT",
   "SANDBOX_TIMEOUT",
+  "SANDBOX_SESSION_LOST",
   "RAILWAY_UNREACHABLE",
   "ANTHROPIC_API_ERROR",
   "AGENT_TIMEOUT",
