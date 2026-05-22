@@ -149,3 +149,42 @@ def render_debug_png(dxf_path: str, walls: list, max_size_kb: int = 5000) -> byt
         )
         return None
     return png
+
+
+def render_pdf_debug_png(pdf_path: str, walls: list, pt_to_mm: float,
+                         max_size_kb: int = 5000) -> bytes | None:
+    """Rasterize the PDF page and overlay detected walls in red.
+
+    Walls are stored in mm; we map them back to PDF points (mm / pt_to_mm) and
+    draw in the page's native coordinate space, so ``get_pixmap`` applies the
+    page rotation + Y-orientation to the overlay and the geometry together (no
+    manual flip needed). Best-effort: any failure → ``None``.
+    """
+    try:
+        import fitz  # lazy
+
+        doc = fitz.open(pdf_path)
+        try:
+            page = doc[0]
+            shape = page.new_shape()
+            for w in walls:
+                sx, sy = w["start"]
+                ex, ey = w["end"]
+                shape.draw_line(
+                    fitz.Point(sx / pt_to_mm, sy / pt_to_mm),
+                    fitz.Point(ex / pt_to_mm, ey / pt_to_mm),
+                )
+            shape.finish(color=(1, 0, 0), width=2.0)
+            shape.commit()
+            png = page.get_pixmap(dpi=120).tobytes("png")
+        finally:
+            doc.close()
+    except Exception as exc:  # noqa: BLE001 — debug is best-effort
+        log.warning("pdf_debug_render_failed", error=str(exc))
+        return None
+
+    if len(png) > max_size_kb * 1024:
+        log.warning("pdf_debug_render_too_large",
+                    png_kb=round(len(png) / 1024, 1), cap_kb=max_size_kb)
+        return None
+    return png

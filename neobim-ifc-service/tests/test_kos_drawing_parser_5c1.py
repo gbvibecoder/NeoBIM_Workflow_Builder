@@ -153,24 +153,27 @@ def test_title_block_region_scan():
 # ── route validation ─────────────────────────────────────────────────────
 
 
-def test_route_rejects_pdf(client: TestClient):
-    resp = client.post(
-        "/kos/parse-drawing",
-        files={"file": ("test.pdf", b"%PDF-1.4 fake pdf bytes", "application/pdf")},
-        data={"format": "dxf"},
-    )
-    assert resp.status_code == 400
-    assert resp.json()["error"] in ("invalid_extension", "unsupported_format")
+# NOTE (5C-2): PDF is now a SUPPORTED format, so the old "reject PDF" tests are
+# repurposed to assert rejection of genuinely-unsupported extensions. The route
+# infers format from the filename extension; only .dxf / .pdf are accepted.
 
 
-def test_route_rejects_unsupported_format(client: TestClient):
+def test_route_rejects_png_extension(client: TestClient):
     resp = client.post(
         "/kos/parse-drawing",
-        files={"file": ("drawing.dxf", b"0 SECTION", "application/octet-stream")},
-        data={"format": "pdf"},
+        files={"file": ("logo.png", b"\x89PNG\r\n\x1a\n fake png", "image/png")},
     )
     assert resp.status_code == 400
-    assert resp.json()["error"] == "unsupported_format"
+    assert resp.json()["error"] == "invalid_extension"
+
+
+def test_route_rejects_txt_extension(client: TestClient):
+    resp = client.post(
+        "/kos/parse-drawing",
+        files={"file": ("notes.txt", b"hello world", "text/plain")},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_extension"
 
 
 def test_route_rejects_oversized(client: TestClient):

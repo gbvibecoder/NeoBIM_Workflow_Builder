@@ -268,7 +268,8 @@ function buildComparison(outcomes: FileOutcome[]): string {
 // ─── main ────────────────────────────────────────────────────────────────
 async function main(): Promise<void> {
   const dirPath = parseArg("--path") ?? defaultPath();
-  const filter = parseArg("--filter") ?? "*.dxf";
+  // 5C-2: default matches both DXF (regression) and PDF (new) drawings.
+  const filter = parseArg("--filter") ?? "*";
   // Debug defaults ON this phase — we want the overlay PNGs.
   const debug = hasFlag("--no-debug") ? false : true;
 
@@ -282,16 +283,16 @@ async function main(): Promise<void> {
   const re = globToRegExp(filter);
   const files = fs
     .readdirSync(dirPath)
-    .filter((f) => f.toLowerCase().endsWith(".dxf") && re.test(f))
+    .filter((f) => /\.(dxf|pdf)$/i.test(f) && re.test(f))
     .sort();
 
   if (files.length === 0) {
-    console.error(`${LOG} no .dxf files matching "${filter}" in ${dirPath}`);
+    console.error(`${LOG} no .dxf/.pdf files matching "${filter}" in ${dirPath}`);
     process.exit(1);
   }
 
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
-  console.info(`${LOG} found ${files.length} DXF file(s) in ${dirPath}`);
+  console.info(`${LOG} found ${files.length} drawing file(s) in ${dirPath}`);
   console.info("");
 
   const outcomes: FileOutcome[] = [];
@@ -300,6 +301,9 @@ async function main(): Promise<void> {
     try {
       const result = await parseDrawing({
         filePath,
+        // The sidecar infers DXF vs PDF from the filename extension; the
+        // `format` field is advisory only (kept "dxf" to satisfy the client's
+        // DrawingFormat literal type — the .pdf filename drives routing).
         format: "dxf",
         debug,
         filename: file,
