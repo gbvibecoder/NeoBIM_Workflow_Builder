@@ -22,7 +22,16 @@ const TRIM_MODEL = "claude-opus-4-7";
 const OPUS_INPUT_COST_PER_MILLION = 5;
 const OPUS_OUTPUT_COST_PER_MILLION = 25;
 
-const PER_CALL_TIMEOUT_MS = 45_000;
+// Per-call Anthropic timeout. Raised from 45_000 to 150_000 (Path A fix,
+// 2026-05-21): the prior 45s ceiling deterministically aborted on briefs
+// that produce a large trim array (~110-130 items / ~5_000 output tokens
+// on a 2-storey villa). 150s matches the node's real workload while
+// sitting well under the route's 800s `maxDuration` cap and the client's
+// 780s AbortController budget. The Brief Enricher precedent (180s in
+// brief-enrichment.ts) covers an even larger output; 150s here keeps us
+// under that ceiling by design. NEVER raise above 180_000 without a
+// matching review of the client-side abort cap.
+const PER_CALL_TIMEOUT_MS = 150_000;
 const MAX_COST_USD = 0.10;
 const MAX_TOKENS_PER_CALL = 8_000;
 
@@ -136,6 +145,12 @@ async function callTrimModel(
   items: TrimItem[] | null;
   inputTokens: number;
   outputTokens: number;
+  /** True when the Anthropic stream itself threw (abort/timeout/network).
+   *  Signals to the caller to SKIP the parse-failure retry path — retrying
+   *  a transport-layer abort would just burn another 150s and risk the
+   *  client-side AbortController cap. The caller takes the graceful
+   *  "spec unchanged" exit instead. */
+  threw?: boolean;
 }> {
   const userContent = isRetry
     ? TRIM_PROMPT_TEMPLATE +
@@ -144,15 +159,34 @@ async function callTrimModel(
       "\n\nRETURN ONLY A JSON ARRAY. First character must be '['. No prose. No markdown."
     : TRIM_PROMPT_TEMPLATE + "\n\n" + specJson;
 
-  const stream = client.messages.stream(
-    {
-      model: TRIM_MODEL,
-      max_tokens: MAX_TOKENS_PER_CALL,
-      messages: [{ role: "user", content: userContent }],
-    },
-    { signal: AbortSignal.timeout(timeoutMs) },
-  );
-  const message = await stream.finalMessage();
+  let message: Anthropic.Messages.Message;
+  try {
+    const stream = client.messages.stream(
+      {
+        model: TRIM_MODEL,
+        max_tokens: MAX_TOKENS_PER_CALL,
+        messages: [{ role: "user", content: userContent }],
+      },
+      { signal: AbortSignal.timeout(timeoutMs) },
+    );
+    message = await stream.finalMessage();
+  } catch (err) {
+    // Anthropic stream threw — APIUserAbortError on AbortSignal.timeout
+    // ("Request was aborted."), or a network/SDK error. Path A fix
+    // (2026-05-21): convert into a signalled-null return so the caller's
+    // existing graceful "spec unchanged" exit runs and the executor sees
+    // this advisory node as a success. NEVER re-throw — TR-030 must be
+    // incapable of killing the pipeline.
+    const msg = err instanceof Error ? err.message : String(err);
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[trim-specifier] Anthropic stream threw on ` +
+      `${isRetry ? "retry" : "first"} attempt (${msg.slice(0, 160)}). ` +
+      `Returning null + threw=true so the caller skips retry and the ` +
+      `BriefSpec flows downstream unchanged.`,
+    );
+    return { items: null, inputTokens: 0, outputTokens: 0, threw: true };
+  }
 
   const inputTokens = message.usage.input_tokens;
   const outputTokens = message.usage.output_tokens;
@@ -236,6 +270,17 @@ export async function applyTrimSpecification(
     metrics.trim_count = result.items.length;
     const updatedSpec: BriefSpec = { ...spec, trim: result.items };
     return { spec: updatedSpec, metrics };
+  }
+
+  // Path A fix (2026-05-21): if the first attempt threw (abort/network),
+  // do NOT retry. The retry block exists for parse/schema failures only;
+  // a second 150s stream attempt after a transport-layer failure would
+  // waste budget and risk the client AbortController cap. Take the same
+  // graceful "spec unchanged" exit the both-attempts-failed path uses.
+  if (result.threw) {
+    metrics.cost_usd = Math.round(runningCost * 1_000_000) / 1_000_000;
+    metrics.wall_time_ms = Date.now() - startedAt;
+    return { spec, metrics };
   }
 
   // Cost guardrail check before retry
