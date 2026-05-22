@@ -417,7 +417,9 @@ export async function POST(req: NextRequest) {
             message:
               `[iter${iteration}] Turn ${record.turn}: ${record.toolName ?? "<no tool>"} ` +
               `(${record.toolDurationMs}ms, ` +
-              `${record.toolOk ? "ok" : "FAIL " + (record.toolErrorType ?? "?")})`,
+              `${record.toolOk ? "ok" : "FAIL " + (record.toolErrorType ?? "?")}` +
+              `${record.httpStatus !== undefined ? `, http=${record.httpStatus}` : ""}` +
+              `${record.sessionRecovered ? ", session-recovered" : ""})`,
             metadata: {
               turn: record.turn,
               toolName: record.toolName,
@@ -425,6 +427,23 @@ export async function POST(req: NextRequest) {
               toolOk: record.toolOk,
               toolErrorType: record.toolErrorType,
               iteration,
+              // Layer 1.5 (AGENT_FAILURE_DIAGNOSIS_2026-05-22.md) — only
+              // emit these keys when the driver actually populated them
+              // so the JSONB column stays cheap for the common ok-call
+              // case. `httpStatus` is the HTTP status of the underlying
+              // sandbox-client call when it failed with `http-error`;
+              // `httpBodySnippet` is the first ~200 chars of the
+              // response body. `sessionRecovered` is set on the turn
+              // where one-shot session re-bootstrap succeeded.
+              ...(record.httpStatus !== undefined
+                ? { httpStatus: record.httpStatus }
+                : {}),
+              ...(record.httpBodySnippet !== undefined
+                ? { httpBodySnippet: record.httpBodySnippet }
+                : {}),
+              ...(record.sessionRecovered
+                ? { sessionRecovered: true }
+                : {}),
             },
           });
         },

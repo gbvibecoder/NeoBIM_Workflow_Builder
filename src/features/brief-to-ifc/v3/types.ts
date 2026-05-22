@@ -825,6 +825,23 @@ export interface AgentTurnRecord {
   toolDurationMs: number;
   toolOk: boolean;
   toolErrorType: string | null;
+  /** Layer 1.5 (AGENT_FAILURE_DIAGNOSIS_2026-05-22.md): when the underlying
+   *  sandbox call returned an http-error, the HTTP status code is surfaced
+   *  here so logs/telemetry can distinguish session-loss (404) from
+   *  service errors (500) without having to infer from timings. Undefined
+   *  for non-http-error failures and for successful calls. */
+  httpStatus?: number;
+  /** Layer 1.5: first ~200 chars of the sandbox-error message (which
+   *  already inlines the response-body slice — see sandbox-client.ts).
+   *  Undefined unless the call failed with http-error. Capped so logs
+   *  stay cheap. */
+  httpBodySnippet?: string;
+  /** Layer 1 — set to true on the turn where session auto-recovery
+   *  successfully re-bootstrapped the sandbox session (the failing
+   *  `run_python` was retried with `brief` + `sessionId = null` and
+   *  the retry succeeded). Telemetry uses this to count recovery
+   *  events vs. unrecoverable losses. */
+  sessionRecovered?: boolean;
 }
 
 export interface GeneratorResult {

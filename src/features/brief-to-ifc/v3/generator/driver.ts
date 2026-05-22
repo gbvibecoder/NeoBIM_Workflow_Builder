@@ -35,6 +35,7 @@ import {
   sandboxFinalize,
   sandboxSummary,
   sandboxValidate,
+  type TransportFailure,
 } from "./sandbox-client";
 import type {
   AgentInputSuggestions,
@@ -460,6 +461,25 @@ export async function runGenerator(
   // Phase gamma.1: render_preview budget — max 10 calls per build
   const renderBudget = new RenderPreviewBudget();
 
+  // Layer-1 session-recovery flag (AGENT_FAILURE_DIAGNOSIS_2026-05-22.md).
+  // The Railway Python sandbox occasionally evicts our in-memory session
+  // mid-build (container restart, idle TTL, replica swap). When it does,
+  // `sandboxExec` returns http-error and the driver's only path to
+  // re-bootstrap is to reset `sessionId = null` and re-issue the call
+  // with `brief` in the body — the same shape as the very first call of
+  // the run (sandbox-client.ts:150-151 + driver.ts:638-640).
+  //
+  // We allow EXACTLY ONE auto-recovery per `runGenerator` invocation:
+  //   • Avoids an infinite re-bootstrap loop if the sandbox is hard-down.
+  //   • Bounds added cost to at most one extra sandbox call per iteration.
+  //   • A second session loss inside the same iteration returns a precise
+  //     `SANDBOX_SESSION_LOST` (not the misleading `AGENT_GAVE_UP` that
+  //     used to swallow this case) so telemetry stays honest.
+  // The recovered call's tool_result is also annotated with a one-line
+  // hint to the model so it knows its in-session Python state is gone
+  // and it must re-issue earlier `bf.add_*` calls.
+  let sessionRecoveryAttempted = false;
+
   // Phase ζ.2 — effective per-turn cap is the smaller of the per-iteration
   // cap and the remaining run-level budget passed by the worker. Computed
   // ONCE here (the run budget is fixed for the duration of this iteration);
@@ -628,27 +648,103 @@ export async function runGenerator(
       let isError = false;
       let toolOk = true;
       let toolErrorType: string | null = null;
+      // Layer 1.5 — when the underlying sandbox call returned an http-error,
+      // these surface the status code + a body snippet up into the
+      // AgentTurnRecord so logs can distinguish session-loss (404) from
+      // service errors (500) without inferring from timings. They stay
+      // undefined for non-http failures and for successful calls.
+      let httpStatus: number | undefined;
+      let httpBodySnippet: string | undefined;
+      // Layer 1 — set to true on the turn where session auto-recovery
+      // actually succeeded. Telemetry-only signal.
+      let sessionRecovered = false;
 
       try {
         switch (tu.name) {
           case TOOL_RUN_PYTHON: {
             const code = String((tu.input as { code?: unknown }).code ?? "");
-            const res = await sandboxExec({
+            let res = await sandboxExec({
               code,
               brief: sessionId ? undefined : args.brief,
               sessionId,
               timeoutMs: execTimeoutMs,
             });
+
+            // ── Layer-1 session-recovery branch ─────────────────────────
+            // The Railway sandbox occasionally drops our session. When it
+            // does and we still have one auto-recovery attempt left for
+            // this iteration, reset `sessionId = null` and re-issue with
+            // `brief` so the server can bootstrap a fresh session — the
+            // same shape as the very first call of the run. Without this
+            // the driver is stuck (sessionId is set, brief is omitted,
+            // every subsequent call carries a dead bf-session-id header)
+            // and the model eventually quits via the AGENT_GAVE_UP exit.
+            if (
+              !res.ok &&
+              sessionId !== null &&
+              isSessionLossFailure(res.failure) &&
+              !sessionRecoveryAttempted
+            ) {
+              sessionRecoveryAttempted = true;
+              sessionId = null;
+              res = await sandboxExec({
+                code,
+                brief: args.brief,
+                sessionId: null,
+                timeoutMs: execTimeoutMs,
+              });
+              sessionRecovered = res.ok;
+            }
+
             if (!res.ok) {
               isError = true;
               toolOk = false;
               toolErrorType = res.failure.kind;
+              if (res.failure.kind === "http-error") {
+                httpStatus = res.failure.statusCode;
+                httpBodySnippet = res.failure.message.slice(0, 200);
+              }
               resultPayload = { error: res.failure };
+              // If session-recovery has been burned this iteration AND
+              // the *current* failure is also session-shaped, the
+              // sandbox is unrecoverable for this run — exit cleanly
+              // with the precise error code so the worker / telemetry
+              // can distinguish "lost the sandbox" from "model gave up".
+              if (
+                sessionRecoveryAttempted &&
+                isSessionLossFailure(res.failure)
+              ) {
+                return failed(
+                  startedAt,
+                  "SANDBOX_SESSION_LOST",
+                  `Railway sandbox session was lost and the one-shot auto-` +
+                    `recovery attempt also failed at turn ${turn}. ` +
+                    `Last failure: ${res.failure.message.slice(0, 200)}`,
+                  { ledger, turnRecords, turns: turn },
+                );
+              }
             } else {
               sessionId = res.data.session_id;
-              resultPayload = res.data;
               toolOk = res.data.ok;
               toolErrorType = res.data.ok ? null : (res.data.error_type ?? "RUN_PYTHON_FAILED");
+              if (sessionRecovered) {
+                // Annotate the recovered call's tool_result so the model
+                // knows its in-session Python state is gone (any prior
+                // `bf.add_*` calls must be re-issued). Keep is_error
+                // false so the agent treats the call as progress, not
+                // a hostile failure — otherwise the AGENT_GAVE_UP exit
+                // stays armed.
+                resultPayload = {
+                  ...res.data,
+                  _session_recovered: true,
+                  _recovery_note:
+                    "⚠️ Sandbox session was lost and re-created — your " +
+                    "previous Python state is gone. Re-run any bf.add_* " +
+                    "calls you had already made before continuing.",
+                };
+              } else {
+                resultPayload = res.data;
+              }
             }
             break;
           }
@@ -665,7 +761,17 @@ export async function runGenerator(
               isError = true;
               toolOk = false;
               toolErrorType = res.failure.kind;
+              if (res.failure.kind === "http-error") {
+                httpStatus = res.failure.statusCode;
+                httpBodySnippet = res.failure.message.slice(0, 200);
+              }
               resultPayload = { error: res.failure };
+              // Drop the dead session pointer on a session-shaped error
+              // so the agent's next `run_python` call naturally carries
+              // `brief` again (sandbox-client.ts:150-151 only attaches
+              // `brief` when sessionId is null). Validate has no way to
+              // bootstrap a session by itself.
+              if (isSessionLossFailure(res.failure)) sessionId = null;
             } else {
               resultPayload = res.data;
               finalValidation = res.data;
@@ -687,7 +793,12 @@ export async function runGenerator(
               isError = true;
               toolOk = false;
               toolErrorType = res.failure.kind;
+              if (res.failure.kind === "http-error") {
+                httpStatus = res.failure.statusCode;
+                httpBodySnippet = res.failure.message.slice(0, 200);
+              }
               resultPayload = { error: res.failure };
+              if (isSessionLossFailure(res.failure)) sessionId = null;
             } else {
               resultPayload = res.data;
             }
@@ -706,7 +817,12 @@ export async function runGenerator(
               isError = true;
               toolOk = false;
               toolErrorType = res.failure.kind;
+              if (res.failure.kind === "http-error") {
+                httpStatus = res.failure.statusCode;
+                httpBodySnippet = res.failure.message.slice(0, 200);
+              }
               resultPayload = { error: res.failure };
+              if (isSessionLossFailure(res.failure)) sessionId = null;
             } else {
               resultPayload = res.data;
               finalIfcUrl = res.data.ifc_url;
@@ -785,6 +901,9 @@ export async function runGenerator(
         toolDurationMs: toolDuration,
         toolOk,
         toolErrorType,
+        ...(httpStatus !== undefined ? { httpStatus } : {}),
+        ...(httpBodySnippet !== undefined ? { httpBodySnippet } : {}),
+        ...(sessionRecovered ? { sessionRecovered: true } : {}),
       };
       turnRecords.push(record);
       try {
@@ -878,6 +997,43 @@ function ok(
     finalValidation,
     error: null,
   };
+}
+
+/**
+ * Layer-1 session-loss heuristic (AGENT_FAILURE_DIAGNOSIS_2026-05-22.md).
+ *
+ * Returns true when an `http-error` from the Railway sandbox looks like
+ * "session not found" — the failure mode where the server-side in-memory
+ * session has evaporated (container restart / redeploy / OOM / idle TTL)
+ * and the driver is the only place that can re-bootstrap.
+ *
+ * Conservative match, in order of confidence:
+ *  - HTTP 404 / 410 — the canonical "session not found / gone" statuses.
+ *    The Railway service's `bf-session-id` lookup either returns the
+ *    session row or returns one of these on miss.
+ *  - Message body contains a session-shaped phrase. `sandbox-client.ts`
+ *    inlines the response-body slice into `failure.message` so this
+ *    catches services that use a different status code with a clear
+ *    body. Tested phrases cover the common variants without being so
+ *    broad that an unrelated 4xx mentioning "session" trips recovery.
+ *
+ * Returns false on every non-http-error failure (timeout, network-error,
+ * parse-error, not-configured) — those have their own remediation and
+ * are not session-shaped.
+ *
+ * Exported for the regression test; not part of the package surface.
+ */
+export function isSessionLossFailure(failure: TransportFailure): boolean {
+  if (failure.kind !== "http-error") return false;
+  if (failure.statusCode === 404 || failure.statusCode === 410) return true;
+  const msg = failure.message.toLowerCase();
+  return (
+    msg.includes("session not found") ||
+    msg.includes("no session") ||
+    msg.includes("session expired") ||
+    msg.includes("unknown session") ||
+    msg.includes("invalid session")
+  );
 }
 
 function failed(
