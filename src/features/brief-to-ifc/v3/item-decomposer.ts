@@ -19,6 +19,7 @@ import { z } from "zod";
 import { furniturePartSchema } from "./types";
 import type { BriefSpec, FurniturePart } from "./types";
 import { MATERIAL_LIBRARY } from "./material-library";
+import { readThrough } from "@/lib/result-cache";
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -171,6 +172,10 @@ export interface DecomposerMetrics {
 export interface DecomposerResult {
   spec: BriefSpec;
   metrics: DecomposerMetrics;
+  /** Set to true when the result was served from the v3 result cache
+   *  (see src/lib/result-cache.ts). On cache hit, `metrics.cost_usd`
+   *  is rewritten to 0 so per-build cost accounting stays accurate. */
+  cacheHit?: boolean;
 }
 
 export interface DecomposerOptions {
@@ -280,6 +285,39 @@ async function decomposeItem(
 // ─── Main entry point ───────────────────────────────────────────────────
 
 export async function decomposeBriefSpecItems(
+  spec: BriefSpec,
+  classification: string | undefined,
+  options?: DecomposerOptions,
+): Promise<DecomposerResult> {
+  // Test injections bypass cache so unit tests stay hermetic.
+  if (options?.clientFactory || options?.maxCostUsd !== undefined || options?.concurrency !== undefined) {
+    return decomposeBriefSpecItemsUncached(spec, classification, options);
+  }
+  const cached = await readThrough<DecomposerResult>({
+    config: {
+      namespace: "decomposeBriefSpecItems",
+      promptVersion: [DECOMPOSER_MODEL, DECOMPOSER_PROMPT_TEMPLATE],
+    },
+    input: {
+      spec,
+      classification: classification ?? null,
+    },
+    compute: () => decomposeBriefSpecItemsUncached(spec, classification, options),
+    // Only memoize when Opus did real work AND at least one item came back
+    // intact — a zero-coverage result is usually a transient API blip.
+    shouldCache: (r) => r.metrics.opus_calls > 0 && r.metrics.decomposed_items > 0,
+  });
+  if (cached.cacheHit) {
+    return {
+      ...cached.value,
+      metrics: { ...cached.value.metrics, cost_usd: 0 },
+      cacheHit: true,
+    };
+  }
+  return cached.value;
+}
+
+async function decomposeBriefSpecItemsUncached(
   spec: BriefSpec,
   classification: string | undefined,
   options?: DecomposerOptions,
