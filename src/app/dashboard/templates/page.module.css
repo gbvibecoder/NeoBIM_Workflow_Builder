@@ -16,33 +16,16 @@
 }
 
 /* ── Hero ──────────────────────────────────────────────────────── */
+/* Phase Z.2 hero deck — the deck component owns its own padding, height,
+ * grid and accent wash. The section retains its border-bottom + ref={heroRef}
+ * so the sticky-filterbar scroll observer (page.tsx:724-736) still flips at
+ * the right place. The old ::before / ::after washes are removed to avoid
+ * doubling up with the deck's own background. */
 .hero {
   position: relative;
-  padding: 64px 56px 48px;
+  padding: 0;
   overflow: hidden;
   border-bottom: 1px solid var(--rs-rule);
-}
-
-.hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(1200px 600px at 20% -5%, rgba(26, 77, 92, 0.05) 0%, transparent 60%),
-    radial-gradient(800px 500px at 85% 110%, rgba(74, 107, 77, 0.03) 0%, transparent 60%);
-  pointer-events: none;
-}
-
-.hero::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, var(--rs-rule) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: radial-gradient(ellipse at 50% 40%, #000 20%, transparent 65%);
-  -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 20%, transparent 65%);
-  opacity: 0.5;
-  pointer-events: none;
 }
 
 .heroInner {
@@ -1197,7 +1180,6 @@
     grid-template-columns: 1fr;
   }
 
-  .hero,
   .filterbar,
   .featured,
   .section {
@@ -1214,9 +1196,7 @@
 }
 
 @media (max-width: 780px) {
-  .hero {
-    padding: 40px 20px 32px;
-  }
+  /* .hero padding intentionally not overridden — deck owns its padding */
 
   .heroTitle {
     font-size: clamp(32px, 8vw, 48px);

@@ -21,6 +21,14 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/cleanup-stuck-brief-to-ifc-v3-runs",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-stuck-brief-renders",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/billing-grace-window-sweep",
       "schedule": "0 * * * *"
     }
@@ -31,7 +39,7 @@
       "maxDuration": 60
     },
     "src/app/api/execute-node/route.ts": {
-      "maxDuration": 600
+      "maxDuration": 800
     },
     "src/app/api/brief-to-ifc-job/worker/route.ts": {
       "maxDuration": 800

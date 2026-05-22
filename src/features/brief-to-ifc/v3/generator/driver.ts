@@ -20,10 +20,16 @@ import Anthropic from "@anthropic-ai/sdk";
 import {
   TOOL_FINALIZE_IFC,
   TOOL_READ_IFC_SUMMARY,
+  TOOL_RENDER_PREVIEW,
   TOOL_RUN_PYTHON,
   TOOL_VALIDATE_IFC,
   v3GeneratorTools,
 } from "./tools";
+import {
+  handleRenderPreviewTool,
+  RenderPreviewBudget,
+} from "../tools/render-preview-tool";
+import type { RenderPreviewInput, RenderPreviewView } from "../tools/render-preview-tool";
 import {
   sandboxExec,
   sandboxFinalize,
@@ -31,12 +37,18 @@ import {
   sandboxValidate,
 } from "./sandbox-client";
 import type {
+  AgentInputSuggestions,
   AgentTokenLedgerEntry,
   AgentTurnRecord,
   BriefSpec,
   GeneratorResult,
   SandboxValidateResult,
 } from "../types";
+import {
+  AGENT_MAX_TURNS_DIRECT_MODE,
+  AGENT_DEFAULT_COST_CAP_USD,
+} from "../constants";
+import type { BuildTelemetryCollector } from "../telemetry";
 
 // System prompt — canonical .md copy at `./system-prompt.md`; the
 // inline const below MUST stay byte-equal to that file. A vitest
@@ -50,32 +62,91 @@ import type {
 // the drift test enforces parity at CI.
 export const GENERATOR_SYSTEM_PROMPT: string = `# BuildFlow v3 - IFC Generator Agent
 
-You are an expert architect-engineer authoring an IFC file via a Python
-sandbox. The sandbox has a pre-instantiated \`BuildFlowIFC\` instance (\`bf\`)
-already initialised from the user's \`BriefSpec\`. Your job: translate the
-spec into a faithful, web-ifc-loadable IFC by calling \`bf\` methods through
-the \`run_python\` tool, validating progress, then calling \`finalize_ifc\`.
+You are a senior BIM architect generating IFC building models. The
+user gives you a brief in plain English. You build an accurate,
+detailed IFC4 file that reflects what they described.
 
-## Section 1: The Two Rules
+## HOW YOU WORK
 
-RULE 1 — FAITHFUL TO BRIEF. Build exactly what the user asked for. No
-additions. No "common defaults". No invented rooms, furniture, lighting,
-reception desks, plants, AC units, ceiling fans, pooja niches — unless
-the brief explicitly mentions them. If the brief says "8 workstations",
-emit 8 workstations. Not 8 + chairs + monitors + accessories. If the
-brief says "office", build an office with what the brief lists — NOT
-what's "commonly in offices".
+You have a Python sandbox with the BuildFlowIFC helper (\`bf\`) loaded.
+You build the IFC by calling Python — adding walls, slabs, spaces,
+openings, furniture, fixtures, trim — using \`bf\` methods. When you're
+satisfied with the build, call \`finalize_ifc\`.
 
-RULE 2 — ACCURATE. Whatever the brief asks for is built to high quality:
-proper Psets, Qtos, materials, openings with voids, multi-part furniture
-composition where appropriate, styled solids, correct spatial containment.
+You have 200 turns. Use them. Don't rush. A great IFC is worth more
+than a fast IFC.
 
-Faithful first. Accurate second. Never sacrifice faithful for accurate.
-When in doubt about whether the brief implies something, DON'T add it.
+## SEEING YOUR WORK
 
-## Section 2: Tool Surface
+Call \`render_preview\` to see what you've built. Do this after every
+20-30 turns. Compare what you see against the brief. If something
+looks wrong, fix it before continuing. If something is missing,
+add it.
 
-### BuildFlowIFC instance methods (\`bf.*\`)
+You can render 10 times per build. Use them strategically:
+  Turn ~20: shape (walls, slabs, openings placed correctly?)
+  Turn ~40: large furniture (desk, table, mannequin in right spots?)
+  Turn ~60: small furniture and parts
+  Turn ~80: trim and fixtures
+  Turn ~100+: final review
+
+## UPSTREAM SUGGESTIONS
+
+The user message includes suggestions from automated upstream
+analysis: a structured spec, design rationale, suggested part
+decomposition, trim items, and material assignments.
+
+Materials are mandatory — use the provided material IDs verbatim
+(the catalog is deterministic and curated).
+
+Everything else is advisory. Read it, take what's useful, refine
+what's incomplete, ignore what's wrong. You are the architect.
+The upstream analysis is a colleague's notes, not a contract.
+
+## WHAT MAKES A GREAT IFC
+
+1. **Multi-part composite items.** A "cutting table" is not a single
+   box — it has a top surface, legs, perhaps a stretcher, perhaps
+   drawers. A "sewing machine" is not a single box — it has a
+   body, a needle assembly, a handwheel, a presser foot. A
+   "mannequin on a tripod" has a torso form, a neck, a head form,
+   a pole, three legs, a base plate.
+   
+   Use IfcRelAggregates to link parent items to their parts. Single
+   boxes are placeholder geometry, not BIM.
+
+2. **Correct IFC classes.** Use the right class for each item:
+   - Furniture, fixtures, appliances → IfcFurnishingElement
+   - Floor coverings, rugs, mats → IfcCovering (FLOORING)
+   - Wall panels, partitions → IfcCovering or IfcWallStandardCase
+   - Light fixtures → IfcLightFixture
+   - Plugs, outlets, switches → IfcFlowTerminal
+   - Walls, doors, windows, slabs → use the obvious classes
+   - Hinges, handles, door hardware → IfcDiscreteAccessory
+   
+   NEVER use IfcBuildingElementProxy for furniture or fixtures.
+   That class is for true unknowns at the IFC schema level.
+   Furniture always has a proper class.
+
+3. **Property sets and quantities.** Each element gets at least:
+   - One IfcPropertySet with semantic properties
+   - One IfcElementQuantity with measured quantities
+   
+   Use \`bf.attach_canonical_psets()\` and \`bf.attach_canonical_qto()\` helpers.
+
+4. **Accurate placement.** The brief describes spatial relationships
+   ("desk against north wall", "rug centered in room"). Build to
+   those constraints. If the brief is ambiguous, make a reasonable
+   choice and proceed — don't get stuck.
+
+5. **Real-world scale.** A door is ~2.1m tall, ~0.9m wide. A standard
+   desk is ~0.75m tall, 1.5-2m wide. A chair seat is ~0.45m off
+   the floor. Use sensible dimensions when the brief doesn't
+   specify them.
+
+## SANDBOX METHODS
+
+The \`bf\` helper has methods for every common building element. Key ones:
 
 **Structural:**
 - \`bf.add_wall(wall_id, origin, dims, depth, material, rotation=0.0, description="", tag="")\`
@@ -90,10 +161,20 @@ When in doubt about whether the brief implies something, DON'T add it.
 - \`bf.add_opening_in_wall(host_wall_id, offset_m, width_m, height_m, sill_m=0)\` — manual opening cut, returns opening entity.
 - \`bf.fill_opening(opening, fill_element)\` — links opening to door/window.
 
-**Furniture + lighting:**
-- \`bf.add_furniture(f_id, origin, dims, depth, material, object_type="", contained_in_space_id=None)\` — single-box furniture.
+**Furniture + lighting + railings:**
+- \`bf.add_furniture(f_id, origin, dims, depth, material, object_type="", contained_in_space_id=None)\` — single-box furniture (IfcFurnishingElement).
 - \`bf.add_light_fixture(l_id, origin, dims, depth, material, object_type="", contained_in_space_id=None)\` — real IfcLightFixture.
-- \`bf.add_proxy(proxy_id, origin, dims, depth, material, object_type="", composition="ELEMENT")\` — catch-all for non-standard items.
+- \`bf.add_railing(railing_id, origin, dims, depth, material, predefined_type="GUARDRAIL", contained_in_space_id=None)\` — IfcRailing. Use for balustrades, handrails, guards.
+- \`bf.add_proxy(proxy_id, origin, dims, depth, material, object_type="", composition="ELEMENT")\` — LAST RESORT for items with no IFC class. Prefer typed methods above.
+
+**Storeys (multi-floor buildings):**
+- \`bf.add_storey(storey_id, name, elevation)\` — creates an additional IfcBuildingStorey at the given elevation (metres). The bootstrap creates "Ground Floor" at 0.0. For multi-storey buildings, add one storey per floor BEFORE creating elements on that floor.
+- \`bf.add_stair(stair_id, origin, total_rise, width=1.0, run=None, step_count=None, material="", predefined_type="STRAIGHT_RUN_STAIR", rotation_z_rad=0.0, storey_id=None)\` — real IfcStair + IfcStairFlight assembly that physically connects two floors. \`total_rise\` is the floor-to-floor height in metres; the top of the last step lands at exactly \`origin[2] + total_rise\` (no rounding error). With \`storey_id="floor-N"\` and \`origin=(x, y, 0)\` and \`total_rise = elevation(floor-N+1) - elevation(floor-N)\`, the stair connects floor-N to floor-N+1. NEVER use \`bf.add_proxy\` for stairs — use this method so downstream BIM tools see the stair as a stair.
+- \`bf.add_roof(roof_id, origin, dims, thickness=0.15, material="", predefined_type="FLAT_ROOF", rotation_z_rad=0.0, storey_id=None)\` — real IfcRoof + IfcSlab(PredefinedType=ROOF) assembly covering the top storey. \`dims=(width, depth)\` is the building footprint; \`origin=(x, y, ceiling_height)\` puts the slab on top of the storey's ceiling. Pass \`storey_id\` of the TOP storey. NEVER use \`bf.add_proxy\` for roofs.
+- \`bf.add_balcony(balcony_id, origin, length, projection, thickness=0.15, material="", rotation_z_rad=0.0, storey_id=None)\` — projecting balcony slab (IfcSlab, PredefinedType=USERDEFINED, ObjectType="Balcony"). \`length\` is along the host wall; \`projection\` is outward cantilever. \`origin\` is the SW corner where the balcony meets the host wall, in the target storey's local frame. Pair with \`bf.add_railing(...)\` along the outer edge for a real-looking balcony. NEVER use \`bf.add_proxy\` for balconies.
+- \`bf.add_parapet(parapet_id, origin, length, height=1.0, thickness=0.1, material="", rotation_z_rad=0.0, storey_id=None)\` — low perimeter wall around a roof edge (IfcWall, PredefinedType=PARAPET in IFC4 / ObjectType="Parapet" in IFC2X3). \`origin\` includes oz = roof_top_z so the parapet sits ON the roof. NEVER use \`bf.add_proxy\` for parapets.
+- \`bf.add_canopy(canopy_id, origin, length, projection, thickness=0.1, material="", rotation_z_rad=0.0, storey_id=None)\` — overhead canopy / awning (IfcSlab, PredefinedType=USERDEFINED, ObjectType="Canopy"). \`length\` is along the host wall; \`projection\` is outward overhang. \`origin\` is typically high on the wall (oz = lintel_z or roof_overhang_z) so the canopy hangs over an entrance/window. Thinner than a balcony (typical 0.1m). NEVER use \`bf.add_proxy\` for canopies / awnings / overhangs.
+- All \`bf.add_*\` methods accept \`storey_id=None\` (default = ground floor). Pass \`storey_id="floor-1"\` to assign an element to that storey.
 
 **Spaces:**
 - \`bf.add_space(space_id, polygon, height, long_name="", occupancy="Internal")\` — IfcSpace from polygon. Bootstrap already creates spaces from brief.spaces — do NOT duplicate.
@@ -107,105 +188,30 @@ When in doubt about whether the brief implies something, DON'T add it.
 - \`bf.attach_pset(element_ids, pset_name, properties)\` — attach custom Pset.
 - \`bf.attach_qto(element_id, quantities)\` — attach custom Qto.
 
-### Pre-bound helper functions (available directly — no import needed)
-
-These are injected into the sandbox namespace alongside \`bf\` and \`math\`:
-
-- \`resolve_material("teak wood", "office", "IfcDoor")\` — returns a material id from the 65-material curated library. Use instead of inventing RGB values.
-- \`compose_furniture(bf, "workstation", (5.0, 3.0, 0.0), 0.0, "mat-laminate-white")\` — emits a 12-part composite linked via IfcRelAggregates. Catalogue: workstation, meeting_chair, bed_master, wardrobe, kitchen_counter, treadmill, weight_rack, display_booth, retail_rack, restaurant_table_4, student_desk.
-- \`apply_naming_convention(bf, spec)\` — renames every element to human-readable convention (Wall-S-01, Door-Entry-01, etc.).
+**Pre-bound helper functions (available directly — no import needed):**
+- \`resolve_material("teak wood", "office", "IfcDoor")\` — returns a material id from the 65-material curated library.
+- \`compose_furniture(bf, "workstation", (5.0, 3.0, 0.0), 0.0, "mat-laminate-white")\` — emits a 12-part composite via IfcRelAggregates.
+- \`apply_naming_convention(bf, spec)\` — renames every element to human-readable convention.
 - \`add_site_context(bf, polygon)\` — adds site polygon, ground plane, north arrow.
-- \`validate_brief_spec(spec)\` — checks internal consistency. Returns \`SpecValidationResult\` with \`.ok\`, \`.errors\`, \`.warnings\`.
+- \`validate_brief_spec(spec)\` — checks internal consistency.
 - \`run_preflight(spec, material_ids)\` — scale/coordinate/material sanity checks.
 
-## Section 3: Recommended Workflow
+When unsure of a method signature, run a small Python probe like
+\`help(bf.method_name)\`.
 
-1. **Inspect.** Call \`read_ifc_summary\`. Confirm spaces are pre-populated. Do NOT call \`bf.add_space\`.
+## MULTI-STOREY BUILDINGS
 
-2. **Validate spec.** Call \`validate_brief_spec(spec)\` in \`run_python\`. If errors, report them.
+For buildings with multiple floors:
+1. Call \`bf.add_storey(storey_id, name, elevation)\` for EACH floor above ground BEFORE creating elements on that floor. Example for a 4-storey building with 3.1m floor-to-floor:
+   - Ground Floor: already created by bootstrap at elevation 0.0
+   - \`bf.add_storey("floor-1", "First Floor", 3.1)\`
+   - \`bf.add_storey("floor-2", "Second Floor", 6.2)\`
+   - \`bf.add_storey("floor-3", "Third Floor", 9.3)\`
+2. Pass \`storey_id="floor-1"\` to every \`bf.add_*\` call for elements on that floor.
+3. Elements with no \`storey_id\` go to Ground Floor (the default).
+4. Geometry Z-coordinates are WORLD-ABSOLUTE (e.g. a first-floor slab at z=3.1). The storey_id controls the IFC containment hierarchy, not the position.
 
-3. **Build perimeter walls.** For each space's polygon, emit one wall per edge using \`bf.add_wall\` with rotation from \`atan2(dy, dx)\`. ALWAYS call \`bf.attach_canonical_psets(wid)\` + \`bf.attach_canonical_qto(wid)\` immediately after.
-
-4. **Build slabs.** Floor slab (z=0, FLOOR) and roof slab (z=height, ROOF) per space. Pset + Qto each.
-
-5. **Build openings.** For each opening in \`spec["openings"]\`, use \`bf.add_door\` or \`bf.add_window\` with \`host_wall_id\` and \`offset_m\`. Pset + Qto each.
-
-6. **Build furniture.** For composites (workstation, bed_master, etc.), call \`compose_furniture\`. Otherwise \`bf.add_furniture\`. ALWAYS Pset + Qto.
-
-7. **Build lighting.** \`bf.add_light_fixture(...)\`. ALWAYS Pset + Qto.
-
-8. **Resolve materials.** Use \`resolve_material(intent, archetype, ifc_class)\` from the library.
-
-9. **Apply naming.** Call \`apply_naming_convention(bf, spec)\`.
-
-10. **Add site context.** Call \`add_site_context(bf, building_polygon)\`.
-
-11. **Validate.** Call \`validate_ifc\`. Fix any FAIL/WARN validators before finalizing.
-
-12. **Finalize.** Call \`finalize_ifc\` exactly once.
-
-## Section 4: What to NEVER Do
-
-- NEVER add elements the brief doesn't mention.
-- NEVER skip \`attach_canonical_psets\` or \`attach_canonical_qto\`.
-- NEVER use \`bf.add_furniture\` for items matching a \`compose_furniture\` catalogue entry.
-- NEVER place a door/window without cutting an opening via host_wall_id.
-- NEVER ignore validator failures.
-- NEVER bypass \`bf\` and write raw ifcopenshell.
-- NEVER invent RGB material values when \`resolve_material\` returns a match.
-- NEVER use millimetres. ALL dimensions are METRES.
-
-## Section 5: Worked Example
-
-Brief: "10x4m office, 3m ceiling. 1 door north wall at 2m. 2 windows south wall at 1.5m and 5m. 4 workstations."
-
-\`\`\`python
-# resolve_material, compose_furniture, apply_naming_convention,
-# add_site_context are pre-bound — no import needed.
-
-polygon = [[0,0],[10,0],[10,4],[0,4]]
-mat_wall = resolve_material("exterior wall", "office", "IfcWall")
-for i in range(len(polygon)):
-    a, b = polygon[i], polygon[(i+1)%len(polygon)]
-    dx, dy = b[0]-a[0], b[1]-a[1]
-    length = math.sqrt(dx*dx + dy*dy)
-    rot = math.atan2(dy, dx)
-    wid = f"W-office-{i}"
-    bf.add_wall(wid, (a[0],a[1],0), (length,0.2), 3.0, mat_wall, rotation=rot)
-    bf.attach_canonical_psets(wid)
-    bf.attach_canonical_qto(wid)
-
-mat_slab = resolve_material("concrete slab", "office", "IfcSlab")
-bf.add_slab("SL-floor", (0,0,0), (10,4), 0.15, mat_slab, predefined_type="FLOOR")
-bf.attach_canonical_psets("SL-floor"); bf.attach_canonical_qto("SL-floor")
-bf.add_slab("SL-roof", (0,0,3.0), (10,4), 0.15, mat_slab, predefined_type="ROOF")
-bf.attach_canonical_psets("SL-roof"); bf.attach_canonical_qto("SL-roof")
-
-mat_door = resolve_material("teak door", "office", "IfcDoor")
-bf.add_door("D-01", (2.0,3.8,0), (0.9,0.1), 2.1, mat_door,
-            host_wall_id="W-office-2", offset_m=2.0)
-bf.attach_canonical_psets("D-01"); bf.attach_canonical_qto("D-01")
-
-mat_glass = resolve_material("clear glass", "office", "IfcWindow")
-bf.add_window("WIN-01", (1.5,0,0.9), (1.2,0.05), 1.5, mat_glass,
-              host_wall_id="W-office-1", offset_m=1.5, sill_m=0.9)
-bf.attach_canonical_psets("WIN-01"); bf.attach_canonical_qto("WIN-01")
-bf.add_window("WIN-02", (5.0,0,0.9), (1.2,0.05), 1.5, mat_glass,
-              host_wall_id="W-office-1", offset_m=5.0, sill_m=0.9)
-bf.attach_canonical_psets("WIN-02"); bf.attach_canonical_qto("WIN-02")
-
-mat_desk = resolve_material("white laminate", "office", "IfcFurnishingElement")
-for idx in range(4):
-    compose_furniture(bf, "workstation", (2.0+idx*2.0, 1.5, 0), 0.0, mat_desk,
-                      parent_id=f"WS-{idx:02d}", contained_in_space_id="sp-office")
-
-apply_naming_convention(bf, spec)
-add_site_context(bf, [(0,0),(10,0),(10,4),(0,4)])
-\`\`\`
-
-Result: 4 walls + 2 slabs + 1 door + 2 windows + 48 furniture parts + site = ~80 elements x ~22 entities each = ~2000+ entities.
-
-## IFC Schema Notes
+## IFC SCHEMA NOTES
 
 - Schema is IFC4 (default) or IFC2X3 (fallback). The bootstrap forces METRE units.
 - ALL dimensions in METRES. A 4m wall = \`dims=(4.0, 0.2)\`, NOT \`(4000, 200)\`.
@@ -214,27 +220,40 @@ Result: 4 walls + 2 slabs + 1 door + 2 windows + 48 furniture parts + site = ~80
 - IfcLightFixture is a real IFC4 class — no proxy fallback needed.
 - String values must be pure ASCII. The helpers auto-sanitize.
 
-## Section 6: Output Discipline
+## FINALIZE
 
-- Final tool call: \`finalize_ifc\`.
-- Last message: one paragraph with URL, entity count, space count, validator summary.
-- Be terse in \`run_python\` blocks — print counts, not prose.
-- If max turns (25) reached, explain what blocked you.
-- If validators fail, fix and retry.
-`;
+When done, call \`finalize_ifc()\`. This writes the .ifc file and
+completes the build. After finalize, you cannot make more changes.
+
+Do not call \`finalize_ifc\` until you have:
+- Built every item in the brief
+- Used \`render_preview\` at least once on the final state
+- Confirmed via \`render_preview\` that nothing is missing or wrong
+- Added property sets + quantities to every element
+
+## ITERATION CONTEXT
+
+If the brief tells you this is iteration 2 or 3 of a self-correcting
+pipeline, you'll see a PREVIOUS ITERATION FEEDBACK section. That's
+feedback from automated review of your last attempt. Read it.
+Address each point. The feedback is in English, not JSON — it's
+a colleague telling you what to improve.
+
+## NOW
+
+Read the brief carefully. Plan your approach in 3-5 sentences as a
+text response (no tool call) before you start building. Then begin.`;
 
 const GENERATOR_MODEL = "claude-opus-4-7";
 const OPUS_INPUT_COST_PER_MILLION = 5;
 const OPUS_OUTPUT_COST_PER_MILLION = 25;
-const DEFAULT_MAX_TURNS = 25;
+/** Phase gamma.1: Direct Agent Mode — 200 turns, imported from constants. */
+const DEFAULT_MAX_TURNS = AGENT_MAX_TURNS_DIRECT_MODE;
 const DEFAULT_TURN_MAX_TOKENS = 8_000;
-const DEFAULT_TURN_TIMEOUT_MS = 60_000;
-const DEFAULT_EXEC_TIMEOUT_MS = 30_000;
-/** Default cost ceiling per generation. A runaway 25-turn loop on Opus
- *  4.7 at the upper bound of token usage maxes out near $2.50 — this
- *  is the published per-call cap that protects against pathological
- *  agent-loop spends. Caller can override via `RunGeneratorArgs.costCapUsd`. */
-export const DEFAULT_COST_CAP_USD = 2.5;
+const DEFAULT_TURN_TIMEOUT_MS = 180_000;
+const DEFAULT_EXEC_TIMEOUT_MS = 60_000;
+/** Phase gamma.1: raised to $5.00 for Direct Agent Mode. */
+export const DEFAULT_COST_CAP_USD = AGENT_DEFAULT_COST_CAP_USD;
 
 function createAnthropicClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -264,6 +283,14 @@ type TextBlock = Extract<
 
 export interface RunGeneratorArgs {
   brief: BriefSpec;
+  /** Phase gamma.1: verbatim user brief text — primary context for the agent. */
+  briefText?: string;
+  /** Phase gamma.1: advisory suggestions from upstream analysis nodes. */
+  suggestions?: AgentInputSuggestions;
+  /** Phase gamma.1: plain-English retry hint from previous iteration. */
+  previousFeedback?: string;
+  /** Phase gamma.1: which iteration this is (1-based). */
+  iteration?: number;
   maxTurns?: number;
   turnTimeoutMs?: number;
   execTimeoutMs?: number;
@@ -280,6 +307,35 @@ export interface RunGeneratorArgs {
   /** Optional logger — invoked per turn for SSE / canvas streaming.
    *  Never blocks the loop; errors are swallowed. */
   onTurn?: (record: AgentTurnRecord) => void;
+  /** Phase δ.0 — optional BuildTelemetry collector. When provided, the
+   *  driver merges Python-side telemetry from the finalize response.
+   *  All telemetry calls are internally try/caught; a telemetry failure
+   *  can never abort the build. */
+  telemetry?: BuildTelemetryCollector;
+  /** Phase ζ.1 — optional pre-turn cancellation probe. When provided, the
+   *  driver invokes it at the TOP of every turn (BEFORE the Anthropic
+   *  stream is constructed). Returning `true` short-circuits the loop via
+   *  the existing graceful `failed(...)` return shape with
+   *  `error.code = "CANCELLED_BY_USER"` — no further Anthropic spend.
+   *
+   *  The driver deliberately does NOT import Prisma; the caller (the
+   *  agent-job worker) closes over a DB read and passes it as this
+   *  callback so the driver stays test-mockable and decoupled from the
+   *  storage layer.
+   *
+   *  Errors thrown by the probe are swallowed (treated as "not cancelled")
+   *  so a transient DB blip never aborts a healthy run. */
+  checkCancelled?: () => Promise<boolean>;
+  /** Phase ζ.2 — optional remaining run-level budget in USD. The agent-job
+   *  worker computes this as `RUN_COST_CAP_USD - sum(prior-iteration
+   *  costUsd)` and passes it per iteration so a single iteration cannot
+   *  blow what's left of the whole-run budget. When provided, the
+   *  effective per-turn cap becomes `Math.min(costCapUsd,
+   *  remainingRunBudgetUsd)` and an over-cap exit reports
+   *  `RUN_COST_CAP_EXCEEDED` rather than `COST_CAP_EXCEEDED` when the
+   *  run-budget was the tighter constraint. When undefined (legacy
+   *  callers / tests), per-iteration cap behaviour is unchanged. */
+  remainingRunBudgetUsd?: number;
 }
 
 export async function runGenerator(
@@ -306,17 +362,93 @@ export async function runGenerator(
 
   const ledger: AgentTokenLedgerEntry[] = [];
   const turnRecords: AgentTurnRecord[] = [];
+
+  // Phase gamma.1: Build the user message with brief + spec + suggestions + feedback
+  const userMessageParts: string[] = [];
+
+  if (args.briefText) {
+    userMessageParts.push(
+      `## THE BRIEF\n\n${args.briefText}`,
+    );
+  }
+
+  userMessageParts.push(
+    `## UPSTREAM SUGGESTIONS (advisory, not mandatory)\n\n` +
+    `### Structured spec from Brief Enricher\n\n` +
+    `<brief_spec>\n${JSON.stringify(args.brief, null, 2)}\n</brief_spec>`,
+  );
+
+  if (args.suggestions?.rationale?.length) {
+    userMessageParts.push(
+      `### Design rationale from Architectural Reasoner\n\n` +
+      args.suggestions.rationale.map(r =>
+        `- **${r.itemId}**: position [${r.position.join(", ")}], rotation ${r.rotation_z_rad}rad — ${r.rationale}`,
+      ).join("\n"),
+    );
+  }
+
+  if (args.suggestions?.decomposed_furniture?.length) {
+    userMessageParts.push(
+      `### Suggested part decomposition from Item Decomposer\n\n` +
+      `This is a starting point — refine as needed.\n\n` +
+      args.suggestions.decomposed_furniture.map(f =>
+        `- **${f.id}** (${f.type}): ${f.parts?.length ?? 0} parts suggested` +
+        (f.parts?.length ? `\n  Parts: ${f.parts.map(p => `${p.subtype} [${p.dims_m.join("x")}m]`).join(", ")}` : ""),
+      ).join("\n"),
+    );
+  }
+
+  if (args.suggestions?.trim?.length) {
+    userMessageParts.push(
+      `### Suggested trim items from Trim Specifier\n\n` +
+      args.suggestions.trim.map(t =>
+        `- **${t.id}** (${t.type}): host=${t.hostId}, material=${t.material_id}`,
+      ).join("\n"),
+    );
+  }
+
+  if (args.suggestions?.materials?.length) {
+    userMessageParts.push(
+      `### Material catalog from Material Resolver — REQUIRED, deterministic\n\n` +
+      `Use these material IDs verbatim.\n\n` +
+      args.suggestions.materials.map(m =>
+        `- **${m.id}**: ${m.name} (${m.method}, rgb=[${m.rgb.join(",")}])`,
+      ).join("\n"),
+    );
+  }
+
+  if (args.previousFeedback && (args.iteration ?? 1) > 1) {
+    userMessageParts.push(
+      `## PREVIOUS ITERATION FEEDBACK\n\n` +
+      `This is iteration ${args.iteration}. The previous build was reviewed and here is the feedback:\n\n` +
+      args.previousFeedback,
+    );
+  }
+
+  userMessageParts.push(
+    `## YOUR TASK\n\n` +
+    `Build the IFC. You have ${maxTurns} turns. You have a render_preview tool — ` +
+    `use it to see what you're building. Iterate within your own session ` +
+    `until you're satisfied. Then call finalize_ifc.\n\n` +
+    `The structured spec, rationale, decomposition, and trim are SUGGESTIONS ` +
+    `from upstream analysis. Use what's useful, ignore what isn't, add what's ` +
+    `missing. You are the architect — judge for yourself what makes a good ` +
+    `building model.\n\n` +
+    `Materials are deterministic — use the material IDs provided. Everything ` +
+    `else is up to you.`,
+  );
+
+  // Fallback: if no briefText was provided, log a warning (backwards compat)
+  if (!args.briefText) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[runGenerator] briefText absent — falling back to spec-only mode. ` +
+      `Direct Agent Mode works best with the original brief.`,
+    );
+  }
+
   const messages: Anthropic.Messages.MessageParam[] = [
-    {
-      role: "user",
-      content:
-        `Here is the BriefSpec to build the IFC from. The sandbox session ` +
-        `is fresh - call \`read_ifc_summary\` first to confirm the ` +
-        `pre-populated state, then proceed through spaces, elements, psets, ` +
-        `validation, and finalize.\n\n<brief_spec>\n` +
-        JSON.stringify(args.brief, null, 2) +
-        `\n</brief_spec>`,
-    },
+    { role: "user", content: userMessageParts.join("\n\n") },
   ];
   const tools = v3GeneratorTools();
 
@@ -325,8 +457,58 @@ export async function runGenerator(
   let finalEntityCount = 0;
   let finalValidation: SandboxValidateResult | null = null;
   let totalCost = 0;
+  // Phase gamma.1: render_preview budget — max 10 calls per build
+  const renderBudget = new RenderPreviewBudget();
+
+  // Phase ζ.2 — effective per-turn cap is the smaller of the per-iteration
+  // cap and the remaining run-level budget passed by the worker. Computed
+  // ONCE here (the run budget is fixed for the duration of this iteration);
+  // the existing post-turn cap-circuit check at the bottom of the loop
+  // reads `effectiveCap` instead of `costCapUsd`. When the caller did not
+  // pass `remainingRunBudgetUsd` (legacy / unit tests) `effectiveCap` ==
+  // `costCapUsd` and behaviour is byte-equal to pre-ζ.2.
+  const effectiveCap =
+    args.remainingRunBudgetUsd !== undefined
+      ? Math.min(costCapUsd, args.remainingRunBudgetUsd)
+      : costCapUsd;
+  /** True when the run-level remaining budget is the tighter of the two
+   *  caps (i.e. `remainingRunBudgetUsd < costCapUsd`). Determines whether
+   *  an over-cap exit reports `RUN_COST_CAP_EXCEEDED` (this run has spent
+   *  enough across all its iterations) or `COST_CAP_EXCEEDED` (this single
+   *  iteration overspent its per-iter share). */
+  const runBudgetIsLimiter =
+    args.remainingRunBudgetUsd !== undefined &&
+    args.remainingRunBudgetUsd < costCapUsd;
 
   for (let turn = 1; turn <= maxTurns; turn++) {
+    // ── Phase ζ.1 cancellation gate ──
+    // Runs at the TOP of every turn, BEFORE the Anthropic stream is
+    // constructed. If the caller's probe reports cancelled, we short-
+    // circuit via the same `failed(...)` path used by COST_CAP_EXCEEDED
+    // / MAX_TURNS_EXCEEDED so the worker's downstream handling treats
+    // this as a clean, accounted-for stop. Maximum additional Anthropic
+    // spend after the probe observes cancel = ZERO turns. (If cancel
+    // landed mid-stream of an earlier turn, that turn completes first
+    // — bounded by ONE turn worst-case, ~$0.10–0.30, not a full
+    // iteration.)
+    //
+    // Per-run budget check (P4, next phase) will slot in right here,
+    // alongside this guard, with the same short-circuit shape.
+    try {
+      if (args.checkCancelled && (await args.checkCancelled())) {
+        return failed(
+          startedAt,
+          "CANCELLED_BY_USER",
+          `Run cancelled by user before turn ${turn}.`,
+          { ledger, turnRecords, turns: turn - 1 },
+        );
+      }
+    } catch {
+      /* swallow — a transient DB blip on the cancel probe must never
+       * abort a healthy run. Worst case: cancel signal is missed for
+       * one turn and caught on the next. */
+    }
+
     let message: Anthropic.Messages.Message;
     try {
       const stream = client.messages.stream(
@@ -374,18 +556,36 @@ export async function runGenerator(
       durationMs: turnDurationMs,
     });
 
-    // Cost-cap circuit breaker (Phase v3 completion §D4). Checked AFTER
-    // the ledger entry is recorded so the running total reflects what
-    // we've already committed to. Returning here preserves the partial
-    // ledger + turnRecords for cost-accounting transparency.
-    if (totalCost > costCapUsd) {
+    // Cost-cap circuit breaker (Phase v3 completion §D4 + Phase ζ.2).
+    // Checked AFTER the ledger entry is recorded so the running total
+    // reflects what we've already committed to. Returning here preserves
+    // the partial ledger + turnRecords for cost-accounting transparency.
+    //
+    // ζ.2: the comparison uses `effectiveCap = min(costCapUsd,
+    // remainingRunBudgetUsd)`. When the run-level remaining budget was
+    // the tighter of the two we report `RUN_COST_CAP_EXCEEDED` so the
+    // worker's downstream handling can distinguish "this iteration
+    // overspent" from "this whole run has spent its budget across all
+    // iterations". When `remainingRunBudgetUsd` was not passed, the
+    // computation collapses to the original per-iter `costCapUsd` and
+    // the error code stays `COST_CAP_EXCEEDED` — byte-equal pre-ζ.2.
+    if (totalCost > effectiveCap) {
       return failed(
         startedAt,
-        "COST_CAP_EXCEEDED",
-        `Cumulative cost $${totalCost.toFixed(4)} exceeded the cap ` +
-          `$${costCapUsd.toFixed(2)} after turn ${turn}. ` +
-          "The loop short-circuited to prevent runaway spend; raise " +
-          "`costCapUsd` if you genuinely need more budget per call.",
+        runBudgetIsLimiter && totalCost > (args.remainingRunBudgetUsd ?? Infinity)
+          ? "RUN_COST_CAP_EXCEEDED"
+          : "COST_CAP_EXCEEDED",
+        `Cumulative iteration cost $${totalCost.toFixed(4)} exceeded the ` +
+          `effective cap $${effectiveCap.toFixed(2)} after turn ${turn} ` +
+          `(per-iter $${costCapUsd.toFixed(2)}, remaining-run-budget ` +
+          `${args.remainingRunBudgetUsd === undefined
+              ? "n/a"
+              : "$" + args.remainingRunBudgetUsd.toFixed(2)}). ` +
+          (runBudgetIsLimiter
+            ? "The whole RUN has spent its budget across all iterations; " +
+              "no further turns will be billed in this iteration."
+            : "The loop short-circuited to prevent runaway spend; raise " +
+              "`costCapUsd` if you genuinely need more budget per call."),
         { ledger, turnRecords, turns: turn },
       );
     }
@@ -512,6 +712,50 @@ export async function runGenerator(
               finalIfcUrl = res.data.ifc_url;
               finalEntityCount = res.data.entity_count;
               finalValidation = res.data.validation;
+              // δ.0 — merge Python-side telemetry (proxy fallbacks,
+              // material misses, built element counts) into the
+              // collector. Safe to call on undefined / malformed
+              // payloads; merge helper is shape-tolerant.
+              try {
+                args.telemetry?.mergePythonTelemetry(res.data.telemetry);
+              } catch {
+                /* swallow — telemetry never crashes the build */
+              }
+            }
+            break;
+          }
+          case TOOL_RENDER_PREVIEW: {
+            const input = tu.input as { view?: string; note?: string };
+            const view = (input.view ?? "iso") as RenderPreviewView;
+            const renderResult = await handleRenderPreviewTool(
+              { view, note: input.note } as RenderPreviewInput,
+              { sessionId, runId: args.iteration?.toString(), turn },
+              renderBudget,
+            );
+            if (renderResult.ok && renderResult.image_b64) {
+              // Return image content block — the driver will wrap it
+              resultPayload = {
+                _renderPreview: true,
+                image_b64: renderResult.image_b64,
+                render_ms: renderResult.render_ms,
+                note: renderResult.note,
+                budget_used: renderBudget.used,
+                budget_remaining: renderBudget.remaining,
+              };
+            } else {
+              resultPayload = {
+                error: renderResult.error ?? "Render failed",
+                budget_used: renderBudget.used,
+                budget_remaining: renderBudget.remaining,
+              };
+              if (renderResult.error?.includes("budget exhausted")) {
+                // Not an error per se — just budget exhausted
+                isError = false;
+              } else {
+                isError = true;
+                toolOk = false;
+                toolErrorType = "RENDER_PREVIEW_FAILED";
+              }
             }
             break;
           }
@@ -549,12 +793,46 @@ export async function runGenerator(
         /* swallow logger errors */
       }
 
-      toolResultBlocks.push({
-        type: "tool_result",
-        tool_use_id: tu.id,
-        content: JSON.stringify(resultPayload).slice(0, 50_000),
-        is_error: isError,
-      });
+      // Phase gamma.1: render_preview returns image content blocks
+      const isRenderPreviewImage =
+        resultPayload &&
+        typeof resultPayload === "object" &&
+        (resultPayload as Record<string, unknown>)._renderPreview === true;
+
+      if (isRenderPreviewImage) {
+        const rp = resultPayload as { image_b64: string; render_ms?: number; note?: string; budget_used: number; budget_remaining: number };
+        toolResultBlocks.push({
+          type: "tool_result",
+          tool_use_id: tu.id,
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: "image/png",
+                data: rp.image_b64,
+              },
+            },
+            {
+              type: "text",
+              text: JSON.stringify({
+                render_ms: rp.render_ms,
+                note: rp.note,
+                budget_used: rp.budget_used,
+                budget_remaining: rp.budget_remaining,
+              }),
+            },
+          ] as unknown as string,
+          is_error: false,
+        });
+      } else {
+        toolResultBlocks.push({
+          type: "tool_result",
+          tool_use_id: tu.id,
+          content: JSON.stringify(resultPayload).slice(0, 50_000),
+          is_error: isError,
+        });
+      }
     }
 
     messages.push({ role: "user", content: toolResultBlocks });

@@ -73,6 +73,13 @@ function IFCViewerEntry() {
   const executionId = params.get("executionId");
   const directUrl = params.get("url");
   const hasInbound = !!executionId || !!directUrl;
+  // Phase ε.2 — explicit `autoEnhance=1` URL param triggered by the
+  // "Enhance ✨" button on the brief-to-IFC v3 run results page. The
+  // generic auto-enhance was disabled in 2026-05-18 (raw IFC by
+  // default); ε.2 RE-ENABLES it only when explicitly requested via
+  // this param, so users coming in from any other route (uploads,
+  // sharing, plain ?url= links) still see the raw IFC by default.
+  const autoEnhanceParam = params.get("autoEnhance") === "1";
   const [hydrating, setHydrating] = useState<boolean>(hasInbound);
   const [hydrated, setHydrated] = useState<boolean>(!hasInbound);
 
@@ -185,7 +192,7 @@ function IFCViewerEntry() {
     );
   }
 
-  return <IFCViewerPage autoEnhance={hasInbound} restoreFromCache={hasInbound} />;
+  return <IFCViewerPage autoEnhance={autoEnhanceParam} restoreFromCache={hasInbound} />;
 }
 
 function isIfcArtifact(art: ApiArtifact): boolean {

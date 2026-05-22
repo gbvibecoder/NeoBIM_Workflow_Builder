@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { DM_Sans, DM_Serif_Display, JetBrains_Mono, Fraunces, Geist } from "next/font/google";
+import { DM_Sans, DM_Serif_Display, JetBrains_Mono, Fraunces, Geist, Caveat } from "next/font/google";
 
 import { ClientToaster } from "@/shared/components/ClientToaster";
 import { Analytics } from "@vercel/analytics/react";
@@ -46,6 +46,13 @@ const fraunces = Fraunces({
   variable: "--font-display",
   display: "swap",
   axes: ["opsz", "SOFT"],
+});
+
+const caveat = Caveat({
+  subsets: ["latin"],
+  variable: "--font-caveat",
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const geist = Geist({
@@ -350,10 +357,16 @@ export default async function RootLayout({
           </>
         )}
       </head>
+<<<<<<< HEAD
       <body className={`${dmSans.variable} ${dmSerif.variable} ${jetbrains.variable} ${fraunces.variable} ${geist.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
         {/* Google Tag Manager (noscript) — fallback for users without JS.
             Skipped on KOS so no googletagmanager.com iframe lands in the HTML. */}
         {!isKos && process.env.NEXT_PUBLIC_GTM_ID && (
+=======
+      <body className={`${dmSans.variable} ${dmSerif.variable} ${jetbrains.variable} ${fraunces.variable} ${geist.variable} ${caveat.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
+        {/* Google Tag Manager (noscript) — fallback for users without JS */}
+        {process.env.NEXT_PUBLIC_GTM_ID && (
+>>>>>>> upstream/main
           <noscript>
             <iframe
               src={`https://www.googletagmanager.com/ns.html?id=${process.env.NEXT_PUBLIC_GTM_ID}`}

@@ -12,7 +12,6 @@ import {
   type RefObject,
 } from "react";
 import {
-  Sparkles,
   Sun,
   Sunset,
   Cloud,
@@ -21,15 +20,14 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
-  RotateCcw,
   AlertTriangle,
   CheckCircle2,
-  Wand2,
   MapPin,
   Home,
   Building2,
 } from "lucide-react";
 import { UI } from "@/features/ifc/components/constants";
+import { useLocale } from "@/hooks/useLocale";
 import type { ViewportHandle } from "@/types/ifc-viewer";
 import {
   DEFAULT_TIER2_TOGGLES,
@@ -75,9 +73,10 @@ import {
   type PanoramaController,
   type PanoramaTier2Adapter,
 } from "@/features/panorama/lib/panorama-controller";
-import type { PanoramaAsset } from "@/features/panorama/constants";
+import { PANORAMA_BUCKET_LABELS, type PanoramaAsset } from "@/features/panorama/constants";
 import { resolveBuildingType } from "@/features/panorama/lib/type-resolver";
 import { PanoramaSection } from "@/features/panorama/components/PanoramaSection";
+import { ApplyHero } from "@/features/ifc/components/primitives";
 
 /* ─── Props + imperative handle ──────────────────────────────────────── */
 
@@ -86,6 +85,10 @@ interface IFCEnhancePanelProps {
   hasModel: boolean;
   /** Called whenever enhance status changes — used by auto-enhance overlay. */
   onStatusChange?: (status: EnhanceStatus) => void;
+  /** Phase Z.IFC.2 (2026-05-19): when true, the panel renders WITHOUT its
+      outer `height: 100%` flex shell — the parent EditPanel manages scroll
+      and the height cascade. Behaviour and state are otherwise identical. */
+  embedded?: boolean;
 }
 
 export interface IFCEnhancePanelHandle {
@@ -119,29 +122,39 @@ const QUALITY_OPTIONS: Array<{ id: MaterialQuality; label: string; helper: strin
 
 /* ─── Shared style helpers ───────────────────────────────────────────── */
 
+/* ─── Inline style helpers — Phase Z.IFC.1 Light Render Studio ───────────
+   These functions are intentionally KEPT (rather than replaced with the
+   new <Switch>/<SegmentedPicker> primitives) so the 30+ existing call
+   sites compile unchanged. The VALUES were re-bound to RS tokens so the
+   panel theme flips with the rest of the chrome.                        */
+
+/* Compact paddings — Phase Z.IFC.2 follow-up (2026-05-19): tightened
+   uniformly so each Section card stops eating ~28px of dead chrome. */
 const sectionHeaderStyle: CSSProperties = {
   width: "100%",
   display: "flex",
   alignItems: "center",
-  gap: 6,
-  padding: "8px 10px",
+  gap: 7,
+  padding: "7px 10px",
   background: "transparent",
   border: "none",
   color: UI.text.primary,
   fontSize: 12,
   fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.4px",
+  letterSpacing: 0.1,
   cursor: "pointer",
+  fontFamily: UI.font.body,
+  textAlign: "left",
 };
 
 const rowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "8px 10px",
-  fontSize: 12.5,
-  color: UI.text.secondary,
+  padding: "5px 10px",
+  fontSize: 12,
+  color: UI.text.primary,
+  fontFamily: UI.font.body,
 };
 
 const pickerBtnStyle = (active: boolean): CSSProperties => ({
@@ -152,22 +165,23 @@ const pickerBtnStyle = (active: boolean): CSSProperties => ({
   alignItems: "center",
   gap: 3,
   borderRadius: UI.radius.sm,
-  border: `1px solid ${active ? UI.accent.cyan : UI.border.default}`,
-  background: active ? "rgba(0,245,255,0.08)" : UI.bg.card,
-  color: active ? UI.accent.cyan : UI.text.secondary,
+  border: `1px solid ${active ? "var(--rs-blueprint)" : UI.border.subtle}`,
+  background: active ? "var(--rs-blueprint-soft)" : UI.bg.paper,
+  color: active ? "var(--rs-blueprint)" : UI.text.secondary,
   fontSize: 10.5,
-  fontWeight: 600,
+  fontWeight: active ? 600 : 500,
   cursor: "pointer",
   transition: UI.transition,
+  fontFamily: UI.font.body,
 });
 
 const switchStyle = (on: boolean): CSSProperties => ({
   position: "relative",
-  width: 34,
-  height: 18,
-  borderRadius: 9,
-  border: "none",
-  background: on ? UI.accent.cyan : UI.border.default,
+  width: 36,
+  height: 20,
+  borderRadius: 10,
+  border: `1px solid ${on ? "var(--rs-blueprint)" : UI.border.default}`,
+  background: on ? "var(--rs-blueprint)" : UI.bg.cream,
   cursor: "pointer",
   transition: UI.transition,
   padding: 0,
@@ -176,19 +190,21 @@ const switchStyle = (on: boolean): CSSProperties => ({
 
 const switchThumbStyle = (on: boolean): CSSProperties => ({
   position: "absolute",
-  top: 2,
-  left: on ? 18 : 2,
-  width: 14,
-  height: 14,
-  borderRadius: 7,
-  background: "#fff",
+  top: 1,
+  left: on ? 17 : 1,
+  width: 16,
+  height: 16,
+  borderRadius: 8,
+  background: "#FFFFFF",
+  boxShadow: "0 1px 2px rgba(14,18,24,0.18)",
   transition: UI.transition,
 });
 
 /* ─── Panel ───────────────────────────────────────────────────────────── */
 
 export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanelProps>(
-  function IFCEnhancePanel({ viewportRef, hasModel, onStatusChange }, panelRef) {
+  function IFCEnhancePanel({ viewportRef, hasModel, onStatusChange, embedded = false }, panelRef) {
+    const t = useLocale((s) => s.t);
     const [toggles, setToggles] = useState<EnhanceToggles>(DEFAULT_TOGGLES);
     const [tier2Toggles, setTier2Toggles] = useState<Tier2Toggles>(DEFAULT_TIER2_TOGGLES);
     const [tier3Toggles, setTier3Toggles] = useState<Tier3Toggles>(DEFAULT_TIER3_TOGGLES);
@@ -281,7 +297,8 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     const isLoading = status.kind === "loading";
     const isApplied = status.kind === "applied";
 
-    // Notify parent of status changes (drives AutoEnhanceLoader overlay)
+    // Notify parent of status changes (optional callback — no current consumer
+    // after 2026-05-18 raw-by-default refactor, kept for future subscribers).
     useEffect(() => {
       onStatusChange?.(status);
     }, [status, onStatusChange]);
@@ -652,33 +669,52 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     }, [status, tier2Counts, tier3Result, tier3Toggles.enabled, tier4Result, tier4Toggles.enabled, tier4Toggles.windowFrames, tier4Toggles.windowSills, tier4Toggles.railings, lastAppliedSlug]);
 
     const anyDisabled = !hasModel || isLoading;
+    const detection = useMemo(() => resolveBuildingType(null), []);
 
     return (
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          height: "100%",
+          height: embedded ? "auto" : "100%",
           color: UI.text.primary,
-          background: UI.bg.base,
+          background: embedded ? "transparent" : UI.bg.trace,
         }}
       >
-        {/* Header */}
-        <header style={{ padding: "12px 14px 8px", borderBottom: `1px solid ${UI.border.subtle}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <Sparkles size={16} color={UI.accent.cyan} strokeWidth={2.2} aria-hidden />
-            <h2 style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Enhance with AI</h2>
-          </div>
-          <p style={{ fontSize: 11, color: UI.text.tertiary, margin: "4px 0 0 0", lineHeight: 1.4 }}>
-            Turn your basic IFC into a photoreal visualisation. Your .ifc file is never modified.
-          </p>
-        </header>
+        {/* Pulse keyframes for the primary Apply CTA. */}
+        <style>{`
+          @keyframes ifc-apply-pulse {
+            0%, 100% { box-shadow: 0 2px 8px rgba(26,77,92,0.25), inset 0 1px 0 rgba(255,255,255,0.15); }
+            50%      { box-shadow: 0 4px 18px rgba(26,77,92,0.40), inset 0 1px 0 rgba(255,255,255,0.20); }
+          }
+        `}</style>
+
+        {/* Premium Apply hero — replaces both the prior header banner AND the
+            sticky TopActionRow. Pulsing primary + Auto secondary + post-apply
+            Reset all live here now. */}
+        <ApplyHero
+          detected={hasModel ? PANORAMA_BUCKET_LABELS[detection.bucket] : null}
+          detectedSource={hasModel ? detection.source : null}
+          applying={isLoading}
+          applied={isApplied}
+          disabled={!hasModel}
+          onApply={() => handleApply()}
+          onAuto={handleAuto}
+          onReset={handleReset}
+        />
 
         {/* Status banner */}
         <StatusBanner status={status} summary={classifiedSummary} />
 
-        {/* Scrollable toggles */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 0 100px 0" }}>
+        {/* Scrollable toggles — when embedded, scrolling is owned by parent
+            EditPanel; we just render at natural height here. */}
+        <div
+          style={
+            embedded
+              ? { padding: "4px 0 12px 0" }
+              : { flex: 1, overflowY: "auto", padding: "4px 0 24px 0" }
+          }
+        >
           {!hasModel ? (
             <div style={{ padding: "24px 16px", color: UI.text.secondary, fontSize: 12.5, lineHeight: 1.5 }}>
               Upload an IFC file to start enhancing.
@@ -692,7 +728,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 onToggle={() =>
                   setExpanded((p) => ({ ...p, panorama: !p.panorama }))
                 }
-                title="Environment (360°)"
+                title={t("ifcViewer.section.backdrop")}
               >
                 <PanoramaSection
                   selectedAsset={stagedPanoramaAsset}
@@ -711,50 +747,15 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 />
               </Section>
 
-              {/* ── MATERIALS ── */}
-              <Section
-                expanded={expanded.materials}
-                onToggle={() => setExpanded((p) => ({ ...p, materials: !p.materials }))}
-                title="Materials"
-              >
-                <div style={rowStyle}>
-                  <span>Apply PBR materials</span>
-                  <button
-                    type="button"
-                    aria-label="Toggle materials"
-                    disabled={anyDisabled}
-                    onClick={() => setToggles((p) => ({ ...p, materials: !p.materials }))}
-                    style={switchStyle(toggles.materials)}
-                  >
-                    <span style={switchThumbStyle(toggles.materials)} />
-                  </button>
-                </div>
-                <div style={{ padding: "4px 10px 10px" }}>
-                  <div style={{ fontSize: 10.5, color: UI.text.tertiary, marginBottom: 6, letterSpacing: "0.4px", textTransform: "uppercase" }}>
-                    Quality
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {QUALITY_OPTIONS.map((q) => (
-                      <button
-                        key={q.id}
-                        type="button"
-                        title={q.helper}
-                        disabled={anyDisabled || !toggles.materials}
-                        onClick={() => setToggles((p) => ({ ...p, quality: q.id }))}
-                        style={pickerBtnStyle(toggles.quality === q.id)}
-                      >
-                        <span>{q.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Section>
+              {/* MATERIALS moved below Ground for logical grouping
+                  (environment-related sections cluster at the top, then
+                  materials, then structural details). See line ~870. */}
 
               {/* ── ENVIRONMENT ── */}
               <Section
                 expanded={expanded.environment}
                 onToggle={() => setExpanded((p) => ({ ...p, environment: !p.environment }))}
-                title="Environment"
+                title={t("ifcViewer.section.lighting")}
               >
                 <div style={rowStyle}>
                   <span>HDRI lighting</span>
@@ -791,21 +792,16 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                     })}
                   </div>
                 </div>
-              </Section>
 
-              {/* ── LIGHTING DETAILS ── */}
-              <Section
-                expanded={expanded.lighting}
-                onToggle={() => setExpanded((p) => ({ ...p, lighting: !p.lighting }))}
-                title="Lighting details"
-              >
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Lit interior windows</span>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      Warm emissive glow behind glass — strongest at night
-                    </span>
-                  </div>
+                {/* Lit interior windows — merged from the prior "Interior glow"
+                    section (Phase Z.IFC.2 follow-up 2026-05-19). Logical home
+                    is here under Lighting, not a separate card for one switch.
+                    Helper text moved to title attribute. */}
+                <div
+                  style={rowStyle}
+                  title="Warm emissive glow behind glass — strongest at night."
+                >
+                  <span>Lit interior windows</span>
                   <button
                     type="button"
                     aria-label="Toggle lit interior windows"
@@ -818,51 +814,62 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 </div>
               </Section>
 
-              {/* ── SITE CONTEXT (Phase 3) ── */}
+              {/* ── GROUND — Phase Z.IFC.2 follow-up 2026-05-19:
+                  Dropped the "Enable site context" master toggle (always-on
+                  in practice; users only ever interact with the ground
+                  switch + type chip). Single switch + type row now. */}
               <Section
                 expanded={expanded.context}
                 onToggle={() => setExpanded((p) => ({ ...p, context: !p.context }))}
-                title="Site context"
+                title={t("ifcViewer.section.ground")}
               >
+                {/* Show ground — single switch (master + ground plane were
+                    redundant). Tier-2 master is auto-derived from this
+                    switch via the orchestrator's `nextTier2.context &&
+                    nextTier2.ground` gate. We force context on when ground
+                    is on by toggling both in lock-step below. */}
                 <div style={rowStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <MapPin size={13} color={UI.accent.cyan} aria-hidden />
-                    <span>Enable site context</span>
+                    <span>Show ground plane</span>
                   </div>
                   <button
                     type="button"
-                    aria-label="Toggle site context master"
-                    disabled={anyDisabled}
-                    onClick={() => setTier2Toggles((p) => ({ ...p, context: !p.context }))}
-                    style={switchStyle(tier2Toggles.context)}
-                  >
-                    <span style={switchThumbStyle(tier2Toggles.context)} />
-                  </button>
-                </div>
-
-                {/* Ground */}
-                <div style={rowStyle}>
-                  <span>Ground plane</span>
-                  <button
-                    type="button"
                     aria-label="Toggle ground plane"
-                    disabled={anyDisabled || !tier2Toggles.context}
-                    onClick={() => setTier2Toggles((p) => ({ ...p, ground: !p.ground }))}
+                    disabled={anyDisabled}
+                    onClick={() =>
+                      setTier2Toggles((p) => ({
+                        ...p,
+                        /* Phase Z.IFC.2 follow-up: master + plane move
+                           together. Apply pipeline gates on `context && ground`. */
+                        ground: !p.ground,
+                        context: !p.ground,
+                      }))
+                    }
                     style={switchStyle(tier2Toggles.ground)}
                   >
                     <span style={switchThumbStyle(tier2Toggles.ground)} />
                   </button>
                 </div>
-                <div style={{ padding: "4px 10px 10px" }}>
-                  <div style={{ fontSize: 10.5, color: UI.text.tertiary, marginBottom: 6, letterSpacing: "0.4px", textTransform: "uppercase" }}>
+                <div style={{ padding: "4px 10px 8px" }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: UI.text.tertiary,
+                      marginBottom: 4,
+                      letterSpacing: 0.4,
+                      textTransform: "uppercase",
+                      fontFamily: UI.font.mono,
+                    }}
+                  >
                     Ground type
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 5 }}>
                     {(["auto", "grass", "concrete", "asphalt"] as GroundType[]).map((g) => (
                       <button
                         key={g}
                         type="button"
-                        disabled={anyDisabled || !tier2Toggles.context || !tier2Toggles.ground}
+                        disabled={anyDisabled || !tier2Toggles.ground}
                         onClick={() => setTier2Toggles((p) => ({ ...p, groundType: g }))}
                         style={pickerBtnStyle(tier2Toggles.groundType === g)}
                       >
@@ -873,11 +880,52 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 </div>
               </Section>
 
+              {/* ── MATERIALS (moved here Phase Z.IFC.2 follow-up 2026-05-19
+                  for logical grouping — environment/lighting sit at top,
+                  then materials, then geometry/details below). ── */}
+              <Section
+                expanded={expanded.materials}
+                onToggle={() => setExpanded((p) => ({ ...p, materials: !p.materials }))}
+                title={t("ifcViewer.section.materials")}
+              >
+                <div style={rowStyle}>
+                  <span>Apply PBR materials</span>
+                  <button
+                    type="button"
+                    aria-label="Toggle materials"
+                    disabled={anyDisabled}
+                    onClick={() => setToggles((p) => ({ ...p, materials: !p.materials }))}
+                    style={switchStyle(toggles.materials)}
+                  >
+                    <span style={switchThumbStyle(toggles.materials)} />
+                  </button>
+                </div>
+                <div style={{ padding: "4px 10px 8px" }}>
+                  <div style={{ fontSize: 10, color: UI.text.tertiary, marginBottom: 4, letterSpacing: "0.4px", textTransform: "uppercase", fontFamily: UI.font.mono }}>
+                    Quality
+                  </div>
+                  <div style={{ display: "flex", gap: 5 }}>
+                    {QUALITY_OPTIONS.map((q) => (
+                      <button
+                        key={q.id}
+                        type="button"
+                        title={q.helper}
+                        disabled={anyDisabled || !toggles.materials}
+                        onClick={() => setToggles((p) => ({ ...p, quality: q.id }))}
+                        style={pickerBtnStyle(toggles.quality === q.id)}
+                      >
+                        <span>{q.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Section>
+
               {/* ── ROOF (Phase 3.5a) ── */}
               <Section
                 expanded={expanded.roof}
                 onToggle={() => setExpanded((p) => ({ ...p, roof: !p.roof }))}
-                title="Roof"
+                title={t("ifcViewer.section.roof")}
               >
                 <div style={rowStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -995,13 +1043,11 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                       </div>
                     </div>
 
-                    <div style={rowStyle}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <span>Bulkheads + HVAC</span>
-                        <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                          Stair access box + condenser units
-                        </span>
-                      </div>
+                    <div
+                      style={rowStyle}
+                      title="Stair access box + condenser units."
+                    >
+                      <span>Bulkheads + HVAC</span>
                       <button
                         type="button"
                         aria-label="Toggle bulkheads"
@@ -1097,7 +1143,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                 onToggle={() =>
                   setExpanded((p) => ({ ...p, "building-details": !p["building-details"] }))
                 }
-                title="Building details"
+                title={t("ifcViewer.section.details")}
               >
                 <div style={rowStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1117,14 +1163,12 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                   </button>
                 </div>
 
-                {/* Balcony railings */}
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Balcony railings</span>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      Metal top + base rail with balusters along cantilever edges
-                    </span>
-                  </div>
+                {/* Balcony railings — helper text → tooltip */}
+                <div
+                  style={rowStyle}
+                  title="Metal top + base rail with balusters along cantilever edges."
+                >
+                  <span>Balcony railings</span>
                   <button
                     type="button"
                     aria-label="Toggle balcony railings"
@@ -1138,14 +1182,12 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                   </button>
                 </div>
 
-                {/* Window frames */}
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Window frames</span>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      4-sided frame · mullion ≥ 1.2 m · transom ≥ 1.5 m
-                    </span>
-                  </div>
+                {/* Window frames — helper text → tooltip */}
+                <div
+                  style={rowStyle}
+                  title="4-sided frame · mullion ≥ 1.2 m · transom ≥ 1.5 m."
+                >
+                  <span>Window frames</span>
                   <button
                     type="button"
                     aria-label="Toggle window frames"
@@ -1197,14 +1239,12 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                   </div>
                 </div>
 
-                {/* Window sills */}
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Window sills</span>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      Concrete ledge below each frame
-                    </span>
-                  </div>
+                {/* Window sills — helper text → tooltip */}
+                <div
+                  style={rowStyle}
+                  title="Concrete ledge below each frame."
+                >
+                  <span>Window sills</span>
                   <button
                     type="button"
                     aria-label="Toggle window sills"
@@ -1222,14 +1262,6 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           )}
         </div>
 
-        {/* ── Sticky action row ── */}
-        <ActionRow
-          status={status}
-          hasModel={hasModel}
-          onApply={() => handleApply()}
-          onReset={handleReset}
-          onAuto={handleAuto}
-        />
       </div>
     );
   },
@@ -1251,12 +1283,22 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ borderBottom: `1px solid ${UI.border.subtle}` }}>
+    <div
+      style={{
+        margin: "0 12px 5px",
+        background: UI.bg.paper,
+        border: `1px solid ${UI.border.subtle}`,
+        borderRadius: UI.radius.md,
+        overflow: "hidden",
+      }}
+    >
       <button type="button" onClick={onToggle} style={sectionHeaderStyle}>
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <span>{title}</span>
+        <span style={{ color: UI.text.tertiary, display: "inline-flex", flexShrink: 0 }}>
+          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        </span>
+        <span style={{ flex: 1 }}>{title}</span>
       </button>
-      {expanded && <div>{children}</div>}
+      {expanded && <div style={{ padding: "0 4px 6px" }}>{children}</div>}
     </div>
   );
 }
@@ -1272,14 +1314,22 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
     gap: 8,
     borderBottom: `1px solid ${UI.border.subtle}`,
     lineHeight: 1.35,
+    fontFamily: UI.font.body,
   };
 
   if (status.kind === "loading") {
     return (
-      <div style={{ ...base, background: "rgba(79,138,255,0.08)", color: UI.accent.blue }}>
-        <Loader2 size={13} aria-hidden />
+      <div
+        style={{
+          ...base,
+          background: "var(--rs-blueprint-soft)",
+          color: UI.accent.blueprint,
+          borderTop: `1px solid var(--rs-blueprint-line)`,
+        }}
+      >
+        <Loader2 size={13} aria-hidden className="animate-spin" />
         <span style={{ flex: 1 }}>{status.step}</span>
-        <span style={{ fontVariantNumeric: "tabular-nums", color: UI.text.secondary }}>
+        <span style={{ fontVariantNumeric: "tabular-nums", color: UI.text.secondary, fontFamily: UI.font.mono, fontSize: 10.5 }}>
           {Math.round(status.progress * 100)}%
         </span>
       </div>
@@ -1288,7 +1338,13 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
 
   if (status.kind === "error") {
     return (
-      <div style={{ ...base, background: "rgba(248,113,113,0.08)", color: UI.accent.red }}>
+      <div
+        style={{
+          ...base,
+          background: "var(--rs-status-error-soft)",
+          color: UI.accent.red,
+        }}
+      >
         <AlertTriangle size={13} aria-hidden />
         <span>{status.message}</span>
       </div>
@@ -1296,7 +1352,13 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
   }
 
   return (
-    <div style={{ ...base, background: "rgba(52,211,153,0.08)", color: UI.accent.green }}>
+    <div
+      style={{
+        ...base,
+        background: "var(--rs-sage-soft)",
+        color: UI.accent.sage,
+      }}
+    >
       <CheckCircle2 size={13} aria-hidden />
       <span style={{ flex: 1, color: UI.text.primary }}>
         Applied · {summary ?? "no classified elements"}
@@ -1305,83 +1367,5 @@ function StatusBanner({ status, summary }: { status: EnhanceStatus; summary: str
   );
 }
 
-function ActionRow({
-  status,
-  hasModel,
-  onApply,
-  onReset,
-  onAuto,
-}: {
-  status: EnhanceStatus;
-  hasModel: boolean;
-  onApply: () => void;
-  onReset: () => void;
-  onAuto: () => void;
-}) {
-  const isLoading = status.kind === "loading";
-  const isApplied = status.kind === "applied";
-
-  const primaryStyle: CSSProperties = {
-    flex: 1,
-    padding: "10px 14px",
-    borderRadius: UI.radius.md,
-    border: isApplied ? `1px solid ${UI.accent.red}` : "none",
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: hasModel && !isLoading ? "pointer" : "not-allowed",
-    opacity: hasModel ? 1 : 0.5,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    transition: UI.transition,
-    background: isApplied ? UI.bg.elevated : `linear-gradient(135deg, ${UI.accent.cyan}, ${UI.accent.blue})`,
-    color: isApplied ? UI.accent.red : "#07070D",
-  };
-
-  const autoStyle: CSSProperties = {
-    padding: "10px 12px",
-    borderRadius: UI.radius.md,
-    border: `1px solid ${UI.border.default}`,
-    background: UI.bg.card,
-    color: UI.text.primary,
-    fontSize: 11.5,
-    fontWeight: 600,
-    cursor: hasModel && !isLoading ? "pointer" : "not-allowed",
-    opacity: hasModel && !isLoading ? 1 : 0.5,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    transition: UI.transition,
-  };
-
-  return (
-    <div
-      style={{
-        position: "sticky",
-        bottom: 0,
-        display: "flex",
-        gap: 8,
-        padding: "10px 12px",
-        background: `linear-gradient(to top, ${UI.bg.base} 70%, rgba(7,7,13,0))`,
-        borderTop: `1px solid ${UI.border.subtle}`,
-      }}
-    >
-      {isApplied ? (
-        <button type="button" onClick={onReset} disabled={isLoading} style={primaryStyle}>
-          <RotateCcw size={13} />
-          Reset
-        </button>
-      ) : (
-        <button type="button" onClick={onApply} disabled={!hasModel || isLoading} style={primaryStyle}>
-          {isLoading ? <Loader2 size={13} /> : <Sparkles size={13} />}
-          {isLoading ? "Applying…" : "Apply Enhancement"}
-        </button>
-      )}
-      <button type="button" onClick={onAuto} disabled={!hasModel || isLoading} style={autoStyle} title="Pick sensible defaults based on model size">
-        <Wand2 size={13} />
-        Auto
-      </button>
-    </div>
-  );
-}
+/* TopActionRow removed 2026-05-18 Phase Z.IFC.1 — replaced by the
+   <ApplyHero/> primitive at the top of the panel. */

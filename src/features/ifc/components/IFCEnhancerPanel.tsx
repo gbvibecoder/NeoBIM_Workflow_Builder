@@ -59,6 +59,11 @@ export interface EnhanceSuccess {
 interface IFCEnhancerPanelProps {
   sourceFile: { name: string; buffer: ArrayBuffer } | null;
   onApplyToViewer: (result: EnhanceSuccess) => void;
+  /** Phase Z.IFC.2 (2026-05-19): when true, the panel renders WITHOUT its
+      outer `height: 100%` flex shell AND without the top "IFC Enhancer"
+      filename banner (redundant when the parent EditPanel already shows
+      file identity). All behaviour and state otherwise identical. */
+  embedded?: boolean;
 }
 
 type Status = "idle" | "working" | "success" | "error";
@@ -106,12 +111,15 @@ interface SectionDef {
   actions: ActionDef[];
 }
 
-const ACCENT_CYAN = "#00F5FF";
-const ACCENT_BLUE = "#4F8AFF";
-const ACCENT_RED = "#F87171";
-const ACCENT_AMBER = "#FFBF00";
+/* Accent constants — Phase Z.IFC.1 rewires to RS tokens. The variable
+   names are kept (used in many JSX style props) so the diff stays small;
+   the values are now the Light Render Studio palette. */
+const ACCENT_CYAN = "var(--rs-blueprint-2)";    // was #00F5FF — now blueprint-2 (lighter teal)
+const ACCENT_BLUE = "var(--rs-blueprint)";       // was #4F8AFF — now blueprint primary
+const ACCENT_RED = "var(--rs-status-error)";     // was #F87171
+const ACCENT_AMBER = "var(--rs-amber-mark)";     // was #FFBF00
 
-const PRIMARY_GRADIENT = "linear-gradient(90deg, #00F5FF 0%, #4F8AFF 100%)";
+const PRIMARY_GRADIENT = "linear-gradient(135deg, var(--rs-blueprint) 0%, var(--rs-blueprint-2) 100%)";
 
 const ico = (Node: React.ComponentType<{ size?: number; strokeWidth?: number }>) => (
   <Node size={13} strokeWidth={2.2} />
@@ -296,17 +304,34 @@ const SECTIONS: SectionDef[] = [
   },
 ];
 
+/* Phase Z.IFC.1 reorder (2026-05-18): "Structure" + "Custom" surface first
+   (both fully-supported by the engine). AI-Beta groups (openings, circulation,
+   exterior, furniture, advanced) get nested inside a single "Experimental
+   Edits" collapsed shell — see the render below. */
 const GROUP_ORDER: { id: SectionDef["group"]; label: string }[] = [
   { id: "structure", label: "Structure" },
-  { id: "openings", label: "Openings" },
-  { id: "circulation", label: "Circulation" },
-  { id: "exterior", label: "Exterior" },
-  { id: "furniture", label: "Furniture" },
-  { id: "advanced", label: "Advanced Builders" },
   { id: "free", label: "Custom" },
 ];
 
-export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPanelProps) {
+const EXPERIMENTAL_GROUPS: SectionDef["group"][] = [
+  "openings",
+  "circulation",
+  "exterior",
+  "furniture",
+  "advanced",
+];
+
+const EXPERIMENTAL_GROUP_LABELS: Record<SectionDef["group"], string> = {
+  structure: "Structure",
+  openings: "Openings",
+  circulation: "Circulation",
+  exterior: "Exterior",
+  furniture: "Furniture",
+  advanced: "Advanced Builders",
+  free: "Custom",
+};
+
+export function IFCEnhancerPanel({ sourceFile, onApplyToViewer, embedded = false }: IFCEnhancerPanelProps) {
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     floors: true,
     rooms: true,
@@ -492,66 +517,104 @@ export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPan
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100%",
-        background: UI.bg.base,
+        height: embedded ? "auto" : "100%",
+        background: embedded ? "transparent" : UI.bg.base,
         color: UI.text.primary,
       }}
     >
-      {/* Header banner */}
-      <div
-        style={{
-          padding: "10px 12px",
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
-          background: "linear-gradient(90deg, rgba(0,245,255,0.05), rgba(79,138,255,0.05))",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          flexShrink: 0,
-        }}
-      >
-        <Sparkles size={14} color={ACCENT_CYAN} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.2 }}>IFC Enhancer</div>
-          <div
+      {/* Header banner — skipped when embedded (EditPanel owns identity). */}
+      {!embedded && (
+        <div
+          style={{
+            padding: "12px 14px",
+            borderBottom: `1px solid ${UI.border.subtle}`,
+            background: UI.bg.paper,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexShrink: 0,
+            position: "relative",
+          }}
+        >
+          <span
+            aria-hidden
             style={{
-              fontSize: 10.5,
-              color: UI.text.tertiary,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 2,
+              background: PRIMARY_GRADIENT,
+              opacity: 0.85,
             }}
-            title={sourceFile?.name ?? ""}
-          >
-            {sourceFile?.name || "No model loaded"}
+          />
+          <Sparkles size={14} color={ACCENT_BLUE} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 9.5,
+                fontWeight: 700,
+                letterSpacing: 1.0,
+                textTransform: "uppercase",
+                color: UI.text.tertiary,
+                fontFamily: UI.font.mono,
+                marginBottom: 2,
+              }}
+            >
+              Direct Edit
+            </div>
+            <div
+              style={{
+                fontSize: 14,
+                fontFamily: UI.font.display,
+                fontStyle: "italic",
+                color: UI.text.primary,
+                fontWeight: 500,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={sourceFile?.name ?? ""}
+            >
+              {sourceFile?.name || "No model loaded"}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Info strip explaining the supported / experimental split */}
       <div
         style={{
-          padding: "8px 12px",
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
-          background: "rgba(255,191,0,0.04)",
+          margin: "10px 14px 4px",
+          padding: "10px 12px",
+          background: "var(--rs-amber-soft)",
+          border: `1px solid ${ACCENT_AMBER}`,
+          borderRadius: UI.radius.sm,
           display: "flex",
           alignItems: "flex-start",
           gap: 8,
-          fontSize: 10.5,
-          color: UI.text.secondary,
+          fontSize: 11,
+          color: UI.text.primary,
           lineHeight: 1.4,
           flexShrink: 0,
+          fontFamily: UI.font.body,
         }}
       >
-        <Info size={12} color={ACCENT_AMBER} style={{ flexShrink: 0, marginTop: 2 }} />
+        <Info size={13} color={ACCENT_AMBER} style={{ flexShrink: 0, marginTop: 1 }} />
         <div>
-          <strong style={{ color: UI.text.primary }}>Floors</strong> &amp;{" "}
-          <strong style={{ color: UI.text.primary }}>Rooms</strong> apply directly. Other sections
-          run through an AI attempt — results vary.
+          <strong>Floors</strong> &amp; <strong>Rooms</strong> apply directly. Experimental
+          sections at the bottom run through an AI attempt — results vary.
         </div>
       </div>
 
       {/* Scrollable body — sections grouped by category */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 10px 12px" }}>
+      <div
+        style={
+          embedded
+            ? { overflowX: "hidden", padding: "8px 10px 12px" }
+            : { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 10px 12px" }
+        }
+      >
         {GROUP_ORDER.map((group) => {
           const groupSections = SECTIONS.filter((s) => s.group === group.id);
           if (groupSections.length === 0) return null;
@@ -658,8 +721,8 @@ export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPan
                         style={{
                           width: "100%",
                           boxSizing: "border-box",
-                          background: "rgba(7,7,13,0.6)",
-                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "var(--rs-cream)",
+                          border: "1px solid var(--rs-rule-strong)",
                           borderRadius: UI.radius.sm,
                           color: UI.text.primary,
                           padding: "8px 10px",
@@ -680,7 +743,7 @@ export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPan
                           padding: "7px 10px",
                           fontSize: 11,
                           fontWeight: 600,
-                          border: "1px solid rgba(0,245,255,0.5)",
+                          border: "1px solid var(--rs-blueprint)",
                           background: PRIMARY_GRADIENT,
                           color: "#07070D",
                           borderRadius: UI.radius.sm,
@@ -713,6 +776,15 @@ export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPan
             </div>
           );
         })}
+
+        {/* ── Experimental Edits — all AI-Beta groups behind one expander ── */}
+        <ExperimentalEditsShell
+          open={open}
+          onToggle={toggle}
+          working={working}
+          disabled={isBusy || !sourceFile}
+          onRunPrompt={(p) => runPrompt(p)}
+        />
       </div>
 
       {/* Status footer */}
@@ -734,6 +806,143 @@ export function IFCEnhancerPanel({ sourceFile, onApplyToViewer }: IFCEnhancerPan
   );
 }
 
+/* ─── Experimental Edits shell — Phase Z.IFC.1 ─────────────────────────────
+   Bundles all AI-Beta groups (openings/circulation/exterior/furniture/
+   advanced) behind a single collapsed expander so the first impression of
+   the panel is the 3 sections that actually work reliably. */
+function ExperimentalEditsShell({
+  open: panelOpen,
+  onToggle: panelToggle,
+  working,
+  disabled,
+  onRunPrompt,
+}: {
+  open: Record<SectionId, boolean>;
+  onToggle: (id: SectionId) => void;
+  working: string | null;
+  disabled: boolean;
+  onRunPrompt: (prompt: string) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const totalSections = EXPERIMENTAL_GROUPS.reduce(
+    (n, g) => n + SECTIONS.filter((s) => s.group === g).length,
+    0,
+  );
+
+  return (
+    <div
+      style={{
+        marginTop: 6,
+        border: `1px solid var(--rs-rule)`,
+        borderRadius: UI.radius.md,
+        background: UI.bg.paper,
+        overflow: "hidden",
+      }}
+    >
+      {/* Drafting strip — amber tint to signal "experimental" */}
+      <span
+        aria-hidden
+        style={{
+          display: "block",
+          height: 2,
+          background: ACCENT_AMBER,
+          opacity: 0.85,
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "10px 12px",
+          background: "transparent",
+          border: "none",
+          color: UI.text.primary,
+          textAlign: "left",
+          cursor: "pointer",
+          fontFamily: UI.font.body,
+        }}
+      >
+        <span style={{ color: ACCENT_AMBER, display: "inline-flex", flexShrink: 0 }}>
+          <Wand2 size={14} strokeWidth={2.2} />
+        </span>
+        <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600 }}>Experimental edits</span>
+          <span
+            style={{
+              fontSize: 9.5,
+              fontWeight: 600,
+              letterSpacing: 0.8,
+              textTransform: "uppercase",
+              color: UI.text.tertiary,
+              fontFamily: UI.font.mono,
+            }}
+          >
+            AI Beta · {totalSections} actions · results vary
+          </span>
+        </span>
+        <span
+          style={{
+            fontSize: 9,
+            padding: "3px 7px",
+            borderRadius: 999,
+            background: "var(--rs-amber-soft)",
+            border: `1px solid ${ACCENT_AMBER}`,
+            color: ACCENT_AMBER,
+            letterSpacing: 0.4,
+            fontWeight: 700,
+            fontFamily: UI.font.mono,
+          }}
+        >
+          AI BETA
+        </span>
+        <span style={{ color: UI.text.tertiary, display: "inline-flex" }}>
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 10px 10px" }}>
+          {EXPERIMENTAL_GROUPS.map((groupId) => {
+            const groupSections = SECTIONS.filter((s) => s.group === groupId);
+            if (groupSections.length === 0) return null;
+            return (
+              <div key={groupId} style={{ marginBottom: 10 }}>
+                <div
+                  style={{
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    color: UI.text.tertiary,
+                    textTransform: "uppercase",
+                    letterSpacing: 1.2,
+                    padding: "8px 4px 6px",
+                    fontFamily: UI.font.mono,
+                  }}
+                >
+                  {EXPERIMENTAL_GROUP_LABELS[groupId]}
+                </div>
+                {groupSections.map((section) => (
+                  <Section
+                    key={section.id}
+                    section={section}
+                    expanded={panelOpen[section.id] ?? false}
+                    onToggle={() => panelToggle(section.id)}
+                    working={working}
+                    disabled={disabled}
+                    onRunPrompt={onRunPrompt}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Collapsible section with action grid ─── */
 
 interface SectionProps {
@@ -750,10 +959,10 @@ function Section({ section, expanded, onToggle, working, disabled, onRunPrompt, 
   return (
     <div
       style={{
-        marginBottom: 5,
-        border: "1px solid rgba(255,255,255,0.04)",
-        borderRadius: UI.radius.sm,
-        background: UI.bg.card,
+        marginBottom: 6,
+        border: `1px solid ${UI.border.subtle}`,
+        borderRadius: UI.radius.md,
+        background: UI.bg.paper,
         overflow: "hidden",
       }}
     >
@@ -773,26 +982,27 @@ function Section({ section, expanded, onToggle, working, disabled, onRunPrompt, 
           textAlign: "left",
         }}
       >
-        <span style={{ color: section.supported ? UI.accent.cyan : UI.text.tertiary, display: "inline-flex" }}>
+        <span style={{ color: section.supported ? ACCENT_BLUE : UI.text.tertiary, display: "inline-flex" }}>
           {section.icon}
         </span>
-        <span style={{ flex: 1, fontSize: 11.5, fontWeight: 600, letterSpacing: 0.3 }}>
+        <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, letterSpacing: 0.1, fontFamily: UI.font.body }}>
           {section.title}
         </span>
         {!section.supported && (
           <span
             style={{
               fontSize: 9,
-              padding: "2px 5px",
+              padding: "3px 7px",
               borderRadius: 999,
-              background: "rgba(255,191,0,0.1)",
-              border: "1px solid rgba(255,191,0,0.25)",
+              background: "var(--rs-amber-soft)",
+              border: `1px solid ${ACCENT_AMBER}`,
               color: ACCENT_AMBER,
               letterSpacing: 0.4,
-              fontWeight: 600,
+              fontWeight: 700,
+              fontFamily: UI.font.mono,
             }}
           >
-            AI Beta
+            AI BETA
           </span>
         )}
         <span style={{ color: UI.text.tertiary, display: "inline-flex" }}>
@@ -849,20 +1059,20 @@ function ActionButton({ action, loading, disabled, supported, onClick }: ActionB
   let color: string;
 
   if (!supported) {
-    borderColor = "rgba(255,255,255,0.08)";
-    bg = "rgba(255,255,255,0.02)";
+    borderColor = "var(--rs-rule-strong)";
+    bg = "var(--rs-cream)";
     color = UI.text.secondary;
   } else if (isDanger) {
     borderColor = "rgba(248,113,113,0.3)";
     bg = "rgba(248,113,113,0.08)";
     color = ACCENT_RED;
   } else if (isPrimary) {
-    borderColor = "rgba(0,245,255,0.35)";
-    bg = "rgba(0,245,255,0.08)";
+    borderColor = "var(--rs-blueprint-line)";
+    bg = "var(--rs-blueprint-soft)";
     color = ACCENT_CYAN;
   } else {
     borderColor = "rgba(255,255,255,0.1)";
-    bg = "rgba(255,255,255,0.03)";
+    bg = "var(--rs-trace)";
     color = UI.text.primary;
   }
 
@@ -937,8 +1147,8 @@ function WallBuilderForm(p: WallBuilderFormProps) {
     <div
       style={{
         padding: 8,
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.05)",
+        background: "var(--rs-cream)",
+        border: "1px solid var(--rs-rule)",
         borderRadius: UI.radius.sm,
         display: "flex",
         flexDirection: "column",
@@ -985,8 +1195,8 @@ function WallBuilderForm(p: WallBuilderFormProps) {
                 padding: "3px 7px",
                 fontSize: 10,
                 fontWeight: 600,
-                border: `1px solid ${p.angle === a ? "rgba(0,245,255,0.5)" : "rgba(255,255,255,0.08)"}`,
-                background: p.angle === a ? "rgba(0,245,255,0.1)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${p.angle === a ? "var(--rs-blueprint)" : "var(--rs-rule-strong)"}`,
+                background: p.angle === a ? "var(--rs-blueprint-soft)" : "var(--rs-trace)",
                 color: p.angle === a ? ACCENT_CYAN : UI.text.secondary,
                 borderRadius: 5,
                 cursor: p.disabled ? "not-allowed" : "pointer",
@@ -1053,8 +1263,8 @@ function WallBuilderForm(p: WallBuilderFormProps) {
                 fontSize: 10,
                 fontWeight: 600,
                 textTransform: "capitalize",
-                border: `1px solid ${p.floor === f ? "rgba(0,245,255,0.5)" : "rgba(255,255,255,0.08)"}`,
-                background: p.floor === f ? "rgba(0,245,255,0.1)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${p.floor === f ? "var(--rs-blueprint)" : "var(--rs-rule-strong)"}`,
+                background: p.floor === f ? "var(--rs-blueprint-soft)" : "var(--rs-trace)",
                 color: p.floor === f ? ACCENT_CYAN : UI.text.secondary,
                 borderRadius: 5,
                 cursor: p.disabled ? "not-allowed" : "pointer",
@@ -1076,7 +1286,7 @@ function WallBuilderForm(p: WallBuilderFormProps) {
           padding: "7px 10px",
           fontSize: 11,
           fontWeight: 600,
-          border: "1px solid rgba(0,245,255,0.5)",
+          border: "1px solid var(--rs-blueprint)",
           background: PRIMARY_GRADIENT,
           color: "#07070D",
           borderRadius: UI.radius.sm,
@@ -1121,8 +1331,8 @@ function InlineRow({ children }: { children: React.ReactNode }) {
         gap: 6,
         alignItems: "center",
         padding: 8,
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.05)",
+        background: "var(--rs-cream)",
+        border: "1px solid var(--rs-rule)",
         borderRadius: UI.radius.sm,
       }}
     >
@@ -1172,8 +1382,8 @@ function NumberInput({ value, onChange, onSubmit, disabled, placeholder, min, ma
         style={{
           width: "100%",
           boxSizing: "border-box",
-          background: "rgba(7,7,13,0.6)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--rs-cream)",
+          border: "1px solid var(--rs-rule-strong)",
           borderRadius: 5,
           color: UI.text.primary,
           padding: suffix ? "4px 20px 4px 7px" : "4px 7px",
@@ -1224,8 +1434,8 @@ function TextInput({ value, onChange, onSubmit, disabled, placeholder }: TextInp
       style={{
         flex: 1,
         minWidth: 0,
-        background: "rgba(7,7,13,0.6)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--rs-cream)",
+        border: "1px solid var(--rs-rule-strong)",
         borderRadius: 5,
         color: UI.text.primary,
         padding: "5px 8px",
@@ -1255,8 +1465,8 @@ function MiniButton({ onClick, disabled, variant = "accent", children }: MiniBut
         padding: "5px 10px",
         fontSize: 10.5,
         fontWeight: 600,
-        border: `1px solid ${isAccent ? "rgba(79,138,255,0.35)" : "rgba(255,255,255,0.1)"}`,
-        background: isAccent ? "rgba(79,138,255,0.12)" : "rgba(255,255,255,0.04)",
+        border: `1px solid ${isAccent ? "var(--rs-blueprint-line)" : "rgba(255,255,255,0.1)"}`,
+        background: isAccent ? "var(--rs-blueprint-soft)" : "var(--rs-cream)",
         color: isAccent ? ACCENT_BLUE : UI.text.primary,
         borderRadius: 6,
         cursor: disabled ? "not-allowed" : "pointer",
@@ -1290,7 +1500,7 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
       <div
         style={{
           padding: "8px 12px",
-          borderTop: "1px solid rgba(255,255,255,0.04)",
+          borderTop: `1px solid ${UI.border.subtle}`,
           background: UI.bg.base,
           fontSize: 10.5,
           color: UI.text.tertiary,
@@ -1307,8 +1517,8 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
       <div
         style={{
           padding: "10px 12px",
-          borderTop: "1px solid rgba(255,255,255,0.04)",
-          background: "rgba(79,138,255,0.05)",
+          borderTop: `1px solid ${UI.border.subtle}`,
+          background: "var(--rs-blueprint-soft)",
           display: "flex",
           alignItems: "center",
           gap: 8,
@@ -1339,8 +1549,8 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
       <div
         style={{
           padding: "10px 12px",
-          borderTop: "1px solid rgba(52,211,153,0.2)",
-          background: "rgba(52,211,153,0.06)",
+          borderTop: `1px solid var(--rs-sage)`,
+          background: "var(--rs-sage-soft)",
           flexShrink: 0,
         }}
       >
@@ -1364,8 +1574,8 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
                     padding: "4px 8px",
                     fontSize: 10,
                     fontWeight: 500,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid var(--rs-rule-strong)",
+                    background: "var(--rs-cream)",
                     color: UI.text.primary,
                     borderRadius: 6,
                     cursor: "pointer",
@@ -1384,7 +1594,7 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
                   padding: "4px 8px",
                   fontSize: 10,
                   fontWeight: 500,
-                  border: "1px solid rgba(255,255,255,0.1)",
+                  border: "1px solid var(--rs-rule-strong)",
                   background: "transparent",
                   color: UI.text.tertiary,
                   borderRadius: 6,
@@ -1410,8 +1620,8 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
       <div
         style={{
           padding: "10px 12px",
-          borderTop: "1px solid rgba(248,113,113,0.2)",
-          background: "rgba(248,113,113,0.06)",
+          borderTop: `1px solid var(--rs-status-error)`,
+          background: "var(--rs-status-error-soft)",
           flexShrink: 0,
         }}
       >
@@ -1440,8 +1650,8 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
                     padding: "4px 8px",
                     fontSize: 10,
                     fontWeight: 500,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid var(--rs-rule-strong)",
+                    background: "var(--rs-cream)",
                     color: UI.text.primary,
                     borderRadius: 6,
                     cursor: "pointer",
@@ -1461,8 +1671,8 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
                     padding: "4px 8px",
                     fontSize: 10,
                     fontWeight: 500,
-                    border: "1px solid rgba(0,245,255,0.3)",
-                    background: "rgba(0,245,255,0.08)",
+                    border: "1px solid var(--rs-blueprint-line)",
+                    background: "var(--rs-blueprint-soft)",
                     color: ACCENT_CYAN,
                     borderRadius: 6,
                     cursor: "pointer",
@@ -1478,7 +1688,7 @@ function StatusFooter({ status, working, last, onRetry, onDownload, onApply, onD
                   padding: "4px 8px",
                   fontSize: 10,
                   fontWeight: 500,
-                  border: "1px solid rgba(255,255,255,0.1)",
+                  border: "1px solid var(--rs-rule-strong)",
                   background: "transparent",
                   color: UI.text.tertiary,
                   borderRadius: 6,

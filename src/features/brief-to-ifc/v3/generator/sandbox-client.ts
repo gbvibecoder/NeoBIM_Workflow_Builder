@@ -33,7 +33,7 @@ import type {
   SandboxValidateResult,
 } from "../types";
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 /** Best-effort error envelope when the transport fails before we can
  *  observe a structured response. The caller treats this as a retryable

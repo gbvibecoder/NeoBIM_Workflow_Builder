@@ -17,6 +17,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { briefSpecSchema } from "./types";
 import type { BriefEnrichmentResult, BriefSpec } from "./types";
+import { withCoercionCollection } from "./telemetry";
 import { zodToOpusToolSchema } from "./zod-to-opus-schema";
 
 const BRIEF_ENRICHMENT_MODEL = "claude-opus-4-7";
@@ -105,7 +106,7 @@ export interface EnrichmentArgs {
   /** Hint for the project type. Passed through to the system prompt
    *  so Opus knows what kind of spec to produce when the brief is
    *  ambiguous. */
-  projectType?: "exhibition_booth" | "office" | "residential" | "retail";
+  projectType?: "exhibition_booth" | "office" | "residential" | "retail" | "gym" | "restaurant" | "classroom" | "studio" | "hotel" | "warehouse" | "hospital" | "other";
 }
 
 export async function enrichBrief(
@@ -193,7 +194,13 @@ export async function enrichBrief(
     };
   }
 
-  const parsed = briefSpecSchema.safeParse(toolUse.input);
+  // Phase δ.1a — wrap the parse in a coercion-collection async context.
+  // Any tolerantEnum / tolerantRgb / tolerantPositive helper that fires
+  // during the parse records into `coercions`; the caller can persist
+  // them as BuildTelemetry.schemaCoercions or its own diagnostic log.
+  const { result: parsed, coercions } = withCoercionCollection(() =>
+    briefSpecSchema.safeParse(toolUse.input),
+  );
   if (!parsed.success) {
     return {
       ok: false, brief: null,
@@ -201,6 +208,7 @@ export async function enrichBrief(
       durationMs: Date.now() - startedAt,
       inputTokens: message.usage.input_tokens,
       outputTokens: message.usage.output_tokens,
+      coercions,
       error: {
         code: "INVALID_BRIEF_SPEC",
         message: parsed.error.issues
@@ -217,6 +225,7 @@ export async function enrichBrief(
     durationMs: Date.now() - startedAt,
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
+    coercions,
     error: null,
   };
 }

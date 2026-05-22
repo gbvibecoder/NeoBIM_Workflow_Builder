@@ -41,6 +41,27 @@ import {
   isLogsSectionEligible,
 } from "@/features/result-page/components/sections/LogsSection";
 import { LiveStatusStrip } from "@/features/result-page/components/sections/LiveStatusStrip";
+import {
+  QualityReportSection,
+  isQualityReportEligible,
+} from "@/features/result-page/components/sections/QualityReportSection";
+import {
+  IterationTraceSection,
+  isIterationTraceEligible,
+} from "@/features/result-page/components/sections/IterationTraceSection";
+import {
+  VerifierMismatchesSection,
+  isVerifierMismatchesEligible,
+} from "@/features/result-page/components/sections/VerifierMismatchesSection";
+import {
+  PatchesAppliedSection,
+  isPatchesAppliedEligible,
+} from "@/features/result-page/components/sections/PatchesAppliedSection";
+import {
+  DesignRationaleSection,
+  isDesignRationaleEligible,
+} from "@/features/result-page/components/sections/DesignRationaleSection";
+import { BuildJourneySection } from "@/features/result-page/components/sections/BuildJourneySection";
 import { NotFound } from "@/features/result-page/components/empty/NotFound";
 import { Forbidden } from "@/features/result-page/components/empty/Forbidden";
 import { readSavedNote } from "@/features/result-page/components/features/AnnotateButton";
@@ -221,6 +242,42 @@ export function ResultPageRoot({ executionId }: ResultPageRootProps) {
                   <HeroSection data={data} heroKind={heroKind} />
                 </ErrorBoundary>
               )}
+
+              {/* Phase Beta 2+3: Quality Report → Verifier → Iterations → Patches → Design */}
+              {isQualityReportEligible(data) ? (
+                <ErrorBoundary>
+                  <QualityReportSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {isVerifierMismatchesEligible(data) ? (
+                <ErrorBoundary>
+                  <VerifierMismatchesSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {isIterationTraceEligible(data) ? (
+                <ErrorBoundary>
+                  <IterationTraceSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {(data.totalAgentTurns > 0 || data.retryHints.length > 0) ? (
+                <ErrorBoundary>
+                  <BuildJourneySection
+                    totalAgentTurns={data.totalAgentTurns}
+                    renderPreviewCalls={data.renderPreviewCalls}
+                    retryHints={data.retryHints}
+                  />
+                </ErrorBoundary>
+              ) : null}
+              {isPatchesAppliedEligible(data) ? (
+                <ErrorBoundary>
+                  <PatchesAppliedSection data={data} />
+                </ErrorBoundary>
+              ) : null}
+              {isDesignRationaleEligible(data) ? (
+                <ErrorBoundary>
+                  <DesignRationaleSection data={data} />
+                </ErrorBoundary>
+              ) : null}
 
               {/* Phase 4.1 Fix 3 — section indices derived from rendered count.
                   Each section's eligibility predicate is consulted in declaration

@@ -1,46 +1,16 @@
 /**
- * Regression test for the `after()` wrap fix.
+ * Phase gamma.2: QStash dispatch regression test (replaces after() test).
  *
- * Yesterday's eval cycle (2026-05-16) discovered that
- * `void runBackground(...)` at `src/app/api/brief-to-ifc/v3/runs/route.ts:195`
- * was dying mid-await on Vercel because the runtime suspends the V8
- * isolate the moment the response flushes. `maxDuration = 800` is the
- * CEILING, not a keepalive — the function never lived long enough for
- * the agent loop's first `await` to resume.
+ * The route now dispatches the agent build via QStash instead of after().
+ * This test verifies:
+ *   1. Response is 202 with a runId
+ *   2. scheduleAgentBuildWorker was called with the runId
  *
- * The fix wraps the call in `after()` from `next/server` (Next.js 15+
- * primitive that registers post-response work). This test mocks
- * `after()` so the assertion fires against the *call site*, not the
- * runtime behaviour:
- *
- *   1. Response is 202 with a runId (happy-path proves the route ran)
- *   2. `after()` was called exactly once
- *   3. The callback is a function returning a Promise (= async)
- *
- * On the *broken* code (`void runBackground(...)`) this test FAILS at
- * step (2): the spy sees 0 calls. On the fixed code (this commit),
- * all three assertions pass. The test exists to prevent future
- * regressions where someone "simplifies" the wrap back to
- * fire-and-forget.
+ * On the broken (after-based) code this test would fail because
+ * scheduleAgentBuildWorker wouldn't be called.
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-
-// ── Hoisted mocks ────────────────────────────────────────────────────
-//
-// `vi.mock()` is hoisted to the top of the file by vitest's transform,
-// so these run BEFORE the dynamic `import("...route")` below resolves
-// the route module's own imports.
-
-// Mock `after` while preserving NextRequest/NextResponse — the route
-// still needs to construct/return real response objects.
-vi.mock("next/server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next/server")>();
-  return {
-    ...actual,
-    after: vi.fn(),
-  };
-});
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(async () => ({
@@ -65,12 +35,8 @@ vi.mock("@/lib/db", () => ({
         createdAt: new Date("2026-05-16T12:00:00Z"),
         status: "PENDING",
       })),
+      update: vi.fn(async () => ({})),
     },
-    // PHASE 6 quota — the route now consults the quota table after
-    // the rate-limit check; the test user defaults to STARTER tier
-    // (test mock above sets `email: test@buildflow.dev`; session role
-    // defaults to FREE which would block, so we mock the quota helper
-    // call below to bypass).
     briefToIfcV3UserQuota: {
       findUnique: vi.fn(async () => null),
       create: vi.fn(async () => ({})),
@@ -79,18 +45,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-// Bypass the quota check — the focus of this test is the after() wrap,
-// not the quota subsystem. Quota behaviour has its own test file.
 vi.mock("@/features/brief-to-ifc/v3/quota/quota", () => ({
   checkBriefToIfcV3Quota: vi.fn(async () => ({ ok: true, limit: 99, used: 0 })),
   incrementBriefToIfcV3Usage: vi.fn(async () => {}),
 }));
 
 vi.mock("@/features/brief-to-ifc/v3", async (importOriginal) => {
-  // Preserve `briefSpecSchema` (used by zod validation in the route)
-  // and any other re-exports the route imports; only override the
-  // canary + the agent-loop entry points so we don't need an Anthropic
-  // key / live network.
   const actual = await importOriginal<typeof import("@/features/brief-to-ifc/v3")>();
   return {
     ...actual,
@@ -101,42 +61,24 @@ vi.mock("@/features/brief-to-ifc/v3", async (importOriginal) => {
       costUsd: 0,
       durationMs: 0,
     })),
-    runGenerator: vi.fn(async () => ({
-      ok: true,
-      ifcUrl: "",
-      entityCount: 0,
-      costUsd: 0,
-      durationMs: 0,
-      turns: 0,
-      ledger: [],
-      turnRecords: [],
-    })),
   };
 });
-
-vi.mock("@/features/brief-to-ifc/v3/runtime/background-runner", () => ({
-  runBackground: vi.fn(async () => ({
-    runId: "test-run-id",
-    terminalStatus: "COMPLETED" as const,
-    errorCode: null,
-    durationMs: 100,
-  })),
-}));
 
 vi.mock("@/features/brief-to-ifc/v3/runtime/append-log", () => ({
   appendLog: vi.fn(async () => {}),
 }));
 
-// A minimal-but-valid BriefSpec that satisfies `briefSpecSchema`.
-// Keeping it inline (rather than importing the JSON fixture) so the
-// test stays portable if the fixture moves. Schema requirements
-// honoured: 1+ material, `brand_language` present, spaces non-empty.
+// Mock QStash — the key assertion target
+vi.mock("@/lib/qstash", () => ({
+  scheduleAgentBuildWorker: vi.fn(async () => "msg-test-123"),
+}));
+
 const validBriefSpec = {
   project: {
     name: "Test Office",
     type: "office" as const,
     location: "Test City",
-    description: "Smallest valid spec for the after() wrap test.",
+    description: "Smallest valid spec for the QStash dispatch test.",
   },
   site: {
     bounds_m: [5.0, 5.0] as [number, number],
@@ -176,18 +118,14 @@ const validBriefSpec = {
   },
 };
 
-describe("v3 /runs route — after() wrap regression", () => {
+describe("v3 /runs route — QStash dispatch (gamma.2)", () => {
   beforeEach(() => {
-    // Only clear call history; the mocks themselves stay registered.
     vi.clearAllMocks();
   });
 
-  it("schedules runBackground via after() from next/server", async () => {
-    // Dynamic import: ensures the hoisted vi.mock above is fully wired
-    // before the route's own `import { after } from "next/server"`
-    // resolves.
+  it("dispatches agent build via QStash scheduleAgentBuildWorker", async () => {
     const { POST } = await import("@/app/api/brief-to-ifc/v3/runs/route");
-    const { after } = await import("next/server");
+    const { scheduleAgentBuildWorker } = await import("@/lib/qstash");
 
     const req = new Request("http://test.local/api/brief-to-ifc/v3/runs", {
       method: "POST",
@@ -198,36 +136,17 @@ describe("v3 /runs route — after() wrap regression", () => {
       }),
     });
 
-    // The route's POST signature accepts NextRequest; in vitest's node
-    // env, a plain `Request` is a structural match (NextRequest extends
-    // Request and the route only calls `req.json()`).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await POST(req as any);
 
-    // (1) The route returns 202 with a runId — proves the happy path.
+    // (1) The route returns 202 with a runId
     expect(response.status).toBe(202);
     const body = await response.json();
     expect(body.runId).toBe("test-run-id");
 
-    // (2) The load-bearing assertion: after() was called exactly once.
-    //     On the broken `void runBackground(...)` code, this is 0 and
-    //     the test fails — which is the entire point.
-    expect(after).toHaveBeenCalledTimes(1);
-
-    // (3) The callback passed to after() is a function returning a
-    //     Promise (= async). Belt-and-braces against someone writing
-    //     `after(runBackground)` or `after(() => runBackground(...))`
-    //     without the await — both shapes pass (1) and (2) but lose
-    //     the error-propagation guarantee.
-    const mockedAfter = vi.mocked(after);
-    expect(mockedAfter.mock.calls.length).toBe(1);
-    const callback = mockedAfter.mock.calls[0][0];
-    expect(typeof callback).toBe("function");
-    // Invoke the callback so the mocked runBackground gets called —
-    // that proves the wrap actually delegates to runBackground rather
-    // than being a no-op placeholder.
-    const cbResult = (callback as () => unknown)();
-    expect(cbResult).toBeInstanceOf(Promise);
-    await cbResult;
+    // (2) QStash was called with a payload containing the runId
+    expect(scheduleAgentBuildWorker).toHaveBeenCalledTimes(1);
+    const callArg = (scheduleAgentBuildWorker as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(callArg).toMatchObject({ runId: "test-run-id" });
   });
 });

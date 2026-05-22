@@ -1287,3 +1287,898 @@
     transition: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Hero V3 — Brief → Building (2026-05-19)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.heroV3 {
+  padding: 32px 0 80px;
+  user-select: none;
+}
+
+/* ── Top strip removed (V6) — greeting line is now the first row ─── */
+
+/* ── Quiet greeting line (V5 declutter, now V6 top-row) ──────────── */
+.heroV3GreetingLine {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 18px;
+  margin-bottom: 36px;
+  border-bottom: 1px dashed var(--rs-rule-strong, rgba(14, 18, 24, 0.14));
+  animation: heroV3FadeUp 0.7s 0.05s ease-out both;
+}
+.heroV3Greeting {
+  font-family: var(--display, 'Fraunces', serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 17px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--rs-text, #5A6478);
+  margin: 0;
+}
+.heroV3Greeting b {
+  font-weight: 500;
+  font-style: italic;
+  color: var(--rs-ink, #0E1218);
+}
+.heroV3GreetingSub {
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rs-text-mute, #9AA1B0);
+}
+
+/* V4-era classes that are no longer referenced by JSX (V5 declutter
+   removed the eyebrow-as-headline, the giant statement, and the
+   helper containers). Kept in source as dead CSS so a future diff
+   reviewer can see what was removed; the rules themselves emit no
+   matching elements anymore.
+   Dead: .heroV3PretitleRow, .heroV3PretitleL, .heroV3GreetingName,
+         .heroV3DragHint, .heroV3Statement, .heroV3StatementEm,
+         .heroV3StatementArrow */
+
+/* ── Transformation card ──────────────────────────────────────────── */
+.heroV3Transform {
+  position: relative;
+  background: var(--rs-paper, #FFFFFF);
+  border: 1px solid var(--rs-rule-strong, rgba(14, 18, 24, 0.14));
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 28px;
+  box-shadow:
+    0 1px 2px rgba(14, 18, 24, 0.04),
+    0 12px 32px -12px rgba(14, 18, 24, 0.12);
+  animation: heroV3FadeUp 0.6s var(--ease) both;
+  animation-delay: 0.22s;
+}
+
+.heroV3TransformStrip {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--rs-rule, rgba(14, 18, 24, 0.07));
+  background: rgba(26, 77, 92, 0.012);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.heroV3TransformStripL {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--rs-text-mute, #9AA1B0);
+}
+.heroV3TransformStripC {
+  justify-self: center;
+  color: var(--rs-text-mute, #9AA1B0);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+}
+.heroV3TransformStripR {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  color: var(--rs-blueprint, #1A4D5C);
+}
+.heroV3DotPlum {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6B4566;
+}
+.heroV3DotSagePulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rs-sage, #4A6B4D);
+  box-shadow: 0 0 6px rgba(74, 107, 77, 0.45);
+  animation: heroV3Pulse 2s ease-in-out infinite;
+}
+
+/* ── Canvas row + panes ───────────────────────────────────────────── */
+.heroV3CanvasRow {
+  position: relative;
+  height: 340px;
+  overflow: hidden;
+  cursor: ew-resize;
+}
+
+/* Brief pane (left, fills entire row; render pane sits on top with clip-path) */
+.heroV3PaneBrief {
+  position: absolute;
+  inset: 0;
+  background: #FAF6EE;
+  background-image: repeating-linear-gradient(
+    180deg,
+    var(--rs-pencil-line, rgba(28, 20, 16, 0.06)) 0,
+    var(--rs-pencil-line, rgba(28, 20, 16, 0.06)) 1px,
+    transparent 1px,
+    transparent 28px
+  );
+  overflow: hidden;
+  padding: 36px clamp(40px, 6vw, 70px) 36px clamp(70px, 8vw, 96px);
+  z-index: 1;
+}
+.heroV3PaneBrief::before {
+  content: "";
+  position: absolute;
+  left: clamp(30px, 4vw, 48px);
+  top: 30px;
+  bottom: 30px;
+  width: 1px;
+  background: var(--rs-red-margin, #C04545);
+  opacity: 0.32;
+}
+.heroV3BriefInner {
+  max-width: 520px;
+}
+.heroV3BriefHead {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 22px;
+  color: var(--rs-ink, #0E1218);
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+.heroV3BriefMeta {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rs-text-mute, #9AA1B0);
+  padding-bottom: 12px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--rs-rule, rgba(14, 18, 24, 0.07));
+}
+.heroV3BriefP {
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 28px;
+  color: var(--rs-ink-soft, #2A3142);
+  margin: 0 0 14px;
+}
+.heroV3BriefP::first-letter {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--rs-blueprint, #1A4D5C);
+  float: left;
+  padding: 4px 8px 0 0;
+}
+.heroV3BriefH {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rs-ink, #0E1218);
+  margin: 14px 0 8px;
+}
+.heroV3BriefList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.heroV3BriefList li {
+  position: relative;
+  padding-left: 18px;
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 28px;
+  color: var(--rs-ink-soft, #2A3142);
+}
+.heroV3BriefList li::before {
+  content: "–";
+  position: absolute;
+  left: 0;
+  color: var(--rs-text-mute, #9AA1B0);
+}
+
+/* Render pane (right; clip-path is set inline from the split state).
+   No transition — RAF-driven state updates are already smooth at 60fps,
+   and a tween would fight every frame. Background, horizon and sun
+   glow are now drawn by the building SVG itself (full-bleed scene). */
+.heroV3PaneRender {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: transparent;
+  overflow: hidden;
+}
+
+.heroV3Building {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.heroV3TimeMarker {
+  position: absolute;
+  bottom: 22px;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #FFFFFF;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ── Handle ───────────────────────────────────────────────────────── */
+.heroV3Handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--rs-ink, #0E1218);
+  z-index: 3;
+  cursor: ew-resize;
+  transform: translateX(-50%);
+}
+.heroV3HandleGrip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--rs-ink, #0E1218);
+  border: 3px solid var(--rs-paper, #FFFFFF);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(14, 18, 24, 0.30);
+}
+.heroV3HandleLabelL,
+.heroV3HandleLabelR {
+  position: absolute;
+  top: 18px;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+  background: var(--rs-ink, #0E1218);
+  padding: 5px 10px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.heroV3HandleLabelL {
+  right: calc(100% + 14px);
+}
+.heroV3HandleLabelR {
+  left: calc(100% + 14px);
+}
+
+/* ── Actions row — V5: flex, CTAs left · stats right (pitch removed) ── */
+.heroV3Actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 16px;
+  animation: heroV3FadeUp 0.7s 0.22s ease-out both;
+}
+/* .heroV3Pitch rule retired in V5 — paragraph no longer rendered in JSX. */
+.heroV3CtaRow,
+.heroV3CtaCluster {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+/* Action-band restyle (Hero V7 aura) — base pill, variant tints,
+   primary keeps dark ink + animated multi-color aura on hover. */
+.heroV3Btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--rs-ink, #0E1218);
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  white-space: nowrap;
+}
+.heroV3BtnPrimary {
+  position: relative;
+  z-index: 1;
+  background: var(--rs-ink, #0E1218);
+  color: #FFFFFF;
+}
+.heroV3BtnPrimary::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  z-index: -1;
+  background: linear-gradient(120deg, #3D5C40, #1A4D5C, #B87333, #A0521C);
+  background-size: 300% 300%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  animation: heroV5AuraShift 6s ease infinite;
+}
+.heroV3BtnPrimary:hover {
+  transform: translateY(-2px);
+}
+.heroV3BtnPrimary:hover::before {
+  opacity: 1;
+}
+@keyframes heroV5AuraShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* Live pulse dot inside primary, before the label */
+.heroV5LiveDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #56794A;
+  box-shadow: 0 0 8px #56794A;
+  flex-shrink: 0;
+  animation: heroV5LivePulse 2s ease infinite;
+}
+@keyframes heroV5LivePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+/* Secondary pill variants — soft-tinted, fully rounded */
+.heroV5PillGreen {
+  background: rgba(61, 92, 64, 0.08);
+  color: #3D5C40;
+}
+.heroV5PillGreen:hover {
+  background: rgba(61, 92, 64, 0.16);
+  transform: translateY(-1px);
+}
+.heroV5PillPlum {
+  background: rgba(107, 69, 102, 0.08);
+  color: #6B4566;
+}
+.heroV5PillPlum:hover {
+  background: rgba(107, 69, 102, 0.16);
+  transform: translateY(-1px);
+}
+
+/* ── Inline stats strip (V4: 3-stat horizontal pill at right of actions) ── */
+.heroV3InlineStats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-left: 18px;
+  border-left: 1px solid var(--rs-rule-strong, rgba(14, 18, 24, 0.14));
+  animation: heroV3FadeUp 0.5s var(--ease) both;
+  animation-delay: 0.40s;
+}
+.heroV3InlineStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.heroV3InlineStatLabel {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rs-text-mute, #9AA1B0);
+}
+.heroV3InlineStatVal {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: var(--rs-ink, #0E1218);
+  line-height: 1.1;
+}
+/* Stat-value tints (pipeline palette) — stable order is workflows / executions / xp */
+.heroV3InlineStats .heroV3InlineStat:nth-child(1) .heroV3InlineStatVal { color: #3D5C40; }
+.heroV3InlineStats .heroV3InlineStat:nth-child(2) .heroV3InlineStatVal { color: #1A4D5C; }
+.heroV3InlineStats .heroV3InlineStat:nth-child(3) .heroV3InlineStatVal { color: #B87333; }
+.heroV3InlineStatSuffix {
+  font-style: italic;
+  font-size: 16px;
+  color: var(--rs-text-mute, #9AA1B0);
+  margin-left: 2px;
+}
+.heroV3InlineStatDelta {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rs-text-mute, #9AA1B0);
+}
+
+/* ── Animations ───────────────────────────────────────────────────── */
+@keyframes heroV3FadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroV3Pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .heroV3CanvasRow { height: 300px; }
+  .heroV3InlineStats { display: none; }
+}
+@media (max-width: 720px) {
+  .heroV3 { padding: 16px 0 28px; }
+  .heroV3GreetingLine { gap: 6px; }
+  .heroV3CanvasRow { height: 280px; }
+  .heroV3Actions { flex-direction: column; align-items: stretch; gap: 14px; }
+  .heroV3CtaRow,
+  .heroV3CtaCluster { justify-content: flex-start; flex-wrap: wrap; }
+  .heroV3PaneBrief { padding: 24px 32px 24px 56px; }
+  .heroV3BriefP { font-size: 13px; line-height: 24px; }
+  .heroV3HandleLabelL, .heroV3HandleLabelR { display: none; }
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .heroV3,
+  .heroV3GreetingLine,
+  .heroV3Transform,
+  .heroV3Actions,
+  .heroV3InlineStats { animation: none !important; }
+  .heroV3PaneRender { transition: none !important; }
+  .heroV3DotSagePulse { animation: none !important; }
+  .heroV3Btn { transition: none !important; }
+  .heroV3BtnPrimary::before { animation: none !important; }
+  .heroV5LiveDot { animation: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Hero V4 — Animated 5-step pipeline (2026-05-19)
+   ═══════════════════════════════════════════════════════════════════════ */
+/* (.heroV3StripMiniStat retired in V6 — top strip removed entirely.) */
+
+.heroV4Pipeline {
+  position: relative;
+  padding: 22px 0 4px;
+  margin-top: 36px;
+  border-top: 1px dashed var(--rs-rule-strong, rgba(14,18,24,0.14));
+  animation: heroV3FadeUp 0.7s 0.32s ease-out both;
+}
+
+.heroV4PipelineHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  color: var(--rs-text-mute, #9AA1B0);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.heroV4PipelineHead b { color: var(--rs-ink, #0E1218); font-weight: 500; }
+
+.heroV4PipelineLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--rs-blueprint, #1A4D5C);
+}
+.heroV4PipelineLive::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--rs-blueprint, #1A4D5C);
+  box-shadow: 0 0 0 0 rgba(26,77,92,.5);
+  animation: heroV4PipelinePulse 1.8s ease-out infinite;
+}
+@keyframes heroV4PipelinePulse {
+  0% { box-shadow: 0 0 0 0 rgba(26,77,92,.5); }
+  70% { box-shadow: 0 0 0 7px rgba(26,77,92,0); }
+  100% { box-shadow: 0 0 0 0 rgba(26,77,92,0); }
+}
+
+.heroV4PipelineRail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: clamp(20px, 3vw, 48px);
+  padding: 4px 0 0;
+}
+
+/* Dashed rail running horizontally through all cards.
+   z-index: 0 — sits behind everything else. */
+.heroV4PipelineRail::before {
+  content: '';
+  position: absolute;
+  top: 64px;
+  left: 5%; right: 5%;
+  height: 1px;
+  background-image: linear-gradient(90deg, rgba(14,18,24,0.40) 50%, transparent 50%);
+  background-size: 8px 1px;
+  background-repeat: repeat-x;
+  z-index: 0;
+  animation: heroV4RailFlow 1.6s linear infinite;
+}
+@keyframes heroV4RailFlow {
+  from { background-position: 0 0; }
+  to   { background-position: 16px 0; }
+}
+
+/* The traveling energy packet.
+   z-index: 1 — ABOVE rail, BELOW cards. */
+.heroV4PipelineDot {
+  position: absolute;
+  top: 60px;
+  left: 5%;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--rs-blueprint, #1A4D5C);
+  box-shadow:
+    0 0 12px var(--rs-blueprint-2, #2C7B8F),
+    0 0 24px rgba(26,77,92,.5);
+  z-index: 1;
+  animation: heroV4Travel 7s cubic-bezier(.65,.05,.36,.95) infinite;
+}
+.heroV4PipelineDot::after {
+  content: '';
+  position: absolute;
+  top: 50%; right: 100%;
+  transform: translateY(-50%);
+  width: 30px; height: 2px;
+  background: linear-gradient(to left, rgba(26,77,92,0.7), transparent);
+  border-radius: 2px;
+}
+@keyframes heroV4Travel {
+  0%   { left: 5%;  opacity: 0; }
+  4%   { opacity: 1; }
+  96%  { opacity: 1; }
+  100% { left: 95%; opacity: 0; }
+}
+
+/* Pipeline card.
+   z-index: 2 — ABOVE the dot, so the dot appears to pass behind. */
+.heroV4Pcard {
+  --c: var(--rs-blueprint, #1A4D5C);
+  --c-soft: rgba(26, 77, 92, 0.08);
+  position: relative;
+  background: var(--rs-paper, #FFFFFF);
+  border: 1px solid var(--rs-rule-strong, rgba(14,18,24,0.14));
+  border-radius: 12px;
+  padding: 12px 14px 14px;
+  z-index: 2;
+  transition: transform 0.4s cubic-bezier(.34,1.56,.64,1), box-shadow 0.4s ease, border-color 0.3s ease;
+  box-shadow: 0 1px 2px rgba(14,18,24,.04), 0 4px 12px -8px rgba(14,18,24,.08);
+  cursor: default;
+  animation: heroV4CardPulse 7s linear infinite;
+}
+/* Staggered delays sync card pulses with the traveling dot's position.
+   nth-child(2..6) because .heroV4PipelineDot is the 1st child of .heroV4PipelineRail */
+.heroV4PipelineRail .heroV4Pcard:nth-child(2) { animation-delay: 0.35s; }
+.heroV4PipelineRail .heroV4Pcard:nth-child(3) { animation-delay: 1.75s; }
+.heroV4PipelineRail .heroV4Pcard:nth-child(4) { animation-delay: 3.15s; }
+.heroV4PipelineRail .heroV4Pcard:nth-child(5) { animation-delay: 4.55s; }
+.heroV4PipelineRail .heroV4Pcard:nth-child(6) { animation-delay: 5.95s; }
+
+@keyframes heroV4CardPulse {
+  0%, 95%, 100% {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(14,18,24,.04), 0 4px 12px -8px rgba(14,18,24,.08);
+    border-color: var(--rs-rule-strong, rgba(14,18,24,0.14));
+  }
+  3% {
+    transform: translateY(-4px);
+    box-shadow: 0 1px 2px rgba(14,18,24,.04), 0 12px 28px -10px rgba(14,18,24,.20);
+    border-color: var(--c);
+  }
+  7% {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 2px rgba(14,18,24,.04), 0 8px 20px -10px rgba(14,18,24,.16);
+    border-color: var(--c);
+  }
+  14% {
+    transform: translateY(0);
+    border-color: var(--rs-rule-strong, rgba(14,18,24,0.14));
+  }
+}
+.heroV4Pcard:hover {
+  transform: translateY(-3px);
+  border-color: var(--c);
+  box-shadow: 0 1px 2px rgba(14,18,24,.04), 0 14px 30px -10px rgba(14,18,24,.22);
+  animation-play-state: paused;
+}
+
+.heroV4PcardNum {
+  position: absolute;
+  top: -8px;
+  left: 14px;
+  background: var(--rs-bone, #F6F4EE);
+  padding: 0 6px;
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+  font-size: 9px;
+  color: var(--c);
+  letter-spacing: 0.22em;
+  font-weight: 600;
+}
+
+.heroV4PcardAnim {
+  height: 56px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--c-soft);
+  position: relative;
+}
+.heroV4PcardAnim svg { width: 80%; height: 100%; }
+
+.heroV4PcardLabel {
+  font-family: var(--display, 'Fraunces', serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--rs-ink, #0E1218);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.heroV4PcardMeta {
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+  font-size: 8px;
+  color: var(--rs-text-mute, #9AA1B0);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.heroV4PcardMeta b { color: var(--c); font-weight: 500; }
+
+.heroV4PcardBrief  { --c: #6B4566; --c-soft: rgba(107,69,102,0.07); }
+.heroV4PcardFloor  { --c: #3D5C40; --c-soft: rgba(61,92,64,0.07); }
+.heroV4PcardIfc    { --c: #1A4D5C; --c-soft: rgba(26,77,92,0.07); }
+.heroV4Pcard3d     { --c: #B87333; --c-soft: rgba(184,115,51,0.07); }
+.heroV4PcardBoq    { --c: #A0521C; --c-soft: rgba(160,82,28,0.07); }
+
+/* ── Per-card micro-animations ── */
+
+/* BRIEF: 4 lines draw in left→right, sparkle */
+.heroV4BriefLine {
+  stroke: #6B4566;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: heroV4DrawLine 4.5s ease-in-out infinite;
+}
+.heroV4PcardBrief .heroV4BriefLine:nth-of-type(2) { animation-delay: 0.35s; }
+.heroV4PcardBrief .heroV4BriefLine:nth-of-type(3) { animation-delay: 0.7s; }
+.heroV4PcardBrief .heroV4BriefLine:nth-of-type(4) { animation-delay: 1.05s; }
+@keyframes heroV4DrawLine {
+  0%, 100% { stroke-dashoffset: 60; opacity: 0; }
+  14% { stroke-dashoffset: 60; opacity: 1; }
+  34% { stroke-dashoffset: 0; opacity: 1; }
+  70% { stroke-dashoffset: 0; opacity: 1; }
+  90%, 99% { stroke-dashoffset: -60; opacity: 0; }
+}
+.heroV4BriefSpark {
+  fill: #6B4566;
+  transform-origin: 60px 11px;
+  animation: heroV4Sparkle 4.5s ease-in-out infinite;
+}
+@keyframes heroV4Sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* FLOOR PLAN: stroke-in walls, then room dots */
+.heroV4FloorStroke {
+  stroke: #3D5C40;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-dasharray: var(--len, 200);
+  stroke-dashoffset: var(--len, 200);
+  animation: heroV4DrawFloor 5s ease-in-out infinite;
+}
+.heroV4PcardFloor .heroV4FloorStroke:nth-of-type(2) { animation-delay: 0.5s; }
+.heroV4PcardFloor .heroV4FloorStroke:nth-of-type(3) { animation-delay: 0.9s; }
+.heroV4PcardFloor .heroV4FloorStroke:nth-of-type(4) { animation-delay: 1.2s; }
+@keyframes heroV4DrawFloor {
+  0%, 100% { stroke-dashoffset: var(--len, 200); opacity: 0.6; }
+  20% { stroke-dashoffset: var(--len, 200); opacity: 1; }
+  50% { stroke-dashoffset: 0; opacity: 1; }
+  85% { stroke-dashoffset: 0; opacity: 1; }
+  95% { stroke-dashoffset: 0; opacity: 0; }
+}
+.heroV4FloorRoom {
+  fill: #3D5C40;
+  opacity: 0;
+  animation: heroV4RoomDot 5s ease-in-out infinite;
+}
+.heroV4PcardFloor .heroV4FloorRoom:nth-of-type(2) { animation-delay: 1.8s; }
+.heroV4PcardFloor .heroV4FloorRoom:nth-of-type(3) { animation-delay: 2.0s; }
+.heroV4PcardFloor .heroV4FloorRoom:nth-of-type(4) { animation-delay: 2.2s; }
+@keyframes heroV4RoomDot {
+  0%, 35%, 100% { opacity: 0; }
+  50%, 85% { opacity: 0.8; }
+}
+
+/* IFC: wireframe gently rotates on Y, vertices pulse */
+.heroV4IfcWireframe {
+  transform-origin: center;
+  animation: heroV4IfcRotate 8s ease-in-out infinite;
+}
+@keyframes heroV4IfcRotate {
+  0%, 100% { transform: rotateY(-15deg) scale(1); }
+  50% { transform: rotateY(15deg) scale(1.04); }
+}
+.heroV4IfcEdge {
+  stroke: #1A4D5C;
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linejoin: round;
+}
+.heroV4IfcFace {
+  fill: rgba(26,77,92,0.10);
+  stroke: #1A4D5C;
+  stroke-width: 1;
+}
+.heroV4IfcVertex {
+  fill: #1A4D5C;
+  animation: heroV4VertexPulse 1.6s ease-in-out infinite;
+}
+.heroV4PcardIfc .heroV4IfcVertex:nth-of-type(odd) { animation-delay: 0.4s; }
+.heroV4PcardIfc .heroV4IfcVertex:nth-of-type(3n) { animation-delay: 0.8s; }
+@keyframes heroV4VertexPulse {
+  0%, 100% { opacity: 0.4; r: 1.2; }
+  50% { opacity: 1; r: 2; }
+}
+
+/* 3D MODEL: solid massing with sun shifting */
+.heroV4ModelBg { fill: url(#heroV4ModelSky); }
+.heroV4ModelMassBack  { fill: #8E6240; }
+.heroV4ModelMassFront { fill: #B07A52; }
+.heroV4ModelMassTop   { fill: #C99369; }
+.heroV4ModelRoof      { fill: #6E7378; }
+.heroV4ModelShadow    { fill: rgba(0,0,0,0.18); }
+.heroV4ModelSun {
+  fill: rgba(255,235,180,0.9);
+  animation: heroV4SunShift 6s ease-in-out infinite;
+}
+@keyframes heroV4SunShift {
+  0%, 100% { transform: translateX(0) translateY(0); opacity: 0.8; }
+  50% { transform: translateX(8px) translateY(-2px); opacity: 1; }
+}
+.heroV4ModelGlow {
+  fill: url(#heroV4ModelGlow);
+  animation: heroV4GlowShift 6s ease-in-out infinite;
+}
+@keyframes heroV4GlowShift {
+  0%, 100% { transform: translateX(-2px); }
+  50% { transform: translateX(6px); }
+}
+
+/* BOQ: rows fill in + total pops */
+.heroV4BoqRowLine {
+  stroke: #A0521C;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: heroV4BoqRow 5s ease-in-out infinite;
+}
+.heroV4PcardBoq .heroV4BoqRowLine:nth-of-type(2) { animation-delay: 0.4s; }
+.heroV4PcardBoq .heroV4BoqRowLine:nth-of-type(3) { animation-delay: 0.8s; }
+.heroV4PcardBoq .heroV4BoqRowLine:nth-of-type(4) { animation-delay: 1.2s; }
+@keyframes heroV4BoqRow {
+  0%, 100% { opacity: 0; transform: translateX(-4px); }
+  20% { opacity: 1; transform: translateX(0); }
+  80% { opacity: 1; transform: translateX(0); }
+  95% { opacity: 0; transform: translateX(4px); }
+}
+.heroV4BoqRowVal {
+  fill: #A0521C;
+  opacity: 0;
+  animation: heroV4BoqVal 5s ease-in-out infinite;
+}
+.heroV4PcardBoq .heroV4BoqRowVal:nth-of-type(2) { animation-delay: 0.6s; }
+.heroV4PcardBoq .heroV4BoqRowVal:nth-of-type(3) { animation-delay: 1.0s; }
+.heroV4PcardBoq .heroV4BoqRowVal:nth-of-type(4) { animation-delay: 1.4s; }
+@keyframes heroV4BoqVal {
+  0%, 100% { opacity: 0; }
+  25%, 80% { opacity: 0.9; }
+}
+.heroV4BoqTotal {
+  font-family: var(--display, 'Fraunces', serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 11px;
+  fill: #A0521C;
+  animation: heroV4TotalPop 5s ease-in-out infinite;
+}
+@keyframes heroV4TotalPop {
+  0%, 40%, 100% { opacity: 0; transform: translateY(2px); }
+  55%, 85% { opacity: 1; transform: translateY(0); }
+}
+.heroV4BoqTotalBar {
+  stroke: #A0521C;
+  stroke-width: 1.2;
+  opacity: 0;
+  animation: heroV4TotalPop 5s ease-in-out infinite;
+}
+
+/* Reduced motion: kill all pipeline animations */
+@media (prefers-reduced-motion: reduce) {
+  .heroV4Pipeline *,
+  .heroV4Pipeline *::before,
+  .heroV4Pipeline *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .heroV4PipelineDot { left: 50% !important; }
+}
+
+/* Responsive — pipeline collapses to 2 rows on smaller viewports */
+@media (max-width: 1100px) {
+  .heroV4PipelineRail { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .heroV4PipelineRail::before { display: none; }
+  .heroV4PipelineDot { display: none; }
+}
+@media (max-width: 720px) {
+  .heroV4PipelineRail { grid-template-columns: repeat(2, 1fr); }
+}

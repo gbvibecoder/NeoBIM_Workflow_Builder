@@ -1,0 +1,448 @@
+/* ═══════════════════════════════════════════════════════════════
+   Canvas Empty State — Studio Sketchbook
+   Phase Z.CANVAS.EMPTY-SKETCHBOOK
+   All colors via var(--canvas-empty-*) — inherits from the
+   canvas-theme-${theme} class set on WorkflowCanvas.tsx:969
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Root overlay (paper background + red margin) ────────────── */
+.root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;          /* C4: outer overlay never blocks drops */
+  overflow: hidden;
+  background: var(--canvas-empty-paper);
+  isolation: isolate;
+}
+
+/* Engineer's graph paper: 24px minor grid + 120px major grid +
+   warm radial tint overlay. Pseudo, so it never intercepts pointers. */
+.root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--canvas-empty-grid-blue-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-empty-grid-blue-major) 1px, transparent 1px),
+    linear-gradient(var(--canvas-empty-grid-blue) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-empty-grid-blue) 1px, transparent 1px),
+    radial-gradient(ellipse at 15% 18%, var(--canvas-empty-tint-amber) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 82%, var(--canvas-empty-tint-rust) 0%, transparent 55%);
+  background-size:
+    120px 120px,
+    120px 120px,
+    24px 24px,
+    24px 24px,
+    100% 100%,
+    100% 100%;
+  z-index: 0;
+}
+
+/* Red margin line — drafting-table style */
+.root::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: clamp(60px, 8vw, 120px);
+  width: 1px;
+  background: var(--canvas-empty-red-margin);
+  opacity: 0.42;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Decorative SVGs (coffee, pencil, arrow) ─────────────────── */
+.decoration {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.coffee {
+  top: clamp(40px, 6vh, 90px);
+  right: clamp(120px, 12vw, 200px);
+  width: 110px;
+  height: 110px;
+  transform: rotate(15deg);
+  color: var(--canvas-empty-amber);
+}
+
+.pencil {
+  bottom: clamp(60px, 8vh, 100px);
+  right: clamp(60px, 8vw, 120px);
+  width: 90px;
+  height: auto;
+  transform: rotate(-30deg);
+  opacity: 0;
+  animation: bf-pencil-fade 0.7s ease-out 0.7s forwards;
+}
+
+.doodleArrow {
+  top: 42vh;
+  left: clamp(120px, 13vw, 200px);
+  width: 80px;
+  height: 60px;
+  color: var(--canvas-empty-amber);
+}
+
+.doodleArrow path {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  opacity: 0.55;
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: bf-arrow-draw 1.2s ease-out 0.8s forwards;
+}
+
+/* ── Inner content cluster (the only pointer-events: auto zone) ─ */
+.content {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;          /* container itself is transparent */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 12vh;
+  padding-bottom: 8vh;
+  padding-left: clamp(90px, 12vw, 180px);
+  padding-right: clamp(40px, 6vw, 80px);
+  z-index: 2;
+}
+
+/* All directly interactive children opt-in to pointer events.
+   This keeps the giant central column drop-target-transparent
+   so SlimLibraryDrawer drops fall through to WorkflowCanvas.tsx:984. */
+.content > * {
+  pointer-events: auto;
+}
+.content > .pointerThrough {
+  pointer-events: none;
+}
+
+/* ── Header row (meta block + stamp) ─────────────────────────── */
+.headerRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: clamp(18px, 3vh, 36px);
+}
+
+.metaBlock {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--canvas-empty-pencil-faint);
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metaBlock .strong {
+  color: var(--canvas-empty-pencil);
+  font-weight: 700;
+}
+
+.stamp {
+  font-family: var(--font-jetbrains), monospace;
+  border: 1.5px solid var(--canvas-empty-red-margin);
+  color: var(--canvas-empty-red-margin);
+  padding: 4px 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  transform: rotate(-4deg);
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.stamp .stampSub {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+/* ── Title block ─────────────────────────────────────────────── */
+.titleBlock {
+  margin-bottom: clamp(28px, 5vh, 48px);
+}
+
+.pretitle {
+  font-family: var(--font-caveat), cursive;
+  font-size: 22px;
+  color: var(--canvas-empty-pencil);
+  display: inline-block;
+  transform: rotate(-1deg);
+  margin-bottom: 6px;
+}
+
+.title {
+  font-family: var(--font-display), serif; /* Fraunces var via layout.tsx */
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(56px, 8vw, 96px);
+  line-height: 0.96;
+  letter-spacing: -0.025em;
+  color: var(--canvas-empty-ink);
+  margin: 0 0 12px;
+}
+
+.titleAccent {
+  position: relative;
+  isolation: isolate;             /* contain z-index: -1 of ::after */
+  font-weight: 400;
+  display: inline-block;
+}
+
+.titleAccent::after {
+  content: "";
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  bottom: 12%;
+  height: 0.18em;
+  background: var(--canvas-empty-amber);
+  opacity: 0.35;
+  transform: skewX(-8deg);
+  border-radius: 4px;
+  z-index: -1;
+}
+
+.note {
+  font-family: var(--font-caveat), cursive;
+  font-size: 22px;
+  color: var(--canvas-empty-pencil);
+  transform: rotate(-0.5deg);
+  max-width: 540px;
+  line-height: 1.35;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.noteArrow {
+  color: var(--canvas-empty-amber);
+  display: inline-block;
+  transform: translate(-4px, 2px) rotate(-5deg);
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ── Choices row ─────────────────────────────────────────────── */
+.choices {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.card {
+  position: relative;
+  display: block;
+  background: var(--canvas-empty-paper-warm);
+  border: none;
+  text-align: left;
+  font-family: inherit;
+  text-decoration: none;
+  color: inherit;
+  padding: 18px 22px 16px;
+  width: clamp(260px, 26vw, 320px);
+  min-height: 168px;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(.2,.7,.2,1);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--card-c);
+  outline-offset: 4px;
+}
+
+.cardA { --card-c: var(--canvas-empty-amber); transform: rotate(-1.2deg); }
+.cardB { --card-c: var(--canvas-empty-teal);  transform: rotate( 0.8deg); margin-top: 8px; }
+.cardC { --card-c: var(--canvas-empty-rust);  transform: rotate(-0.6deg); margin-top: -4px; }
+
+.card:hover,
+.card:focus-visible {
+  transform: rotate(0deg) translateY(-3px);
+}
+
+/* Sketched-border SVG frame — sits behind card content, stretches to size */
+.frame {
+  position: absolute;
+  inset: -3px;
+  width: calc(100% + 6px);
+  height: calc(100% + 6px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.frame .outer,
+.frame .inner {
+  fill: none;
+  stroke: var(--card-c);
+  vector-effect: non-scaling-stroke;
+}
+.frame .outer { stroke-width: 1.6; opacity: 0.75; }
+.frame .inner { stroke-width: 0.9; opacity: 0.35; }
+
+.cardBody {
+  position: relative;
+  z-index: 1;                     /* above .frame */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kbd {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 9px;
+  color: var(--canvas-empty-pencil-faint);
+  letter-spacing: 0.08em;
+  transform: rotate(2deg);
+  z-index: 2;
+}
+
+.choiceNum {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--card-c);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.choiceNum::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 1px;
+  background: var(--card-c);
+  opacity: 0.4;
+}
+
+.choiceTitle {
+  font-family: var(--font-display), serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.05;
+  color: var(--canvas-empty-ink);
+  margin: 4px 0 0;
+}
+
+.choiceDesc {
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--canvas-empty-ink-soft);
+  max-width: 220px;
+  margin: 0;
+}
+
+.choiceAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-caveat), cursive;
+  font-size: 18px;
+  color: var(--card-c);
+  margin-top: 4px;
+}
+
+.choiceAction svg {
+  width: 22px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.25s cubic-bezier(.2,.7,.2,1);
+}
+
+.card:hover .choiceAction svg,
+.card:focus-visible .choiceAction svg {
+  transform: translateX(4px);
+}
+
+/* ── Bottom metadata ribbon ──────────────────────────────────── */
+.ribbon {
+  position: absolute;
+  bottom: 18px;
+  left: clamp(90px, 12vw, 180px);
+  right: clamp(40px, 6vw, 80px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--canvas-empty-pencil-faint);
+  pointer-events: none;
+  z-index: 2;
+  gap: 24px;
+}
+
+.ribbonHair {
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: var(--canvas-empty-pencil-vfaint);
+  margin: 0 8px;
+  vertical-align: middle;
+}
+
+.ribbonKbd {
+  display: inline-block;
+  background: var(--canvas-empty-pencil-vfaint);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 10px;
+  color: var(--canvas-empty-pencil);
+  margin: 0 2px;
+}
+
+/* ── Keyframes ───────────────────────────────────────────────── */
+@keyframes bf-arrow-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes bf-pencil-fade {
+  from { opacity: 0; transform: rotate(-30deg) translateY(8px); }
+  to   { opacity: 0.85; transform: rotate(-30deg) translateY(0); }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .pencil {
+    opacity: 0.85;
+    animation: none;
+  }
+  .doodleArrow path {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  .card,
+  .choiceAction svg {
+    transition: none;
+  }
+}

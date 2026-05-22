@@ -1,14 +1,24 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+/* ─── Toolbar — Phase Z.IFC.1 Light Render Studio ──────────────────────────
+   Restructured 2026-05-18. The previous 17-button single-strip is replaced
+   by four grouped pill clusters (Camera / Section / Style / Visibility+Export)
+   plus a left "Upload New + file identity" region and a right "Help + BOQ"
+   CTA region. Every viewportRef.current.* call is preserved — only the
+   visual composition changes. */
+
+import React, { useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import {
   FolderOpen, Home, Scissors, Ruler, Grid3x3,
   Camera, Maximize, Box, Eye, EyeOff, Palette,
-  RotateCcw, ChevronDown, Download,
+  RotateCcw, Download,
   Layers, Scan, X, Waypoints,
   Calculator, Loader2,
+  HelpCircle,
 } from "lucide-react";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
+import { ToolGroup, ToolButton } from "@/features/ifc/components/primitives";
+import { useLocale } from "@/hooks/useLocale";
 import type {
   ViewModeType,
   ColorByType,
@@ -22,205 +32,56 @@ interface ToolbarProps {
   viewportRef: React.RefObject<ViewportHandle | null>;
   modelInfo: IFCModelInfo | null;
   onOpenFile: () => void;
-  /* showShortcuts / onToggleShortcuts are still wired up because the
-     shortcuts MODAL lives inside this component and listens to them. The
-     header button that USED to toggle them was removed in 2026-05-18 Follow-up
-     (it was crowding the Calculate BOQ CTA). Trigger is now the "?" keyboard
-     shortcut in IFCViewerPage's keydown handler. */
+  /** Back-compat — IFCViewerPage no longer wires this from the X button
+      (X was removed), but the Upload-New button in the header still uses it. */
+  onUnload?: () => void;
   showShortcuts: boolean;
   onToggleShortcuts: () => void;
   measureUnit: "m" | "ft";
   onToggleUnit: () => void;
-  /* Primary CTA — launches BOQ cost-estimation workflow with the currently
-     loaded IFC pre-attached. Disabled state shows when no IFC is loaded. */
+  /** Primary CTA — launches BOQ workflow with the currently-loaded IFC. */
   onCalculateBOQ: () => void;
   canCalculateBOQ: boolean;
   boqLaunching: boolean;
 }
 
-/* ─── Shared button style ─────────────────── */
-/* Heights dropped from 38→32 and toolbar padding from 6px→3px so the whole
-   header bar takes ~38px of vertical space instead of ~50px (user feedback
-   2026-05-18: "header taking lots of space"). */
-const btnBase: React.CSSProperties = {
-  width: 32,
-  height: 32,
-  borderRadius: UI.radius.sm,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "transparent",
-  borderWidth: 1,
-  borderStyle: "solid",
-  borderColor: "transparent",
-  color: UI.text.secondary,
-  cursor: "pointer",
-  transition: UI.transition,
-  position: "relative",
-};
-
-const btnHover: React.CSSProperties = {
-  background: "rgba(99,130,255,0.12)",
-  borderColor: "rgba(99,130,255,0.2)",
-  color: UI.text.primary,
-  boxShadow: "0 0 8px rgba(99,130,255,0.08)",
-};
-
-const dividerStyle: React.CSSProperties = {
-  width: 1,
-  height: 20,
-  background: UI.border.subtle,
-  margin: "0 4px",
-  flexShrink: 0,
-};
-
-/* Primary CTA — Calculate BOQ. Filled blue gradient on the dark toolbar so it
-   pops as the action you should actually take once the model is loaded.
-   Sized to match the shrunk button base (height 28 vs prior 34). */
-const boqBtnBase: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  height: 28,
-  padding: "0 12px",
-  borderRadius: UI.radius.sm,
-  background: "linear-gradient(135deg, #4F8AFF 0%, #6E7CFF 100%)",
-  border: "1px solid rgba(99,130,255,0.5)",
-  color: "#FFFFFF",
-  fontSize: 11.5,
-  fontWeight: 600,
-  letterSpacing: "0.2px",
-  cursor: "pointer",
-  transition: UI.transition,
-  boxShadow: "0 2px 10px rgba(79,138,255,0.32), inset 0 1px 0 rgba(255,255,255,0.18)",
-  flexShrink: 0,
-  whiteSpace: "nowrap",
-};
-
-const boqBtnDisabled: React.CSSProperties = {
-  background: "rgba(79,138,255,0.10)",
-  borderColor: "rgba(79,138,255,0.18)",
-  color: UI.text.tertiary,
-  boxShadow: "none",
-  cursor: "not-allowed",
-};
-
-function CalculateBOQButton({
-  disabled,
-  loading,
-  onClick,
+/* ─── Dropdown popover ────────────────────────────────────────────────── */
+function Dropdown({
+  open,
+  onClose,
+  children,
 }: {
-  disabled: boolean;
-  loading: boolean;
-  onClick: () => void;
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
 }) {
-  const [hover, setHover] = useState(false);
-  const isDisabled = disabled || loading;
-  return (
-    <button
-      onClick={onClick}
-      disabled={isDisabled}
-      title={disabled ? "Upload an IFC first" : "Run the BOQ cost-estimation workflow with this IFC"}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        ...boqBtnBase,
-        ...(isDisabled ? boqBtnDisabled : {}),
-        ...(hover && !isDisabled
-          ? {
-              background: "linear-gradient(135deg, #5C95FF 0%, #7B89FF 100%)",
-              boxShadow: "0 2px 16px rgba(79,138,255,0.5), inset 0 1px 0 rgba(255,255,255,0.22)",
-              transform: "translateY(-1px)",
-            }
-          : {}),
-      }}
-    >
-      {loading ? (
-        <Loader2 size={14} className="animate-spin" />
-      ) : (
-        <Calculator size={14} strokeWidth={2.2} />
-      )}
-      <span>Calculate BOQ</span>
-    </button>
-  );
-}
-
-/* ─── ToolBtn Component ───────────────────── */
-function ToolBtn({
-  icon: Icon,
-  label,
-  shortcut,
-  active,
-  onClick,
-  disabled,
-  dropdown,
-  showLabel,
-}: {
-  icon: React.ComponentType<{ size?: number }>;
-  label: string;
-  shortcut?: string;
-  active?: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  dropdown?: React.ReactNode;
-  showLabel?: boolean;
-}) {
-  const [hover, setHover] = useState(false);
-  const [showDrop, setShowDrop] = useState(false);
-
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open, onClose]);
+  if (!open) return null;
   return (
     <div
-      style={{ position: "relative" }}
-      onMouseEnter={() => { setHover(true); if (dropdown) setShowDrop(true); }}
-      onMouseLeave={() => { setHover(false); setShowDrop(false); }}
+      ref={ref}
+      style={{
+        position: "absolute",
+        top: "calc(100% + 6px)",
+        left: 0,
+        zIndex: 100,
+        background: UI.bg.paper,
+        border: `1px solid ${UI.border.subtle}`,
+        borderRadius: UI.radius.md,
+        padding: 4,
+        minWidth: 160,
+        boxShadow: UI.shadow.floating,
+      }}
     >
-      <button
-        onClick={() => {
-          if (dropdown) setShowDrop((p) => !p);
-          else onClick();
-        }}
-        disabled={disabled}
-        title={`${label}${shortcut ? ` (${shortcut})` : ""}`}
-        style={{
-          ...btnBase,
-          ...(showLabel ? { width: "auto", padding: "0 8px", gap: 4 } : {}),
-          ...(hover || active ? btnHover : {}),
-          ...(active ? { color: UI.accent.blue, borderColor: "rgba(79,138,255,0.25)", background: "rgba(79,138,255,0.1)", boxShadow: "0 0 12px rgba(79,138,255,0.15)" } : {}),
-          opacity: disabled ? 0.35 : 1,
-        }}
-      >
-        <Icon size={showLabel ? 13 : 16} />
-        {showLabel && (
-          <span style={{ fontSize: 10.5, fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>
-        )}
-        {dropdown && (
-          <ChevronDown size={9} style={{ ...(showLabel ? { marginLeft: 1 } : { position: "absolute" as const, right: 2, bottom: 3 }), opacity: 0.5 }} />
-        )}
-      </button>
-      {dropdown && showDrop && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            paddingTop: 4,
-            zIndex: 100,
-          }}
-        >
-          <div
-            style={{
-              background: UI.bg.elevated,
-              border: `1px solid ${UI.border.default}`,
-              borderRadius: UI.radius.md,
-              padding: 4,
-              minWidth: 140,
-              boxShadow: UI.shadow.panel,
-            }}
-          >
-            {dropdown}
-          </div>
-        </div>
-      )}
+      {children}
     </div>
   );
 }
@@ -237,22 +98,24 @@ function DropItem({
   const [h, setH] = useState(false);
   return (
     <button
+      type="button"
       onClick={onClick}
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
       style={{
         display: "block",
         width: "100%",
-        padding: "6px 12px",
-        borderRadius: 4,
+        padding: "7px 12px",
+        borderRadius: UI.radius.sm,
         border: "none",
-        background: h ? "rgba(99,130,255,0.08)" : "transparent",
-        color: active ? UI.accent.blue : UI.text.secondary,
-        fontSize: 13,
+        background: h ? UI.bg.cream : "transparent",
+        color: active ? UI.accent.blueprint : UI.text.primary,
+        fontSize: 12,
         textAlign: "left",
         cursor: "pointer",
         transition: UI.transition,
-        fontWeight: active ? 600 : 400,
+        fontWeight: active ? 600 : 500,
+        fontFamily: UI.font.body,
       }}
     >
       {label}
@@ -260,6 +123,166 @@ function DropItem({
   );
 }
 
+/* ─── Upload New button ───────────────────────────────────────────────── */
+function UploadNewButton({ onClick }: { onClick: () => void }) {
+  const t = useLocale((s) => s.t);
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title="Open a different IFC file"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        height: 32,
+        padding: "0 12px",
+        background: hover ? "var(--rs-blueprint-soft)" : UI.bg.paper,
+        border: `1px solid ${hover ? "var(--rs-blueprint-line)" : UI.border.subtle}`,
+        borderRadius: UI.radius.md,
+        color: hover ? UI.accent.blueprint : UI.text.primary,
+        fontSize: 11.5,
+        fontWeight: 600,
+        cursor: "pointer",
+        transition: UI.transition,
+        fontFamily: UI.font.body,
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+      }}
+    >
+      <FolderOpen size={13} strokeWidth={2.2} />
+      {t("ifcViewer.uploadNew")}
+    </button>
+  );
+}
+
+/* FileIdentity removed Phase Z.IFC.2 follow-up 2026-05-19 — duplicate of
+   the bottom status bar's filename + schema chips. */
+
+/* ─── Help icon button ────────────────────────────────────────────────── */
+function HelpButton({ onClick }: { onClick: () => void }) {
+  const t = useLocale((s) => s.t);
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title={`${t("ifcViewer.help")} (?)`}
+      aria-label={t("ifcViewer.help")}
+      style={{
+        width: 32,
+        height: 32,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: hover ? UI.bg.cream : "transparent",
+        border: `1px solid ${UI.border.subtle}`,
+        borderRadius: UI.radius.md,
+        color: UI.text.secondary,
+        cursor: "pointer",
+        transition: UI.transition,
+        flexShrink: 0,
+      }}
+    >
+      <HelpCircle size={14} strokeWidth={2.2} />
+    </button>
+  );
+}
+
+/* ─── BOQ primary CTA ─────────────────────────────────────────────────── */
+function BOQButton({
+  disabled,
+  loading,
+  onClick,
+}: {
+  disabled: boolean;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  const t = useLocale((s) => s.t);
+  const [hover, setHover] = useState(false);
+  const isDisabled = disabled || loading;
+  return (
+    <button
+      type="button"
+      onClick={() => !isDisabled && onClick()}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      disabled={isDisabled}
+      title={disabled ? "Upload an IFC first" : "Run the BOQ cost-estimation workflow with this IFC"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        height: 32,
+        padding: "0 14px",
+        background: isDisabled
+          ? "var(--rs-blueprint-soft)"
+          : hover
+            ? "linear-gradient(135deg, var(--rs-blueprint-2) 0%, var(--rs-blueprint) 100%)"
+            : "linear-gradient(135deg, var(--rs-blueprint) 0%, var(--rs-blueprint-2) 100%)",
+        border: isDisabled ? `1px solid var(--rs-blueprint-line)` : "none",
+        color: isDisabled ? UI.text.tertiary : "#FFFFFF",
+        fontSize: 11.5,
+        fontWeight: 700,
+        letterSpacing: 0.3,
+        textTransform: "uppercase",
+        borderRadius: UI.radius.md,
+        cursor: isDisabled ? "not-allowed" : "pointer",
+        transition: UI.transition,
+        fontFamily: UI.font.body,
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+        boxShadow: isDisabled
+          ? "none"
+          : "0 2px 6px rgba(26,77,92,0.22), inset 0 1px 0 rgba(255,255,255,0.18)",
+      }}
+    >
+      {loading ? (
+        <Loader2 size={13} className="animate-spin" />
+      ) : (
+        <Calculator size={13} strokeWidth={2.4} />
+      )}
+      {t("ifcViewer.calculateBOQ")}
+    </button>
+  );
+}
+
+/* ─── Unit toggle (m / ft) ────────────────────────────────────────────── */
+function UnitToggle({ value, onChange }: { value: "m" | "ft"; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      title={`Switch to ${value === "m" ? "feet" : "meters"}`}
+      style={{
+        height: 24,
+        padding: "0 8px",
+        margin: "0 2px",
+        borderRadius: UI.radius.sm,
+        border: `1px solid ${UI.border.subtle}`,
+        background: UI.bg.cream,
+        color: UI.text.primary,
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: 0.4,
+        fontFamily: UI.font.mono,
+        cursor: "pointer",
+        transition: UI.transition,
+        textTransform: "uppercase",
+      }}
+    >
+      {value}
+    </button>
+  );
+}
+
+/* ─── Toolbar component ───────────────────────────────────────────────── */
 export function Toolbar({
   viewportRef,
   modelInfo,
@@ -272,113 +295,184 @@ export function Toolbar({
   canCalculateBOQ,
   boqLaunching,
 }: ToolbarProps) {
+  const t = useLocale((s) => s.t);
   const [viewMode, setViewMode] = useState<ViewModeType>("shaded");
   const [colorBy, setColorBy] = useState<ColorByType>("default");
   const [measuring, setMeasuring] = useState(false);
   const [ortho, setOrtho] = useState(false);
 
+  /* Each dropdown gets its own boolean. Click-to-open with click-outside
+     dismissal handled inside Dropdown. */
+  const [openMenu, setOpenMenu] = useState<"views" | "section" | "style" | "color" | null>(null);
+  const closeMenu = useCallback(() => setOpenMenu(null), []);
+
   const v = viewportRef.current;
   const hasModel = modelInfo !== null;
 
-  const doSetViewMode = useCallback((m: ViewModeType) => {
-    setViewMode(m);
-    v?.setViewMode(m);
-  }, [v]);
+  const doSetViewMode = useCallback(
+    (m: ViewModeType) => {
+      setViewMode(m);
+      v?.setViewMode(m);
+      closeMenu();
+    },
+    [v, closeMenu],
+  );
 
-  const doSetColorBy = useCallback((c: ColorByType) => {
-    setColorBy(c);
-    v?.setColorBy(c);
+  const doSetColorBy = useCallback(
+    (c: ColorByType) => {
+      setColorBy(c);
+      v?.setColorBy(c);
+      closeMenu();
+    },
+    [v, closeMenu],
+  );
+
+  const downloadCSV = useCallback(() => {
+    const csv = v?.getCSVData();
+    if (!csv) return;
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ifc-elements-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }, [v]);
 
   return (
     <>
       <div
         style={{
+          /* Phase Z.IFC.2 follow-up 2026-05-19: dropped the outer paper bg,
+             border-bottom, and multi-color drafting strip. Toolbar is now
+             chromeless — the tool group pills (which already carry their
+             own paper bg + border + shadow) float over the 3D canvas grid,
+             matching the Canvas SlimLibraryStrip pattern.
+
+             pointer-events: none on the root + auto on each interactive
+             child (UploadNew, scrollable tools, Help+BOQ group) lets
+             mouse-drag pan/orbit pass through the empty space between
+             pills directly to the Viewport canvas below. */
+          /* Toolbar content-sized so the parent floating wrapper can
+             `justifyContent: center` it for symmetric L/R visual margins
+             (Phase Z.IFC.2 follow-up 2026-05-19). */
+          position: "relative",
           display: "flex",
           alignItems: "center",
-          gap: 4,
-          /* Symmetric horizontal padding. Earlier revisions reserved 60px of
-             right-padding to clear the dashboard avatar, but that pushed
-             Calculate BOQ far right and created a visible gap after Download.
-             With the middle strip no longer set to flex:1, the right group
-             sits flush against the last tool button on the LEFT side of the
-             toolbar — leaving the right side naturally empty for the avatar
-             to overlay without interfering with any button. */
-          padding: "3px 10px",
-          background: UI.bg.toolbar,
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
-          flexWrap: "nowrap",
-          minHeight: 38,
-          position: "relative",
-          zIndex: 30,
+          gap: 10,
+          padding: 0,
+          height: 40,
+          width: "fit-content",
+          maxWidth: "100%",
+          background: "transparent",
+          pointerEvents: "none",
         }}
       >
-        {/* MIDDLE — tool strip sized to its content (NOT flex:1). The earlier
-            flex:1 stretched it across the toolbar, creating a dead gap between
-            the last tool button (Download) and Calculate BOQ. Setting
-            `flex: "0 1 auto"` keeps natural sizing on wide screens (no gap)
-            and still allows shrinking + horizontal scroll on narrow ones. */}
+        {/* LEFT — Upload New only (Phase Z.IFC.2 follow-up 2026-05-19:
+            FileIdentity removed — the filename + schema are already shown
+            in the bottom status bar, so this was duplicate info eating
+            horizontal space and pushing Calculate BOQ into the avatar). */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 4,
-            flex: "0 1 auto",
-            minWidth: 0,
-            overflowX: "auto",
-            overflowY: "hidden",
-            scrollbarWidth: "thin",
+            flexShrink: 0,
+            pointerEvents: "auto",
           }}
         >
-          {/* File */}
-          <ToolBtn icon={FolderOpen} label="Open" onClick={onOpenFile} showLabel />
+          <UploadNewButton onClick={onOpenFile} />
+        </div>
 
-          {hasModel && (
-            <>
-              <div style={dividerStyle} />
-
-              {/* Navigation */}
-              <ToolBtn icon={Home} label="Fit All" shortcut="F" onClick={() => v?.fitToView()} showLabel />
-              <ToolBtn icon={Maximize} label="Fit" shortcut="V" onClick={() => v?.fitToSelection()} />
-
-              <ToolBtn
-                icon={Box}
-                label="Views"
-                showLabel
-                onClick={() => {}}
-                dropdown={
-                  <>
-                    {(["front", "back", "left", "right", "top", "bottom", "iso"] as PresetView[]).map((view) => (
-                      <DropItem key={view} label={view.charAt(0).toUpperCase() + view.slice(1)} onClick={() => v?.setPresetView(view)} />
-                    ))}
-                  </>
-                }
+        {/* MIDDLE — 4 tool groups (only when a model is loaded) */}
+        {hasModel && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flex: "0 1 auto",
+              minWidth: 0,
+              overflowX: "auto",
+              overflowY: "hidden",
+              scrollbarWidth: "thin",
+              padding: "0 2px",
+              pointerEvents: "auto",
+            }}
+          >
+            {/* Camera group */}
+            <ToolGroup label="Camera">
+              <ToolButton
+                icon={<Home size={14} strokeWidth={2.2} />}
+                label={t("ifcViewer.tool.fitAll")}
+                shortcut="F"
+                onClick={() => v?.fitToView()}
               />
+              <ToolButton
+                icon={<Maximize size={14} strokeWidth={2.2} />}
+                label={t("ifcViewer.tool.fit")}
+                shortcut="V"
+                onClick={() => v?.fitToSelection()}
+              />
+              <ToolButton
+                icon={<Box size={14} strokeWidth={2.2} />}
+                label={t("ifcViewer.tool.views")}
+                hasDropdown
+                active={openMenu === "views"}
+                onClick={() => setOpenMenu(openMenu === "views" ? null : "views")}
+              >
+                <Dropdown open={openMenu === "views"} onClose={closeMenu}>
+                  {(["front", "back", "left", "right", "top", "bottom", "iso"] as PresetView[]).map((view) => (
+                    <DropItem
+                      key={view}
+                      label={t(`ifcViewer.view.${view}` as const)}
+                      onClick={() => {
+                        v?.setPresetView(view);
+                        closeMenu();
+                      }}
+                    />
+                  ))}
+                </Dropdown>
+              </ToolButton>
+              <ToolButton
+                icon={<Waypoints size={14} strokeWidth={2.2} />}
+                label={ortho ? t("ifcViewer.tool.persp") : t("ifcViewer.tool.ortho")}
+                active={ortho}
+                onClick={() => {
+                  const next = !ortho;
+                  setOrtho(next);
+                  v?.setProjection(next ? "orthographic" : "perspective");
+                }}
+              />
+            </ToolGroup>
 
-              <div style={dividerStyle} />
-
-              {/* Tools */}
-              <ToolBtn
-                icon={Scissors}
-                label="Section"
+            {/* Section + Measure group */}
+            <ToolGroup label="Section + Measure">
+              <ToolButton
+                icon={<Scissors size={14} strokeWidth={2.2} />}
+                label={t("ifcViewer.tool.section")}
                 shortcut="S"
-                showLabel
-                onClick={() => v?.toggleSectionPlane("x")}
-                dropdown={
-                  <>
-                    {(["x", "y", "z"] as SectionAxis[]).map((axis) => (
-                      <DropItem key={axis} label={`Section ${axis.toUpperCase()}`} onClick={() => v?.toggleSectionPlane(axis)} />
-                    ))}
-                  </>
-                }
-              />
-              <ToolBtn
-                icon={Ruler}
-                label={measuring ? "Stop" : "Measure"}
+                hasDropdown
+                active={openMenu === "section"}
+                onClick={() => setOpenMenu(openMenu === "section" ? null : "section")}
+              >
+                <Dropdown open={openMenu === "section"} onClose={closeMenu}>
+                  {(["x", "y", "z"] as SectionAxis[]).map((axis) => (
+                    <DropItem
+                      key={axis}
+                      label={t(`ifcViewer.section.${axis}` as const)}
+                      onClick={() => {
+                        v?.toggleSectionPlane(axis);
+                        closeMenu();
+                      }}
+                    />
+                  ))}
+                </Dropdown>
+              </ToolButton>
+              <ToolButton
+                icon={<Ruler size={14} strokeWidth={2.2} />}
+                label={measuring ? t("ifcViewer.tool.stop") : t("ifcViewer.tool.measure")}
                 shortcut="M"
                 active={measuring}
-                showLabel
                 onClick={() => {
                   if (measuring) {
                     v?.cancelMeasurement();
@@ -389,162 +483,197 @@ export function Toolbar({
                   }
                 }}
               />
-              {/* Unit toggle (m/ft) */}
-              <button
-                onClick={onToggleUnit}
-                title={`Switch to ${measureUnit === "m" ? "feet/inches" : "meters"}`}
-                style={{
-                  ...btnBase,
-                  width: "auto",
-                  padding: "0 8px",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  fontFamily: "var(--font-jetbrains)",
-                  color: UI.text.secondary,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = UI.text.primary; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = UI.text.secondary; }}
+              <UnitToggle value={measureUnit} onChange={onToggleUnit} />
+            </ToolGroup>
+
+            {/* Style group */}
+            <ToolGroup label="Style">
+              <ToolButton
+                icon={<Eye size={14} strokeWidth={2.2} />}
+                label={t("ifcViewer.tool.style")}
+                hasDropdown
+                active={openMenu === "style"}
+                onClick={() => setOpenMenu(openMenu === "style" ? null : "style")}
               >
-                {measureUnit}
-              </button>
-
-              <div style={dividerStyle} />
-
-              {/* Visual */}
-              <ToolBtn
-                icon={Eye}
-                label="Style"
-                showLabel
-                onClick={() => {}}
-                dropdown={
-                  <>
-                    <DropItem label="Shaded" active={viewMode === "shaded"} onClick={() => doSetViewMode("shaded")} />
-                    <DropItem label="Wireframe" active={viewMode === "wireframe"} onClick={() => doSetViewMode("wireframe")} />
-                    <DropItem label="X-Ray" active={viewMode === "xray"} onClick={() => doSetViewMode("xray")} />
-                  </>
-                }
+                <Dropdown open={openMenu === "style"} onClose={closeMenu}>
+                  <DropItem label={t("ifcViewer.style.shaded")} active={viewMode === "shaded"} onClick={() => doSetViewMode("shaded")} />
+                  <DropItem label={t("ifcViewer.style.wireframe")} active={viewMode === "wireframe"} onClick={() => doSetViewMode("wireframe")} />
+                  <DropItem label={t("ifcViewer.style.xray")} active={viewMode === "xray"} onClick={() => doSetViewMode("xray")} />
+                </Dropdown>
+              </ToolButton>
+              <ToolButton
+                icon={<Palette size={14} strokeWidth={2.2} />}
+                label={t("ifcViewer.tool.color")}
+                hasDropdown
+                active={openMenu === "color"}
+                onClick={() => setOpenMenu(openMenu === "color" ? null : "color")}
+              >
+                <Dropdown open={openMenu === "color"} onClose={closeMenu}>
+                  <DropItem label={t("ifcViewer.color.default")} active={colorBy === "default"} onClick={() => doSetColorBy("default")} />
+                  <DropItem label={t("ifcViewer.color.storey")} active={colorBy === "storey"} onClick={() => doSetColorBy("storey")} />
+                  <DropItem label={t("ifcViewer.color.category")} active={colorBy === "category"} onClick={() => doSetColorBy("category")} />
+                </Dropdown>
+              </ToolButton>
+              <ToolButton
+                icon={<Grid3x3 size={14} strokeWidth={2.2} />}
+                title={t("ifcViewer.tool.toggleGrid")}
+                onClick={() => v?.toggleGrid()}
               />
-              <ToolBtn
-                icon={Palette}
-                label="Color By"
-                onClick={() => {}}
-                dropdown={
-                  <>
-                    <DropItem label="Default" active={colorBy === "default"} onClick={() => doSetColorBy("default")} />
-                    <DropItem label="By Storey" active={colorBy === "storey"} onClick={() => doSetColorBy("storey")} />
-                    <DropItem label="By Category" active={colorBy === "category"} onClick={() => doSetColorBy("category")} />
-                  </>
-                }
+              <ToolButton
+                icon={<Layers size={14} strokeWidth={2.2} />}
+                title={t("ifcViewer.tool.toggleEdges")}
+                onClick={() => v?.toggleEdges()}
               />
-              <ToolBtn icon={Grid3x3} label="Toggle Grid" onClick={() => v?.toggleGrid()} />
-              <ToolBtn icon={Layers} label="Toggle Edges" onClick={() => v?.toggleEdges()} />
-              <ToolBtn
-                icon={Waypoints}
-                label={ortho ? "Perspective" : "Orthographic"}
-                active={ortho}
-                onClick={() => {
-                  const next = !ortho;
-                  setOrtho(next);
-                  v?.setProjection(next ? "orthographic" : "perspective");
-                }}
+            </ToolGroup>
+
+            {/* Visibility + Export group */}
+            <ToolGroup label="Visibility + Export">
+              <ToolButton
+                icon={<EyeOff size={14} strokeWidth={2.2} />}
+                title={t("ifcViewer.tool.hide")}
+                shortcut="H"
+                onClick={() => v?.hideSelected()}
               />
-
-              <div style={dividerStyle} />
-
-              {/* Selection actions */}
-              <ToolBtn icon={EyeOff} label="Hide Selected" shortcut="H" onClick={() => v?.hideSelected()} />
-              <ToolBtn icon={Scan} label="Isolate Selected" shortcut="I" onClick={() => v?.isolateSelected()} />
-              <ToolBtn icon={RotateCcw} label="Show All" shortcut="A" onClick={() => v?.showAll()} />
-
-              <div style={dividerStyle} />
-
-              {/* Export */}
-              <ToolBtn icon={Camera} label="Screenshot" shortcut="P" onClick={() => v?.takeScreenshot()} />
-              <ToolBtn
-                icon={Download}
-                label="Export CSV"
-                onClick={() => {
-                  const csv = v?.getCSVData();
-                  if (!csv) return;
-                  const blob = new Blob([csv], { type: "text/csv" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `ifc-elements-${Date.now()}.csv`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
+              <ToolButton
+                icon={<Scan size={14} strokeWidth={2.2} />}
+                title={t("ifcViewer.tool.isolate")}
+                shortcut="I"
+                onClick={() => v?.isolateSelected()}
               />
-            </>
-          )}
-        </div>
+              <ToolButton
+                icon={<RotateCcw size={14} strokeWidth={2.2} />}
+                title={t("ifcViewer.tool.showAll")}
+                shortcut="A"
+                onClick={() => v?.showAll()}
+              />
+              <ToolButton
+                icon={<Camera size={14} strokeWidth={2.2} />}
+                title={t("ifcViewer.tool.screenshot")}
+                shortcut="P"
+                onClick={() => v?.takeScreenshot()}
+              />
+              <ToolButton
+                icon={<Download size={14} strokeWidth={2.2} />}
+                title={t("ifcViewer.tool.exportCSV")}
+                onClick={downloadCSV}
+              />
+            </ToolGroup>
+          </div>
+        )}
 
-        {/* RIGHT — pinned: Calculate BOQ primary CTA only.
-            The X-close, Panel-Toggle, and Keyboard-Shortcuts header buttons
-            were removed (X 2026-05-18 — duplicated Upload New; Panel-Toggle +
-            Shortcuts 2026-05-18 follow-up — crowded the Calculate BOQ CTA and
-            caused avatar overlap at narrow viewports). Bottom panel still
-            toggles via the `[` keyboard shortcut and the in-panel minimize /
-            expand buttons; shortcuts overlay still toggles via the `?` key. */}
-        {hasModel && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            <CalculateBOQButton
+        {/* Help + BOQ — sit flush against the last tool group (Download).
+            Phase Z.IFC.2 follow-up 2026-05-19: the prior `flex:1` spacer
+            pushed BOQ to the right edge under the dashboard avatar; this
+            new layout lets the buttons flow naturally left-to-right so
+            the whole toolbar reads as one continuous family, and the
+            empty right zone naturally accommodates the floating avatar
+            (no margin hacks needed). */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+            pointerEvents: "auto",
+          }}
+        >
+          <HelpButton onClick={onToggleShortcuts} />
+          {hasModel && (
+            <BOQButton
               disabled={!canCalculateBOQ}
               loading={boqLaunching}
               onClick={onCalculateBOQ}
             />
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Spacer removed Phase Z.IFC.2 follow-up 2026-05-19 — the
+            outer floating wrapper now uses `justifyContent: center` to
+            center this content, and the Toolbar root is `width:
+            fit-content`. Spacer would force the toolbar back to filling
+            its parent and break centering. */}
       </div>
 
       {/* Shortcuts modal */}
       {showShortcuts && (
         <div
+          onClick={onToggleShortcuts}
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.6)",
+            background: "rgba(14,18,24,0.35)",
             backdropFilter: "blur(4px)",
             zIndex: 9990,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
-          onClick={onToggleShortcuts}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: 360,
+              width: 400,
               borderRadius: UI.radius.lg,
-              background: UI.bg.card,
-              border: `1px solid ${UI.border.default}`,
+              background: UI.bg.paper,
+              border: `1px solid ${UI.border.subtle}`,
               padding: 24,
-              boxShadow: UI.shadow.panel,
+              boxShadow: UI.shadow.floating,
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-              <h3 style={{ color: UI.text.primary, fontSize: 16, fontWeight: 600 }}>Keyboard Shortcuts</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h3
+                style={{
+                  color: UI.text.primary,
+                  fontSize: 18,
+                  fontWeight: 500,
+                  margin: 0,
+                  fontFamily: UI.font.display,
+                  fontStyle: "italic",
+                }}
+              >
+                Keyboard shortcuts
+              </h3>
               <button
+                type="button"
                 onClick={onToggleShortcuts}
-                style={{ background: "none", border: "none", color: UI.text.tertiary, cursor: "pointer" }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: UI.text.tertiary,
+                  cursor: "pointer",
+                  padding: 4,
+                  display: "flex",
+                }}
+                aria-label="Close"
               >
                 <X size={16} />
               </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {Object.values(SHORTCUTS).map((s) => (
-                <div key={s.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: UI.text.secondary, fontSize: 13 }}>{s.description}</span>
+                <div
+                  key={s.key}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "6px 0",
+                    borderBottom: `1px dashed ${UI.border.subtle}`,
+                  }}
+                >
+                  <span style={{ color: UI.text.secondary, fontSize: 13, fontFamily: UI.font.body }}>
+                    {s.description}
+                  </span>
                   <kbd
                     style={{
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      background: "rgba(255,255,255,0.04)",
+                      padding: "3px 10px",
+                      borderRadius: UI.radius.sm,
+                      background: UI.bg.cream,
                       border: `1px solid ${UI.border.subtle}`,
                       color: UI.text.primary,
-                      fontSize: 12,
-                      fontFamily: "var(--font-jetbrains)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      fontFamily: UI.font.mono,
                     }}
                   >
                     {s.label}

@@ -12,7 +12,7 @@
    status row. */
 
 import React, { useCallback, useMemo } from "react";
-import { Globe, RefreshCw, Sparkles, TriangleAlert } from "lucide-react";
+import { RefreshCw, TriangleAlert } from "lucide-react";
 import { UI } from "@/features/ifc/components/constants";
 import {
   PANORAMA_BUCKETS,
@@ -54,8 +54,10 @@ interface Props {
   disabled: boolean;
 }
 
-const ACCENT_CYAN = "#00F5FF";
-const ACCENT_AMBER = "#FFBF00";
+/* ACCENT_AMBER kept for the tier-2 conflict pill (only visible call site
+   left after the compression pass). ACCENT_CYAN was used by the dropped
+   "Detected" chip + thumbnail border (now uses RS tokens), so removed. */
+const ACCENT_AMBER = "var(--rs-amber-mark)";
 
 export function PanoramaSection({
   selectedAsset,
@@ -64,7 +66,10 @@ export function PanoramaSection({
   tier2GroundEnabled,
   keepTier2Override,
   onToggleKeepTier2,
-  lastAppliedSlug,
+  /* lastAppliedSlug — prop kept on the interface for backwards-compat
+     with the parent's call site, but no longer rendered (the "Staged: …"
+     status row was dropped in the compression pass). */
+  lastAppliedSlug: _lastAppliedSlug,
   disabled,
 }: Props) {
   const detection = useMemo(
@@ -94,95 +99,41 @@ export function PanoramaSection({
   const conflictActive = selectedAsset !== null && tier2GroundEnabled;
 
   return (
-    <div style={{ padding: "0 0 6px" }}>
-      {/* Detected type chip + clear-staging affordance */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "6px 10px 8px",
-        }}
-      >
-        <div
-          title={detection.reasoning}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "3px 8px",
-            fontSize: 10.5,
-            fontWeight: 600,
-            color: UI.text.secondary,
-            background: "rgba(79,138,255,0.06)",
-            border: "1px solid rgba(79,138,255,0.18)",
-            borderRadius: 999,
-          }}
-        >
-          <Sparkles size={11} color={ACCENT_CYAN} />
-          <span>
-            Detected: {PANORAMA_BUCKET_LABELS[detection.bucket]}
-            <span style={{ color: UI.text.tertiary, marginLeft: 4 }}>
-              ({detection.source})
-            </span>
-          </span>
-        </div>
-        {selectedAsset && (
-          <button
-            type="button"
-            onClick={handleClear}
-            disabled={disabled}
-            title="Clear panorama selection — Apply will skip the 360° step."
-            style={{
-              padding: "3px 7px",
-              fontSize: 10,
-              fontWeight: 600,
-              border: "1px solid rgba(255,255,255,0.1)",
-              background: "rgba(255,255,255,0.04)",
-              color: UI.text.tertiary,
-              borderRadius: 5,
-              cursor: disabled ? "not-allowed" : "pointer",
-            }}
-          >
-            Clear
-          </button>
-        )}
-      </div>
+    <div style={{ padding: "2px 8px 6px" }}>
+      {/* Compressed redesign — Phase Z.IFC.2 follow-up 2026-05-19.
+          Drops the duplicate detected chip (already shown in ApplyHero
+          at the top of the panel). Drops the bulky "Type" label + dark
+          dropdown — replaced with a tight RS-themed select sitting
+          flush left. Drops the "Staged: X" status row (the highlighted
+          thumbnail already conveys what's staged). Tier-2 warning
+          becomes a tiny inline note instead of a full amber wall. */}
 
-      {/* Building type dropdown */}
+      {/* Type select + clear-staging — single tight row */}
       <div
         style={{
           display: "flex",
           gap: 6,
           alignItems: "center",
-          padding: "0 10px 8px",
+          padding: "2px 2px 8px",
         }}
       >
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            color: UI.text.tertiary,
-            textTransform: "uppercase",
-            letterSpacing: 0.6,
-          }}
-        >
-          Type
-        </span>
         <select
           value={activeBucket}
           onChange={(e) => handleBucketChange(e.target.value as PanoramaBucket)}
           disabled={disabled}
           style={{
             flex: 1,
-            background: "rgba(7,7,13,0.6)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            height: 28,
+            background: UI.bg.cream,
+            border: `1px solid ${UI.border.subtle}`,
             borderRadius: UI.radius.sm,
             color: UI.text.primary,
-            padding: "5px 7px",
+            padding: "0 8px",
             fontSize: 11,
             outline: "none",
-            fontFamily: "inherit",
+            fontFamily: UI.font.body,
+            cursor: disabled ? "not-allowed" : "pointer",
+            appearance: "auto",
           }}
         >
           {PANORAMA_BUCKETS.map((b) => (
@@ -195,30 +146,57 @@ export function PanoramaSection({
           <button
             type="button"
             onClick={() => handleBucketChange(detection.bucket)}
-            title="Reset to detected type"
+            title={`Reset to detected: ${PANORAMA_BUCKET_LABELS[detection.bucket]}`}
             disabled={disabled}
             style={{
-              padding: "4px 6px",
-              fontSize: 10,
-              border: "1px solid rgba(255,255,255,0.1)",
-              background: "rgba(255,255,255,0.04)",
+              height: 28,
+              width: 28,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: `1px solid ${UI.border.subtle}`,
+              background: UI.bg.cream,
               color: UI.text.secondary,
-              borderRadius: 5,
+              borderRadius: UI.radius.sm,
               cursor: disabled ? "not-allowed" : "pointer",
             }}
           >
-            <RefreshCw size={10} />
+            <RefreshCw size={11} />
+          </button>
+        )}
+        {selectedAsset && (
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={disabled}
+            title="Clear panorama selection — Apply will skip the 360° step."
+            style={{
+              height: 28,
+              padding: "0 10px",
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: 0.4,
+              textTransform: "uppercase",
+              fontFamily: UI.font.mono,
+              border: `1px solid ${UI.border.subtle}`,
+              background: UI.bg.cream,
+              color: UI.text.secondary,
+              borderRadius: UI.radius.sm,
+              cursor: disabled ? "not-allowed" : "pointer",
+            }}
+          >
+            Clear
           </button>
         )}
       </div>
 
-      {/* Asset thumbnail picker — horizontal scroll */}
+      {/* Asset thumbnail strip — horizontal scroll, compact 80px tiles */}
       <div
         style={{
           display: "flex",
           gap: 6,
           overflowX: "auto",
-          padding: "0 10px 8px",
+          padding: "0 2px 4px",
         }}
       >
         {assetsInBucket.length === 0 && (
@@ -238,13 +216,13 @@ export function PanoramaSection({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
+                alignItems: "stretch",
                 gap: 4,
-                padding: 4,
-                width: 96,
+                padding: 3,
+                width: 80,
                 flexShrink: 0,
-                background: isSelected ? "rgba(0,245,255,0.06)" : "rgba(255,255,255,0.02)",
-                border: `1px solid ${isSelected ? ACCENT_CYAN : "rgba(255,255,255,0.08)"}`,
+                background: isSelected ? "var(--rs-blueprint-soft)" : UI.bg.paper,
+                border: `1px solid ${isSelected ? "var(--rs-blueprint)" : UI.border.subtle}`,
                 borderRadius: UI.radius.sm,
                 cursor: disabled ? "not-allowed" : "pointer",
                 opacity: disabled ? 0.55 : 1,
@@ -252,26 +230,24 @@ export function PanoramaSection({
             >
               <div
                 style={{
-                  width: 88,
-                  height: 44,
-                  borderRadius: 4,
+                  width: "100%",
+                  height: 40,
+                  borderRadius: 3,
                   backgroundImage: `url(${asset.thumbnail ?? panoramaUrlFor(asset)})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
-                  border: "1px solid rgba(255,255,255,0.04)",
                 }}
               />
               <span
                 style={{
-                  fontSize: 9.5,
-                  color: isSelected ? ACCENT_CYAN : UI.text.secondary,
+                  fontSize: 9,
+                  color: isSelected ? "var(--rs-blueprint)" : UI.text.secondary,
                   fontWeight: 600,
                   textAlign: "center",
                   lineHeight: 1.2,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  width: "100%",
                 }}
               >
                 {asset.displayName}
@@ -281,80 +257,39 @@ export function PanoramaSection({
         })}
       </div>
 
-      {/* Tier 2 conflict warning — preemptive (shown before Apply runs).
-          The parent's orchestration uses `keepTier2Override` to decide
-          whether to skip Tier 2 in the apply pipeline. */}
+      {/* Tier-2 conflict — tiny inline note instead of full amber wall */}
       {conflictActive && (
-        <div
+        <button
+          type="button"
+          onClick={onToggleKeepTier2}
+          disabled={disabled}
+          title={
+            keepTier2Override
+              ? "Click to skip ground (recommended)."
+              : "Click to keep the ground plane anyway."
+          }
           style={{
-            margin: "0 10px 6px",
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 6,
-            padding: "6px 8px",
-            background: keepTier2Override
-              ? "rgba(52,211,153,0.06)"
-              : "rgba(255,191,0,0.08)",
-            border: `1px solid ${keepTier2Override ? "rgba(52,211,153,0.25)" : "rgba(255,191,0,0.25)"}`,
-            borderRadius: UI.radius.sm,
-            fontSize: 10.5,
-            color: UI.text.secondary,
-            lineHeight: 1.4,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            margin: "6px 0 0",
+            padding: "3px 8px",
+            fontSize: 10,
+            color: keepTier2Override ? UI.accent.sage : ACCENT_AMBER,
+            background: keepTier2Override ? "var(--rs-sage-soft)" : "var(--rs-amber-soft)",
+            border: `1px solid ${keepTier2Override ? UI.accent.sage : ACCENT_AMBER}`,
+            borderRadius: 999,
+            cursor: disabled ? "not-allowed" : "pointer",
+            fontFamily: UI.font.mono,
+            fontWeight: 600,
+            letterSpacing: 0.3,
+            textTransform: "uppercase",
           }}
         >
-          <TriangleAlert
-            size={12}
-            color={keepTier2Override ? UI.accent.green : ACCENT_AMBER}
-            style={{ flexShrink: 0, marginTop: 2 }}
-          />
-          <div style={{ flex: 1 }}>
-            {keepTier2Override
-              ? "Ground plane will mount on top of the panorama. May visually clash."
-              : "Ground plane will be skipped on Apply — a real-world panorama already includes ground."}
-            <button
-              type="button"
-              onClick={onToggleKeepTier2}
-              disabled={disabled}
-              style={{
-                marginLeft: 6,
-                background: "transparent",
-                border: "none",
-                color: ACCENT_CYAN,
-                cursor: disabled ? "not-allowed" : "pointer",
-                fontSize: 10.5,
-                textDecoration: "underline",
-                padding: 0,
-              }}
-            >
-              {keepTier2Override ? "Skip ground" : "Keep ground anyway"}
-            </button>
-          </div>
-        </div>
+          <TriangleAlert size={10} />
+          {keepTier2Override ? "Ground kept" : "Ground skipped"}
+        </button>
       )}
-
-      {/* Status row */}
-      <div
-        style={{
-          padding: "0 10px 4px",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          fontSize: 9.5,
-          color: UI.text.tertiary,
-        }}
-      >
-        <Globe size={10} color={UI.text.tertiary} />
-        <span>
-          {selectedAsset
-            ? `Staged: ${selectedAsset.displayName}`
-            : "No panorama selected — Apply will leave the blueprint background."}
-        </span>
-        {lastAppliedSlug && lastAppliedSlug !== selectedAsset?.slug && (
-          <span style={{ marginLeft: "auto", color: UI.text.tertiary }}>
-            Last applied: {lastAppliedSlug}
-          </span>
-        )}
-      </div>
     </div>
   );
 }

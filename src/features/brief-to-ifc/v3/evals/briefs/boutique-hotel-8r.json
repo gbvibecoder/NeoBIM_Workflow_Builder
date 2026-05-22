@@ -1,0 +1,62 @@
+{
+  "project": {
+    "name": "Boutique Hotel — 8 Rooms",
+    "type": "hotel",
+    "location": "Goa",
+    "description": "A small two-storey boutique hotel: 4 guest rooms per floor flanking a central corridor, internal stair connecting floors, flat roof. Tests 'hotel' project type (previously enum-only, never tested live), repetitive room scale, and multi-storey vertical circulation. Floor-to-floor 3.0m."
+  },
+  "site": {
+    "bounds_m": [24.0, 10.0],
+    "height_limit_m": 8.0,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    { "id": "SP-GF-COR", "name": "SP-GF-COR", "long_name": "Ground Floor Corridor", "polygon_world_m": [[0.0, 4.0], [24.0, 4.0], [24.0, 6.0], [0.0, 6.0]], "height_m": 3.0, "occupancy_type": "Corridor" },
+    { "id": "SP-GF-R1", "name": "SP-GF-R1", "long_name": "Ground Room 1", "polygon_world_m": [[0.0, 0.0], [6.0, 0.0], [6.0, 4.0], [0.0, 4.0]], "height_m": 3.0, "occupancy_type": "Guest Room" },
+    { "id": "SP-GF-R2", "name": "SP-GF-R2", "long_name": "Ground Room 2", "polygon_world_m": [[6.0, 0.0], [12.0, 0.0], [12.0, 4.0], [6.0, 4.0]], "height_m": 3.0, "occupancy_type": "Guest Room" },
+    { "id": "SP-GF-R3", "name": "SP-GF-R3", "long_name": "Ground Room 3", "polygon_world_m": [[0.0, 6.0], [6.0, 6.0], [6.0, 10.0], [0.0, 10.0]], "height_m": 3.0, "occupancy_type": "Guest Room" },
+    { "id": "SP-GF-R4", "name": "SP-GF-R4", "long_name": "Ground Room 4", "polygon_world_m": [[6.0, 6.0], [12.0, 6.0], [12.0, 10.0], [6.0, 10.0]], "height_m": 3.0, "occupancy_type": "Guest Room" },
+    { "id": "SP-FF-COR", "name": "SP-FF-COR", "long_name": "First Floor Corridor", "polygon_world_m": [[0.0, 4.0], [24.0, 4.0], [24.0, 6.0], [0.0, 6.0]], "height_m": 3.0, "occupancy_type": "Corridor" },
+    { "id": "SP-FF-R1", "name": "SP-FF-R1", "long_name": "First Room 1", "polygon_world_m": [[0.0, 0.0], [6.0, 0.0], [6.0, 4.0], [0.0, 4.0]], "height_m": 3.0, "occupancy_type": "Guest Room" },
+    { "id": "SP-FF-R2", "name": "SP-FF-R2", "long_name": "First Room 2", "polygon_world_m": [[6.0, 0.0], [12.0, 0.0], [12.0, 4.0], [6.0, 4.0]], "height_m": 3.0, "occupancy_type": "Guest Room" },
+    { "id": "SP-FF-R3", "name": "SP-FF-R3", "long_name": "First Room 3", "polygon_world_m": [[0.0, 6.0], [6.0, 6.0], [6.0, 10.0], [0.0, 10.0]], "height_m": 3.0, "occupancy_type": "Guest Room" },
+    { "id": "SP-FF-R4", "name": "SP-FF-R4", "long_name": "First Room 4", "polygon_world_m": [[6.0, 6.0], [12.0, 6.0], [12.0, 10.0], [6.0, 10.0]], "height_m": 3.0, "occupancy_type": "Guest Room" }
+  ],
+  "elements": [
+    { "id": "SLAB-GF", "type": "slab", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [24.0, 10.0, 0.2], "material_id": "mat-concrete", "description": "Ground floor slab", "object_type": "Floor Slab", "tag": "SLAB-GF" },
+    { "id": "SLAB-FF", "type": "slab", "origin_world_m": [0.0, 0.0, 3.0], "dims_m": [24.0, 10.0, 0.2], "material_id": "mat-concrete", "description": "First floor slab", "object_type": "Floor Slab", "tag": "SLAB-FF" },
+
+    { "id": "WALL-EXT-N-GF", "type": "wall", "origin_world_m": [0.0, 9.85, 0.0], "dims_m": [24.0, 0.15, 3.0], "material_id": "mat-paint", "description": "Ground north external wall", "object_type": "External Wall", "tag": "WALL-EXT-N-GF" },
+    { "id": "WALL-EXT-S-GF", "type": "wall", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [24.0, 0.15, 3.0], "material_id": "mat-paint", "description": "Ground south external wall", "object_type": "External Wall", "tag": "WALL-EXT-S-GF" },
+    { "id": "WALL-EXT-E-GF", "type": "wall", "origin_world_m": [23.85, 0.0, 0.0], "dims_m": [0.15, 10.0, 3.0], "material_id": "mat-paint", "description": "Ground east external wall", "object_type": "External Wall", "tag": "WALL-EXT-E-GF" },
+    { "id": "WALL-EXT-W-GF", "type": "wall", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [0.15, 10.0, 3.0], "material_id": "mat-paint", "description": "Ground west external wall", "object_type": "External Wall", "tag": "WALL-EXT-W-GF" },
+
+    { "id": "WALL-COR-S-GF", "type": "wall", "origin_world_m": [0.0, 4.0, 0.0], "dims_m": [24.0, 0.1, 3.0], "material_id": "mat-paint", "description": "Ground corridor south wall", "object_type": "Partition", "tag": "WALL-COR-S-GF" },
+    { "id": "WALL-COR-N-GF", "type": "wall", "origin_world_m": [0.0, 6.0, 0.0], "dims_m": [24.0, 0.1, 3.0], "material_id": "mat-paint", "description": "Ground corridor north wall", "object_type": "Partition", "tag": "WALL-COR-N-GF" },
+
+    { "id": "WALL-EXT-N-FF", "type": "wall", "origin_world_m": [0.0, 9.85, 3.0], "dims_m": [24.0, 0.15, 3.0], "material_id": "mat-paint", "description": "First north external wall", "object_type": "External Wall", "tag": "WALL-EXT-N-FF" },
+    { "id": "WALL-EXT-S-FF", "type": "wall", "origin_world_m": [0.0, 0.0, 3.0], "dims_m": [24.0, 0.15, 3.0], "material_id": "mat-paint", "description": "First south external wall", "object_type": "External Wall", "tag": "WALL-EXT-S-FF" },
+    { "id": "WALL-EXT-E-FF", "type": "wall", "origin_world_m": [23.85, 0.0, 3.0], "dims_m": [0.15, 10.0, 3.0], "material_id": "mat-paint", "description": "First east external wall", "object_type": "External Wall", "tag": "WALL-EXT-E-FF" },
+    { "id": "WALL-EXT-W-FF", "type": "wall", "origin_world_m": [0.0, 0.0, 3.0], "dims_m": [0.15, 10.0, 3.0], "material_id": "mat-paint", "description": "First west external wall", "object_type": "External Wall", "tag": "WALL-EXT-W-FF" },
+
+    { "id": "STAIR-GF-FF", "type": "stair", "origin_world_m": [13.0, 4.0, 0.0], "dims_m": [5.0, 1.2, 3.0], "material_id": "mat-concrete", "description": "Central stair connecting ground to first floor", "object_type": "Stair", "tag": "STAIR-GF-FF" },
+
+    { "id": "ROOF-HOTEL", "type": "roof", "origin_world_m": [0.0, 0.0, 6.0], "dims_m": [24.0, 10.0, 0.15], "material_id": "mat-concrete", "description": "Flat roof over the hotel", "object_type": "Flat Roof", "tag": "ROOF-HOTEL" },
+
+    { "id": "PARAPET-HOTEL-N", "type": "parapet", "origin_world_m": [0.0, 9.9, 6.15], "dims_m": [24.0, 0.1, 0.9], "material_id": "mat-paint", "description": "North parapet around the roof", "object_type": "Parapet", "tag": "PARAPET-HOTEL-N" },
+    { "id": "PARAPET-HOTEL-S", "type": "parapet", "origin_world_m": [0.0, 0.0, 6.15], "dims_m": [24.0, 0.1, 0.9], "material_id": "mat-paint", "description": "South parapet around the roof", "object_type": "Parapet", "tag": "PARAPET-HOTEL-S" },
+
+    { "id": "BED-GF-R1", "type": "furniture", "origin_world_m": [1.0, 0.5, 0.0], "dims_m": [2.0, 1.5, 0.5], "material_id": "mat-wood", "description": "Bed in ground room 1", "object_type": "Bed", "tag": "BED-GF-R1", "contained_in_space_id": "SP-GF-R1" },
+    { "id": "BED-FF-R3", "type": "furniture", "origin_world_m": [1.0, 6.5, 3.0], "dims_m": [2.0, 1.5, 0.5], "material_id": "mat-wood", "description": "Bed in first floor room 3", "object_type": "Bed", "tag": "BED-FF-R3", "contained_in_space_id": "SP-FF-R3" }
+  ],
+  "materials": [
+    { "id": "mat-concrete", "name": "RCC Concrete", "rgb": [0.7, 0.7, 0.7], "roughness": 0.85, "method": "MATT", "category": "concrete" },
+    { "id": "mat-paint", "name": "Warm Paint", "rgb": [0.95, 0.92, 0.86], "roughness": 0.75, "method": "MATT", "category": "paint" },
+    { "id": "mat-wood", "name": "Teak Wood", "rgb": [0.55, 0.4, 0.28], "roughness": 0.55, "method": "MATT", "category": "wood" }
+  ],
+  "brand_language": {
+    "primary_text": "Boutique Hotel — 8 Rooms",
+    "approved_terms": ["Hotel", "Guest Room", "Corridor"],
+    "forbidden_terms": []
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from "react";
 import {
   ChevronRight, ChevronDown, Building2, Layers, Box, Search,
 } from "lucide-react";
@@ -11,6 +11,12 @@ interface ModelTreeProps {
   tree: SpatialNode[];
   selectedID: number | null;
   viewportRef: React.RefObject<ViewportHandle | null>;
+}
+
+/* Imperative handle so the CollapsedRail's Search button can focus the
+   filter input after expanding the sidebar + switching to Tree. */
+export interface ModelTreeHandle {
+  focusFilter: () => void;
 }
 
 /* Icon for IFC type */
@@ -63,15 +69,15 @@ function TreeNode({
           gap: 6,
           paddingLeft: depth * 16 + 8,
           paddingRight: 8,
-          height: 34,
+          height: 32,
           position: "relative",
           cursor: node.expressID > 0 ? "pointer" : "default",
-          background: isSelected ? "rgba(79,138,255,0.08)" : "transparent",
-          borderLeft: isSelected ? `2px solid ${UI.accent.blue}` : "2px solid transparent",
-          transition: "background 0.1s",
+          background: isSelected ? "var(--rs-blueprint-soft)" : "transparent",
+          borderLeft: isSelected ? `2px solid var(--rs-blueprint)` : "2px solid transparent",
+          transition: UI.transition,
         }}
         onMouseEnter={(e) => {
-          if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+          if (!isSelected) e.currentTarget.style.background = UI.bg.cream;
         }}
         onMouseLeave={(e) => {
           if (!isSelected) e.currentTarget.style.background = "transparent";
@@ -87,7 +93,7 @@ function TreeNode({
               top: 0,
               bottom: 0,
               width: 1,
-              background: "rgba(255,255,255,0.04)",
+              background: UI.border.subtle,
             }}
           />
         ))}
@@ -140,11 +146,13 @@ function TreeNode({
               marginLeft: "auto",
               fontSize: 10,
               color: UI.text.tertiary,
-              background: "rgba(255,255,255,0.05)",
-              padding: "1px 6px",
+              background: UI.bg.cream,
+              border: `1px solid ${UI.border.subtle}`,
+              padding: "1px 7px",
               borderRadius: 10,
-              fontFamily: "var(--font-jetbrains)",
+              fontFamily: UI.font.mono,
               flexShrink: 0,
+              fontWeight: 600,
             }}
           >
             {node.elementCount}
@@ -169,8 +177,14 @@ function TreeNode({
   );
 }
 
-export function ModelTree({ tree, selectedID, viewportRef }: ModelTreeProps) {
+export const ModelTree = forwardRef<ModelTreeHandle, ModelTreeProps>(
+function ModelTree({ tree, selectedID, viewportRef }, ref) {
   const [filter, setFilter] = useState("");
+  const filterInputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusFilter: () => filterInputRef.current?.focus(),
+  }), []);
 
   const handleSelect = useCallback(
     (id: number) => {
@@ -181,8 +195,37 @@ export function ModelTree({ tree, selectedID, viewportRef }: ModelTreeProps) {
 
   if (tree.length === 0) {
     return (
-      <div style={{ padding: 16, color: UI.text.tertiary, fontSize: 13, textAlign: "center" }}>
-        No spatial structure available
+      <div
+        style={{
+          padding: 32,
+          color: UI.text.tertiary,
+          fontSize: 12.5,
+          textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+          fontFamily: UI.font.body,
+        }}
+      >
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            background: UI.bg.cream,
+            border: `1px solid ${UI.border.subtle}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Building2 size={20} color={UI.text.tertiary} strokeWidth={1.6} />
+        </div>
+        <div style={{ maxWidth: 240, lineHeight: 1.5 }}>
+          The IFC didn&apos;t expose a spatial structure — try a richer file or use
+          the Inspect tab to drill into individual elements.
+        </div>
       </div>
     );
   }
@@ -190,31 +233,32 @@ export function ModelTree({ tree, selectedID, viewportRef }: ModelTreeProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Search */}
-      <div style={{ padding: "10px 10px 6px", flexShrink: 0 }}>
+      <div style={{ padding: "10px 12px 8px", flexShrink: 0 }}>
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            padding: "5px 10px",
-            borderRadius: UI.radius.sm,
-            background: "rgba(255,255,255,0.03)",
+            gap: 8,
+            padding: "6px 10px",
+            borderRadius: UI.radius.md,
+            background: UI.bg.cream,
             border: `1px solid ${UI.border.subtle}`,
           }}
         >
           <Search size={12} color={UI.text.tertiary} />
           <input
+            ref={filterInputRef}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter tree..."
+            placeholder="Filter spatial nodes…"
             style={{
               flex: 1,
               background: "transparent",
               border: "none",
               outline: "none",
               color: UI.text.primary,
-              fontSize: 12,
-              fontFamily: "var(--font-dm-sans)",
+              fontSize: 11.5,
+              fontFamily: UI.font.mono,
             }}
           />
         </div>
@@ -235,4 +279,6 @@ export function ModelTree({ tree, selectedID, viewportRef }: ModelTreeProps) {
       </div>
     </div>
   );
-}
+});
+
+ModelTree.displayName = "ModelTree";

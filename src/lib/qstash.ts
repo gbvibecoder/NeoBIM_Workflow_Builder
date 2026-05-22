@@ -218,6 +218,68 @@ export async function scheduleBriefToIfcWorker(
   return result.messageId;
 }
 
+// ─── Brief-to-IFC v3 Agent Build (Phase gamma.2) ───────────────────
+
+/**
+ * Schedule the v3 agent build worker. QStash POSTs to
+ * `/api/brief-to-ifc/v3/agent-job` with the full γ.1 Direct Agent Mode
+ * payload: runId + briefText + suggestions + iteration. The worker loads
+ * briefSpec from the DB, combines with the payload fields, and runs the
+ * generator loop with the verify→hint→iterate quality loop.
+ *
+ * Phase gamma.3: payload now carries ALL γ.1 fields (briefText,
+ * suggestions, iteration) — γ.2 only passed runId and the agent ran
+ * blind on spec-only input (quality 45, proven on cmpdqhfx).
+ */
+export interface AgentBuildWorkerPayload {
+  runId: string;
+  briefText?: string;
+  suggestions?: Record<string, unknown>;
+  previousFeedback?: string;
+  iteration?: number;
+}
+
+export interface ScheduleAgentBuildWorkerOptions {
+  /**
+   * Optional Upstash-Deduplication-Id header value. Phase δ.3 uses
+   * this as defense-in-depth for the per-iteration QStash chain:
+   * set `<runId>-iter-<N>` when re-enqueueing iteration N, so any
+   * QStash double-delivery is dropped at the queue level (in addition
+   * to the DB-level atomic currentIteration counter check in the
+   * worker, which is the primary guard).
+   */
+  dedupId?: string;
+}
+
+export async function scheduleAgentBuildWorker(
+  payload: AgentBuildWorkerPayload,
+  options: ScheduleAgentBuildWorkerOptions = {},
+): Promise<string> {
+  const client = getClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const workerUrl = `${appUrl}/api/brief-to-ifc/v3/agent-job`;
+
+  const headers: Record<string, string> = {};
+  if (options.dedupId) {
+    // QStash deduplicates publishes that share an Upstash-Deduplication-Id
+    // within the configured dedup window. The DB-level currentIteration
+    // counter is the authoritative idempotency guard; this header is a
+    // belt-and-braces measure that prevents the duplicate from ever
+    // reaching the worker.
+    headers["Upstash-Deduplication-Id"] = options.dedupId;
+  }
+
+  const result = await client.publishJSON({
+    url: workerUrl,
+    body: payload,
+    retries: 0,
+    timeout: "15m",
+    ...(Object.keys(headers).length > 0 ? { headers } : {}),
+  });
+
+  return result.messageId;
+}
+
 /**
  * Verify that a request came from QStash (signature validation).
  * Returns true if valid, false otherwise.

@@ -19,6 +19,13 @@
 export const BRIEF_TO_IFC_V3_ERROR_CODES = [
   // --- Cost / budget exhaustion ----------------------------------------
   "COST_CAP_EXCEEDED",
+  /** Phase ζ.2 — cumulative run cost (across all iterations) exceeded
+   *  `RUN_COST_CAP_USD`. Distinct from `COST_CAP_EXCEEDED` (which caps
+   *  a single iteration) so the dashboard / diagnostic CLI can tell
+   *  "this iteration overspent" from "this RUN has spent enough across
+   *  all its iterations". User-actionable: raise the cap or accept the
+   *  best-so-far result. */
+  "RUN_COST_CAP_EXCEEDED",
   "MAX_TURNS_EXCEEDED",
   "EXECUTION_TIMEOUT",
   // --- Sandbox / Railway failures --------------------------------------
@@ -83,6 +90,7 @@ export function toBriefToIfcV3ErrorCode(
  *  cost cap, etc.). The dashboard surfaces a "Retry" CTA for these. */
 export const USER_ACTIONABLE_CODES: ReadonlySet<BriefToIfcV3ErrorCode> = new Set([
   "COST_CAP_EXCEEDED",
+  "RUN_COST_CAP_EXCEEDED",
   "MAX_TURNS_EXCEEDED",
   "EXECUTION_TIMEOUT",
   "SANDBOX_TIMEOUT",

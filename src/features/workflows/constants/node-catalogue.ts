@@ -394,6 +394,153 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     tags: ["validate", "geometry", "bbox", "ifc", "v3", "qa"],
     executionTime: "< 3s",
   },
+  {
+    id: "TR-028",
+    name: "Item Decomposer (advisory)",
+    description:
+      "Item Decomposer (advisory) — suggests part breakdown for furniture/equipment items via parallel Opus calls. Each item gets a parts[] array with 6+ sub-components as suggestions for the agent.",
+    category: "transform",
+    icon: "Wand2",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+      { id: "classification-in", label: "Classification", type: "text" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (with parts)", type: "json" },
+      { id: "metrics-out", label: "Decomposer Metrics", type: "json" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 (parallel tool_use)",
+    tags: ["ai", "decompose", "furniture", "parts", "ifc", "v3", "anthropic"],
+    executionTime: "5-20s",
+  },
+
+  // ── Phase Beta 2 (2026-05-18): 5 new pipeline nodes ──
+  {
+    id: "TR-029",
+    name: "Architectural Reasoner (advisory)",
+    description:
+      "Architectural Reasoner (advisory) — suggests rationale and positioning for furniture items via Opus. Photography studios get backdrop-away-from-light, offices get desk-facing-window, etc.",
+    category: "transform",
+    icon: "Compass",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (with rationale)", type: "json" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 (single call)",
+    tags: ["ai", "reasoning", "positioning", "domain", "v3", "anthropic"],
+    executionTime: "15-30s",
+  },
+  {
+    id: "TR-030",
+    name: "Trim Specifier (advisory)",
+    description:
+      "Trim Specifier (advisory) — suggests trim items including skirting along walls, door hinges/handles/strike plates, window handles. Single Opus call.",
+    category: "transform",
+    icon: "Wrench",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (with trim)", type: "json" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 (single call)",
+    tags: ["ai", "trim", "hardware", "skirting", "v3", "anthropic"],
+    executionTime: "10-25s",
+  },
+  {
+    id: "TR-031",
+    name: "Material Resolver",
+    description:
+      "Resolves material strings to 50-entry canonical library via fuzzy match — deterministic, sub-50ms. No AI call.",
+    category: "transform",
+    icon: "Palette",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (normalized materials)", type: "json" },
+    ],
+    apiEngine: "Deterministic (no AI call)",
+    tags: ["material", "resolver", "deterministic", "v3"],
+    executionTime: "< 50ms",
+  },
+  {
+    id: "TR-034",
+    name: "Spec Validator",
+    description:
+      "Deterministic spec validation gate — fails fast on structural errors (missing polygons, NaN coords, broken refs), warns on quality issues.",
+    category: "transform",
+    icon: "ShieldCheck",
+    inputs: [
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "BriefSpec (validated)", type: "json" },
+      { id: "report-out", label: "Validation Report", type: "json" },
+    ],
+    apiEngine: "Deterministic (no AI call)",
+    tags: ["validate", "spec", "deterministic", "gate", "v3"],
+    executionTime: "< 10ms",
+  },
+  {
+    id: "TR-032",
+    name: "Vision Inspector",
+    description:
+      "Renders IFC to PNG, feeds to Opus 4.7 vision with briefSpec. Returns quality_score 0-100, issues list, pass/fail. Read-only — does not modify IFC.",
+    category: "transform",
+    icon: "Eye",
+    inputs: [
+      { id: "ifc-in", label: "IFC File", type: "ifc" },
+    ],
+    outputs: [
+      { id: "report-out", label: "Vision Report", type: "json" },
+      { id: "ifc-out", label: "IFC File (passthrough)", type: "ifc" },
+    ],
+    apiEngine: "Anthropic Opus 4.7 (vision)",
+    tags: ["ai", "vision", "quality", "inspection", "v3", "anthropic"],
+    executionTime: "20-45s",
+  },
+  // Phase Beta 3: Self-correcting pipeline nodes
+  {
+    id: "TR-033",
+    name: "Spec Patcher",
+    description:
+      "Combines Hard Verifier mismatches + Vision Inspector issues to decide if a rebuild is needed. Generates MUST_BUILD patches for collapsed or missing items. Part of the self-correcting pipeline.",
+    category: "transform",
+    icon: "Wrench",
+    inputs: [
+      { id: "ifc-in", label: "IFC File", type: "ifc" },
+      { id: "report-in", label: "Reports", type: "json" },
+    ],
+    outputs: [
+      { id: "spec-out", label: "Patched Spec", type: "json" },
+      { id: "ifc-out", label: "Best IFC", type: "ifc" },
+    ],
+    apiEngine: "Anthropic Opus 4.7",
+    tags: ["ai", "patch", "self-correct", "retry", "v3", "anthropic"],
+    executionTime: "5-15s",
+  },
+  {
+    id: "TR-035",
+    name: "Hard Verifier",
+    description:
+      "Deterministic verification: compares spec.furniture[].parts vs actual IfcRelAggregates in the produced IFC. Reports parts_coverage, trim_coverage, and itemised mismatches.",
+    category: "transform",
+    icon: "ShieldCheck",
+    inputs: [
+      { id: "ifc-in", label: "IFC File", type: "ifc" },
+      { id: "spec-in", label: "BriefSpec", type: "json" },
+    ],
+    outputs: [
+      { id: "report-out", label: "Verifier Report", type: "json" },
+      { id: "ifc-out", label: "IFC File (passthrough)", type: "ifc" },
+    ],
+    apiEngine: "Python ifcopenshell (Railway)",
+    tags: ["verification", "deterministic", "ifc", "parts", "quality", "v3"],
+    executionTime: "5-15s",
+  },
 
   // ── Brief-to-IFC v2 (Phase 1) — AI-powered faithful IFC creation ──
   {
@@ -776,9 +923,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   },
   {
     id: "EX-007",
-    name: "IFC Export + Preview",
+    name: "IFC Export",
     description:
-      "Final stage of the AI IFC pipeline — exposes the IFC R2 URL, deep link to the BIM viewer, and renders top + isometric PNG previews so users see the building right on canvas.",
+      "Final stage of the AI IFC pipeline — exposes the IFC R2 URL and deep link to the BIM viewer. Passthrough of the finalized IFC asset.",
     category: "export",
     icon: "FileBox",
     inputs: [
@@ -786,11 +933,10 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     ],
     outputs: [
       { id: "ifc-out", label: "IFC File", type: "ifc" },
-      { id: "previews-out", label: "Top + Iso PNGs", type: "image" },
     ],
-    apiEngine: "BuildFlow Preview Sandbox (Railway, matplotlib + ifcopenshell.geom)",
-    tags: ["ifc", "preview", "matplotlib", "v3", "render", "export"],
-    executionTime: "5-15s",
+    apiEngine: "R2 passthrough (no sandbox call)",
+    tags: ["ifc", "v3", "export", "download"],
+    executionTime: "< 1s",
   },
 ];
 
@@ -859,7 +1005,7 @@ export const CATEGORY_CONFIG = {
  *  was the source of the "DEMO" badge bug (Phase 0 §1.2). TR-024/TR-022/
  *  EX-006 are the Brief-to-IFC v2 (Phase 1) nodes (retired). TR-025/26/27
  *  and EX-007 are the v3 Canvas Unification nodes (2026-05-17). */
-export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
+export const LIVE_NODES = new Set(['TR-001', 'TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'TR-022', 'TR-024', 'TR-025', 'TR-026', 'TR-027', 'TR-028', 'TR-029', 'TR-030', 'TR-031', 'TR-032', 'TR-033', 'TR-034', 'TR-035', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002', 'EX-006', 'EX-007']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {

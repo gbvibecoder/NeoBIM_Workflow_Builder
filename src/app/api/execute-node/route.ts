@@ -23,7 +23,7 @@ import type { NodeHandlerContext } from "./handlers";
 // EX-006 retained — their handlers return 410, but the dispatcher
 // still routes there so the user gets a clean error instead of a
 // generic NODE_NOT_IMPLEMENTED.
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "TR-013", "TR-014", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "TR-013", "TR-014", "TR-015", "TR-016", "TR-022", "TR-024", "TR-025", "TR-026", "TR-027", "TR-028", "TR-029", "TR-030", "TR-031", "TR-032", "TR-033", "TR-034", "TR-035", "EX-001", "EX-002", "EX-003", "EX-006", "EX-007"]);
 
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
@@ -31,8 +31,10 @@ const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", 
 // Per-workflow rate-limit dedup is handled by isExecutionAlreadyCounted() in
 // src/lib/rate-limit.ts (Redis-backed, 30-day TTL). No in-memory cache needed.
 
-// Allow up to 600s for heavy AI generation chains (DALL-E + Claude QA + retries, 3D, video)
-export const maxDuration = 600;
+// Allow up to 800s for heavy AI generation chains. Phase gamma.1 Direct Agent
+// Mode runs 200 turns which can take 10-15 min for complex briefs. 800s is the
+// Vercel Fluid Compute Pro ceiling (900 rejected at deploy time).
+export const maxDuration = 800;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -293,7 +295,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!REAL_NODE_IDS.has(catalogueId)) {
+  const routing = REAL_NODE_IDS.has(catalogueId) ? "real" : "rejected";
+  // eslint-disable-next-line no-console
+  console.info(`[execute-node] nodeTypeId=${catalogueId} routing=${routing}`);
+
+  if (routing === "rejected") {
     await logValidationError(executionId, catalogueId, `Node ${catalogueId} not in REAL_NODE_IDS`);
     return NextResponse.json(
       formatErrorResponse(UserErrors.NODE_NOT_IMPLEMENTED(catalogueId)),

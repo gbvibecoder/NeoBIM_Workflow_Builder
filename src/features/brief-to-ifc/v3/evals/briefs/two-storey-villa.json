@@ -1,0 +1,71 @@
+{
+  "project": {
+    "name": "Two-Storey Villa",
+    "type": "residential",
+    "location": "Pune",
+    "description": "A compact 10x10m two-storey residential villa with an internal stair connecting ground to first floor, an east-facing 1.2m projecting balcony from the master bedroom, a flat RCC roof, and a 0.9m parapet around the roof perimeter. Phase ε regression brief — exercises δ.4 add_stair + ε.1 add_balcony + add_roof + add_parapet end-to-end. Floor-to-floor 3.1m."
+  },
+  "site": {
+    "bounds_m": [10.0, 10.0],
+    "height_limit_m": 12.0,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SP-GF",
+      "name": "SP-GF",
+      "long_name": "Ground Floor Living",
+      "polygon_world_m": [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]],
+      "height_m": 3.1,
+      "occupancy_type": "Living/Dining"
+    },
+    {
+      "id": "SP-FF",
+      "name": "SP-FF",
+      "long_name": "First Floor Bedrooms",
+      "polygon_world_m": [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]],
+      "height_m": 3.1,
+      "occupancy_type": "Bedrooms"
+    }
+  ],
+  "elements": [
+    { "id": "SLAB-GF", "type": "slab", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [10.0, 10.0, 0.2], "material_id": "mat-concrete", "description": "Ground floor slab", "object_type": "Floor Slab", "tag": "SLAB-GF" },
+    { "id": "SLAB-FF", "type": "slab", "origin_world_m": [0.0, 0.0, 3.1], "dims_m": [10.0, 10.0, 0.2], "material_id": "mat-concrete", "description": "First floor slab", "object_type": "Floor Slab", "tag": "SLAB-FF" },
+    { "id": "WALL-GF-N", "type": "wall", "origin_world_m": [0.0, 9.8, 0.0], "dims_m": [10.0, 0.2, 3.1], "material_id": "mat-brick", "description": "Ground floor north wall", "object_type": "External Wall", "tag": "WALL-GF-N" },
+    { "id": "WALL-GF-S", "type": "wall", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [10.0, 0.2, 3.1], "material_id": "mat-brick", "description": "Ground floor south wall", "object_type": "External Wall", "tag": "WALL-GF-S" },
+    { "id": "WALL-GF-E", "type": "wall", "origin_world_m": [9.8, 0.0, 0.0], "dims_m": [0.2, 10.0, 3.1], "material_id": "mat-brick", "description": "Ground floor east wall", "object_type": "External Wall", "tag": "WALL-GF-E" },
+    { "id": "WALL-GF-W", "type": "wall", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [0.2, 10.0, 3.1], "material_id": "mat-brick", "description": "Ground floor west wall", "object_type": "External Wall", "tag": "WALL-GF-W" },
+    { "id": "WALL-FF-N", "type": "wall", "origin_world_m": [0.0, 9.8, 3.1], "dims_m": [10.0, 0.2, 3.1], "material_id": "mat-brick", "description": "First floor north wall", "object_type": "External Wall", "tag": "WALL-FF-N" },
+    { "id": "WALL-FF-S", "type": "wall", "origin_world_m": [0.0, 0.0, 3.1], "dims_m": [10.0, 0.2, 3.1], "material_id": "mat-brick", "description": "First floor south wall", "object_type": "External Wall", "tag": "WALL-FF-S" },
+    { "id": "WALL-FF-E", "type": "wall", "origin_world_m": [9.8, 0.0, 3.1], "dims_m": [0.2, 10.0, 3.1], "material_id": "mat-brick", "description": "First floor east wall", "object_type": "External Wall", "tag": "WALL-FF-E" },
+    { "id": "WALL-FF-W", "type": "wall", "origin_world_m": [0.0, 0.0, 3.1], "dims_m": [0.2, 10.0, 3.1], "material_id": "mat-brick", "description": "First floor west wall", "object_type": "External Wall", "tag": "WALL-FF-W" },
+    { "id": "DOOR-MAIN", "type": "door", "origin_world_m": [4.5, 0.0, 0.0], "dims_m": [1.0, 0.2, 2.1], "material_id": "mat-oak", "description": "Main entrance door", "object_type": "Entrance Door", "tag": "DOOR-MAIN" },
+    { "id": "WIN-GF-E1", "type": "window", "origin_world_m": [9.8, 3.0, 0.9], "dims_m": [0.2, 1.5, 1.2], "material_id": "mat-glass", "description": "Ground floor east window", "object_type": "Window", "tag": "WIN-GF-E1" },
+    { "id": "WIN-FF-E1", "type": "window", "origin_world_m": [9.8, 3.0, 4.0], "dims_m": [0.2, 2.0, 1.5], "material_id": "mat-glass", "description": "First floor east window to balcony", "object_type": "Window", "tag": "WIN-FF-E1" },
+
+    { "id": "STAIR-GF-FF", "type": "stair", "origin_world_m": [1.5, 1.5, 0.0], "dims_m": [5.0, 1.0, 3.1], "material_id": "mat-concrete", "description": "Internal stair ground to first floor (18 risers at ~17cm, 1m wide)", "object_type": "Stair", "tag": "STAIR-GF-FF" },
+
+    { "id": "BALCONY-FF-E", "type": "balcony", "origin_world_m": [10.0, 3.0, 3.1], "dims_m": [2.5, 1.2, 0.15], "material_id": "mat-concrete", "description": "First floor east balcony, 1.2m projection, 2.5m wide", "object_type": "Balcony", "tag": "BALCONY-FF-E" },
+
+    { "id": "ROOF-VILLA", "type": "roof", "origin_world_m": [0.0, 0.0, 6.2], "dims_m": [10.0, 10.0, 0.15], "material_id": "mat-concrete", "description": "Flat RCC roof covering the building footprint", "object_type": "Flat Roof", "tag": "ROOF-VILLA" },
+
+    { "id": "PARAPET-N", "type": "parapet", "origin_world_m": [0.0, 9.9, 6.35], "dims_m": [10.0, 0.1, 0.9], "material_id": "mat-brick", "description": "North parapet, 0.9m above roof", "object_type": "Parapet", "tag": "PARAPET-N" },
+    { "id": "PARAPET-S", "type": "parapet", "origin_world_m": [0.0, 0.0, 6.35], "dims_m": [10.0, 0.1, 0.9], "material_id": "mat-brick", "description": "South parapet, 0.9m above roof", "object_type": "Parapet", "tag": "PARAPET-S" },
+    { "id": "PARAPET-E", "type": "parapet", "origin_world_m": [9.9, 0.0, 6.35], "dims_m": [0.1, 10.0, 0.9], "material_id": "mat-brick", "description": "East parapet, 0.9m above roof", "object_type": "Parapet", "tag": "PARAPET-E" },
+    { "id": "PARAPET-W", "type": "parapet", "origin_world_m": [0.0, 0.0, 6.35], "dims_m": [0.1, 10.0, 0.9], "material_id": "mat-brick", "description": "West parapet, 0.9m above roof", "object_type": "Parapet", "tag": "PARAPET-W" },
+
+    { "id": "RAIL-BAL-E", "type": "railing", "origin_world_m": [11.1, 3.0, 3.25], "dims_m": [2.5, 0.05, 1.0], "material_id": "mat-steel", "description": "Balcony outer-edge guardrail", "object_type": "Balcony Guardrail", "tag": "RAIL-BAL-E" }
+  ],
+  "materials": [
+    { "id": "mat-concrete", "name": "RCC Concrete", "rgb": [0.65, 0.65, 0.65], "roughness": 0.85, "method": "MATT", "category": "concrete" },
+    { "id": "mat-brick", "name": "Red Brick", "rgb": [0.7, 0.35, 0.25], "roughness": 0.9, "method": "MATT", "category": "masonry" },
+    { "id": "mat-oak", "name": "Solid Oak", "rgb": [0.72, 0.55, 0.35], "roughness": 0.55, "method": "MATT", "category": "wood" },
+    { "id": "mat-glass", "name": "Float Glass", "rgb": [0.7, 0.85, 0.95], "roughness": 0.05, "method": "PHONG", "category": "glass" },
+    { "id": "mat-steel", "name": "Steel", "rgb": [0.6, 0.6, 0.62], "roughness": 0.4, "method": "METAL", "category": "metal" }
+  ],
+  "brand_language": {
+    "primary_text": "Two-Storey Residential Villa",
+    "approved_terms": ["Villa", "Balcony", "Stair", "Parapet"],
+    "forbidden_terms": []
+  }
+}

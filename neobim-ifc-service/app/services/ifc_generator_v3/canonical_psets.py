@@ -175,6 +175,37 @@ IFC4_PREDEFINED_TYPES: Dict[str, frozenset] = {
         "COMPLEX", "ELEMENT", "PARTIAL", "PROVISIONFORVOID",
         "PROVISIONFORSPACE", "USERDEFINED", "NOTDEFINED",
     }),
+    # Phase δ.4 — IfcStair / IfcStairFlight predefined-type enums for
+    # IFC4 (the IFC2X3 equivalents already live in
+    # buildflow_ifc.py:_PREDEFINED_TYPE_ENUMS). add_stair sets these so
+    # downstream BIM tools (Solibri, Revit import, IDS) read the stair
+    # type correctly. The IFC4 shape enum is broader than IFC2X3 —
+    # SPIRAL/CURVED variants got renamed and a few new ones were added.
+    "IfcStair": frozenset({
+        "STRAIGHT_RUN_STAIR", "TWO_STRAIGHT_RUN_STAIR",
+        "QUARTER_WINDING_STAIR", "QUARTER_TURN_STAIR",
+        "HALF_WINDING_STAIR", "HALF_TURN_STAIR",
+        "TWO_QUARTER_WINDING_STAIR", "TWO_QUARTER_TURN_STAIR",
+        "THREE_QUARTER_WINDING_STAIR", "THREE_QUARTER_TURN_STAIR",
+        "SPIRAL_STAIR", "DOUBLE_RETURN_STAIR",
+        "CURVED_RUN_STAIR", "TWO_CURVED_RUN_STAIR",
+        "USERDEFINED", "NOTDEFINED",
+    }),
+    "IfcStairFlight": frozenset({
+        "STRAIGHT", "WINDER", "SPIRAL", "CURVED", "FREEFORM",
+        "USERDEFINED", "NOTDEFINED",
+    }),
+    # Phase ε.1 — IfcRoof for IFC4 (add_roof). The IFC2X3 enum already
+    # lives in buildflow_ifc.py:_PREDEFINED_TYPE_ENUMS; this mirror
+    # closes the IFC4 path that add_roof's _add_box_element-style
+    # schema-aware predefined-type setting needs.
+    "IfcRoof": frozenset({
+        "FLAT_ROOF", "SHED_ROOF", "GABLE_ROOF", "HIP_ROOF",
+        "HIPPED_GABLE_ROOF", "GAMBREL_ROOF", "MANSARD_ROOF",
+        "BARREL_ROOF", "RAINBOW_ROOF", "BUTTERFLY_ROOF",
+        "PAVILION_ROOF", "DOME_ROOF", "FREEFORM",
+        "USERDEFINED", "NOTDEFINED",
+    }),
 }
 
 

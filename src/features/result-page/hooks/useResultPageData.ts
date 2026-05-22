@@ -240,6 +240,60 @@ export interface ResultPageData {
    *  When set, the result page renders the IFC hero card instead of
    *  the image hero, and the page tag becomes "IFC Export". */
   ifcExport: IfcExportSummary | null;
+
+  // ── Phase Beta 2: Vision + Reasoning ──────────────────────────────────────
+
+  /** Quality score from TR-032 Vision Inspector (0-100). Null when TR-032
+   *  didn't run or returned no report. */
+  qualityScore: number | null;
+  /** Full vision report issues array from TR-032. */
+  visionIssues: Array<{
+    severity: "low" | "med" | "high";
+    type: string;
+    description: string;
+    affected_element?: string;
+  }>;
+  /** Design rationale entries from TR-029 Architectural Reasoner. */
+  designRationale: Array<{
+    itemId: string;
+    position: [number, number, number];
+    rationale: string;
+  }>;
+
+  // ── Phase Beta 3: Iteration + Verifier + Patches ──────────────────────────
+
+  /** Number of build iterations (from TR-033 PatcherResult). Null if TR-033 didn't run. */
+  iterationCount: number | null;
+  /** Which iteration produced the best IFC (1-indexed). */
+  bestIteration: number | null;
+  /** Per-iteration metrics trace. */
+  iterationTrace: Array<{
+    iteration: number;
+    qualityScore: number;
+    partsCoverage: number;
+    entityCount: number;
+    elapsedMs: number;
+  }>;
+  /** Hard verifier mismatches from TR-035. */
+  verifierMismatches: Array<{
+    type: string;
+    item_id: string;
+    severity: string;
+    description: string;
+    suggested_patch?: string;
+  }>;
+  /** Patches applied by TR-033 Spec Patcher. */
+  patchesApplied: Array<{
+    item_id: string;
+    patch_type: string;
+    rationale: string;
+  }>;
+  /** Phase gamma.1: total agent turns across all iterations. */
+  totalAgentTurns: number;
+  /** Phase gamma.1: count of render_preview tool calls. */
+  renderPreviewCalls: number;
+  /** Phase gamma.1: plain-English retry hints from each iteration. */
+  retryHints: string[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -533,19 +587,9 @@ export function useResultPageData(executionId: string): ResultPageData {
       .map(a => asStr(asRecord(a.data).url) ?? "")
       .filter(Boolean);
 
-    // EX-007 emits `type: "file"` for the IFC export. Its data carries
-    // preview PNG URLs (topPngUrl / isoPngUrl) that the existing image
-    // grid would otherwise miss — file artifacts aren't scanned for
-    // `url`. Lift them in here so the GeneratedAssetsSection thumbnail
-    // grid still renders the renders, even though the primary artifact
-    // is now classified as a file download.
-    for (const a of findAllByType(artifacts, "file")) {
-      const d = asRecord(a.data);
-      const top = asStr(d.topPngUrl);
-      const iso = asStr(d.isoPngUrl);
-      if (top) allImageUrls.push(top);
-      if (iso) allImageUrls.push(iso);
-    }
+    // Phase Beta 1: PNG preview rendering removed from EX-007. File
+    // artifacts no longer carry topPngUrl/isoPngUrl. This block is
+    // intentionally empty — kept as a comment to prevent re-introduction.
 
     const heroImageUrl = allImageUrls[0] ?? null;
 
@@ -872,6 +916,118 @@ export function useResultPageData(executionId: string): ResultPageData {
       }
     }
 
+    // ── Phase Beta 2: Vision Report + Design Rationale ─────────
+    // Scan JSON artifacts for TR-032 visionReport and TR-029 designRationale.
+    let qualityScore: number | null = null;
+    let visionIssues: ResultPageData["visionIssues"] = [];
+    let designRationale: ResultPageData["designRationale"] = [];
+    for (const a of artifacts.values()) {
+      if (a.type !== "json") continue;
+      const dd = asRecord(a.data);
+      // TR-032 Vision Inspector: data.visionReport
+      if (dd.visionReport && typeof dd.visionReport === "object" && qualityScore === null) {
+        const vr = dd.visionReport as Record<string, unknown>;
+        const qs = typeof vr.quality_score === "number" ? vr.quality_score : null;
+        if (qs !== null) qualityScore = qs;
+        if (Array.isArray(vr.issues)) {
+          visionIssues = (vr.issues as Array<Record<string, unknown>>).map(issue => {
+            const sev = asStr(issue.severity);
+            return {
+              severity: (sev === "low" || sev === "med" || sev === "high") ? sev : "low",
+              type: asStr(issue.type) ?? "other",
+              description: asStr(issue.description) ?? "",
+              affected_element: asStr(issue.affected_element),
+            };
+          });
+        }
+      }
+      // TR-029 Architectural Reasoner: data.briefSpec.designRationale
+      if (dd.briefSpec && typeof dd.briefSpec === "object" && designRationale.length === 0) {
+        const spec = dd.briefSpec as Record<string, unknown>;
+        if (Array.isArray(spec.designRationale)) {
+          designRationale = (spec.designRationale as Array<Record<string, unknown>>).map((r, idx) => {
+            const pos = Array.isArray(r.position) && r.position.length === 3
+              && r.position.every((v: unknown) => typeof v === "number")
+              ? (r.position as [number, number, number])
+              : [0, 0, 0] as [number, number, number];
+            return {
+              itemId: asStr(r.itemId) ?? `item-${idx}`,
+              position: pos,
+              rationale: asStr(r.rationale) ?? "",
+            };
+          });
+        }
+      }
+    }
+
+    // ── Phase Beta 3: Iteration trace + Verifier mismatches + Patches ─────────
+    let iterationCount: number | null = null;
+    let bestIteration: number | null = null;
+    let iterationTrace: ResultPageData["iterationTrace"] = [];
+    let verifierMismatches: ResultPageData["verifierMismatches"] = [];
+    let patchesApplied: ResultPageData["patchesApplied"] = [];
+    for (const a of artifacts.values()) {
+      if (a.type !== "json") continue;
+      const dd = asRecord(a.data);
+      // TR-033 Spec Patcher output: iterations[], bestIteration, patches_applied
+      if (Array.isArray(dd.iterations) && typeof dd.bestIteration === "number" && iterationCount === null) {
+        iterationCount = (dd.iterations as unknown[]).length;
+        bestIteration = dd.bestIteration as number;
+        iterationTrace = (dd.iterations as Array<Record<string, unknown>>).map(it => ({
+          iteration: typeof it.iteration === "number" ? it.iteration : 0,
+          qualityScore: typeof it.qualityScore === "number" ? it.qualityScore : 0,
+          partsCoverage: typeof it.parts_coverage === "number" ? it.parts_coverage : 0,
+          entityCount: typeof it.entityCount === "number" ? it.entityCount : 0,
+          elapsedMs: typeof it.elapsedMs === "number" ? it.elapsedMs : 0,
+        }));
+        if (Array.isArray(dd.patches_applied)) {
+          patchesApplied = (dd.patches_applied as Array<Record<string, unknown>>).map(p => ({
+            item_id: asStr(p.item_id) ?? "",
+            patch_type: asStr(p.patch_type) ?? "",
+            rationale: asStr(p.rationale) ?? "",
+          }));
+        }
+      }
+      // TR-035 Hard Verifier output: verifierReport.mismatches
+      if (dd.verifierReport && typeof dd.verifierReport === "object" && verifierMismatches.length === 0) {
+        const vr = dd.verifierReport as Record<string, unknown>;
+        if (Array.isArray(vr.mismatches)) {
+          verifierMismatches = (vr.mismatches as Array<Record<string, unknown>>).map(mm => ({
+            type: asStr(mm.type) ?? "unknown",
+            item_id: asStr(mm.item_id) ?? "",
+            severity: asStr(mm.severity) ?? "low",
+            description: asStr(mm.description) ?? "",
+            suggested_patch: asStr(mm.suggested_patch),
+          }));
+        }
+      }
+    }
+
+    // ── Phase gamma.1: Build Journey (agent turns, render_preview, retry hints) ──
+    let totalAgentTurns = 0;
+    let renderPreviewCalls = 0;
+    const retryHints: string[] = [];
+    for (const a of artifacts.values()) {
+      if (a.type !== "json" && a.type !== "file") continue;
+      const dd = asRecord(a.data);
+      // TR-026 IFC Agent Builder: turns count
+      if (typeof dd.turns === "number" && dd.turns > 0) {
+        totalAgentTurns += dd.turns;
+      }
+      // TR-033 Retry Hint output
+      if (typeof dd.retryHint === "string" && dd.retryHint.length > 0) {
+        retryHints.push(dd.retryHint);
+      }
+      // Count render_preview tool calls from turnRecords or metadata
+      if (dd.runId && typeof dd.generatorCostUsd === "number") {
+        // This is likely a TR-026 output; render preview count would be in metadata
+        const meta = asRecord(a.metadata);
+        if (typeof meta.renderPreviewCount === "number") {
+          renderPreviewCalls += meta.renderPreviewCount;
+        }
+      }
+    }
+
     // ── JSON ─────────
     const jsonData = findAllByType(artifacts, "json").map(a => {
       const d = asRecord(a.data);
@@ -948,6 +1104,17 @@ export function useResultPageData(executionId: string): ResultPageData {
       boqSummary,
       clashSummary,
       ifcExport,
+      qualityScore,
+      visionIssues,
+      designRationale,
+      iterationCount,
+      bestIteration,
+      iterationTrace,
+      verifierMismatches,
+      patchesApplied,
+      totalAgentTurns,
+      renderPreviewCalls,
+      retryHints,
     };
   }, [
     rawArtifacts,

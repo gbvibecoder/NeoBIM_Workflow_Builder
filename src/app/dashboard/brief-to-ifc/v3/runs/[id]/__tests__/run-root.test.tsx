@@ -88,6 +88,49 @@ describe("ExecutionRunRoot — 4 lifecycle states", () => {
     });
   });
 
+  it("Phase ε.2 — COMPLETED state renders the Enhance button linking to the viewer with autoEnhance=1", async () => {
+    fetchMock.mockResolvedValue(statusResponse({
+      status: "COMPLETED",
+      ifcUrl: "https://r2.example/villa.ifc",
+      entityCount: 2000,
+      turns: 50,
+      generatorCostUsd: 0.42,
+    }));
+    const { getByTestId } = render(<ExecutionRunRoot runId="r2" />);
+    await waitFor(() => {
+      const enhance = getByTestId("enhance-link") as HTMLAnchorElement;
+      // Links to the IFC viewer with both ?url= (IFC source) AND
+      // ?autoEnhance=1 (the ε.2 opt-in flag that opens the Enhance
+      // panel on first render).
+      expect(enhance.href).toContain("/dashboard/ifc-viewer");
+      expect(enhance.href).toContain("url=");
+      expect(enhance.href).toContain(encodeURIComponent("https://r2.example/villa.ifc"));
+      expect(enhance.href).toContain("autoEnhance=1");
+      // Visually distinguished — the button text signals the photoreal
+      // pass with a sparkle emoji.
+      expect(enhance.textContent).toMatch(/Enhance/);
+    });
+  });
+
+  it("Phase ε.2 — the plain 'Open in viewer' link does NOT include autoEnhance (preserves raw-IFC default)", async () => {
+    fetchMock.mockResolvedValue(statusResponse({
+      status: "COMPLETED",
+      ifcUrl: "https://r2.example/file.ifc",
+      entityCount: 1234,
+      turns: 7,
+      generatorCostUsd: 0.86,
+    }));
+    const { getByTestId } = render(<ExecutionRunRoot runId="r3" />);
+    await waitFor(() => {
+      const viewer = getByTestId("open-viewer-link") as HTMLAnchorElement;
+      expect(viewer.href).toContain("/dashboard/ifc-viewer");
+      // The plain "Open in viewer" path stays raw-IFC-by-default per
+      // the 2026-05-18 UX baseline. Only the explicit "Enhance" button
+      // opts into auto-expanding the Enhance panel.
+      expect(viewer.href).not.toContain("autoEnhance");
+    });
+  });
+
   it("renders FAILED state with errorCode + retry-context", async () => {
     fetchMock.mockResolvedValue(statusResponse({
       status: "FAILED",

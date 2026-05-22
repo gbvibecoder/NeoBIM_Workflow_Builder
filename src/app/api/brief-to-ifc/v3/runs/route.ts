@@ -30,7 +30,7 @@
  * production gets async observability.
  */
 
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
@@ -42,13 +42,11 @@ import type { Prisma } from "@prisma/client";
 import {
   briefSpecSchema,
   enrichBrief,
-  runGenerator,
   shouldUseBriefToIfcV3,
   type BriefSpec,
 } from "@/features/brief-to-ifc/v3";
-import { runBackground } from "@/features/brief-to-ifc/v3/runtime/background-runner";
 import { appendLog } from "@/features/brief-to-ifc/v3/runtime/append-log";
-import { toBriefToIfcV3ErrorCode } from "@/features/brief-to-ifc/v3/lifecycle/error-codes";
+import { scheduleAgentBuildWorker } from "@/lib/qstash";
 import {
   checkBriefToIfcV3Quota,
   incrementBriefToIfcV3Usage,
@@ -56,6 +54,8 @@ import {
 // TODO: Re-enable when BriefToIfcV3Run has classifiedArchetype field.
 // import { classifyBrief } from "@/features/brief-to-ifc/v3/archetype-classifier";
 
+// Phase gamma.1: Direct Agent Mode — 200 turns can take 10-15 min.
+// 800s is the Vercel Fluid Compute Pro ceiling (900 rejected at deploy).
 export const maxDuration = 800;
 
 const RATE_LIMIT_PER_HOUR = 10;
@@ -67,11 +67,20 @@ const BODY_SCHEMA = z
     project_type: z
       .enum(["exhibition_booth", "office", "residential", "retail"])
       .optional(),
-    max_turns: z.number().int().min(1).max(25).optional(),
-    cost_cap_usd: z.number().min(0.1).max(10.0).optional(),
+    max_turns: z.number().int().min(1).max(200).optional(),
+    cost_cap_usd: z.number().min(0.1).max(15.0).optional(),
     /** Caller-supplied correlation id (e.g. the workflow id from the
      *  canvas). Not enforced; carried back on the status view. */
     workflow_id: z.string().min(1).max(64).optional(),
+    // Phase gamma.1: Direct Agent Mode fields
+    /** Verbatim user brief text — passed directly to the agent. */
+    brief_text: z.string().max(20_000).optional(),
+    /** Advisory suggestions from upstream nodes. */
+    suggestions: z.record(z.string(), z.unknown()).optional(),
+    /** Plain-English retry hint from previous iteration. */
+    previous_feedback: z.string().max(10_000).optional(),
+    /** Which iteration this is (1-based). */
+    iteration: z.number().int().min(1).max(3).optional(),
   })
   .strict()
   .refine((v) => Boolean(v.brief) || Boolean(v.briefSpec), {
@@ -191,6 +200,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // NOTE: Item decomposition (TR-028) is NOT called here. The canvas
+  // flow runs TR-028 before TR-026 (which calls this route). The
+  // standalone API path expects the caller to pass an already-decomposed
+  // briefSpec (or accepts a raw spec — the agent builder handles both
+  // cases via the Section 4b fallback in its system prompt).
+
   // Create the run row in PENDING. The row's existence is the
   // observability anchor — the diagnostic CLI keys off `id` here.
   const run = await prisma.briefToIfcV3Run.create({
@@ -228,74 +243,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     },
   });
 
-  // Schedule background work via `after()` — tells Vercel to keep the
-  // function alive past the response flush so the agent loop can run
-  // to completion. Plain `void runBackground(...)` does NOT work:
-  // `maxDuration = 800` is the CEILING on how long the function CAN
-  // run, NOT a keepalive. The runtime suspends the V8 isolate when
-  // the response flushes; the first `await` inside runBackground
-  // becomes a death trap. Verified empirically — see
-  // PHASE_EVAL_RESULTS_REPORT_2026-05-16.md (run cmp7zv5i2000004juwmdgchau
-  // stuck in RUNNING with zero heartbeat updates for 3+ min). Pattern
-  // mirrors `src/app/api/auth/register/route.ts` + `src/lib/auth.ts`.
-  // TODO: Re-enable archetype classifier when BriefToIfcV3Run has a
-  // `classifiedArchetype` field (requires Prisma migration). Currently
-  // there's nowhere to store the result — calling Anthropic for a label
-  // we throw away wastes credits. The classifier code exists at
-  // src/features/brief-to-ifc/v3/archetype-classifier.ts and is ready
-  // to wire once the schema has the field.
-
-  after(async () => {
-    await runBackground({
-      prisma,
+  // Phase gamma.2: dispatch via QStash instead of after().
+  // QStash POSTs to /api/brief-to-ifc/v3/agent-job with { runId }.
+  // The worker runs in its OWN Vercel invocation (800s budget per
+  // invocation, uncapped from the user's perspective). The frontend
+  // polls /runs/{id}/status rather than holding a synchronous request.
+  //
+  // Why not after(): after() is still bound by this route's maxDuration.
+  // The agent needs 15-25 min. QStash gives each invocation a fresh
+  // Vercel budget.
+  try {
+    // Phase gamma.3: pass the full γ.1 Direct Agent Mode payload
+    const messageId = await scheduleAgentBuildWorker({
       runId: run.id,
-      timeoutMs: 700_000,
-      fn: async (ctx) => {
-        await ctx.log("INFO", "GENERATE", "Generator agent loop starting.");
-        const result = await runGenerator({
-          brief: briefSpec,
-          maxTurns: body.max_turns,
-          costCapUsd: body.cost_cap_usd,
-          onTurn: (record) => {
-            void appendLog(prisma, {
-              executionId: run.id, level: "INFO", source: "TOOL_CALL",
-              message:
-                `Turn ${record.turn}: ${record.toolName ?? "<no tool>"} ` +
-                `(${record.toolDurationMs}ms, ` +
-                `${record.toolOk ? "ok" : "FAIL " + (record.toolErrorType ?? "?")})`,
-              metadata: {
-                turn: record.turn,
-                toolName: record.toolName,
-                toolDurationMs: record.toolDurationMs,
-                toolOk: record.toolOk,
-                toolErrorType: record.toolErrorType,
-              },
-            });
-          },
-        });
-        if (!result.ok) {
-          throw Object.assign(
-            new Error(result.error?.message ?? "generator failed"),
-            { code: toBriefToIfcV3ErrorCode(result.error?.code) },
-          );
-        }
-        return result;
-      },
-      toCompletedPayload: (result) => ({
-        ifcUrl: result.ifcUrl ?? "",
-        entityCount: result.entityCount,
-        finalValidation: result.finalValidation ?? undefined,
-        generatorCostUsd: result.costUsd,
-        generatorMs: result.durationMs,
-        turns: result.turns,
-        ledger: result.ledger,
-        turnRecords: result.turnRecords,
-      }),
-    }).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error(`[bf-v3 /runs] runBackground escaped throw for ${run.id}:`, err);
+      briefText: body.brief_text,
+      suggestions: body.suggestions as Record<string, unknown> | undefined,
+      previousFeedback: body.previous_feedback,
+      iteration: body.iteration,
     });
-  });
+    await appendLog(prisma, {
+      executionId: run.id, level: "INFO", source: "LIFECYCLE",
+      message: `QStash worker dispatched (messageId: ${messageId}).`,
+    });
+  } catch (err) {
+    // QStash dispatch failed — mark the run as failed immediately
+    // so the frontend doesn't poll forever.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    // eslint-disable-next-line no-console
+    console.error(`[bf-v3 /runs] QStash dispatch failed for ${run.id}:`, errMsg);
+    await prisma.briefToIfcV3Run.update({
+      where: { id: run.id },
+      data: {
+        status: "FAILED",
+        errorCode: "QSTASH_DISPATCH_FAILED",
+        errorMessage: `Worker dispatch failed: ${errMsg.slice(0, 500)}`,
+        completedAt: new Date(),
+      },
+    }).catch(() => {});
+  }
 
   return NextResponse.json(
     {

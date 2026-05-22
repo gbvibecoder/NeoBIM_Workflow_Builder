@@ -20,119 +20,73 @@ const Y = 200; // default vertical position
 
 export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
   {
-    // ▲ FEATURED #1 — AI-Powered IFC Generation (Canvas Unification, 2026-05-17)
+    // ▲ FEATURED #1 — AI-Powered IFC Generation (Phase Beta 3, 2026-05-18)
     //
-    // The transparent 5-node v3 pipeline that replaced the deleted form
-    // (/dashboard/brief-to-ifc/v3/new) and the deleted GN-013 mega-node.
-    // Each stage of the v3 backend (Brief Enricher → Agent Builder →
-    // Geometric Validator → IFC Export + Preview) is now a visible
-    // canvas node that surfaces its own artifacts.
+    // 13-node self-correcting pipeline with 3-way parallel branch:
+    // IN-009 → TR-025 → TR-029 → [TR-028 | TR-030 | TR-031] → TR-034
+    //   → TR-026 → TR-035 → TR-027 → TR-032 → TR-033 → EX-007
     id: "wf-ai-ifc-v3",
     name: "AI-Powered IFC Generation",
     description:
-      "Paste a building brief (or upload PDF/DOCX). AI enriches it into a structured spec, builds an IFC2X3 model via agent loop, validates geometry, and renders top + iso PNG previews — all visible per stage on canvas.",
+      "Paste a building brief. AI enriches, positions items via domain reasoning, decomposes furniture into parts + adds trim + resolves materials (3 parallel), validates the spec, builds IFC via agent loop, inspects quality with vision AI, and exports.",
     tags: ["ai", "ifc", "bim", "agent", "v3", "concept", "featured"],
     category: "AI BIM",
     complexity: "advanced",
-    estimatedRunTime: "~1-3 minutes (~$0.20–$0.50)",
+    estimatedRunTime: "~3-5 minutes (~$0.50–$1.00)",
     requiredInputs: ["Architectural brief (text, PDF, or DOCX)"],
     expectedOutputs: [
-      "Tender-grade BriefSpec (JSON)",
-      "Validated IFC2X3 file (R2 download)",
-      "Top-down PNG preview",
-      "Isometric PNG preview",
+      "Tender-grade BriefSpec with design rationale, parts, trim, resolved materials",
+      "Validated IFC2X3 file with multi-part furniture, skirting, door hardware",
+      "Vision quality score (0-100)",
     ],
     thumbnail: "https://picsum.photos/seed/wf-ai-ifc-v3/600/400",
     tileGraph: {
-      // Explicit positions (y=300, 320px between left-edges) so all 5
-      // nodes sit on one horizontal row regardless of the global X/Y
-      // layout constants used by other templates.
+      // 13 nodes. 3-way parallel branch + self-correcting verifier/patcher loop.
       nodes: [
-        {
-          id: "n1",
-          type: "workflowNode",
-          position: { x: 100, y: 300 },
-          data: {
-            catalogueId: "IN-009",
-            label: "Brief",
-            category: "input",
-            status: "idle",
-            inputs: [],
-            outputs: [{ id: "brief-out", label: "Brief Text", type: "text" }],
-            icon: "FileText",
-          },
-        },
-        {
-          id: "n2",
-          type: "workflowNode",
-          position: { x: 420, y: 300 },
-          data: {
-            catalogueId: "TR-025",
-            label: "Brief Enricher",
-            category: "transform",
-            status: "idle",
-            inputs: [{ id: "brief-in", label: "Brief Text", type: "text" }],
-            outputs: [{ id: "spec-out", label: "BriefSpec", type: "json" }],
-            icon: "Wand2",
-          },
-        },
-        {
-          id: "n3",
-          type: "workflowNode",
-          position: { x: 740, y: 300 },
-          data: {
-            catalogueId: "TR-026",
-            label: "IFC Agent Builder",
-            category: "transform",
-            status: "idle",
-            inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }],
-            outputs: [
-              { id: "ifc-out", label: "IFC File", type: "ifc" },
-              { id: "kpi-out", label: "Stats", type: "json" },
-            ],
-            icon: "Bot",
-          },
-        },
-        {
-          id: "n4",
-          type: "workflowNode",
-          position: { x: 1060, y: 300 },
-          data: {
-            catalogueId: "TR-027",
-            label: "Geometric Validator",
-            category: "transform",
-            status: "idle",
-            inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }],
-            outputs: [
-              { id: "verdict-out", label: "Verdict + Bbox", type: "json" },
-              { id: "ifc-out", label: "IFC File (passthrough)", type: "ifc" },
-            ],
-            icon: "ShieldCheck",
-          },
-        },
-        {
-          id: "n5",
-          type: "workflowNode",
-          position: { x: 1380, y: 300 },
-          data: {
-            catalogueId: "EX-007",
-            label: "IFC Export + Preview",
-            category: "export",
-            status: "idle",
-            inputs: [{ id: "ifc-in", label: "Validated IFC", type: "ifc" }],
-            outputs: [
-              { id: "ifc-out", label: "IFC File", type: "ifc" },
-              { id: "previews-out", label: "Top + Iso PNGs", type: "image" },
-            ],
-            icon: "FileBox",
-          },
-        },
+        // Row 1: Input
+        { id: "n1", type: "workflowNode", position: { x: 100, y: 300 }, data: { catalogueId: "IN-009", label: "Brief", category: "input", status: "idle", inputs: [], outputs: [{ id: "brief-out", label: "Brief Text", type: "text" }], icon: "FileText" } },
+        // Row 2: Enrichment
+        { id: "n2", type: "workflowNode", position: { x: 400, y: 300 }, data: { catalogueId: "TR-025", label: "Brief Enricher", category: "transform", status: "idle", inputs: [{ id: "brief-in", label: "Brief Text", type: "text" }], outputs: [{ id: "spec-out", label: "BriefSpec", type: "json" }], icon: "Wand2" } },
+        // Row 3: Reasoning
+        { id: "n3", type: "workflowNode", position: { x: 680, y: 300 }, data: { catalogueId: "TR-029", label: "Architectural Reasoner", category: "transform", status: "idle", inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }], outputs: [{ id: "spec-out", label: "BriefSpec (with rationale)", type: "json" }], icon: "Compass" } },
+        // Row 4: Parallel branch (3 nodes vertically stacked)
+        { id: "n4a", type: "workflowNode", position: { x: 960, y: 160 }, data: { catalogueId: "TR-028", label: "Item Decomposer", category: "transform", status: "idle", inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }], outputs: [{ id: "spec-out", label: "BriefSpec (with parts)", type: "json" }], icon: "Wand2" } },
+        { id: "n4b", type: "workflowNode", position: { x: 960, y: 300 }, data: { catalogueId: "TR-030", label: "Trim Specifier", category: "transform", status: "idle", inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }], outputs: [{ id: "spec-out", label: "BriefSpec (with trim)", type: "json" }], icon: "Wrench" } },
+        { id: "n4c", type: "workflowNode", position: { x: 960, y: 440 }, data: { catalogueId: "TR-031", label: "Material Resolver", category: "transform", status: "idle", inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }], outputs: [{ id: "spec-out", label: "BriefSpec (resolved)", type: "json" }], icon: "Palette" } },
+        // Row 5: Spec Validator (fan-in)
+        { id: "n5", type: "workflowNode", position: { x: 1240, y: 300 }, data: { catalogueId: "TR-034", label: "Spec Validator", category: "transform", status: "idle", inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }], outputs: [{ id: "spec-out", label: "BriefSpec (validated)", type: "json" }], icon: "ShieldCheck" } },
+        // Row 6: Agent Builder
+        { id: "n6", type: "workflowNode", position: { x: 1520, y: 300 }, data: { catalogueId: "TR-026", label: "IFC Agent Builder", category: "transform", status: "idle", inputs: [{ id: "spec-in", label: "BriefSpec", type: "json" }], outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }, { id: "kpi-out", label: "Stats", type: "json" }], icon: "Bot" } },
+        // Row 6b: Hard Verifier (Phase Beta 3)
+        { id: "n6b", type: "workflowNode", position: { x: 1660, y: 300 }, data: { catalogueId: "TR-035", label: "Hard Verifier", category: "transform", status: "idle", inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }], outputs: [{ id: "report-out", label: "Verifier Report", type: "json" }, { id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "ShieldCheck" } },
+        // Row 7: Geometric Validator
+        { id: "n7", type: "workflowNode", position: { x: 1800, y: 300 }, data: { catalogueId: "TR-027", label: "Geometric Validator", category: "transform", status: "idle", inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }], outputs: [{ id: "verdict-out", label: "Verdict", type: "json" }, { id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "ShieldCheck" } },
+        // Row 8: Vision Inspector
+        { id: "n8", type: "workflowNode", position: { x: 2080, y: 300 }, data: { catalogueId: "TR-032", label: "Vision Inspector", category: "transform", status: "idle", inputs: [{ id: "ifc-in", label: "IFC File", type: "ifc" }], outputs: [{ id: "report-out", label: "Quality Report", type: "json" }, { id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "Eye" } },
+        // Row 8b: Spec Patcher (Phase Beta 3 — iterative rebuild orchestrator)
+        { id: "n8b", type: "workflowNode", position: { x: 2220, y: 300 }, data: { catalogueId: "TR-033", label: "Spec Patcher", category: "transform", status: "idle", inputs: [{ id: "report-in", label: "Reports", type: "json" }], outputs: [{ id: "spec-out", label: "Patched Spec / Best IFC", type: "json" }, { id: "ifc-out", label: "Best IFC", type: "ifc" }], icon: "Wrench" } },
+        // Row 9: Export
+        { id: "n9", type: "workflowNode", position: { x: 2400, y: 300 }, data: { catalogueId: "EX-007", label: "IFC Export", category: "export", status: "idle", inputs: [{ id: "ifc-in", label: "Validated IFC", type: "ifc" }], outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }], icon: "FileBox" } },
       ],
       edges: [
+        // Sequential: IN-009 → TR-025 → TR-029
         { id: "e1-2", source: "n1", sourceHandle: "brief-out", target: "n2", targetHandle: "brief-in", type: "animatedEdge" },
         { id: "e2-3", source: "n2", sourceHandle: "spec-out", target: "n3", targetHandle: "spec-in", type: "animatedEdge" },
-        { id: "e3-4", source: "n3", sourceHandle: "ifc-out", target: "n4", targetHandle: "ifc-in", type: "animatedEdge" },
-        { id: "e4-5", source: "n4", sourceHandle: "ifc-out", target: "n5", targetHandle: "ifc-in", type: "animatedEdge" },
+        // Fan-out: TR-029 → [TR-028, TR-030, TR-031]
+        { id: "e3-4a", source: "n3", sourceHandle: "spec-out", target: "n4a", targetHandle: "spec-in", type: "animatedEdge" },
+        { id: "e3-4b", source: "n3", sourceHandle: "spec-out", target: "n4b", targetHandle: "spec-in", type: "animatedEdge" },
+        { id: "e3-4c", source: "n3", sourceHandle: "spec-out", target: "n4c", targetHandle: "spec-in", type: "animatedEdge" },
+        // Fan-in: [TR-028, TR-030, TR-031] → TR-034
+        { id: "e4a-5", source: "n4a", sourceHandle: "spec-out", target: "n5", targetHandle: "spec-in", type: "animatedEdge" },
+        { id: "e4b-5", source: "n4b", sourceHandle: "spec-out", target: "n5", targetHandle: "spec-in", type: "animatedEdge" },
+        { id: "e4c-5", source: "n4c", sourceHandle: "spec-out", target: "n5", targetHandle: "spec-in", type: "animatedEdge" },
+        // Sequential: TR-034 → TR-026 → TR-035 → TR-027 → TR-032 → TR-033 → EX-007
+        { id: "e5-6", source: "n5", sourceHandle: "spec-out", target: "n6", targetHandle: "spec-in", type: "animatedEdge" },
+        { id: "e6-6b", source: "n6", sourceHandle: "ifc-out", target: "n6b", targetHandle: "ifc-in", type: "animatedEdge" },
+        { id: "e6b-7", source: "n6b", sourceHandle: "ifc-out", target: "n7", targetHandle: "ifc-in", type: "animatedEdge" },
+        { id: "e7-8", source: "n7", sourceHandle: "ifc-out", target: "n8", targetHandle: "ifc-in", type: "animatedEdge" },
+        { id: "e8-8b", source: "n8", sourceHandle: "ifc-out", target: "n8b", targetHandle: "report-in", type: "animatedEdge" },
+        { id: "e8b-9", source: "n8b", sourceHandle: "ifc-out", target: "n9", targetHandle: "ifc-in", type: "animatedEdge" },
       ],
     },
   },

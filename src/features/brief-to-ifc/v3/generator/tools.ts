@@ -17,12 +17,15 @@ export const TOOL_RUN_PYTHON = "run_python";
 export const TOOL_VALIDATE_IFC = "validate_ifc";
 export const TOOL_READ_IFC_SUMMARY = "read_ifc_summary";
 export const TOOL_FINALIZE_IFC = "finalize_ifc";
+/** Phase gamma.1: agent can see its in-progress IFC mid-build. */
+export const TOOL_RENDER_PREVIEW = "render_preview";
 
 export const V3_TOOL_NAMES = [
   TOOL_RUN_PYTHON,
   TOOL_VALIDATE_IFC,
   TOOL_READ_IFC_SUMMARY,
   TOOL_FINALIZE_IFC,
+  TOOL_RENDER_PREVIEW,
 ] as const;
 
 export type V3ToolName = (typeof V3_TOOL_NAMES)[number];
@@ -105,6 +108,31 @@ export function v3GeneratorTools(): Anthropic.Tool[] {
         "from the brief is present, every element has been added, and " +
         "`validate_ifc` reports `refs_resolve: true` with `web_ifc_load_test: PASS`.",
       input_schema: { type: "object", properties: {} },
+    },
+    {
+      name: TOOL_RENDER_PREVIEW,
+      description:
+        "Render the current in-progress IFC and see it as an image. " +
+        "Use this to check your work mid-build. Cheap (~2-5s, ~$0.01). " +
+        "Recommended: call after every ~20 turns to verify shape and placement.",
+      input_schema: {
+        type: "object",
+        properties: {
+          view: {
+            type: "string",
+            enum: ["iso", "top", "front", "side"],
+            description:
+              "Camera angle. 'iso' for isometric overview, 'top' for floor plan, " +
+              "'front'/'side' for elevations.",
+          },
+          note: {
+            type: "string",
+            description:
+              "Optional: what you're checking for, e.g. 'verify the cutting table has multi-part decomposition'",
+          },
+        },
+        required: ["view"],
+      },
     },
   ];
 }

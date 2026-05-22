@@ -1,0 +1,60 @@
+{
+  "project": {
+    "name": "Logistics Warehouse",
+    "type": "warehouse",
+    "location": "Bhiwandi",
+    "description": "A 30x60m single-volume logistics warehouse with 8m clear height. Concrete floor slab, perimeter walls, flat steel roof. Minimal furniture (a small office cabin in the SW corner). Phase ε regression brief — exercises unusual aspect ratio (2:1 long), large-scale geometry, and the flat-roof builder. Single storey."
+  },
+  "site": {
+    "bounds_m": [60.0, 30.0],
+    "height_limit_m": 10.0,
+    "coordinate_origin": "sw_corner"
+  },
+  "spaces": [
+    {
+      "id": "SP-MAIN",
+      "name": "SP-MAIN",
+      "long_name": "Main Warehouse Volume",
+      "polygon_world_m": [[0.0, 0.0], [60.0, 0.0], [60.0, 30.0], [0.0, 30.0]],
+      "height_m": 8.0,
+      "occupancy_type": "Storage"
+    },
+    {
+      "id": "SP-OFFICE",
+      "name": "SP-OFFICE",
+      "long_name": "Site Office",
+      "polygon_world_m": [[0.5, 0.5], [4.5, 0.5], [4.5, 4.5], [0.5, 4.5]],
+      "height_m": 2.8,
+      "occupancy_type": "Office"
+    }
+  ],
+  "elements": [
+    { "id": "SLAB-FLOOR", "type": "slab", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [60.0, 30.0, 0.3], "material_id": "mat-concrete", "description": "Industrial concrete floor slab", "object_type": "Industrial Floor", "tag": "SLAB-FLOOR" },
+    { "id": "WALL-N", "type": "wall", "origin_world_m": [0.0, 29.8, 0.0], "dims_m": [60.0, 0.2, 8.0], "material_id": "mat-precast", "description": "North precast concrete wall", "object_type": "External Wall", "tag": "WALL-N" },
+    { "id": "WALL-S", "type": "wall", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [60.0, 0.2, 8.0], "material_id": "mat-precast", "description": "South precast concrete wall", "object_type": "External Wall", "tag": "WALL-S" },
+    { "id": "WALL-E", "type": "wall", "origin_world_m": [59.8, 0.0, 0.0], "dims_m": [0.2, 30.0, 8.0], "material_id": "mat-precast", "description": "East precast concrete wall", "object_type": "External Wall", "tag": "WALL-E" },
+    { "id": "WALL-W", "type": "wall", "origin_world_m": [0.0, 0.0, 0.0], "dims_m": [0.2, 30.0, 8.0], "material_id": "mat-precast", "description": "West precast concrete wall", "object_type": "External Wall", "tag": "WALL-W" },
+    { "id": "DOOR-DOCK-1", "type": "door", "origin_world_m": [5.0, 0.0, 0.0], "dims_m": [3.5, 0.2, 4.0], "material_id": "mat-steel", "description": "Loading dock roller shutter 1", "object_type": "Roller Shutter", "tag": "DOOR-DOCK-1" },
+    { "id": "DOOR-DOCK-2", "type": "door", "origin_world_m": [12.0, 0.0, 0.0], "dims_m": [3.5, 0.2, 4.0], "material_id": "mat-steel", "description": "Loading dock roller shutter 2", "object_type": "Roller Shutter", "tag": "DOOR-DOCK-2" },
+    { "id": "COL-1", "type": "column", "origin_world_m": [20.0, 15.0, 0.0], "dims_m": [0.4, 0.4, 8.0], "material_id": "mat-steel", "description": "Internal steel column 1", "object_type": "Structural Column", "tag": "COL-1" },
+    { "id": "COL-2", "type": "column", "origin_world_m": [40.0, 15.0, 0.0], "dims_m": [0.4, 0.4, 8.0], "material_id": "mat-steel", "description": "Internal steel column 2", "object_type": "Structural Column", "tag": "COL-2" },
+    { "id": "OFFICE-DESK", "type": "furniture", "origin_world_m": [1.0, 1.0, 0.0], "dims_m": [1.4, 0.7, 0.74], "material_id": "mat-oak", "description": "Site office desk", "object_type": "Office Desk", "tag": "OFFICE-DESK", "contained_in_space_id": "SP-OFFICE" },
+
+    { "id": "ROOF-WAREHOUSE", "type": "roof", "origin_world_m": [0.0, 0.0, 8.0], "dims_m": [60.0, 30.0, 0.15], "material_id": "mat-steel", "description": "Flat steel deck roof spanning warehouse footprint", "object_type": "Flat Steel Roof", "tag": "ROOF-WAREHOUSE" },
+
+    { "id": "LIGHT-1", "type": "lighting", "origin_world_m": [15.0, 15.0, 7.5], "dims_m": [0.4, 0.4, 0.1], "material_id": "mat-aluminium", "description": "High-bay LED 1", "object_type": "High-bay LED", "tag": "LIGHT-1" },
+    { "id": "LIGHT-2", "type": "lighting", "origin_world_m": [45.0, 15.0, 7.5], "dims_m": [0.4, 0.4, 0.1], "material_id": "mat-aluminium", "description": "High-bay LED 2", "object_type": "High-bay LED", "tag": "LIGHT-2" }
+  ],
+  "materials": [
+    { "id": "mat-concrete", "name": "Industrial Concrete", "rgb": [0.6, 0.6, 0.6], "roughness": 0.85, "method": "MATT", "category": "concrete" },
+    { "id": "mat-precast", "name": "Precast Concrete Panel", "rgb": [0.7, 0.7, 0.7], "roughness": 0.8, "method": "MATT", "category": "concrete" },
+    { "id": "mat-steel", "name": "Mild Steel", "rgb": [0.6, 0.6, 0.62], "roughness": 0.4, "method": "METAL", "category": "metal" },
+    { "id": "mat-aluminium", "name": "Brushed Aluminium", "rgb": [0.82, 0.82, 0.85], "roughness": 0.35, "method": "METAL", "category": "metal" },
+    { "id": "mat-oak", "name": "Oak Veneer", "rgb": [0.72, 0.55, 0.35], "roughness": 0.55, "method": "MATT", "category": "wood" }
+  ],
+  "brand_language": {
+    "primary_text": "Logistics Warehouse",
+    "approved_terms": ["Warehouse", "Storage", "Dock"],
+    "forbidden_terms": []
+  }
+}

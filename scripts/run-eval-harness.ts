@@ -35,6 +35,7 @@ interface EvalResult {
   entityCount: number | null;
   buildDurationMs: number | null;
   overreach: string[];
+  partsCheck: { total: number; underDecomposed: string[] } | null;
   error: string | null;
   timestamp: string;
 }
@@ -79,11 +80,33 @@ export function detectOverreach(briefText: string, spec: Record<string, unknown>
   return overreaches;
 }
 
+/** Check that every furniture item in a spec has parts.length >= minParts.
+ *  Returns the total parts count and any under-decomposed items. */
+function checkParts(
+  spec: Record<string, unknown>,
+  minParts = 4,
+): { total: number; underDecomposed: string[] } {
+  const furniture = (spec.furniture as Array<Record<string, unknown>>) ?? [];
+  let total = 0;
+  const underDecomposed: string[] = [];
+  for (const item of furniture) {
+    const parts = (item.parts as unknown[]) ?? [];
+    total += parts.length;
+    if (parts.length < minParts && parts.length > 0) {
+      underDecomposed.push(`${item.type ?? item.id} (${parts.length} parts)`);
+    } else if (parts.length === 0) {
+      underDecomposed.push(`${item.type ?? item.id} (no parts)`);
+    }
+  }
+  return { total, underDecomposed };
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   let mode = "local-spec-only";
   if (args.includes("--mode=full")) mode = "full";
   else if (args.includes("--mode=spec-shape-only")) mode = "spec-shape-only";
+  const shouldCheckParts = args.includes("--check-parts");
 
   console.log(`\n=== Brief-to-IFC v3 Eval Harness (mode: ${mode}) ===\n`);
 
@@ -112,6 +135,7 @@ async function main(): Promise<void> {
         brief: file, archetype, mode,
         entityCount: null, buildDurationMs: null,
         overreach: [],
+        partsCheck: null,
         error: null,
         timestamp: new Date().toISOString(),
       });
@@ -145,10 +169,29 @@ async function main(): Promise<void> {
         const spec = result.brief as unknown as Record<string, unknown>;
         const overreach = detectOverreach(data.brief, spec);
 
+        // Optional: run item decomposer and check parts
+        let partsResult: { total: number; underDecomposed: string[] } | null = null;
+        if (shouldCheckParts) {
+          try {
+            const { decomposeBriefSpecItems } = await import(
+              "../src/features/brief-to-ifc/v3/item-decomposer"
+            );
+            const decomposed = await decomposeBriefSpecItems(result.brief!, undefined);
+            partsResult = checkParts(decomposed.spec as unknown as Record<string, unknown>);
+            console.log(
+              `  [PARTS] ${partsResult.total} total parts, ` +
+              `${partsResult.underDecomposed.length} under-decomposed`,
+            );
+          } catch (partsErr) {
+            console.log(`  [PARTS SKIP] ${partsErr instanceof Error ? partsErr.message : partsErr}`);
+          }
+        }
+
         results.push({
           brief: file, archetype, mode,
           entityCount: null, buildDurationMs: result.durationMs,
           overreach,
+          partsCheck: partsResult,
           error: overreach.length > 0 ? `OVERREACH: ${overreach.join(", ")}` : null,
           timestamp: new Date().toISOString(),
         });
@@ -164,6 +207,7 @@ async function main(): Promise<void> {
           brief: file, archetype, mode,
           entityCount: null, buildDurationMs: null,
           overreach: [],
+          partsCheck: null,
           error: msg.includes("API") || msg.includes("key") ? "SKIPPED: no credits" : msg,
           timestamp: new Date().toISOString(),
         });
@@ -177,6 +221,7 @@ async function main(): Promise<void> {
       brief: file, archetype, mode,
       entityCount: null, buildDurationMs: null,
       overreach: [],
+      partsCheck: null,
       error: "full mode requires live Railway + Anthropic",
       timestamp: new Date().toISOString(),
     });

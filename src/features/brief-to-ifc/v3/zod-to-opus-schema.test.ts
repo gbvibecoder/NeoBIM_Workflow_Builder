@@ -232,7 +232,11 @@ describe("zodToOpusToolSchema", () => {
     expect(props.materials).toBeDefined();
     expect(props.brand_language).toBeDefined();
     expect(result.required).toEqual(
-      expect.arrayContaining(["project", "site", "spaces", "elements", "materials", "brand_language"]),
+      expect.arrayContaining(["project", "site", "spaces", "elements", "materials"]),
+    );
+    // brand_language is optional — residential briefs have no branding
+    expect(result.required).not.toEqual(
+      expect.arrayContaining(["brand_language"]),
     );
 
     const elemItems = (props.elements as Record<string, unknown>).items as Record<string, unknown>;
