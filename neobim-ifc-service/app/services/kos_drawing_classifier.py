@@ -1,17 +1,24 @@
 """KOS drawing classifier (Week 5C-1, Phase 1).
 
 Lightweight, vector-only drawing-type detector. Given a parsed ezdxf
-``doc`` + ``msp`` it inventories entity counts + text content and walks a
+``doc`` + ``msp`` (and optionally the extracted ``title_block``) it walks a
 first-match-wins decision tree:
 
+  0. FLOOR_PLAN  — title-block drawing title names a plan/setout/layout/floor
+                   drawing (AUTHORITATIVE; skips the body-text scan)
   1. TITLE_SHEET — mostly text, almost no geometry (a pure metadata sheet)
-  2. SECTION     — "SECTION A-A" / "SECTION 1-1" text
+  2. SECTION     — STRONG "SECTION A-A" / "SECTION 1-1" callout text
   3. ELEVATION   — level markers (FFL / +0.000 / GL / GROUND LEVEL) with a
                    vertically-dominant extent
   4. FLOOR_PLAN  — plan keywords (PLAN / SETOUT / BASEMENT / LAYOUT…) with
-                   closed room polygons present
+                   closed room polygons present, or a title-block storey level
   5. DETAIL      — dense geometry in a small footprint + heavy dimensioning
-  6. UNKNOWN     — nothing matched
+  6. SECTION     — bare "SECTION" keyword tiebreaker (nothing stronger matched)
+  7. UNKNOWN     — nothing matched
+
+A plan drawing routinely contains section-cut markers; that is why a bare
+"SECTION" keyword is a last-resort tiebreaker (step 6), never a step-2 winner,
+and why the title-block plan title (step 0) dominates everything.
 
 Confidence scales with how many independent signals fired for the chosen
 type. NO vision, NO LLM — pure heuristics.
@@ -20,6 +27,7 @@ type. NO vision, NO LLM — pure heuristics.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any
 
 import structlog
@@ -34,6 +42,16 @@ _TEXT_SAMPLE_LIMIT = 4000
 _SECTION_TOKENS = ("SECTION A-A", "SECTION 1-1", "SECTION B-B", "SECTION")
 _ELEVATION_TOKENS = ("FFL", "+0.000", " GL ", "GROUND LEVEL", "ELEVATION")
 _PLAN_TOKENS = ("PLAN", "FLOOR", "SETOUT", "BASEMENT", "GROUND FLOOR", "LAYOUT")
+
+# Title-block drawing-title keywords that mark a plan/setout/layout drawing —
+# the authoritative FLOOR_PLAN signal (Section A, Step 0).
+_PLAN_TITLE_RE = re.compile(r"(plan|setout|layout|floor)", re.IGNORECASE)
+
+# Title-block level values that name a building storey — a positive FLOOR_PLAN hint.
+_LEVEL_FLOOR_TOKENS = (
+    "BASEMENT", "GROUND", "LEVEL", "FLOOR", "PODIUM", "STILT", "ROOF",
+    "MEZZANINE", "TERRACE", "GF", "LG", "B1", "B2", "L1", "L2",
+)
 
 
 def _collect_text(msp: Any) -> str:
@@ -97,8 +115,33 @@ def _bounds_aspect(msp: Any) -> tuple[float, float]:
     return max_x - min_x, max_y - min_y
 
 
-def classify_drawing(doc: Any, msp: Any) -> dict:
-    """Classify the drawing type. See module docstring for the decision tree."""
+def classify_drawing(doc: Any, msp: Any, title_block: dict | None = None) -> dict:
+    """Classify the drawing type. See module docstring for the decision tree.
+
+    ``title_block`` (optional) is the extracted title-block metadata. When it
+    names a plan/setout/layout drawing it is the dominant, authoritative signal
+    and short-circuits the body-text scan (Step 0) — a plan drawing routinely
+    contains section-cut markers, which must never flip its classification.
+    """
+    # Step 0 — title-block PLAN signal dominates; body scan is skipped entirely.
+    tb = title_block or {}
+    drawing_title = tb.get("drawing_title")
+    level = tb.get("level")
+    plan_title = bool(drawing_title) and bool(_PLAN_TITLE_RE.search(str(drawing_title)))
+    plan_level = bool(level) and any(
+        tok in str(level).upper() for tok in _LEVEL_FLOOR_TOKENS
+    )
+    if plan_title:
+        signals = [f"title_block:drawing_title={drawing_title!r}"]
+        if plan_level:
+            signals.append(f"title_block:level={level!r}")
+        conf = 0.9 if plan_level else 0.85
+        return _result(
+            "FLOOR_PLAN", conf, signals,
+            "Title-block drawing title names a plan/setout/layout/floor "
+            "drawing — authoritative signal; body section markers ignored.",
+        )
+
     try:
         counts = _counts(msp)
         text = _collect_text(msp)
@@ -128,14 +171,14 @@ def classify_drawing(doc: Any, msp: Any) -> dict:
                        "Text entities dominate with negligible geometry — "
                        "reads as a pure metadata / title sheet.")
 
-    # 2 — SECTION.
+    # 2 — SECTION (STRONG callouts only). Bare "SECTION" is demoted to a
+    # last-resort tiebreaker (step 6) so it can never outrank a real plan.
     section_hits = [t for t in _SECTION_TOKENS if t in text]
-    if section_hits:
-        # An explicit "SECTION A-A"/"1-1" is strong; bare "SECTION" is weak.
-        strong = any(h != "SECTION" for h in section_hits)
-        conf = 0.8 if strong else 0.45
-        return _result("SECTION", conf, [f"text:{h}" for h in section_hits],
-                       "Section callout text present in the drawing.")
+    strong_section = [h for h in section_hits if h != "SECTION"]
+    if strong_section:
+        return _result("SECTION", 0.8, [f"text:{h}" for h in strong_section],
+                       "Lettered/numbered section callout present "
+                       "(SECTION A-A / 1-1 / B-B).")
 
     # 3 — ELEVATION: level markers + vertically-dominant extent.
     elev_hits = [t.strip() for t in _ELEVATION_TOKENS if t in text]
@@ -164,9 +207,18 @@ def classify_drawing(doc: Any, msp: Any) -> dict:
                        "Plan keywords plus closed polygons forming rooms — "
                        "high-confidence floor plan.")
     if plan_hits:
-        return _result("FLOOR_PLAN", 0.55, [f"text:{h}" for h in plan_hits],
+        signals = [f"text:{h}" for h in plan_hits]
+        conf = 0.55
+        if plan_level:  # title-block storey corroborates the body keyword
+            conf = 0.70
+            signals.append(f"title_block:level={level!r}")
+        return _result("FLOOR_PLAN", conf, signals,
                        "Plan keywords present but no closed room polygons "
                        "detected; medium-confidence floor plan.")
+    if plan_level:
+        return _result("FLOOR_PLAN", 0.70, [f"title_block:level={level!r}"],
+                       "Title-block level names a building storey — "
+                       "floor-plan hint with no body plan keyword.")
 
     # 5 — DETAIL: dense geometry in a small footprint + heavy dimensioning.
     area_m2 = (width * height) / 1.0e6 if width > 0 and height > 0 else 0.0
@@ -183,7 +235,13 @@ def classify_drawing(doc: Any, msp: Any) -> dict:
                        "Dense geometry in a small footprint with heavy "
                        "dimensioning — reads as a construction detail.")
 
-    # 6 — UNKNOWN.
+    # 6 — bare "SECTION" tiebreaker (only when nothing stronger matched).
+    if "SECTION" in section_hits:
+        return _result("SECTION", 0.45, ["text:SECTION"],
+                       "Bare 'SECTION' keyword present with no stronger signal "
+                       "— low-confidence section call.")
+
+    # 7 — UNKNOWN.
     return _result("UNKNOWN", 0.0, [],
                    "No decision-tree branch matched: "
                    f"text_ratio={text_ratio:.2f}, geom_ratio={geom_ratio:.2f}, "

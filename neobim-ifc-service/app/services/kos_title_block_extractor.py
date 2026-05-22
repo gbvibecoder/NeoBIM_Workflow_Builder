@@ -53,8 +53,8 @@ _LABELS: list[tuple[str, str]] = [
     ("CLIENT", "client"),
     ("DRAWING TITLE", "drawing_title"),
     ("TITLE", "drawing_title"),
+    ("DRAWN BY", "drawn_by"),
     ("DRAWN", "drawn_by"),
-    ("BY", "drawn_by"),
     ("FLOOR", "level"),
 ]
 
@@ -68,6 +68,56 @@ _LEVEL_TOKENS = (
     "BASEMENT", "GROUND", "PODIUM", "MEZZANINE", "TYPICAL", "STILT", "ROOF",
     "FIRST", "SECOND", "THIRD", "FOURTH", "FLOOR", "TERRACE", "PARKING",
 )
+
+# Section/discipline header words a drawn-by signature must never contain.
+_SECTION_HEADER_WORDS = (
+    "HYDRAULICS", "STRUCTURAL", "ELECTRICAL", "MECHANICAL", "PLUMBING",
+    "ENGINEER", "DETAILS", "GENERAL", "NOTES", "SLAB", "CONCRETE",
+)
+
+
+def _valid_scale(value: str | None) -> str | None:
+    """Accept ``1:N`` with 5 ≤ N ≤ 500; reject timestamps (``1:17 PM``) and
+    ratio-with-suffix patterns (``1:17:30``, ``1:17.5``). Returns ``"1:N"`` or None."""
+    if not value:
+        return None
+    m = _SCALE_RE.search(value)
+    if not m:
+        return None
+    tail = value[m.end():m.end() + 3].upper().strip()
+    if tail.startswith(("AM", "PM")) or value[m.end():m.end() + 1] in (":", "."):
+        return None
+    denom = int(m.group(0).split(":")[1].strip())
+    return f"1:{denom}" if 5 <= denom <= 500 else None
+
+
+def _valid_drawn_by(value: str | None) -> str | None:
+    """Accept a name-shaped signature; reject conjunctions, all-caps multi-word
+    section labels, known discipline headers, and >4-word strings."""
+    v = (value or "").strip()
+    if not v:
+        return None
+    up = v.upper()
+    if re.search(r"\b(AND|OR)\b", up) or "&" in up:
+        return None
+    words = v.split()
+    if up == v and len(words) > 2:          # ALL-CAPS multi-word → section label
+        return None
+    if any(w in up for w in _SECTION_HEADER_WORDS):
+        return None
+    if len(words) > 4:
+        return None
+    return v
+
+
+def _valid_level(value: str | None) -> str | None:
+    """Accept only a value naming a building storey (contains a _LEVEL_TOKENS
+    word). Rejects set-out abbreviations like ``(SSL)``; returns None so the
+    filename fallback can fill the slot."""
+    up = (value or "").strip().upper()
+    if not up:
+        return None
+    return up if any(tok in up for tok in _LEVEL_TOKENS) else None
 
 
 def _text_entities_with_pos(msp: Any) -> list[tuple[str, float, float]]:
@@ -107,6 +157,7 @@ def _bottom_right_region(texts: list[tuple[str, float, float]]) -> list[tuple[st
 def _match_value_for_label(
     label: str, label_text: str, label_pos: tuple[float, float],
     all_texts: list[tuple[str, float, float]], field: str,
+    region_mode: bool = True,
 ) -> str | None:
     """Resolve a label's value.
 
@@ -115,6 +166,10 @@ def _match_value_for_label(
     remainder — we strip the *label*, not split on the first colon, so a
     scale like "1:100" survives intact. Otherwise find the nearest text to
     the right of, or just below, the label.
+
+    ``region_mode`` — S1 rule: in scan-all (fallback) mode there is no
+    positional trust, so spatial-neighbour matching is disabled and only an
+    *inline* label-value is accepted.
     """
     # Inline value: strip the matched label keyword from the front.
     up = label_text.upper()
@@ -123,6 +178,10 @@ def _match_value_for_label(
         remainder = label_text[pos + len(label):].lstrip(": -\t").strip()
         if remainder:
             return _refine(remainder, field)
+
+    if not region_mode:
+        # Scan-all mode: inline-only. Reject spatial-neighbour guesses.
+        return None
 
     lx, ly = label_pos
     # Spatial neighbour: prefer text to the right on the same row, else below.
@@ -154,17 +213,20 @@ def _is_label(text: str) -> bool:
 
 
 def _refine(value: str, field: str) -> str | None:
-    """Field-specific cleanup of a raw matched value."""
+    """Field-specific cleanup + validation of a raw matched value. Returns None
+    when the value fails the field's validator (a null beats a wrong value)."""
     value = value.strip().strip(":").strip()
     if not value:
         return None
     if field == "scale":
-        m = _SCALE_RE.search(value)
-        return m.group(0).replace(" ", "") if m else value
+        return _valid_scale(value)
     if field == "revision":
-        # Revisions are short tokens; take the first.
-        tok = value.split()[0] if value.split() else value
-        return tok[:8]
+        tok = (value.split() or [""])[0].strip().upper()
+        return tok if re.fullmatch(r"[A-Z]", tok) else None
+    if field == "drawn_by":
+        return _valid_drawn_by(value)
+    if field == "level":
+        return _valid_level(value)
     return value
 
 
@@ -222,6 +284,7 @@ def extract_title_block(doc: Any, msp: Any, filename: str | None = None) -> dict
         all_texts = []
 
     region = _bottom_right_region(all_texts)
+    region_mode = bool(region)
     scan_texts = region
     if not region and all_texts:
         warnings.append(
@@ -237,19 +300,24 @@ def extract_title_block(doc: Any, msp: Any, filename: str | None = None) -> dict
         for label, field in _LABELS:
             if result[field] is not None:
                 continue
-            if up.startswith(label) or f" {label}" in up[:40]:
-                value = _match_value_for_label(label, txt, (x, y), all_texts, field)
+            # Word-boundary match so "REV" doesn't fire on "REVIEWED".
+            if re.search(rf"\b{re.escape(label)}\b", up[:40]):
+                value = _match_value_for_label(
+                    label, txt, (x, y), all_texts, field, region_mode
+                )
                 if value:
                     result[field] = value
                     tb_found += 1
                 break
 
-    # A bare scale value ("1:100") may appear without a SCALE label.
-    if result["scale"] is None:
+    # A bare scale value ("1:100") may appear without a SCALE label — but only
+    # trust it in region mode (S2). In scan-all mode body ratios ("1:80 FALLS",
+    # "1:17") are not the drawing scale, so a scale must sit beside a SCALE label.
+    if region_mode and result["scale"] is None:
         for (txt, _x, _y) in scan_texts:
-            m = _SCALE_RE.search(txt)
-            if m:
-                result["scale"] = m.group(0).replace(" ", "")
+            v = _valid_scale(txt)
+            if v:
+                result["scale"] = v
                 tb_found += 1
                 break
 

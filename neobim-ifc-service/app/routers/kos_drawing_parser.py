@@ -126,11 +126,11 @@ async def parse_drawing(
         doc = parsed.pop("_doc")
         msp = parsed.pop("_msp")
 
-        # 2. Classify drawing type.
-        classification = classify_drawing(doc, msp)
-
-        # 3. Title block.
+        # 2. Title block (extracted first so the classifier can use it).
         title_block = extract_title_block(doc, msp, upload_name)
+
+        # 3. Classify drawing type (title block is the dominant signal).
+        classification = classify_drawing(doc, msp, title_block)
 
         walls = parsed["walls"]
         junctions = parsed["junctions"]

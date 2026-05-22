@@ -44,6 +44,12 @@ PHASE = "5C-1"
 # hatch fragments, leader stubs) and dropped.
 MIN_WALL_LENGTH_MM = 100.0
 
+# Tier-1 (wall-layer) candidates shorter than this (mm) are dropped. Stricter
+# than the global floor: on real wall layers the sub-200mm population is hatch
+# / pattern / annotation fragments, not structural walls. (Defended in
+# temp_folder/phase-5c1-tuning/DIAGNOSIS.md §C.4 against measured filter impact.)
+TIER1_MIN_WALL_LENGTH_MM = 200.0
+
 # Junction clustering tolerance — endpoints within this distance (mm) are
 # considered to meet at the same point.
 JUNCTION_TOLERANCE_MM = 20.0
@@ -62,8 +68,27 @@ VERY_THICK_LINE_LW = 100
 TIER2_MAX_CANDIDATES = 4000
 TIER3_MAX_POLYGONS = 6000
 
+# Thickness enrichment (post-detection, non-exclusive parallel-partner pass).
+THICKNESS_ANGLE_TOL_DEG = 3.0       # partner must be parallel within this many °
+THICKNESS_MIN_OVERLAP_FRAC = 0.30   # partner must overlap >30% of the wall's axis
+THICKNESS_MAX_WALLS = 4000          # O(n²) guard; skip + warn above this
+
 # Wall-layer name patterns (case-insensitive). Covers EN / FR / ES / DE.
 _WALL_LAYER_RE = re.compile(r"^(.*WALL.*|.*MUR.*|.*PARED.*|.*WAND.*)$", re.IGNORECASE)
+
+# Wall-family layers that are actually annotation / hidden-line / pattern
+# sub-layers and must NOT count as walls. Tuned for AECOM-style AIA/ISO-13567
+# naming (e.g. A-WALL-HDLN, A-WALL-IDEN, A-WALL-PATT). NOTE: this exclusion set
+# will need revisiting for Kalzen-authored layer conventions (future work).
+_WALL_LAYER_EXCLUDE_RE = re.compile(
+    r"(HDLN|IDEN|PATT|HATCH|NOTE|DIMS?|ANNO|TEXT|KEYN|TTLB)", re.IGNORECASE
+)
+
+
+def _is_wall_layer(layer: str) -> bool:
+    """Tier-1 wall-layer test: in the wall family AND not an annotation/
+    hidden-line/pattern sub-layer."""
+    return bool(_WALL_LAYER_RE.match(layer)) and not _WALL_LAYER_EXCLUDE_RE.search(layer)
 
 # $INSUNITS → (unit_name, mm_multiplier). Source: DXF spec.
 _INSUNITS_MAP: dict[int, tuple[str, float]] = {
@@ -326,11 +351,11 @@ def _tier1_wall_layers(ebt: dict, mult: float) -> list[dict]:
     for line in ebt["LINE"]:
         try:
             layer = line.dxf.layer
-            if not _WALL_LAYER_RE.match(layer):
+            if not _is_wall_layer(layer):
                 continue
             s, e = line.dxf.start, line.dxf.end
             w = _seg_to_wall(idx, s.x, s.y, e.x, e.y, mult, layer, 1, 0.85, None)
-            if w:
+            if w and w["length_mm"] >= TIER1_MIN_WALL_LENGTH_MM:
                 walls.append(w)
                 idx += 1
         except Exception:  # noqa: BLE001
@@ -338,14 +363,14 @@ def _tier1_wall_layers(ebt: dict, mult: float) -> list[dict]:
     for pl in ebt["LWPOLYLINE"]:
         try:
             layer = pl.dxf.layer
-            if not _WALL_LAYER_RE.match(layer):
+            if not _is_wall_layer(layer):
                 continue
             pts = pl.get_points("xy")
             if pl.closed and len(pts) > 2:
                 pts = list(pts) + [pts[0]]
             for (ax, ay, bx, by) in _polyline_segments(list(pts)):
                 w = _seg_to_wall(idx, ax, ay, bx, by, mult, layer, 1, 0.85, None)
-                if w:
+                if w and w["length_mm"] >= TIER1_MIN_WALL_LENGTH_MM:
                     walls.append(w)
                     idx += 1
         except Exception:  # noqa: BLE001
@@ -541,19 +566,112 @@ def _tier4_all_lines(ebt: dict, mult: float) -> list[dict]:
     return walls
 
 
-def _detect_walls(ebt: dict, doc: Any, mult: float, warnings: list[str]) -> tuple[list[dict], int]:
-    """Run the 4 tiers in order; first tier yielding walls wins."""
+# ── thickness enrichment (post-detection, non-exclusive) ────────────────────
+
+
+def _perp_distance(ax: float, ay: float, ux: float, uy: float,
+                   px: float, py: float) -> float:
+    """Perpendicular distance of point (px, py) to the line through (ax, ay)
+    with unit direction (ux, uy)."""
+    nx, ny = -uy, ux
+    return abs((px - ax) * nx + (py - ay) * ny)
+
+
+def _projected_overlap(ax: float, ay: float, ux: float, uy: float, length: float,
+                       cx: float, cy: float, dx: float, dy: float) -> float:
+    """Length of segment (c→d)'s projection onto the [0, length] axis of a wall
+    anchored at (ax, ay) with unit direction (ux, uy)."""
+    t1 = (cx - ax) * ux + (cy - ay) * uy
+    t2 = (dx - ax) * ux + (dy - ay) * uy
+    lo, hi = (t1, t2) if t1 <= t2 else (t2, t1)
+    return min(hi, length) - max(lo, 0.0)
+
+
+def _enrich_thickness(walls: list[dict], msp: Any, warnings: list[str]) -> None:
+    """Fill ``thickness_mm`` on walls that still lack it (Option X+).
+
+    For each wall whose thickness is None, scan the same wall set for parallel
+    partners (within ``THICKNESS_ANGLE_TOL_DEG``) that sit side-by-side (overlap
+    > ``THICKNESS_MIN_OVERLAP_FRAC`` of the axis) within the [MIN, MAX] mm band,
+    and assign the CLOSEST (minimum) qualifying perpendicular offset — the
+    nearest parallel partner is the opposite face of the same wall.
+
+    Non-exclusive: a partner is never consumed and may serve several walls.
+    Never overwrites a thickness a tier already computed (e.g. tier-2).
+    ``msp`` is accepted for the future Option-Y cross-layer search; unused here.
+    """
+    n = len(walls)
+    if n < 2:
+        return
+    if n > THICKNESS_MAX_WALLS:
+        warnings.append(
+            f"thickness enrichment skipped: {n} walls exceeds cap "
+            f"{THICKNESS_MAX_WALLS} (O(n^2) guard)"
+        )
+        return
+
+    # Precompute axis (unit direction), length, angle, midpoint per wall.
+    geom: list[tuple | None] = []
+    for w in walls:
+        ax, ay = w["start"]
+        bx, by = w["end"]
+        L = math.hypot(bx - ax, by - ay)
+        if L <= 0:
+            geom.append(None)
+            continue
+        ux, uy = (bx - ax) / L, (by - ay) / L
+        geom.append((ax, ay, ux, uy, L, w["angle_degrees"],
+                     (ax + bx) / 2.0, (ay + by) / 2.0))
+
+    for i in range(n):
+        if walls[i]["thickness_mm"] is not None:
+            continue
+        gi = geom[i]
+        if gi is None:
+            continue
+        ax, ay, ux, uy, li, ang_i = gi[0], gi[1], gi[2], gi[3], gi[4], gi[5]
+        best = math.inf
+        for j in range(n):
+            if j == i:
+                continue
+            gj = geom[j]
+            if gj is None:
+                continue
+            da = abs(ang_i - gj[5])
+            if da > THICKNESS_ANGLE_TOL_DEG and da < 180.0 - THICKNESS_ANGLE_TOL_DEG:
+                continue
+            d = _perp_distance(ax, ay, ux, uy, gj[6], gj[7])
+            if d < WALL_THICKNESS_MIN_MM or d > WALL_THICKNESS_MAX_MM:
+                continue
+            cx, cy = walls[j]["start"]
+            dxp, dyp = walls[j]["end"]
+            ov = _projected_overlap(ax, ay, ux, uy, li, cx, cy, dxp, dyp)
+            if ov <= THICKNESS_MIN_OVERLAP_FRAC * li:
+                continue
+            if d < best:
+                best = d
+        if best != math.inf:
+            walls[i]["thickness_mm"] = round(best, 2)
+
+
+def _detect_walls(ebt: dict, doc: Any, mult: float, warnings: list[str],
+                  msp: Any) -> tuple[list[dict], int]:
+    """Run the 4 tiers in order (first tier yielding walls wins), then enrich
+    thickness on the winning set. Tier order/semantics are unchanged; the
+    single-return structure gives the enrichment pass one place to run."""
     walls = _tier1_wall_layers(ebt, mult)
-    if walls:
-        return walls, 1
-    walls = _tier2_thick_double_lines(ebt, doc, mult, warnings)
-    if walls:
-        return walls, 2
-    walls = _tier3_polygon_shared_edges(ebt, mult, warnings)
-    if walls:
-        return walls, 3
-    walls = _tier4_all_lines(ebt, mult)
-    return walls, 4
+    tier = 1
+    if not walls:
+        walls = _tier2_thick_double_lines(ebt, doc, mult, warnings)
+        tier = 2
+    if not walls:
+        walls = _tier3_polygon_shared_edges(ebt, mult, warnings)
+        tier = 3
+    if not walls:
+        walls = _tier4_all_lines(ebt, mult)
+        tier = 4
+    _enrich_thickness(walls, msp, warnings)
+    return walls, tier
 
 
 # ── junctions ─────────────────────────────────────────────────────────────
@@ -646,7 +764,7 @@ def parse_dxf_walls(dxf_path: str, filename: str | None = None) -> dict:
     ebt, layers_index, bounds, bad_count, inv_warnings = _inventory(msp, doc)
     warnings.extend(inv_warnings)
 
-    walls, tier = _detect_walls(ebt, doc, mult, warnings)
+    walls, tier = _detect_walls(ebt, doc, mult, warnings, msp)
     junctions = _detect_junctions(walls, warnings)
 
     # Confidence: base on tier, penalise missing thickness + missing dims.
