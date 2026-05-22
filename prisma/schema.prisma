@@ -1337,3 +1337,649 @@ model CanvasGroup {
   @@index([workflowId])
   @@map("canvas_groups")
 }
+
+// ============================================================
+// KOS (Kalzen Operating System) — multi-tenant feature module
+// Added Week 1. Do not modify without reviewing all KOS code.
+// ============================================================
+//
+// Rules of the road:
+//   • Every KOS model carries a tenantId (directly or via parent FK) and
+//     every query MUST go through requireTenantOrThrow(req) first. No raw
+//     `prisma.kosX.findMany()` without a tenant scope.
+//   • Tenant.{whatsapp,frappe,s3}Config store REFERENCES to env var names
+//     (e.g. `accessTokenRef: "WHATSAPP_ACCESS_TOKEN_KALZEN"`), never the
+//     secrets themselves. Runtime resolves via process.env[ref].
+//   • KosDocumentChunk.embedding is declared via `Unsupported("vector(3072)")`
+//     so Prisma emits the column but does not generate a typed accessor.
+//     Week 1 installs the pgvector extension + a vector(1536) column;
+//     Week 2 promotes it to vector(3072) to fit OpenAI's
+//     text-embedding-3-large output (see migration
+//     `kos_pgvector_dim_3072_week2`).
+//   • Phone is the canonical KOS customer identity (E.164). Composite
+//     uniques are (tenantId, phone) for KosCustomer and (tenantId, email)
+//     for KosBdUser so multi-tenant separation holds at the DB level.
+// ------------------------------------------------------------
+
+model Tenant {
+  id             String   @id @default(cuid())
+  // URL-safe slug for tenant resolution (e.g. "kalzen").
+  slug           String   @unique
+  // Display name for UI surfaces.
+  name           String
+  // Optional custom domain (e.g. "kalzen.trybuildflow.in"); unique so the
+  // middleware host resolver can do an O(1) lookup once it's populated.
+  customDomain   String?  @unique
+  // { displayName, primaryColor, secondaryColor, logoUrl, supportPhone }
+  branding       Json
+  // { provider, phoneNumberRef, apiKeyRef, webhookVerifyTokenRef } — *Ref
+  // suffix means the value is the NAME of an env var, never the secret.
+  whatsappConfig Json?
+  // { baseUrl, apiKeyRef, apiSecretRef, leadStages: { ... } }
+  frappeConfig   Json?
+  // { bucket, region, accessKeyRef, secretKeyRef }
+  s3Config       Json?
+  // Tenant-scoped feature flags (kill-switches for KOS modules).
+  featureFlags   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  customers     KosCustomer[]
+  documents     KosDocument[]
+  conversations KosConversation[]
+  bdUsers       KosBdUser[]
+  // Week 5A — BIM panel/accessory family library (Dincel/Kalzen via APS).
+  bimFamilies   KosBimFamily[]
+
+  @@index([slug])
+  @@index([customDomain])
+  @@map("kos_tenants")
+}
+
+model KosCustomer {
+  id               String     @id @default(cuid())
+  tenantId         String
+  // E.164 (e.g. "+919876543210"). The canonical identity across channels.
+  phone            String
+  name             String?
+  email            String?
+  firstSeenChannel KosChannel
+  // Mirrored CRM ID; unique so we can resolve back from a Frappe webhook
+  // without scanning. Null until the first sync writes it.
+  frappeLeadId     String?    @unique
+  // Stage B (Phase 3A) — bot-facing identity.
+  //   • displayName — friendly name surfaced in the bot's system prompt.
+  //     Distinct from `name` which holds the canonical contact-card name.
+  //     For anonymous customers we set "Guest-XXXX".
+  //   • lastSeenAt — bumped on every session validation hit.
+  //   • isAnonymous — true until the customer completes phone-OTP
+  //     verification (Phase 4); defaults to true so a fresh
+  //     CUSTOMER_SESSION_START row carries the right flag.
+  displayName      String?
+  lastSeenAt       DateTime?  @default(now())
+  isAnonymous      Boolean    @default(true)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations KosConversation[]
+  sessions      KosCustomerSession[]
+
+  @@unique([tenantId, phone])
+  @@index([phone])
+  @@index([frappeLeadId])
+  @@map("kos_customers")
+}
+
+model KosBdUser {
+  id           String    @id @default(cuid())
+  tenantId     String
+  email        String
+  phone        String?
+  name         String
+  role         KosBdRole @default(BD)
+  passwordHash String
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations KosConversation[]
+  sessions      KosBdSession[]
+
+  @@unique([tenantId, email])
+  @@map("kos_bd_users")
+}
+
+model KosDocument {
+  id         String       @id @default(cuid())
+  tenantId   String
+  title      String
+  docType    KosDocType
+  // S3 key — bucket + region resolved from Tenant.s3Config at access time.
+  s3Key      String
+  mimeType   String
+  pageCount  Int?
+  version    Int          @default(1)
+  status     KosDocStatus @default(UPLOADED)
+  indexedAt  DateTime?
+  // KosBdUser.id of the uploader, or "system" for seeded docs.
+  uploadedBy String
+  createdAt  DateTime     @default(now())
+
+  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chunks KosDocumentChunk[]
+
+  @@index([tenantId, docType])
+  @@index([tenantId, status])
+  @@map("kos_documents")
+}
+
+model KosDocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  content    String   @db.Text
+  pageNum    Int?
+  chunkIndex Int
+  // pgvector type. Prisma emits BYTEA by default; the kos_pgvector
+  // migration installs vector(1536), and `kos_pgvector_dim_3072_week2`
+  // promotes it to halfvec(3072) (16-bit half-precision floats) to fit
+  // OpenAI text-embedding-3-large (3072 dims) under pgvector's HNSW
+  // dimension ceiling — `vector` HNSW tops out at 2000 dims, `halfvec`
+  // tops out at 4000. Half-precision loses ~0 quality at retrieval
+  // ranking for cosine search and halves storage. The HNSW index is
+  // recreated after the type flip.
+  embedding  Unsupported("halfvec(3072)")
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  document KosDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("kos_document_chunks")
+}
+
+model KosConversation {
+  id                 String                @id @default(cuid())
+  tenantId           String
+  // Null until the customer is identified (anonymous web sessions).
+  customerId         String?
+  // Cookie-tied anonymous session id; used to stitch a pre-OTP web
+  // conversation onto a KosCustomer once the phone is verified.
+  anonymousSessionId String?
+  channel            KosChannel
+  stage              KosLeadStage          @default(INQUIRY)
+  status             KosConversationStatus @default(BOT_ACTIVE)
+  // Set when an escalation is picked up by a BD.
+  assignedBdUserId   String?
+  startedAt          DateTime              @default(now())
+  lastMessageAt      DateTime              @default(now())
+  // Stage B (Phase 3A) — free-form reason captured by the bot when it
+  // calls escalate_to_human. Status flips to AWAITING_HUMAN in the
+  // same transaction. Null while the conversation is still BOT_ACTIVE.
+  escalationReason   String?
+  metadata           Json?
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer KosCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bdUser   KosBdUser?   @relation(fields: [assignedBdUserId], references: [id], onDelete: SetNull)
+  messages KosMessage[]
+
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@index([anonymousSessionId])
+  @@map("kos_conversations")
+}
+
+model KosMessage {
+  id                String              @id @default(cuid())
+  conversationId    String
+  direction         KosMessageDirection
+  channel           KosChannel
+  authorType        KosAuthorType
+  // KosBdUser.id when authorType=BD_HUMAN; null otherwise.
+  authorId          String?
+  content           String              @db.Text
+  // S3 URL (presigned at read time) for inbound media or bot attachments.
+  mediaUrl          String?
+  mediaType         String?
+  // Unique so we can dedupe Meta's at-least-once webhook redelivery.
+  whatsappMessageId String?             @unique
+  // [{ docId, docTitle, pageNum, viewUrl }] — rendered by citation-formatter.
+  citations         Json?
+  // { model, inputTokens, outputTokens, latencyMs } — bot replies only.
+  llmMetadata       Json?
+  // Stage B (Phase 3A) — KosAuditLog.id of the BOT_RETRIEVAL row that
+  // sourced the citations on this BOT message. Soft reference (no FK)
+  // so audit rows can be purged independently. Null for non-bot
+  // messages or bot messages with no retrieval.
+  retrievalAuditId  String?
+  createdAt         DateTime            @default(now())
+
+  conversation KosConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([whatsappMessageId])
+  @@map("kos_messages")
+}
+
+// Append-only audit trail. Plain-string actor/action columns so any future
+// actor type slots in without a schema change.
+model KosAuditLog {
+  id             String   @id @default(cuid())
+  tenantId       String
+  conversationId String?
+  // "CUSTOMER" | "BOT" | "BD" | "SYSTEM"
+  actorType      String
+  actorId        String?
+  // "MESSAGE_RECEIVED" | "MESSAGE_SENT" | "ESCALATED" | "LEAD_CREATED" | ...
+  action         String
+  details        Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([conversationId])
+  @@map("kos_audit_logs")
+}
+
+model KosOtpRequest {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  // E.164, same shape as KosCustomer.phone.
+  phone              String
+  // bcrypt hash of the 6-digit code.
+  codeHash           String
+  // Carried across the verify step so we can stitch an anonymous web
+  // session to the newly-identified KosCustomer in a single transaction.
+  anonymousSessionId String?
+  attempts           Int       @default(0)
+  verifiedAt         DateTime?
+  expiresAt          DateTime
+  createdAt          DateTime  @default(now())
+
+  @@index([tenantId, phone])
+  @@index([expiresAt])
+  @@map("kos_otp_requests")
+}
+
+model KosMagicLink {
+  id         String    @id @default(cuid())
+  tenantId   String
+  // The customer this link logs in. Plain string FK so we can purge expired
+  // links without touching the KosCustomer relation graph.
+  customerId String
+  // bcrypt hash of the 32-byte token; the raw token is sent over WhatsApp.
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  // Set on first consumption — single-use enforcement.
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("kos_magic_links")
+}
+
+// BD console sessions (Week 2). One row per active sign-in — multi-device
+// is supported by inserting multiple rows for the same KosBdUser, each
+// with an independent token + expiry. Mirrors the cookie-token pattern
+// AdminAccount.sessionToken originally used (DB-stored opaque token),
+// but kept in its own table so logout / revocation / rotation hygiene
+// doesn't require mutating the user row.
+//
+// Token format: `${bdUserId}.${base64url(randomBytes(32))}`. The
+// bdUserId prefix scopes session-token validation to that user's
+// rows (typically 1-5) so bcrypt comparison stays bounded at <500 ms
+// even at the 12-round cost — see kos-bd-auth.ts.
+//
+// `tokenHash` is bcrypt(token, 12). The raw token only ever lives in
+// the HttpOnly cookie; a DB leak alone cannot impersonate a BD user.
+model KosBdSession {
+  id         String    @id @default(cuid())
+  bdUserId   String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  userAgent  String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  bdUser KosBdUser @relation(fields: [bdUserId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([bdUserId])
+  @@index([expiresAt])
+  @@map("kos_bd_sessions")
+}
+
+// Stage B (Phase 3A) — customer-facing session cookies. Mirrors the
+// shape of KosBdSession but for KosCustomer. Each row represents an
+// active web-chat session — the kos_customer_session cookie carries a
+// 32-byte random token whose bcrypt(12) hash is stored here.
+//
+// Anonymous-first: a brand-new visitor lands on a KOS host and the
+// POST /api/kos/customer/session/start route mints a `Guest-XXXX`
+// KosCustomer + a KosCustomerSession in one transaction. The OTP-
+// based identity claim (Phase 4) re-uses the same session, just bumps
+// the KosCustomer rows to isAnonymous=false.
+model KosCustomerSession {
+  id         String    @id @default(cuid())
+  customerId String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  userAgent  String?
+  ipAddress  String?
+
+  customer KosCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([customerId, expiresAt])
+  @@map("kos_customer_sessions")
+}
+
+enum KosChannel {
+  WHATSAPP
+  WEB
+}
+
+enum KosLeadStage {
+  INQUIRY
+  DRAWING_RECEIVED
+  BOQ_GENERATED
+  SITE_VISIT_SCHEDULED
+  COMMERCIAL_DISCUSSION
+  WON
+  LOST
+}
+
+enum KosConversationStatus {
+  BOT_ACTIVE
+  AWAITING_HUMAN
+  HUMAN_HANDLING
+  RESOLVED
+  CLOSED
+}
+
+enum KosMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum KosAuthorType {
+  CUSTOMER
+  BOT
+  BD_HUMAN
+  SYSTEM
+}
+
+enum KosDocType {
+  PAC
+  CERTIFICATE
+  CASE_STUDY
+  PRICING
+  COMPARISON
+  FAQ
+  WARRANTY
+  OTHER
+}
+
+enum KosDocStatus {
+  UPLOADED
+  PARSING
+  CHUNKING
+  EMBEDDING
+  READY
+  FAILED
+}
+
+enum KosBdRole {
+  BD
+  OPERATIONS
+  VIEWER
+  TENANT_ADMIN
+}
+
+// ════════════════════════════════════════════════════════════════════
+// KOS BIM infrastructure (Week 5A) — Dincel/Kalzen panel SKU library.
+// ════════════════════════════════════════════════════════════════════
+// A .rfa (Revit family) / .dwg is Autodesk-proprietary binary that we
+// cannot parse directly. The ingestion pipeline pushes each file through
+// the Autodesk Platform Services (APS) Model Derivative API, which
+// translates it to SVF2 + a properties manifest. We persist the APS URN,
+// the extracted parameters, and geometry pointers here. One KosBimFamily
+// row per source file; derived KosBimPanelType / KosBimAccessory /
+// KosBimAssembly rows carry the structured SKU data the Stage B BOQ
+// engine queries. Idempotency keys on the SHA-256 of the file bytes so a
+// re-run never re-ingests (or re-spends APS credits on) the same content.
+
+enum KosBimApsStatus {
+  PENDING
+  UPLOADING
+  TRANSLATING
+  READY
+  FAILED
+  SKIPPED
+}
+
+enum KosBimFamilyCategory {
+  PANEL
+  ACCESSORY
+  ASSEMBLY
+  REFERENCE
+  OTHER
+}
+
+enum KosBimAccessoryType {
+  TRACK
+  FINISH
+  VOID
+  CORNER
+  JOINER
+  END_CAP
+  STOP_END
+  SPACER
+  ANGLE
+  OTHER
+}
+
+// One row per ingested .rfa / .dwg source file.
+model KosBimFamily {
+  id             String   @id @default(cuid())
+  tenantId       String
+  // Bare filename (e.g. "Profile_DIN-200P-1.rfa").
+  sourceFilename String
+  // "profiles" | "vertical" | "horizontal" | "systems" | null (root .dwg).
+  sourceFolder   String?
+  // Relative path from the package root, for traceability across runs.
+  sourcePath     String
+  // SHA-256 hex of the raw file bytes — the idempotency key.
+  sourceFileHash String
+  // KOS S3 key of the original file (Kalzen-owned bucket, ap-south-1).
+  s3KeyOriginal  String
+  sizeBytes      Int
+  // "application/octet-stream" (.rfa/.rvt) | "image/vnd.dwg" (.dwg) | …
+  mimeType       String
+
+  // ── APS (Autodesk Platform Services) pipeline state ──────────────
+  // Base64url-encoded objectId URN used as the Model Derivative key.
+  apsUrn          String?         @unique
+  apsBucketKey    String?
+  apsObjectKey    String?
+  apsJobId        String?
+  apsStatus       KosBimApsStatus @default(PENDING)
+  apsError        String?
+  apsCreditCost   Int?
+  apsTranslatedAt DateTime?
+  // KOS S3 key of the cached APS manifest JSON.
+  s3KeyManifest   String?
+  // Truncated APS metadata/properties snapshot for debugging.
+  rawMetadata     Json?
+
+  familyCategory KosBimFamilyCategory
+  displayName    String
+  // { source: "dincel", originalFilename, ... }
+  metadata       Json?
+  ingestedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  panelTypes  KosBimPanelType[]
+  accessories KosBimAccessory[]
+  assemblies  KosBimAssembly[]
+
+  // Same file content (hash) within a tenant = the same row. This is the
+  // core idempotency contract — a re-run upserts, never duplicates.
+  @@unique([tenantId, sourceFileHash])
+  @@index([tenantId, apsStatus])
+  @@index([tenantId, familyCategory])
+  @@map("kos_bim_families")
+}
+
+// Structured panel SKU derived from a PANEL-category family (profiles/).
+model KosBimPanelType {
+  id             String    @id @default(cuid())
+  tenantId       String
+  familyId       String
+  // Normalised SKU code, e.g. "DIN-200P-1".
+  skuCode        String
+  displayName    String
+  widthMm        Decimal?
+  heightMm       Decimal?
+  thicknessMm    Decimal?
+  weightKg       Decimal?
+  material       String?
+  ribPattern     String?
+  fireRatingHours Decimal?
+  acousticRw     Int?
+  pricePerUnit   Decimal?
+  priceCurrency  String?
+  priceUpdatedAt DateTime?
+  // Raw extracted APS parameters (defensive store for later re-mapping).
+  parameters     Json      @default("{}")
+  // APS internal objectid of the source type, when resolvable.
+  sourceTypeId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family   KosBimFamily   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  geometry KosBimGeometry?
+
+  @@unique([tenantId, skuCode])
+  @@index([tenantId, widthMm, heightMm])
+  @@map("kos_bim_panel_types")
+}
+
+// Structured accessory SKU derived from an ACCESSORY-category family
+// (vertical/ + horizontal/).
+model KosBimAccessory {
+  id            String              @id @default(cuid())
+  tenantId      String
+  familyId      String
+  skuCode       String
+  displayName   String
+  accessoryType KosBimAccessoryType
+  loadRatingKn  Decimal?
+  spanMinMm     Decimal?
+  spanMaxMm     Decimal?
+  weightKg      Decimal?
+  pricePerUnit  Decimal?
+  priceCurrency String?
+  parameters    Json                @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family   KosBimFamily    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  geometry KosBimGeometry?
+  // Spacing-rule back-relations (BracingRule table seeded empty in 5A).
+  bracingRulesAsBracing KosBracingRule[] @relation("BracingRule_Bracing")
+  bracingRulesAsTie     KosBracingRule[] @relation("BracingRule_Tie")
+
+  @@unique([tenantId, skuCode])
+  @@index([tenantId, accessoryType])
+  @@map("kos_bim_accessories")
+}
+
+// Structured assembly derived from an ASSEMBLY-category family (systems/).
+model KosBimAssembly {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  familyId           String
+  assemblyCode       String
+  displayName        String
+  description        String?
+  // Panel SKU codes this assembly references, when encoded in properties.
+  componentPanelSkus String[]
+  parameters         Json     @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family   KosBimFamily    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  geometry KosBimGeometry?
+
+  @@unique([tenantId, assemblyCode])
+  @@map("kos_bim_assemblies")
+}
+
+// Geometry pointer for a panel / accessory / assembly. Kept in its own
+// table so the heavy mesh reference is loaded only when needed, and so a
+// single SKU can later carry multiple LODs without bloating the SKU row.
+// Exactly one of panelTypeId / accessoryId / assemblyId is set.
+model KosBimGeometry {
+  id            String   @id @default(cuid())
+  tenantId      String
+  panelTypeId   String?  @unique
+  accessoryId   String?  @unique
+  assemblyId    String?  @unique
+  // For 5A this is the APS URN reference "aps://<urn>"; a future phase may
+  // cache an extracted OBJ/glTF to S3 and point here instead.
+  s3KeyMesh     String
+  // "svf2" | "obj" | "gltf".
+  format        String
+  vertexCount   Int?
+  faceCount     Int?
+  boundingBoxMm Json?
+  createdAt     DateTime @default(now())
+
+  panelType KosBimPanelType? @relation(fields: [panelTypeId], references: [id], onDelete: Cascade)
+  accessory KosBimAccessory? @relation(fields: [accessoryId], references: [id], onDelete: Cascade)
+  assembly  KosBimAssembly?  @relation(fields: [assemblyId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("kos_bim_geometries")
+}
+
+// Bracing / tie spacing rules. Table created in 5A but seeded EMPTY —
+// populated in a later phase from Dincel installation manuals once the
+// accessory SKUs above exist to reference.
+model KosBracingRule {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  wallHeightMinMm       Decimal
+  wallHeightMaxMm       Decimal
+  pourRateMin           Decimal?
+  pourRateMax           Decimal?
+  bracingAccessoryId    String?
+  bracingSpacingMm      Decimal?
+  tieAccessoryId        String?
+  tieSpacingHorizontalMm Decimal?
+  tieSpacingVerticalMm  Decimal?
+  sourceDocument        String?
+  notes                 String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bracingAccessory KosBimAccessory? @relation("BracingRule_Bracing", fields: [bracingAccessoryId], references: [id], onDelete: SetNull)
+  tieAccessory     KosBimAccessory? @relation("BracingRule_Tie", fields: [tieAccessoryId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, wallHeightMinMm, wallHeightMaxMm])
+  @@map("kos_bracing_rules")
+}
