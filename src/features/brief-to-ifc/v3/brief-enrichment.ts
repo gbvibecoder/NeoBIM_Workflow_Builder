@@ -19,6 +19,7 @@ import { briefSpecSchema } from "./types";
 import type { BriefEnrichmentResult, BriefSpec } from "./types";
 import { withCoercionCollection } from "./telemetry";
 import { zodToOpusToolSchema } from "./zod-to-opus-schema";
+import { readThrough } from "@/lib/result-cache";
 
 const BRIEF_ENRICHMENT_MODEL = "claude-opus-4-7";
 const OPUS_INPUT_COST_PER_MILLION = 5;
@@ -110,6 +111,35 @@ export interface EnrichmentArgs {
 }
 
 export async function enrichBrief(
+  args: EnrichmentArgs,
+): Promise<BriefEnrichmentResult> {
+  // Read-through cache: same brief (+ projectType) hashed via SHA-256
+  // returns the previously-stored BriefSpec without paying Anthropic.
+  // Failures are NEVER cached — see `shouldCache` predicate below.
+  const cached = await readThrough<BriefEnrichmentResult>({
+    config: {
+      namespace: "enrichBrief",
+      // Editing the system prompt or the model literal auto-invalidates.
+      promptVersion: [BRIEF_ENRICHMENT_MODEL, SYSTEM_PROMPT, TOOL_NAME],
+    },
+    input: {
+      brief: args.brief.trim(),
+      projectType: args.projectType ?? null,
+    },
+    compute: () => enrichBriefUncached(args),
+    shouldCache: (r) => r.ok === true && r.brief !== null,
+  });
+  if (cached.cacheHit) {
+    return {
+      ...cached.value,
+      costUsd: 0,
+      cacheHit: true,
+    };
+  }
+  return cached.value;
+}
+
+async function enrichBriefUncached(
   args: EnrichmentArgs,
 ): Promise<BriefEnrichmentResult> {
   const startedAt = Date.now();

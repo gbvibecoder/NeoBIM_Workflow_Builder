@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import { designRationaleSchema } from "./types";
 import type { BriefSpec, DesignRationale } from "./types";
+import { readThrough } from "@/lib/result-cache";
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -98,6 +99,10 @@ export interface ReasonerMetrics {
 export interface ReasonerResult {
   spec: BriefSpec;
   metrics: ReasonerMetrics;
+  /** Set to true when the result was served from the v3 result cache
+   *  (see src/lib/result-cache.ts). On cache hit, `metrics.cost_usd`
+   *  is rewritten to 0 so per-build cost accounting stays accurate. */
+  cacheHit?: boolean;
 }
 
 export interface ReasonerOptions {
@@ -216,6 +221,37 @@ async function callReasoner(
 // ─── Main entry point ───────────────────────────────────────────────────
 
 export async function applyArchitecturalReasoning(
+  spec: BriefSpec,
+  options?: ReasonerOptions,
+): Promise<ReasonerResult> {
+  // Test injections bypass cache so unit tests stay hermetic and the
+  // existing timing assertions (architectural-reasoner-timing.test.ts)
+  // see real Opus call paths.
+  if (options?.clientFactory || options?.maxCostUsd !== undefined || options?.timeout !== undefined) {
+    return applyArchitecturalReasoningUncached(spec, options);
+  }
+  const cached = await readThrough<ReasonerResult>({
+    config: {
+      namespace: "applyArchitecturalReasoning",
+      promptVersion: [REASONER_MODEL, REASONER_PROMPT_TEMPLATE],
+    },
+    input: { spec },
+    compute: () => applyArchitecturalReasoningUncached(spec, options),
+    // Cache only when the reasoner actually produced rationale entries —
+    // a zero-rationale return is a quiet failure, not a useful memo.
+    shouldCache: (r) => r.metrics.rationale_count > 0,
+  });
+  if (cached.cacheHit) {
+    return {
+      ...cached.value,
+      metrics: { ...cached.value.metrics, cost_usd: 0 },
+      cacheHit: true,
+    };
+  }
+  return cached.value;
+}
+
+async function applyArchitecturalReasoningUncached(
   spec: BriefSpec,
   options?: ReasonerOptions,
 ): Promise<ReasonerResult> {

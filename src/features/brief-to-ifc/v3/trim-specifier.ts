@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { trimItemSchema } from "./types";
 import type { BriefSpec, TrimItem } from "./types";
+import { readThrough } from "@/lib/result-cache";
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -100,6 +101,10 @@ export interface TrimSpecifierMetrics {
 export interface TrimSpecifierResult {
   spec: BriefSpec;
   metrics: TrimSpecifierMetrics;
+  /** Set to true when the result was served from the v3 result cache
+   *  (see src/lib/result-cache.ts). On cache hit, `metrics.cost_usd`
+   *  is rewritten to 0 so per-build cost accounting stays accurate. */
+  cacheHit?: boolean;
 }
 
 export interface TrimSpecifierOptions {
@@ -222,6 +227,34 @@ async function callTrimModel(
 // ─── Main entry point ───────────────────────────────────────────────────
 
 export async function applyTrimSpecification(
+  spec: BriefSpec,
+  options?: TrimSpecifierOptions,
+): Promise<TrimSpecifierResult> {
+  // Test injections bypass cache so unit tests stay hermetic.
+  if (options?.clientFactory || options?.maxCostUsd !== undefined || options?.timeout !== undefined) {
+    return applyTrimSpecificationUncached(spec, options);
+  }
+  const cached = await readThrough<TrimSpecifierResult>({
+    config: {
+      namespace: "applyTrimSpecification",
+      promptVersion: [TRIM_MODEL, TRIM_PROMPT_TEMPLATE],
+    },
+    input: { spec },
+    compute: () => applyTrimSpecificationUncached(spec, options),
+    // Only memoize when the specifier produced trim items.
+    shouldCache: (r) => r.metrics.trim_count > 0,
+  });
+  if (cached.cacheHit) {
+    return {
+      ...cached.value,
+      metrics: { ...cached.value.metrics, cost_usd: 0 },
+      cacheHit: true,
+    };
+  }
+  return cached.value;
+}
+
+async function applyTrimSpecificationUncached(
   spec: BriefSpec,
   options?: TrimSpecifierOptions,
 ): Promise<TrimSpecifierResult> {
