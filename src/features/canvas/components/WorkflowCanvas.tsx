@@ -500,6 +500,82 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
 
   const { runWorkflow, isExecuting, rateLimitHit, setRateLimitHit, clearRateLimitError } = useExecution({ onLog: addLogEntry });
 
+  /* ── Phase ζ.1 — STOP handler.
+     Replaces the prior `onStop={() => {}}` no-op that had been silently
+     dropping user cancel intent for the entire v3 lifetime. Iterates the
+     current execution's artifacts for any with a `pendingRunId` (set by
+     TR-026 when it dispatches `/api/brief-to-ifc/v3/runs`) and POSTs the
+     new `/runs/[id]/cancel` endpoint for each. The cancel endpoint sets
+     the row to CANCELLED; the agent-job worker's in-turn probe picks
+     that up on its next turn boundary and short-circuits — bounding
+     additional Anthropic spend after STOP to at most one mid-stream
+     turn (~$0.10–0.30) vs the prior $5–16 per "stopped" run. Idempotent
+     on the server side (already-terminal runs return 200 with their
+     current status). Errors are swallowed per-runId so a flaky network
+     never prevents the others from cancelling.
+
+     Out of scope this phase: client-side polling halt + canvas tile
+     state cleanup. The TR-026 client poll (useExecution.ts:888) will
+     spin until its 30-min timeout when status reads CANCELLED — wasted
+     polling, but ZERO Anthropic spend. UI polish to be addressed
+     separately.                                                       */
+  const handleStop = useCallback(async () => {
+    if (!isExecuting) {
+      return;
+    }
+    const pendingRunIds: string[] = [];
+    for (const [, art] of artifacts) {
+      const data = (art.data ?? {}) as Record<string, unknown>;
+      const candidate = data.pendingRunId;
+      if (typeof candidate === "string" && candidate.length > 0) {
+        pendingRunIds.push(candidate);
+      }
+    }
+    if (pendingRunIds.length === 0) {
+      toast.info("Workflow stop requested — nothing in-flight to cancel server-side.", {
+        duration: 4000,
+      });
+      return;
+    }
+    toast.info(
+      `Cancelling ${pendingRunIds.length} active AI build${pendingRunIds.length === 1 ? "" : "s"}…`,
+      { duration: 5000 },
+    );
+    const results = await Promise.all(
+      pendingRunIds.map(async (runId) => {
+        try {
+          const res = await fetch(`/api/brief-to-ifc/v3/runs/${runId}/cancel`, {
+            method: "POST",
+            credentials: "include",
+          });
+          if (!res.ok) {
+            console.warn(`[stop] cancel ${runId} returned HTTP ${res.status}`);
+            return { runId, ok: false };
+          }
+          return { runId, ok: true };
+        } catch (err) {
+          console.warn(
+            `[stop] cancel ${runId} failed:`,
+            err instanceof Error ? err.message : err,
+          );
+          return { runId, ok: false };
+        }
+      }),
+    );
+    const cancelledCount = results.filter((r) => r.ok).length;
+    if (cancelledCount === pendingRunIds.length) {
+      toast.success(
+        `Cancellation sent for ${cancelledCount} build${cancelledCount === 1 ? "" : "s"}. The worker will halt on its next turn (≤ ~30s).`,
+        { duration: 6000 },
+      );
+    } else {
+      toast.warning(
+        `${cancelledCount}/${pendingRunIds.length} cancellations succeeded; the rest may already be terminal.`,
+        { duration: 6000 },
+      );
+    }
+  }, [isExecuting, artifacts]);
+
   // §P UX polish: fetch eligibility on canvas mount + after every execution
   // ends so the workflow-lock banner reflects current state. Skipped in demo
   // mode and for unsaved workflows.
@@ -1106,7 +1182,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             isSaving={isSaving}
             isNodeLibraryOpen={isNodeLibraryOpen}
             onRun={handleRun}
-            onStop={() => {}}
+            onStop={handleStop}
             onSave={handleSave}
             onUndo={undo}
             onRedo={redo}

@@ -66,7 +66,11 @@ import { verifyBuild } from "@/features/brief-to-ifc/v3/hard-verifier";
 import { generateRetryHint } from "@/features/brief-to-ifc/v3/retry-hint";
 import { transitionStatus } from "@/features/brief-to-ifc/v3/lifecycle/transitions";
 import { startHeartbeat } from "@/features/brief-to-ifc/v3/lifecycle/heartbeat";
-import { QUALITY_THRESHOLD, MAX_ITERATIONS } from "@/features/brief-to-ifc/v3/constants";
+import {
+  QUALITY_THRESHOLD,
+  MAX_ITERATIONS,
+  RUN_COST_CAP_USD,
+} from "@/features/brief-to-ifc/v3/constants";
 import {
   BuildTelemetryCollector,
   emitBuildTelemetry,
@@ -237,6 +241,88 @@ export async function POST(req: NextRequest) {
     ? (run.iterationHistory as unknown as IterationHistoryEntry[])
     : [];
 
+  // ── 5b. Phase ζ.2 — PER-RUN cost cap pre-check.
+  // Cumulative Anthropic spend = sum of prior iterations' `costUsd`
+  // values (already persisted to `iterationHistory` after each
+  // iteration at line ~514 below — no schema change). If the remaining
+  // run-level budget is non-positive, don't start this iteration:
+  //   • prior iteration(s) exist → finalize the best one rather than
+  //     discarding it (the IFC is already paid for and uploaded to R2).
+  //   • no prior iteration succeeded → mark the run FAILED with
+  //     RUN_COST_CAP_EXCEEDED (rare: only happens if iter-1 spent enough
+  //     to exhaust the cap before producing a finalizable IFC, which
+  //     the per-iter cap of $5 against the $7 run cap normally prevents).
+  // The check ALSO catches the runaway-guard / re-enqueue path's escape
+  // route: if iter-N+1 was enqueued before this worker's pre-check
+  // landed, the pre-check is the second line of defence.
+  const spentSoFar = iterationHistory.reduce(
+    (s, e) => s + (e.costUsd ?? 0),
+    0,
+  );
+  const remainingRunBudgetUsd = RUN_COST_CAP_USD - spentSoFar;
+  if (remainingRunBudgetUsd <= 0) {
+    await appendLog(prisma, {
+      executionId: runId,
+      level: "WARN",
+      source: "LIFECYCLE",
+      message:
+        `Iteration ${iteration} not started — cumulative run cost ` +
+        `$${spentSoFar.toFixed(4)} has exhausted the $${RUN_COST_CAP_USD.toFixed(2)} ` +
+        `per-run cap (RUN_COST_CAP_USD). ` +
+        (iterationHistory.length > 0
+          ? `Finalizing with best-so-far (${iterationHistory.length} prior iteration(s)).`
+          : `No prior iteration produced an IFC — marking FAILED.`),
+      metadata: {
+        iteration,
+        spentSoFarUsd: spentSoFar,
+        runCapUsd: RUN_COST_CAP_USD,
+        priorIterations: iterationHistory.length,
+      },
+    });
+    if (iterationHistory.length === 0) {
+      try {
+        await transitionStatus(prisma, runId, "RUNNING", {
+          to: "FAILED",
+          payload: {
+            errorCode: "RUN_COST_CAP_EXCEEDED",
+            errorMessage:
+              `Run cost cap $${RUN_COST_CAP_USD.toFixed(2)} exhausted ` +
+              `before iteration ${iteration} could start; cumulative spend ` +
+              `$${spentSoFar.toFixed(4)}.`,
+          },
+        });
+      } catch (transitionErr) {
+        // Race with cancel sweep or another writer — silently swallow.
+        console.warn(
+          `[agent-job] FAILED transition raced for ${runId}: ${
+            transitionErr instanceof Error ? transitionErr.message : String(transitionErr)
+          }`,
+        );
+      }
+      return NextResponse.json({
+        status: "budget_exhausted",
+        runId,
+        iteration,
+        spentSoFarUsd: spentSoFar,
+        noPriorResult: true,
+      });
+    }
+    const bestIdx = findBestIterationIdx(iterationHistory);
+    await finalizeWithBest({
+      runId,
+      history: iterationHistory,
+      bestIdx,
+      completedReason: "run_budget_exhausted",
+    });
+    return NextResponse.json({
+      status: "budget_exhausted",
+      runId,
+      iteration,
+      spentSoFarUsd: spentSoFar,
+      finalizedBestIteration: iterationHistory[bestIdx].iteration,
+    });
+  }
+
   // ── 6. Per-iteration BuildTelemetryCollector (δ.0 reuse) ──
   const telemetry = new BuildTelemetryCollector({
     runId,
@@ -282,6 +368,21 @@ export async function POST(req: NextRequest) {
       }
     });
 
+    // ── 7b. Phase ζ.1 — pre-turn cancellation probe.
+    // Closes over `runId` + `prisma` so the driver doesn't need either.
+    // Fires once per agent turn at the top of the loop (BEFORE the
+    // Anthropic stream call). Returns true when the user cancelled the
+    // run; the driver short-circuits via the existing `failed(...)`
+    // path with `CANCELLED_BY_USER`. Errors are swallowed by the
+    // driver so a transient DB blip never aborts a healthy run.
+    const checkCancelled = async (): Promise<boolean> => {
+      const row = await prisma.briefToIfcV3Run.findUnique({
+        where: { id: runId },
+        select: { status: true },
+      });
+      return row?.status === "CANCELLED";
+    };
+
     // ── 8. Run generator + verifier (raced against the timeout) ──
     const built = await Promise.race([
       runIterationAndVerify({
@@ -292,6 +393,12 @@ export async function POST(req: NextRequest) {
         iteration,
         iterationStartMs,
         telemetry,
+        checkCancelled,
+        // ζ.2 — pass the remaining run-budget so the driver's per-turn
+        // cap collapses to `min(per-iter, remaining)`. The driver will
+        // exit via `failed(RUN_COST_CAP_EXCEEDED)` if the run budget is
+        // the tighter constraint and it gets breached mid-iteration.
+        remainingRunBudgetUsd,
         onTurn: (record) => {
           try {
             if (record.toolName === "render_preview") {
@@ -354,6 +461,46 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       /* swallow */
+    }
+
+    // Phase ζ.1 — cancellation short-circuit. The cancel-probe inside
+    // `runGenerator` returned the same `failed(...)` shape as any other
+    // graceful exit, with `error.code = "CANCELLED_BY_USER"`. We DO NOT
+    // throw here: the user already set the run's status to CANCELLED via
+    // the cancel endpoint, and trying to transition `RUNNING → FAILED`
+    // would race against (and lose to) the user's CANCELLED transition.
+    // Instead we log the abort, leave the row in its CANCELLED state,
+    // stop the heartbeat, and acknowledge the QStash invocation. No
+    // further iteration enqueues — chaining is gated below.
+    if (
+      built.result.error?.code === "CANCELLED_BY_USER" ||
+      toBriefToIfcV3ErrorCode(built.result.error?.code) === "CANCELLED_BY_USER"
+    ) {
+      await appendLog(prisma, {
+        executionId: runId,
+        level: "INFO",
+        source: "LIFECYCLE",
+        message:
+          `Iteration ${iteration} aborted by user cancel — agent turn loop ` +
+          `exited via CANCELLED_BY_USER guard after ${built.result.turns} ` +
+          `turn(s), cumulative cost $${built.result.costUsd.toFixed(4)}. ` +
+          `No further iterations will be enqueued.`,
+        metadata: {
+          iteration,
+          turnsCompleted: built.result.turns,
+          costUsdAtCancel: built.result.costUsd,
+        },
+      });
+      void snapshotAndEmit(prisma, telemetry).catch(() => {
+        /* swallow — telemetry never crashes the worker */
+      });
+      heartbeat.stop();
+      return NextResponse.json({
+        status: "cancelled",
+        runId,
+        iteration,
+        turnsCompleted: built.result.turns,
+      });
     }
 
     // If the generator failed (ok=false), abort this iteration as a
@@ -472,6 +619,93 @@ export async function POST(req: NextRequest) {
     if (shouldRetry && decision.kind === "retry") {
       // ── 10a. RE-ENQUEUE iteration N+1 ──
       const nextIteration = decision.nextIteration;
+
+      // Phase ζ.1 — between-iterations cancel guard. The user may have
+      // cancelled the run AFTER this iteration's atomic claim but
+      // BEFORE the agent-loop's in-turn probe fired (rare window if
+      // cancel + quality-pass land in the same millisecond, BUT also
+      // common when iteration N completes normally and the user
+      // cancels in the brief moment before N+1 enqueues). Re-read the
+      // row's status here; if CANCELLED, do NOT enqueue the next
+      // iteration. The user's CANCELLED row is authoritative; we leave
+      // the iterationHistory in place (already persisted above) but do
+      // not bill another iteration's Anthropic spend.
+      const currentRow = await prisma.briefToIfcV3Run.findUnique({
+        where: { id: runId },
+        select: { status: true },
+      });
+      if (currentRow?.status === "CANCELLED") {
+        await appendLog(prisma, {
+          executionId: runId,
+          level: "INFO",
+          source: "LIFECYCLE",
+          message:
+            `Iteration ${nextIteration} NOT enqueued — run was cancelled ` +
+            `by user between iteration ${iteration}'s finalize and the ` +
+            `re-enqueue decision. iterationHistory persisted; no further ` +
+            `Anthropic spend.`,
+          metadata: {
+            iteration,
+            wouldHaveEnqueued: nextIteration,
+            cancelledBetweenIterations: true,
+          },
+        });
+        heartbeat.stop();
+        return NextResponse.json({
+          status: "cancelled",
+          runId,
+          iteration,
+          skippedNextIteration: nextIteration,
+        });
+      }
+
+      // Phase ζ.2 — between-iterations PER-RUN budget gate. Re-compute
+      // cumulative spend from `newHistory` (which now includes this
+      // iteration's cost) and refuse to chain iteration N+1 if the
+      // run-level cap is exhausted. Finalize-with-best-so-far instead —
+      // the prior iteration(s) are paid for; returning the best result
+      // beats discarding it. Distinct from the pre-iteration check at
+      // §5b: that one fires when a freshly-claimed worker has no budget
+      // left; this one fires when iteration N JUST completed but iter
+      // N+1 would breach the cap.
+      const cumulativeAfterThis = newHistory.reduce(
+        (s, e) => s + (e.costUsd ?? 0),
+        0,
+      );
+      if (cumulativeAfterThis >= RUN_COST_CAP_USD) {
+        await appendLog(prisma, {
+          executionId: runId,
+          level: "INFO",
+          source: "LIFECYCLE",
+          message:
+            `Iteration ${nextIteration} NOT enqueued — cumulative run cost ` +
+            `$${cumulativeAfterThis.toFixed(4)} has reached the ` +
+            `$${RUN_COST_CAP_USD.toFixed(2)} per-run cap. ` +
+            `Finalizing with best-so-far (iteration ${
+              newHistory[bestIdx].iteration
+            }, quality ${newHistory[bestIdx].qualityScore}).`,
+          metadata: {
+            iteration,
+            wouldHaveEnqueued: nextIteration,
+            cumulativeCostUsd: cumulativeAfterThis,
+            runCapUsd: RUN_COST_CAP_USD,
+            bestIteration: newHistory[bestIdx].iteration,
+          },
+        });
+        await finalizeWithBest({
+          runId,
+          history: newHistory,
+          bestIdx,
+          completedReason: "run_budget_exhausted",
+        });
+        heartbeat.stop();
+        return NextResponse.json({
+          status: "ok",
+          runId,
+          iteration,
+          completedReason: "run_budget_exhausted",
+        });
+      }
 
       // Runaway guard re-check (Rule 3 — defense in depth). The pure
       // assertion refuses any nextIteration that breaches the ceiling
@@ -658,6 +892,16 @@ async function runIterationAndVerify(args: {
    *  past that, vision is skipped to keep the iteration under the
    *  750s ITERATION_TIMEOUT_MS cap. */
   iterationStartMs: number;
+  /** Phase ζ.1 — pre-turn cancellation probe. Closes over the runId
+   *  + Prisma to re-read the run row at every turn boundary; returns
+   *  true when the user has cancelled the run. Forwarded verbatim to
+   *  `runGenerator` so the driver stays decoupled from Prisma. */
+  checkCancelled: () => Promise<boolean>;
+  /** Phase ζ.2 — remaining run-level budget in USD (RUN_COST_CAP_USD -
+   *  sum of prior iterations' costUsd). Forwarded verbatim to
+   *  `runGenerator`; clamps the per-turn cost cap so a single iteration
+   *  cannot blow the whole run's budget. */
+  remainingRunBudgetUsd: number;
 }): Promise<BuiltIteration> {
   const result = await runGenerator({
     brief: args.briefSpec,
@@ -667,6 +911,8 @@ async function runIterationAndVerify(args: {
     iteration: args.iteration,
     telemetry: args.telemetry,
     onTurn: args.onTurn,
+    checkCancelled: args.checkCancelled,
+    remainingRunBudgetUsd: args.remainingRunBudgetUsd,
   });
 
   // Generator failed — no verifier call; return zero score on both
