@@ -126,13 +126,27 @@ const INPUT_NODE_IDS = new Set(["IN-001", "IN-002", "IN-003", "IN-004", "IN-005"
 const DEMO_NODE_IDS = new Set(["TR-003", "GN-003"]);
 
 // Route execution to real API, demo API, or mock
-async function executeNode(
+// Exported for direct unit-testing of the TR-026 cancel-bug fix
+// (see `__tests__/tr-026-cancel-visibility.test.ts`). Not part of the
+// hook's public surface; no other module imports it.
+export async function executeNode(
   node: WorkflowNode,
   executionId: string,
   dbExecutionId: string | null,
   previousArtifact?: ExecutionArtifact | null,
   useRealExecution = false,
-  demoMode = false
+  demoMode = false,
+  // Cancel-bug fix (2026-05-22): the canvas STOP / pagehide handlers
+  // (`WorkflowCanvas.tsx:527-655`) iterate the zustand artifacts store
+  // looking for `data.pendingRunId`. For TR-026 the polling loop below
+  // would otherwise hold that runId inside its closure for the entire
+  // 10–25 min build, leaving STOP/Back unable to find anything to cancel
+  // (toast: "nothing in-flight to cancel server-side"). When provided,
+  // we publish a pending artifact BEFORE the `while` loop so the store
+  // exposes the live runId immediately. Mirrors the existing video-
+  // poller pattern (`pollVideoGeneration` line 1124). Optional so all
+  // non-TR-026 paths are byte-equal to today.
+  addArtifactFn?: (nodeId: string, artifact: ExecutionArtifact) => void
 ): Promise<ExecutionArtifact> {
   const { catalogueId, inputValue } = node.data as { catalogueId: string; inputValue?: string };
 
@@ -881,12 +895,47 @@ async function executeNode(
     const pendingRunId = artData?.pendingRunId;
     if (typeof pendingRunId === "string" && pendingRunId.length > 0) {
       console.info(`[tr-026-poll] Agent build queued — polling run ${pendingRunId}...`);
+
+      // Cancel-bug fix (2026-05-22): publish the pending artifact to the
+      // zustand artifacts store NOW, before the poll loop blocks for
+      // 10–25 min. This is the visibility the canvas STOP / pagehide
+      // handlers need to find the live runId via `collectPendingRunIds`
+      // (`WorkflowCanvas.tsx:527-537`). Without this, the store has no
+      // TR-026 entry for the entire build, the cancel endpoint is never
+      // POSTed, and the agent loop runs unbounded after STOP.
+      // The terminal-state addArtifact at the caller (~2124) overwrites
+      // this stamp with the completed artifact on success; on failure /
+      // timeout, the catch path leaves the pending stamp in place
+      // (harmless — the cancel endpoint is idempotent for terminal rows
+      // and the STOP button only renders while `isExecuting`).
+      addArtifactFn?.(node.id, { ...artifact, createdAt: new Date() });
+
       const POLL_INTERVAL = 8_000;
       const POLL_TIMEOUT = 30 * 60_000; // 30 min safety cap
       const pollStart = Date.now();
 
       while (Date.now() - pollStart < POLL_TIMEOUT) {
         await new Promise(r => setTimeout(r, POLL_INTERVAL));
+
+        // STOP-UX fix (2026-05-22): bail when the user reset the canvas.
+        // `clearCurrentExecution()` flips `isExecuting` to false; reading
+        // the store via getState() (non-reactive) gives us the freshest
+        // value without re-rendering. Returning here:
+        //   • stops further wasted status fetches (every 8s for up to 30 min),
+        //   • prevents the COMPLETED branch below from RE-ADDING the
+        //     finished artifact to the now-cleared store (which would
+        //     repopulate a "fresh canvas" 8s after STOP).
+        // The outer for-level loop has the matching guard at level entry
+        // + per-node body, so the returned artifact never reaches the
+        // caller's `addArtifact(node.id, artifact)` (line ~2124).
+        if (!useExecutionStore.getState().isExecuting) {
+          // eslint-disable-next-line no-console
+          console.info(
+            `[tr-026-poll] Execution reset — abandoning poll for ${pendingRunId}`,
+          );
+          return { ...artifact, createdAt: new Date() };
+        }
+
         try {
           const statusRes = await fetch(
             `/api/brief-to-ifc/v3/runs/${pendingRunId}/status`,
@@ -1954,12 +2003,26 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     // parallel via Promise.allSettled. Levels execute sequentially.
     for (const level of executionLevels) {
       if (breakExecution) break;
+      // STOP-UX guard (2026-05-22): the user clicked STOP+confirm during a
+      // prior level / await; `clearCurrentExecution()` flipped isExecuting
+      // to false. Treat the remainder of the run as cancelled — no more
+      // node bodies run, no more artifacts get added, the loop exits
+      // cleanly. `completeExecution(...)` below is store-safe with
+      // currentExecution=null (early-returns).
+      if (!useExecutionStore.getState().isExecuting) {
+        breakExecution = true;
+        break;
+      }
 
       // If this level has a single node, run it directly (no overhead).
       // If multiple nodes, run them in parallel.
       const nodePromises = level.map((node) => (async () => {
       // ─── BEGIN PER-NODE BODY (shared for sequential and parallel) ───
       if (breakExecution) return; // another node in this level failed hard
+      // STOP-UX guard (2026-05-22): user clicked STOP+confirm — reset
+      // already wiped the store. Skip the node body entirely so we
+      // neither call the API nor write back to the cleared store.
+      if (!useExecutionStore.getState().isExecuting) return;
 
       updateNodeStatus(node.id, "running");
       log("running", `Running: ${node.data.label}`, node.data.catalogueId);
@@ -2076,7 +2139,14 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           }
         }
 
-        const artifact = await executeNode(node, executionId, dbExecutionId, upstreamArtifact, useReal, isDemoMode);
+        const artifact = await executeNode(node, executionId, dbExecutionId, upstreamArtifact, useReal, isDemoMode, addArtifact);
+
+        // STOP-UX guard (2026-05-22): user clicked STOP+confirm WHILE this
+        // node was running. The reset cleared the store; do NOT re-add
+        // this artifact via the local artifactMap or the store writes
+        // below. Returning here exits the per-node closure cleanly so
+        // Promise.allSettled at the level boundary doesn't see a rejection.
+        if (!useExecutionStore.getState().isExecuting) return;
         artifactMap.set(node.id, artifact);
 
         // Diagnostics: capture output summary + fold any node-emitted deep
@@ -2587,7 +2657,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       // share are degraded. Hydration in WorkflowCanvas closes the common
       // reload-then-regen path.
       const dbExecId = useExecutionStore.getState().currentDbExecutionId;
-      const artifact = await executeNode(node, executionId, dbExecId, upstreamArtifact, useReal, isDemoMode);
+      const artifact = await executeNode(node, executionId, dbExecId, upstreamArtifact, useReal, isDemoMode, addArtifact);
       addArtifact(nodeId, artifact);
       updateNodeStatus(nodeId, "success");
       trackRegenerationUsed(nodeId, node.data.catalogueId);
