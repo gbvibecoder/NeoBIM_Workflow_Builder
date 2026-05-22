@@ -84,6 +84,50 @@ export function ExecutionRunRoot({ runId }: { runId: string }) {
     };
   }, [runId]);
 
+  /* ── Phase η.1 — KILL-ON-ABANDON for the run-page surface.
+     If the user lands on `/dashboard/brief-to-ifc/v3/runs/[id]` directly
+     (skipping the canvas) and then closes the tab / navigates away while
+     the run is still PENDING or RUNNING, we want the same kill-on-abandon
+     defence the canvas got: fire cancel via `sendBeacon` so the request
+     survives page unload.
+
+     Distinct from the canvas handler because the run-page knows the
+     `runId` directly (from the route), not from artifacts. Distinct from
+     the explicit cancel-button flow because the run-page UI currently
+     has no STOP control; this is the ONLY user-cancel path the run-page
+     offers today.
+
+     Same `pagehide` + `event.persisted` + `sendBeacon` discipline as the
+     canvas. Idempotent on the server side. Limitation: best-effort —
+     hard crash falls back to the 5-min deadman cron. */
+  useEffect(() => {
+    // Only arm the handler when the run is still cancellable. Reading
+    // `view?.status` so a CANCELLED/COMPLETED/FAILED view doesn't fire
+    // a useless cancel beacon that briefly toasts the server logs.
+    const status = view?.status;
+    if (status !== "PENDING" && status !== "RUNNING") return;
+    const onPageHide = (event: PageTransitionEvent): void => {
+      if (event.persisted) return;
+      try {
+        const url = `/api/brief-to-ifc/v3/runs/${runId}/cancel`;
+        const accepted = navigator.sendBeacon(url, new Blob([], { type: "text/plain" }));
+        if (!accepted) {
+          void fetch(url, {
+            method: "POST",
+            credentials: "include",
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch {
+        /* never throw from a leave-handler */
+      }
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [runId, view?.status]);
+
   if (!view) {
     return (
       <div data-testid="execution-run-loading" style={panelStyle}>

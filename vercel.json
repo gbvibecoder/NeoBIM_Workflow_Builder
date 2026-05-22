@@ -22,7 +22,11 @@
     },
     {
       "path": "/api/cron/cleanup-stuck-brief-to-ifc-v3-runs",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-stuck-brief-renders",
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/billing-grace-window-sweep",
