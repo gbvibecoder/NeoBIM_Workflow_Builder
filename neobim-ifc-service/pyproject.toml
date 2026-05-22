@@ -35,6 +35,10 @@ dependencies = [
     # shapely + matplotlib (above) are reused for geometry + the debug overlay.
     "ezdxf>=1.3",
     "Pillow>=10.0",
+    # KOS Week 5C-2 — PDF customer-drawing parser. PyMuPDF (fitz) does the
+    # vector path + text extraction and the debug-overlay rasterization.
+    # Pinned to the version validated against the customer PDFs in 5C-2.
+    "pymupdf==1.27.2",
 ]
 
 [project.optional-dependencies]
