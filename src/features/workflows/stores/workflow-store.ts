@@ -104,6 +104,19 @@ interface WorkflowState {
 
   // Reset
   resetCanvas: () => void;
+  /** STOP-UX soft reset (2026-05-22). Unlike `resetCanvas`, this PRESERVES
+   *  `nodes` and `edges` (the workflow template stays on screen) and only
+   *  clears per-run execution state:
+   *    • every node's `data.status` and `data.errorMessage` (back to idle),
+   *    • IN-009's `data.briefText` + `data.inputValue` (the brief input is emptied).
+   *  It does NOT push history (system-initiated, not a user edit) and does
+   *  NOT change `currentWorkflow` / `isDirty` — the user is still editing
+   *  the same workflow. Companion action of the canvas STOP confirm flow;
+   *  `clearArtifacts` + `clearCurrentExecution` on the execution store
+   *  handle the run-side cleanup. The `?new=1` blank-canvas path keeps
+   *  using the hard `resetCanvas` — those two paths are intentionally
+   *  separate. */
+  softResetCanvas: () => void;
 }
 
 export const useWorkflowStore = create<WorkflowState>()(
@@ -458,6 +471,34 @@ export const useWorkflowStore = create<WorkflowState>()(
       // Clear stale selection IDs from UI store
       useUIStore.getState().setSelectedNodeIds([]);
     },
+
+    // STOP-UX soft reset: preserve template, clear execution state.
+    // Companion of handleConfirmStop in WorkflowCanvas.tsx — see the
+    // interface JSDoc above for the contract this implements.
+    softResetCanvas: () => {
+      set((state) => ({
+        nodes: state.nodes.map((n) => {
+          const data = n.data as unknown as Record<string, unknown>;
+          const nextData: Record<string, unknown> = {
+            ...data,
+            status: undefined,
+            errorMessage: undefined,
+          };
+          if (data.catalogueId === "IN-009") {
+            nextData.briefText = "";
+            // Some IN-009 instances also mirror their value into
+            // `inputValue` for legacy downstream readers; clear that
+            // too so a "fresh" reset doesn't leak the old brief into
+            // anything reading the alias.
+            nextData.inputValue = "";
+          }
+          return { ...n, data: nextData as typeof n.data };
+        }),
+      }));
+      // Selection is left untouched — the user may still be looking
+      // at a specific node and a soft reset shouldn't blow that away.
+      // (Hard `resetCanvas` clears selection because the nodes are gone.)
+    },
   })),
     {
       // localStorage snapshot so a hard refresh doesn't wipe an in-progress
@@ -496,6 +537,7 @@ export const selectRemoveEdge = (s: WorkflowState) => s.removeEdge;
 export const selectUpdateNode = (s: WorkflowState) => s.updateNode;
 export const selectAddEdge = (s: WorkflowState) => s.addEdge;
 export const selectResetCanvas = (s: WorkflowState) => s.resetCanvas;
+export const selectSoftResetCanvas = (s: WorkflowState) => s.softResetCanvas;
 export const selectSetEdgeFlowing = (s: WorkflowState) => s.setEdgeFlowing;
 export const selectMarkDirty = (s: WorkflowState) => s.markDirty;
 export const selectSetCreationMode = (s: WorkflowState) => s.setCreationMode;

@@ -102,6 +102,7 @@ import {
   selectUpdateNode,
   selectAddEdge,
   selectResetCanvas,
+  selectSoftResetCanvas,
   selectSetEdgeFlowing,
   selectMarkDirty,
   selectSetCreationMode,
@@ -199,6 +200,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   const updateNode = useWorkflowStore(selectUpdateNode);
   const addStoreEdge = useWorkflowStore(selectAddEdge);
   const resetCanvas = useWorkflowStore(selectResetCanvas);
+  const softResetCanvas = useWorkflowStore(selectSoftResetCanvas);
   const setEdgeFlowing = useWorkflowStore(selectSetEdgeFlowing);
   const markDirty = useWorkflowStore(selectMarkDirty);
   const setCreationMode = useWorkflowStore(selectSetCreationMode);
@@ -551,10 +553,10 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   }, [isExecuting]);
 
   const handleConfirmStop = useCallback(() => {
-    // Capture the in-flight runIds BEFORE we clear the store. After the
-    // reset call below the artifacts Map is empty so a re-read would
-    // collect nothing — same bug pattern the cancel-fix already
-    // remediated for the polling window.
+    // Capture the in-flight runIds BEFORE we clear execution state. The
+    // artifacts Map is wiped by `clearArtifacts()` below, so a re-read
+    // after that would collect nothing — same bug pattern the cancel
+    // visibility fix remediated for the polling window.
     const pendingRunIds = collectPendingRunIds();
     setIsStopConfirmOpen(false);
 
@@ -576,32 +578,34 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
       });
     }
 
-    // Optimistic reset — mirrors the canonical "New blank workflow"
-    // path (this same trio fires from the `?new=1` effect at the top
-    // of this component, lines ~348-354). Wipes nodes/edges/brief input
-    // (resetCanvas) + execution artifacts (clearArtifacts) + the
-    // currentExecution row (clearCurrentExecution → also flips
-    // isExecuting=false, which the stale-poll guard in useExecution
-    // checks). The URL is replaced so a refresh / back doesn't reload
-    // the just-stopped workflow.
-    resetCanvas();
+    // SOFT reset (2026-05-22): keep the workflow template on screen
+    // exactly as the user built it (same 13 nodes, same edges, same
+    // URL). Only clear per-run state:
+    //   • `softResetCanvas()` → every node's status back to idle, and
+    //     IN-009's briefText emptied. Edges untouched.
+    //   • `clearArtifacts()` → drops the executed artifacts Map.
+    //   • `clearCurrentExecution()` → currentExecution=null,
+    //     isExecuting=false (which the 4 stale-poll guards in
+    //     useExecution.ts read), executionProgress=0.
+    // We intentionally do NOT call `resetCanvas()` (the hard wipe used
+    // by `/dashboard/canvas?new=1`) and do NOT `router.replace(...)` —
+    // the user should land on the SAME workflow they just stopped,
+    // not on the "Sketch your first workflow" onboarding canvas.
+    softResetCanvas();
     clearArtifacts();
     clearCurrentExecution();
-    useUIStore.getState().setSelectedNodeIds([]);
-    router.replace("/dashboard/canvas", { scroll: false });
 
     toast.success(
       pendingRunIds.length === 0
-        ? "Build cancelled — fresh canvas ready."
-        : `Build cancelled — fresh canvas ready. The worker is wrapping up in the background (≤30s).`,
+        ? "Build cancelled — template reset, ready for a new brief."
+        : "Build cancelled — template reset, ready for a new brief. The worker is wrapping up in the background (≤30s).",
       { duration: 5000 },
     );
   }, [
     collectPendingRunIds,
-    resetCanvas,
+    softResetCanvas,
     clearArtifacts,
     clearCurrentExecution,
-    router,
   ]);
 
   const handleStopCancel = useCallback(() => {
