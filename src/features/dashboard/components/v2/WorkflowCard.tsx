@@ -4,6 +4,7 @@ import { Play } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import { TemplatePreviewMedia } from "@/features/workflows/components/TemplatePreviewMedia";
 import { WorkflowPreviewBoq } from "./WorkflowPreviewBoq";
 import { WorkflowPreviewRenovation } from "./WorkflowPreviewRenovation";
 import { WorkflowPreviewPdfWalkthrough } from "./WorkflowPreviewPdfWalkthrough";
@@ -61,6 +62,7 @@ export function WorkflowCard({ workflowId }: WorkflowCardProps) {
   const loadFromTemplate = useWorkflowStore((s) => s.loadFromTemplate);
   const cfg = CONFIG[workflowId];
   const Preview = cfg.preview;
+  const previewAlt = `${t(cfg.nameKey)} ${t(cfg.nameEmKey)}`.trim();
 
   const handleClick = useCallback(() => {
     const template = PREBUILT_WORKFLOWS.find((w) => w.id === cfg.templateId);
@@ -81,7 +83,19 @@ export function WorkflowCard({ workflowId }: WorkflowCardProps) {
         </span>
       </div>
       <div className={s.workflowPreview}>
-        <Preview />
+        {/* Preview-first / SVG-fallback: when TEMPLATE_PREVIEWS has an
+            entry for this card's templateId (videos for wf-08 and
+            wf-11), render the same media as the templates page so the
+            dashboard featured cards stay visually consistent with
+            /dashboard/templates. wf-09 has no preview entry (the BOQ
+            SVG illustration is preferred at every surface), so it
+            falls through to the bespoke `Preview` SVG below. */}
+        <TemplatePreviewMedia
+          wfId={cfg.templateId}
+          alt={previewAlt}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          fallback={<Preview />}
+        />
       </div>
       <div className={s.workflowBody}>
         <div className={s.workflowTag}>{t(cfg.tagKey)}</div>
