@@ -5,14 +5,16 @@ import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-work
 
 /**
  * Tests for wf-08: "PDF Brief → Video Walkthrough" pipeline + the EX-001
- * (IFC Exporter) infrastructure shared with wf-04.
+ * (IFC Exporter) infrastructure.
  *
  * wf-08 data flow:
  *   PDF Upload (IN-002) → Brief Parser (TR-001) → Video Walkthrough (GN-009)
  *
  * The parameter-extraction and IFC-generation tests below exercise the
- * EX-001 handler's fallback logic (still used by wf-04 "Parameters → 3D
- * Massing + IFC Export"), even though wf-08 itself no longer ends in IFC.
+ * EX-001 handler / generateIFCFile / generateMassingGeometry directly.
+ * No prebuilt template currently wires them in (wf-03 and wf-04 were
+ * removed), but the modules remain shipped for direct API consumers and
+ * for any future templates that re-introduce IFC export.
  */
 
 /**

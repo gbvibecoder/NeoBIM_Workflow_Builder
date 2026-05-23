@@ -116,11 +116,11 @@ export const fixtureImage: ExecutionResult = {
   summaryText: "Three concept renders exploring material palette for a suburban residence.",
 };
 
-/** Workflow 3 — Text Prompt → 3D Building + IFC Export (HeroViewer3D, procedural). */
+/** Workflow 3 — Floor Plan → Interactive 3D Model (HeroViewer3D, procedural). */
 export const fixtureViewer3D: ExecutionResult = {
   executionId: "fx-3d-03",
-  workflowId: "wf-04",
-  workflowName: "Text Prompt → 3D Building + IFC Export",
+  workflowId: "wf-05",
+  workflowName: "Floor Plan → Interactive 3D Model",
   status: {
     state: "success",
     startedAt: "2026-04-24T09:10:00.000Z",
@@ -242,7 +242,7 @@ export const fixtureFloorPlan: ExecutionResult = {
 /** Workflow 5 — IFC Model → BOQ (HeroKPI). */
 export const fixtureKpi: ExecutionResult = {
   executionId: "fx-kpi-05",
-  workflowId: "wf-03",
+  workflowId: "wf-09",
   workflowName: "IFC Model → Bill of Quantities",
   status: {
     state: "success",

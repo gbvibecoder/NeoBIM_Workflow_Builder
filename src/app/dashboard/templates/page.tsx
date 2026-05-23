@@ -64,7 +64,7 @@ const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, a
 // Locked templates are now driven by `requiredTier` on each WorkflowTemplate
 // + canAccessTemplate(userRole, requiredTier) — see template-access.ts.
 const QUICK_START_IDS = ["wf-08", "wf-01", "wf-06"];
-const CORE_IDS = ["wf-09", "wf-11", "wf-03"];
+const CORE_IDS = ["wf-09", "wf-11"];
 const FEATURED_ID = "wf-08";
 
 const CATEGORY_LABEL_KEYS: Record<string, TranslationKey> = {
@@ -82,14 +82,12 @@ function hexToRgb(hex: string): string {
 /* ── Preview mapping ── */
 const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
 const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: number } | { type: "svg"; output: string } | { type: "image"; url: string }> = {
-  "wf-04": { type: "video", url: `${R2}/ifc-exporter.mp4`, start: 120 },
   "wf-09": { type: "image", url: `/boq-cost-estimate-preview.png` },
   "wf-01": { type: "image", url: `/floor-plan-editor-preview.png` },
   "wf-12": { type: "svg", output: "clash" },
   "wf-08": { type: "video", url: `${R2}/pdf-to-3d-model.mp4`, start: 2 },
   "wf-06": { type: "video", url: `${R2}/floor-plan-to-video-render.mp4`, start: 2 },
   "wf-05": { type: "video", url: `${R2}/interactive-3d-model.mp4`, start: 8 },
-  "wf-03": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 132 },
   "wf-11": { type: "video", url: `${R2}/img-to-renovation.mp4`, start: 0 },
 };
 
@@ -130,8 +128,6 @@ const stagger = { visible: { transition: { staggerChildren: 0.1 } } };
 function WorkflowOverlay({ wfId, color, rgb }: { wfId: string; color: string; rgb: string }) {
   const overlays: Record<string, React.ReactNode> = {
     "wf-01": (<svg viewBox="0 0 120 120" fill="none" style={{ width: 120, height: 120, opacity: 0.15 }}><rect x="10" y="10" width="100" height="100" stroke={color} strokeWidth="0.5" strokeDasharray="4 4"><animate attributeName="stroke-dashoffset" from="0" to="8" dur="3s" repeatCount="indefinite" /></rect><line x1="10" y1="50" x2="70" y2="50" stroke={color} strokeWidth="0.5" /><line x1="60" y1="10" x2="60" y2="110" stroke={color} strokeWidth="0.5" /></svg>),
-    "wf-03": (<svg viewBox="0 0 100 100" fill="none" style={{ width: 100, height: 100, opacity: 0.12 }}><path d="M20 70 L20 30 L50 15 L80 30 L80 70 L50 85 Z" stroke={color} strokeWidth="0.6"><animate attributeName="stroke-dasharray" values="0 200;200 0" dur="4s" repeatCount="indefinite" /></path><line x1="50" y1="15" x2="50" y2="55" stroke={color} strokeWidth="0.4" opacity="0.5" /><line x1="20" y1="30" x2="50" y2="45" stroke={color} strokeWidth="0.4" opacity="0.5" /></svg>),
-    "wf-04": (<svg viewBox="0 0 100 100" fill="none" style={{ width: 100, height: 100, opacity: 0.12 }}><rect x="15" y="30" width="25" height="55" stroke={color} strokeWidth="0.5"><animate attributeName="height" values="55;50;55" dur="3s" repeatCount="indefinite" /></rect><rect x="45" y="50" width="35" height="35" stroke={color} strokeWidth="0.5"><animate attributeName="height" values="35;40;35" dur="3.5s" repeatCount="indefinite" /></rect><rect x="60" y="20" width="20" height="65" stroke={color} strokeWidth="0.5"><animate attributeName="height" values="65;60;65" dur="2.8s" repeatCount="indefinite" /></rect></svg>),
     "wf-06": (<svg viewBox="0 0 100 80" fill="none" style={{ width: 100, height: 80, opacity: 0.12 }}><rect x="5" y="5" width="90" height="60" rx="3" stroke={color} strokeWidth="0.6" /><circle cx="50" cy="35" r="15" stroke={color} strokeWidth="0.5" opacity="0.4"><animate attributeName="r" values="15;17;15" dur="3s" repeatCount="indefinite" /></circle><circle cx="50" cy="35" r="4" fill={`rgba(${rgb},0.2)`} /><rect x="5" y="68" width="90" height="6" rx="2" fill={`rgba(${rgb},0.06)`} /><rect x="5" y="68" width="30" height="6" rx="2" fill={`rgba(${rgb},0.12)`}><animate attributeName="width" values="0;90;0" dur="5s" repeatCount="indefinite" /></rect></svg>),
     "wf-08": (<svg viewBox="0 0 100 80" fill="none" style={{ width: 100, height: 80, opacity: 0.12 }}><rect x="5" y="10" width="30" height="40" rx="2" stroke={color} strokeWidth="0.5" /><line x1="10" y1="20" x2="30" y2="20" stroke={color} strokeWidth="0.3" /><line x1="10" y1="26" x2="28" y2="26" stroke={color} strokeWidth="0.3" /><line x1="10" y1="32" x2="25" y2="32" stroke={color} strokeWidth="0.3" /><line x1="40" y1="30" x2="55" y2="30" stroke={color} strokeWidth="0.5" strokeDasharray="2 2"><animate attributeName="stroke-dashoffset" from="0" to="4" dur="1s" repeatCount="indefinite" /></line><polygon points="53,26 60,30 53,34" fill={`rgba(${rgb},0.3)`} /><rect x="65" y="10" width="30" height="40" rx="2" stroke={color} strokeWidth="0.5" /><rect x="70" y="15" width="20" height="15" rx="1" fill={`rgba(${rgb},0.06)`} /></svg>),
     "wf-09": (<svg viewBox="0 0 100 80" fill="none" style={{ width: 100, height: 80, opacity: 0.12 }}>{[0,1,2,3,4].map(i => (<rect key={i} x={10 + i * 18} y={60 - [30,45,25,50,35][i]} width="12" height={[30,45,25,50,35][i]} rx="1" fill={`rgba(${rgb},0.08)`} stroke={color} strokeWidth="0.4"><animate attributeName="height" values={`${[30,45,25,50,35][i]};${[35,40,30,45,40][i]};${[30,45,25,50,35][i]}`} dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" /><animate attributeName="y" values={`${60 - [30,45,25,50,35][i]};${60 - [35,40,30,45,40][i]};${60 - [30,45,25,50,35][i]}`} dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" /></rect>))}<line x1="5" y1="62" x2="95" y2="62" stroke={color} strokeWidth="0.3" /></svg>),
@@ -419,81 +415,6 @@ function IllusBOQ() {
   );
 }
 
-/* wf-03: Text → 3D Building + IFC */
-function IllusBuilding3D() {
-  return (
-    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, #0F1822 0%, #1A2533 100%)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }} aria-hidden="true">
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(26,77,92,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(26,77,92,.06) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
-      <svg viewBox="0 0 200 200" fill="none" style={{ width: "70%", height: "70%", position: "relative", zIndex: 1 }}>
-        {/* Isometric building */}
-        <path d="M60 140 L60 70 L100 50 L140 70 L140 140 L100 160 Z" stroke="#E5A878" strokeWidth="1.5" fill="none" />
-        <line x1="100" y1="50" x2="100" y2="110" stroke="#E5A878" strokeWidth="1" opacity="0.5" />
-        <line x1="60" y1="70" x2="100" y2="90" stroke="#E5A878" strokeWidth="0.8" opacity="0.4" />
-        <line x1="140" y1="70" x2="100" y2="90" stroke="#E5A878" strokeWidth="0.8" opacity="0.4" />
-        {/* Floor lines (dashed) */}
-        <line x1="60" y1="93" x2="100" y2="113" stroke="#E5A878" strokeWidth="0.6" strokeDasharray="4 4" opacity="0.3" />
-        <line x1="100" y1="113" x2="140" y2="93" stroke="#E5A878" strokeWidth="0.6" strokeDasharray="4 4" opacity="0.3" />
-        <line x1="60" y1="116" x2="100" y2="136" stroke="#E5A878" strokeWidth="0.6" strokeDasharray="4 4" opacity="0.3" />
-        <line x1="100" y1="136" x2="140" y2="116" stroke="#E5A878" strokeWidth="0.6" strokeDasharray="4 4" opacity="0.3" />
-        {/* Windows */}
-        <rect x="70" y="78" width="8" height="6" rx="1" fill="rgba(229,168,120,.12)" stroke="#E5A878" strokeWidth="0.5" />
-        <rect x="70" y="100" width="8" height="6" rx="1" fill="rgba(229,168,120,.12)" stroke="#E5A878" strokeWidth="0.5" />
-        {/* Vertex dots */}
-        {[[60,70],[100,50],[140,70],[60,140],[100,160],[140,140]].map(([cx,cy], i) => <circle key={i} cx={cx} cy={cy} r="2.5" fill="#E5A878" opacity="0.5" />)}
-      </svg>
-      <div style={{ position: "absolute", top: 14, right: 16, fontFamily: "var(--font-jetbrains, monospace)", fontSize: 8, letterSpacing: ".12em", textTransform: "uppercase", color: "#E5A878" }}>IFC4</div>
-      <div style={{ position: "absolute", bottom: 14, left: 16, fontFamily: "var(--font-jetbrains, monospace)", fontSize: 7, color: "rgba(255,255,255,.3)", letterSpacing: ".08em" }}>3 STOREYS &middot; 12.4 &times; 8.6 M</div>
-    </div>
-  );
-}
-
-/* wf-04: Parameters → Massing + IFC */
-function IllusMassing() {
-  return (
-    <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "36% 64%", overflow: "hidden" }} aria-hidden="true">
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(14,18,24,.04) 1px, transparent 1px)", backgroundSize: "16px 16px", opacity: 0.5 }} />
-      {/* Left: Sliders */}
-      <div style={{ padding: "24px 14px 24px 18px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 18, position: "relative", zIndex: 1 }}>
-        {[
-          { label: "FLOORS", value: "3" },
-          { label: "GFA M\u00B2", value: "2,400" },
-          { label: "HEIGHT M", value: "12" },
-          { label: "FOOTPRINT", value: "CYL" },
-        ].map((p, i) => (
-          <div key={i}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-              <span style={{ fontFamily: "var(--font-jetbrains, monospace)", fontSize: 7, letterSpacing: ".15em", textTransform: "uppercase", color: "#9AA1B0" }}>{p.label}</span>
-              <span style={{ fontFamily: "var(--font-jetbrains, monospace)", fontSize: 8, fontWeight: 600, color: "#1A4D5C" }}>{p.value}</span>
-            </div>
-            <div style={{ height: 4, background: "rgba(14,18,24,.06)", borderRadius: 2, position: "relative" }}>
-              <div style={{ height: "100%", width: `${40 + i * 15}%`, background: "#1A4D5C", borderRadius: 2 }} />
-              <div style={{ position: "absolute", top: "50%", left: `${40 + i * 15}%`, transform: "translate(-50%,-50%)", width: 10, height: 10, borderRadius: "50%", background: "#fff", border: "2px solid #1A4D5C", boxShadow: "0 1px 4px rgba(0,0,0,.1)" }} />
-            </div>
-          </div>
-        ))}
-      </div>
-      {/* Right: Cylinder wireframe */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 1 }}>
-        <svg viewBox="0 0 160 200" fill="none" style={{ width: "85%", height: "85%" }}>
-          {/* Top ellipse */}
-          <ellipse cx="80" cy="40" rx="55" ry="18" stroke="#0E1218" strokeWidth="1.2" fill="none" />
-          {/* Bottom ellipse */}
-          <ellipse cx="80" cy="160" rx="55" ry="18" stroke="#0E1218" strokeWidth="1.2" fill="none" />
-          {/* Middle ellipses (dashed) */}
-          <ellipse cx="80" cy="80" rx="55" ry="18" stroke="#0E1218" strokeWidth="0.6" fill="none" strokeDasharray="4 3" />
-          <ellipse cx="80" cy="120" rx="55" ry="18" stroke="#0E1218" strokeWidth="0.6" fill="none" strokeDasharray="4 3" />
-          {/* Vertical edges */}
-          <line x1="25" y1="40" x2="25" y2="160" stroke="#0E1218" strokeWidth="1" />
-          <line x1="135" y1="40" x2="135" y2="160" stroke="#0E1218" strokeWidth="1" />
-          {/* Vertex dots */}
-          {[[25,40],[135,40],[25,160],[135,160]].map(([cx,cy], i) => <circle key={i} cx={cx} cy={cy} r="3" fill="#C26A3B" opacity="0.6" />)}
-          <text x="80" y="190" textAnchor="middle" fontFamily="var(--font-jetbrains, monospace)" fontSize="7" fill="#9AA1B0" letterSpacing=".12em">IFC4 EXPORT</text>
-        </svg>
-      </div>
-    </div>
-  );
-}
-
 /* wf-05: Floor Plan → Interactive 3D */
 function IllusInteractive3D() {
   return (
@@ -612,8 +533,6 @@ const ILLUS_MAP: Record<string, React.FC> = {
   "wf-11": IllusRenovation,
   "wf-06": IllusRenderVideo,
   "wf-09": IllusBOQ,
-  "wf-03": IllusBuilding3D,
-  "wf-04": IllusMassing,
   "wf-05": IllusInteractive3D,
   "wf-12": IllusClashDetection,
 };
@@ -661,12 +580,8 @@ const HUMOR_TAGLINES: Record<string, string> = {
     "QS-grade quantities. Without the QS. Without the spreadsheets. Without the existential dread.",
   "wf-11":
     "Your boring “before” becomes an aspirational “after”. Realtor not included.",
-  "wf-03":
-    "Describe a building. Get a building. We’re as surprised as you are.",
   "wf-05":
     "Click, drag, rotate. The 3D model your client thinks took you a week.",
-  "wf-04":
-    "Move some sliders. Out comes a mass. Architecture, but with significantly less arguing.",
 };
 
 function deriveChain(wf: WorkflowTemplate): string[] {
@@ -1000,7 +915,7 @@ export default function TemplatesPage() {
     const isLocked = !canAccessTemplate(userRole, wf.requiredTier);
     const upgradeTarget = getUpgradeTargetForTemplate(userRole, wf.requiredTier);
     const IllusComp = ILLUS_MAP[wf.id];
-    const isDarkIllus = wf.id === "wf-06" || wf.id === "wf-03";
+    const isDarkIllus = wf.id === "wf-06";
     const isCostCard = wf.category === "Cost Estimation";
     const steps = wf.name.split("\u2192").map(x => x.trim());
 

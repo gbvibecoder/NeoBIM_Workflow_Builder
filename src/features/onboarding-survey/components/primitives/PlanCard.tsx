@@ -115,7 +115,7 @@ export function PlanCard(props: PlanCardProps) {
 // ── Free plan ──────────────────────────────────────────────────────────
 function FreePlan(props: PlanCardProps) {
   // Three actual prebuilt workflows — keeps the visual honest.
-  const showcaseIds = ["wf-01", "wf-03", "wf-08"];
+  const showcaseIds = ["wf-01", "wf-06", "wf-08"];
   const showcases = showcaseIds
     .map((id) => PREBUILT_WORKFLOWS_MAP.get(id))
     .filter((w): w is NonNullable<ReturnType<typeof PREBUILT_WORKFLOWS_MAP.get>> => Boolean(w));

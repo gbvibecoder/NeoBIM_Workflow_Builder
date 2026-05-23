@@ -52,43 +52,6 @@ function Scene01() {
   );
 }
 
-// wf-03: Wireframe building
-function Scene03() {
-  const ref = useRef<Group>(null);
-  useFrame(({ clock }) => { if (ref.current) ref.current.rotation.y = clock.getElapsedTime()*0.1; });
-  return (
-    <group ref={ref}>
-      <EBox args={[2,3,1.5]} color="#1e1e3a" edgeColor="#a855f7" pos={[0,1.5,0]} op={0.15} eo={0.55} />
-      <EBox args={[2.1,0.06,1.6]} color="#a855f7" edgeColor="#a855f7" pos={[0,1,0]} op={0.08} eo={0.3} />
-      <EBox args={[2.1,0.06,1.6]} color="#a855f7" edgeColor="#a855f7" pos={[0,2,0]} op={0.08} eo={0.3} />
-      {[[-0.8,-0.6],[0.8,-0.6],[-0.8,0.6],[0.8,0.6]].map(([x,z],i) => <EBox key={i} args={[0.12,3,0.12]} color="#475569" edgeColor="#94a3b8" pos={[x,1.5,z]} op={0.25} eo={0.4} />)}
-      <EBox args={[2.3,0.08,1.8]} color="#1e293b" edgeColor="#a855f7" pos={[0,3.04,0]} op={0.2} eo={0.45} />
-    </group>
-  );
-}
-
-// wf-04: Breathing massing volumes
-function Scene04() {
-  const ref = useRef<Group>(null);
-  const v0 = useRef<Group>(null);
-  const v1 = useRef<Group>(null);
-  const v2 = useRef<Group>(null);
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (ref.current) ref.current.rotation.y = t*0.07;
-    if (v0.current) { v0.current.scale.y = 1+Math.sin(t*0.8)*0.1; }
-    if (v1.current) { v1.current.scale.y = 1+Math.sin(t*0.6+2)*0.12; }
-    if (v2.current) { v2.current.scale.y = 1+Math.sin(t*0.9+1)*0.08; }
-  });
-  return (
-    <group ref={ref}>
-      <group ref={v0} position={[-1,1.25,-0.3]}><EBox args={[1.3,2.5,1.3]} color="#0e1e30" edgeColor="#06b6d4" pos={[0,0,0]} op={0.15} eo={0.5} /></group>
-      <group ref={v1} position={[0.8,0.5,0.5]}><EBox args={[2,1,1.5]} color="#1a0e30" edgeColor="#a855f7" pos={[0,0,0]} op={0.12} eo={0.45} /></group>
-      <group ref={v2} position={[0.2,1.5,-0.8]}><EBox args={[1,3,1]} color="#0e2a20" edgeColor="#10b981" pos={[0,0,0]} op={0.12} eo={0.5} /></group>
-    </group>
-  );
-}
-
 // wf-06: Orbiting camera around render screen
 function Scene06() {
   const ref = useRef<Group>(null);
@@ -224,7 +187,7 @@ function Scene12() {
 
 // Scene registry
 const CARD_SCENES: Record<string, React.FC> = {
-  "wf-01": Scene01, "wf-03": Scene03, "wf-04": Scene04,
+  "wf-01": Scene01,
   "wf-06": Scene06, "wf-08": Scene08, "wf-09": Scene09,
   "wf-05": Scene05, "wf-11": Scene11, "wf-12": Scene12,
 };
