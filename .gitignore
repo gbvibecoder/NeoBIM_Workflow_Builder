@@ -45,6 +45,12 @@ public/models/*.glb
 # Demo videos (served from R2 CDN, not git)
 public/videos/*.mp4
 
+# Template preview source working folder — the kebab-case production
+# copies live under public/templates/ (committed). Preview/ holds the
+# original drag-and-drop assets (mixed case, typos, trailing spaces)
+# as a local backup; not for git.
+Preview/
+
 # Test artifacts
 coverage/
 *.swp
