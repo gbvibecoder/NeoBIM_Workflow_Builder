@@ -8,7 +8,6 @@ import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Workflow,
-  Globe,
   BookOpen,
   Settings,
   Plus,
@@ -106,7 +105,6 @@ export function Sidebar() {
 
   const isAdmin = isPlatformAdmin(session?.user?.email);
   const SECONDARY_NAV = [
-    { href: "/dashboard/community", label: t("nav.community"), icon: Globe, badge: "Beta" },
     { href: "/dashboard/feedback",  label: t("nav.feedback"),  icon: MessageSquareHeart, badge: "New" },
     ...(isAdmin
       ? [{ href: "/dashboard/admin/live-chat", label: "Live Chat", icon: MessageSquare, badge: "Admin" }]

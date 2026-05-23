@@ -3196,7 +3196,7 @@ export default function LandingPage() {
                   {t('landing.createFirstWorkflow')}
                 </Link>
                 <div style={{ marginTop: 16 }}>
-                  <Link href="/dashboard/community" style={{
+                  <Link href="/dashboard/templates" style={{
                     fontSize: 13, color: "#4F8AFF", textDecoration: "none",
                     display: "inline-flex", alignItems: "center", gap: 6,
                     transition: "color 0.15s",
