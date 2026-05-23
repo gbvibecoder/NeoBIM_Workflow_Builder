@@ -16,7 +16,6 @@ import { BriefRendersTemplateCard } from "@/features/brief-renders/components/Br
 import { canAccessTemplate, getUpgradeTargetForTemplate } from "@/features/billing/lib/template-access";
 import { TemplateLockBadge } from "@/features/workflows/components/TemplateLockBadge";
 import { TemplatePreviewMedia } from "@/features/workflows/components/TemplatePreviewMedia";
-import { TEMPLATE_PREVIEWS } from "@/features/workflows/constants/template-previews";
 import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
 import {
   openInlineUpgradeCheckout,
@@ -82,12 +81,13 @@ function hexToRgb(hex: string): string {
 }
 
 /* ── Preview mapping ──
- * `TEMPLATE_PREVIEWS` lives in src/features/workflows/constants/template-previews.ts
- * (single source of truth, consumed by every template surface — dark card,
- * light grid card, light featured card, hero deck Illus slot, public
- * /templates page). Imported above. Values byte-identical to the prior
- * inline definition; the dark-card render path at line ~188 still reads
- * from the same `TEMPLATE_PREVIEWS` identifier — only the source moved. */
+ * The `TEMPLATE_PREVIEWS` registry lives in
+ * src/features/workflows/constants/template-previews.ts and is consumed
+ * exclusively through the `<TemplatePreviewMedia>` helper imported
+ * above. Every surface on this page — DarkFeaturedTemplate, renderLight-
+ * Card, light featured card, hero deck Illus slot — funnels through the
+ * same component, so video autoplay / IntersectionObserver / reduced-
+ * motion behaviour is identical across themes. */
 
 /* ── SVG output illustration (dark theme) ── */
 function OutputPreviewSVG({ output, color }: { output: string; color: string }) {
@@ -183,7 +183,13 @@ function DarkFeaturedTemplate({ wf, index, isMobile, onUse, t, userRole }: {
       <div className="tpl-featured-shimmer" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, zIndex: 3, overflow: "hidden" }}><div style={{ width: "100%", height: "100%", background: `linear-gradient(90deg, transparent, ${catColor}50, transparent)` }} /></div>
       <motion.div variants={previewVariants} className="tpl-featured-scene" style={{ width: isMobile ? "100%" : "45%", height: isMobile ? 220 : 340, position: "relative", flexShrink: 0, overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, zIndex: 0, background: `radial-gradient(ellipse at ${reversed ? "30%" : "70%"} 50%, rgba(${catRgb}, 0.12) 0%, transparent 60%)`, pointerEvents: "none" }} />
-        {(() => { const preview = TEMPLATE_PREVIEWS[wf.id]; if (preview?.type === "image") return <img src={preview.url} alt={wf.name} loading="lazy" className="tpl-featured-media" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "relative", zIndex: 1, transition: "transform 0.7s cubic-bezier(0.22,1,0.36,1)" }} />; if (preview?.type === "video") return <video src={preview.url} muted playsInline onLoadedMetadata={e => { e.currentTarget.currentTime = preview.start; }} onMouseEnter={e => { e.currentTarget.play().catch(() => {}); }} onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = preview.start; }} className="tpl-featured-media" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "relative", zIndex: 1, transition: "transform 0.7s cubic-bezier(0.22,1,0.36,1)" }} />; const FallbackIllus = ILLUS_MAP[wf.id]; if (FallbackIllus) return <FallbackIllus />; return <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><Building2 size={48} style={{ color: `rgba(${catRgb}, 0.15)` }} /></div>; })()}
+        <TemplatePreviewMedia
+          wfId={wf.id}
+          alt={wf.name}
+          className="tpl-featured-media"
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "relative", zIndex: 1, transition: "transform 0.7s cubic-bezier(0.22,1,0.36,1)" }}
+          fallback={(() => { const FallbackIllus = ILLUS_MAP[wf.id]; if (FallbackIllus) return <FallbackIllus />; return <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><Building2 size={48} style={{ color: `rgba(${catRgb}, 0.15)` }} /></div>; })()}
+        />
         <div style={{ position: "absolute", bottom: 16, [reversed ? "left" : "right"]: 16, zIndex: 2, pointerEvents: "none" }}><WorkflowOverlay wfId={wf.id} color={catColor} rgb={catRgb} /></div>
         {!isMobile && <div style={{ position: "absolute", top: 0, bottom: 0, zIndex: 2, [reversed ? "left" : "right"]: 0, width: 100, background: reversed ? "linear-gradient(90deg, rgba(10,12,20,0.98), transparent)" : "linear-gradient(270deg, rgba(10,12,20,0.98), transparent)", pointerEvents: "none" }} />}
         {isMobile && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: "linear-gradient(transparent, rgba(10,12,20,1))", pointerEvents: "none", zIndex: 2 }} />}
