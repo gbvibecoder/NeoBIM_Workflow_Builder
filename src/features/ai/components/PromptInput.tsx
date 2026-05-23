@@ -101,7 +101,7 @@ function buildFromTemplate(template: WorkflowTemplate): {
 
 function matchTemplate(text: string): WorkflowTemplate {
   const q = text.toLowerCase();
-  if (q.includes("pdf") && (q.includes("mass") || q.includes("brief") || q.includes("ifc") || q.includes("concept"))) return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-08") ?? PREBUILT_WORKFLOWS[0];
+  if (q.includes("pdf") && (q.includes("mass") || q.includes("brief") || q.includes("video") || q.includes("walkthrough") || q.includes("concept"))) return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-08") ?? PREBUILT_WORKFLOWS[0];
   if (q.includes("ifc") && (q.includes("quantity") || q.includes("boq"))) return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-09") ?? PREBUILT_WORKFLOWS[0];
   if (q.includes("variant") || q.includes("options"))                    return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-04") ?? PREBUILT_WORKFLOWS[0];
   if (q.includes("image") && q.includes("concept"))                      return PREBUILT_WORKFLOWS.find((w) => w.id === "wf-03") ?? PREBUILT_WORKFLOWS[0];

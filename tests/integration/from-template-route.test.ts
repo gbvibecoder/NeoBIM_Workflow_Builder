@@ -184,7 +184,7 @@ describe("POST /api/workflows/from-template — name auto-suffix", () => {
   it("appends ' (1)' on first collision", async () => {
     prismaMocks.workflowFindFirst.mockResolvedValueOnce({ id: "existing" });
     prismaMocks.workflowFindMany.mockResolvedValueOnce([
-      { name: "PDF Brief → IFC + Video Walkthrough" },
+      { name: "PDF Brief → Video Walkthrough" },
     ]);
     const res = await POST(makeReq({ templateId: "wf-08" }) as any);
     expect(res.status).toBe(201);

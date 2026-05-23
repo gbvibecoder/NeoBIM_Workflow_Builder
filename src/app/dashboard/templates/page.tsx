@@ -229,7 +229,7 @@ function DarkFeaturedTemplate({ wf, index, isMobile, onUse, t, userRole }: {
    LIGHT THEME SVG ILLUSTRATIONS — Phase Z.1B
    ══════════════════════════════════════════════════════════════════════ */
 
-/* wf-08: Featured — PDF Brief → IFC + Video (stacked panels) */
+/* wf-08: Featured — PDF Brief → Video Walkthrough (stacked panels) */
 function IllusFeatured() {
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }} aria-hidden="true">
@@ -241,42 +241,16 @@ function IllusFeatured() {
         <div style={{ fontFamily: "var(--font-jetbrains, monospace)", fontSize: 6.5, letterSpacing: ".15em", textTransform: "uppercase", color: "#1A4D5C", marginTop: 8, marginBottom: 6 }}>SPECIFICATIONS</div>
         {[70, 55, 65].map((w, i) => <div key={i} style={{ height: 3, width: `${w}%`, background: "rgba(14,18,24,.04)", borderRadius: 2, marginBottom: 4 }} />)}
       </div>
-      {/* Middle panel: IFC wireframe */}
-      <div style={{ position: "absolute", width: 200, height: 240, background: "#0F1822", borderRadius: 12, border: "1px solid rgba(26,77,92,.3)", boxShadow: "0 12px 40px rgba(14,18,24,.15)", transform: "translate(0px, 5px)", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: 10, right: 12, fontFamily: "var(--font-jetbrains, monospace)", fontSize: 6.5, letterSpacing: ".15em", textTransform: "uppercase", color: "rgba(229,168,120,.7)" }}>IFC4 &middot; OUTPUT</div>
-        <svg viewBox="0 0 200 200" fill="none" style={{ width: "100%", height: "100%", padding: 24 }}>
-          {/* Isometric building wireframe */}
-          <path d="M60 140 L60 80 L100 60 L140 80 L140 140 L100 160 Z" stroke="#E5A878" strokeWidth="1.2" fill="none" />
-          <line x1="100" y1="60" x2="100" y2="120" stroke="#E5A878" strokeWidth="0.8" opacity="0.5" />
-          <line x1="60" y1="80" x2="100" y2="100" stroke="#E5A878" strokeWidth="0.6" opacity="0.4" />
-          <line x1="140" y1="80" x2="100" y2="100" stroke="#E5A878" strokeWidth="0.6" opacity="0.4" />
-          {/* Floor lines */}
-          <line x1="60" y1="100" x2="100" y2="120" stroke="#E5A878" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.3" />
-          <line x1="100" y1="120" x2="140" y2="100" stroke="#E5A878" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.3" />
-          <line x1="60" y1="120" x2="100" y2="140" stroke="#E5A878" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.3" />
-          <line x1="100" y1="140" x2="140" y2="120" stroke="#E5A878" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.3" />
-          {/* Vertex dots */}
-          <circle cx="60" cy="80" r="2" fill="#E5A878" opacity="0.6" />
-          <circle cx="100" cy="60" r="2" fill="#E5A878" opacity="0.6" />
-          <circle cx="140" cy="80" r="2" fill="#E5A878" opacity="0.6" />
-          <circle cx="60" cy="140" r="2" fill="#E5A878" opacity="0.6" />
-          <circle cx="100" cy="160" r="2" fill="#E5A878" opacity="0.6" />
-          <circle cx="140" cy="140" r="2" fill="#E5A878" opacity="0.6" />
-        </svg>
-        <div style={{ position: "absolute", bottom: 10, left: 12, right: 12, display: "flex", justifyContent: "space-between", fontFamily: "var(--font-jetbrains, monospace)", fontSize: 6, color: "rgba(255,255,255,.35)", letterSpacing: ".1em" }}>
-          <span>X 12.4M</span><span>Y 8.6M</span><span>Z 9.0M</span>
-        </div>
-      </div>
       {/* Front panel: Video */}
-      <div style={{ position: "absolute", width: 180, height: 120, borderRadius: 12, overflow: "hidden", transform: "rotate(5deg) translate(40px, 60px)", boxShadow: "0 16px 48px rgba(14,18,24,.18)", border: "1px solid rgba(229,168,120,.2)" }}>
+      <div style={{ position: "absolute", width: 200, height: 134, borderRadius: 12, overflow: "hidden", transform: "rotate(5deg) translate(50px, 50px)", boxShadow: "0 16px 48px rgba(14,18,24,.18)", border: "1px solid rgba(229,168,120,.2)" }}>
         <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #E5A878 0%, #C26A3B 50%, #1A4D5C 100%)" }}>
           {/* Skyline silhouette */}
-          <svg viewBox="0 0 180 120" fill="none" style={{ position: "absolute", inset: 0 }}>
-            <path d="M0 85 L20 75 L30 80 L45 60 L55 65 L65 45 L75 50 L90 35 L105 55 L115 48 L130 60 L145 55 L160 65 L180 58 L180 120 L0 120 Z" fill="rgba(14,18,24,.25)" />
+          <svg viewBox="0 0 200 134" fill="none" style={{ position: "absolute", inset: 0 }}>
+            <path d="M0 95 L22 83 L33 89 L50 67 L61 72 L72 50 L83 56 L100 39 L117 61 L128 53 L144 67 L161 61 L178 72 L200 64 L200 134 L0 134 Z" fill="rgba(14,18,24,.25)" />
           </svg>
           {/* Play button */}
-          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,.9)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
-            <svg viewBox="0 0 16 16" fill="#0E1218" style={{ width: 14, height: 14, marginLeft: 2 }}><polygon points="3,1 13,8 3,15" /></svg>
+          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,.92)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}>
+            <svg viewBox="0 0 16 16" fill="#0E1218" style={{ width: 15, height: 15, marginLeft: 2 }}><polygon points="3,1 13,8 3,15" /></svg>
           </div>
           <div style={{ position: "absolute", bottom: 8, right: 10, fontFamily: "var(--font-jetbrains, monospace)", fontSize: 7, color: "rgba(255,255,255,.7)", letterSpacing: ".08em" }}>0:15</div>
         </div>
@@ -286,7 +260,7 @@ function IllusFeatured() {
         <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#4A6B4D" }} />Brief parsed
       </div>
       <div style={{ position: "absolute", bottom: 32, right: 20, display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 99, background: "rgba(245,242,236,.94)", border: "1px solid rgba(14,18,24,.06)", fontSize: 9, fontWeight: 500, fontFamily: "var(--font-jetbrains, monospace)", color: "#1A4D5C" }}>
-        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#1A4D5C" }} />3 storeys &middot; IFC4
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#1A4D5C" }} />0:15 cinematic &middot; MP4
       </div>
     </div>
   );

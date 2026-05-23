@@ -92,10 +92,10 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
   },
   {
     id: "wf-08",
-    name: "PDF Brief → IFC + Video Walkthrough",
+    name: "PDF Brief → Video Walkthrough",
     description:
-      "Upload a detailed PDF brief → extract text → export IFC file of the BIM model + produce an ultra-realistic cinematic 3D walkthrough video — 5s exterior + 10s interior.",
-    tags: ["pdf", "video", "walkthrough", "3d", "full-pipeline", "brief", "ifc", "bim"],
+      "Upload a detailed PDF brief → extract text → produce an ultra-realistic cinematic 3D walkthrough video — 5s exterior + 10s interior.",
+    tags: ["pdf", "video", "walkthrough", "3d", "brief"],
     category: "Concept Design",
     complexity: "simple",
     estimatedRunTime: "~3 minutes",
@@ -103,7 +103,6 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     requiredInputs: ["Detailed PDF project brief"],
     expectedOutputs: [
       "Parsed brief text (faithful to original PDF)",
-      "Downloadable IFC4 file (walls, slabs, storeys)",
       "Ultra-realistic cinematic 3D walkthrough video (5s exterior + 10s interior)",
     ],
     thumbnail: "https://picsum.photos/seed/wf14/600/400",
@@ -140,24 +139,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n3",
           type: "workflowNode",
-          position: { x: X3, y: Y - 120 },
-          data: {
-            catalogueId: "EX-001",
-            label: "IFC Exporter",
-            category: "export",
-            status: "idle",
-            inputs: [
-              { id: "geo-in", label: "3D Geometry", type: "geometry" },
-              { id: "meta-in", label: "Metadata", type: "json" },
-            ],
-            outputs: [{ id: "ifc-out", label: "IFC File", type: "ifc" }],
-            icon: "Download",
-          },
-        },
-        {
-          id: "n4",
-          type: "workflowNode",
-          position: { x: X3, y: Y + 120 },
+          position: { x: X3, y: Y },
           data: {
             catalogueId: "GN-009",
             label: "Video Walkthrough Generator",
@@ -175,7 +157,6 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       edges: [
         { id: "e1-2", source: "n1", sourceHandle: "pdf-out", target: "n2", targetHandle: "pdf-in", type: "animatedEdge" },
         { id: "e2-3", source: "n2", sourceHandle: "text-out", target: "n3", targetHandle: "geo-in", type: "animatedEdge" },
-        { id: "e2-4", source: "n2", sourceHandle: "text-out", target: "n4", targetHandle: "geo-in", type: "animatedEdge" },
       ],
     },
   },

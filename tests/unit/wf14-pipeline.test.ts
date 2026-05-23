@@ -4,14 +4,15 @@ import { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 
 /**
- * Tests for wf-08: "Detailed PDF → 3D Video Walkthrough" pipeline.
+ * Tests for wf-08: "PDF Brief → Video Walkthrough" pipeline + the EX-001
+ * (IFC Exporter) infrastructure shared with wf-04.
  *
- * Validates the end-to-end data flow:
- *   PDF Upload (IN-002) → Brief Parser (TR-001) → IFC Exporter (EX-001)
- *                                                → Video Walkthrough (GN-009)
+ * wf-08 data flow:
+ *   PDF Upload (IN-002) → Brief Parser (TR-001) → Video Walkthrough (GN-009)
  *
- * EX-001 extracts building parameters from TR-001's _raw (ParsedBrief) and
- * generates massing geometry internally — no separate GN-001 node needed.
+ * The parameter-extraction and IFC-generation tests below exercise the
+ * EX-001 handler's fallback logic (still used by wf-04 "Parameters → 3D
+ * Massing + IFC Export"), even though wf-08 itself no longer ends in IFC.
  */
 
 /**
@@ -142,7 +143,7 @@ const TR001_OUTPUTS: Record<string, Record<string, unknown>> = {
   },
 };
 
-describe("wf-08: PDF → Video Walkthrough + IFC Pipeline", () => {
+describe("wf-08: PDF Brief → Video Walkthrough pipeline", () => {
   describe("Workflow template structure", () => {
     const wf14 = PREBUILT_WORKFLOWS.find((w) => w.id === "wf-08");
 
@@ -150,46 +151,46 @@ describe("wf-08: PDF → Video Walkthrough + IFC Pipeline", () => {
       expect(wf14).toBeDefined();
     });
 
-    it("has 4 nodes: IN-002, TR-001, EX-001, GN-009", () => {
+    it("has 3 nodes: IN-002, TR-001, GN-009", () => {
       const nodes = wf14!.tileGraph.nodes;
-      expect(nodes).toHaveLength(4);
+      expect(nodes).toHaveLength(3);
 
       const catalogueIds = nodes.map(
         (n) => (n.data as { catalogueId: string }).catalogueId
       );
       expect(catalogueIds).toContain("IN-002");
       expect(catalogueIds).toContain("TR-001");
-      expect(catalogueIds).toContain("EX-001");
       expect(catalogueIds).toContain("GN-009");
     });
 
-    it("does NOT include GN-001 (Massing Generator)", () => {
+    it("does NOT include GN-001 (Massing Generator) or EX-001 (IFC Exporter)", () => {
       const nodes = wf14!.tileGraph.nodes;
       const catalogueIds = nodes.map(
         (n) => (n.data as { catalogueId: string }).catalogueId
       );
       expect(catalogueIds).not.toContain("GN-001");
+      expect(catalogueIds).not.toContain("EX-001");
     });
 
-    it("has 3 edges with correct topology", () => {
+    it("has 2 edges with correct topology (linear: IN → TR → GN)", () => {
       const edges = wf14!.tileGraph.edges;
-      expect(edges).toHaveLength(3);
+      expect(edges).toHaveLength(2);
 
       expect(edges).toContainEqual(expect.objectContaining({ source: "n1", target: "n2" }));
       expect(edges).toContainEqual(expect.objectContaining({ source: "n2", target: "n3" }));
-      expect(edges).toContainEqual(expect.objectContaining({ source: "n2", target: "n4" }));
     });
 
-    it("TR-001 fans out to both EX-001 and GN-009", () => {
+    it("TR-001 feeds exactly one downstream node (GN-009)", () => {
       const edges = wf14!.tileGraph.edges;
       const parserOutEdges = edges.filter((e) => e.source === "n2");
-      expect(parserOutEdges).toHaveLength(2);
+      expect(parserOutEdges).toHaveLength(1);
+      expect(parserOutEdges[0]).toMatchObject({ target: "n3" });
     });
 
-    it("includes IFC in expected outputs and tags", () => {
-      expect(wf14!.expectedOutputs).toContainEqual(expect.stringContaining("IFC"));
-      expect(wf14!.tags).toContain("ifc");
-      expect(wf14!.tags).toContain("bim");
+    it("does NOT advertise IFC in expected outputs or tags", () => {
+      expect(wf14!.expectedOutputs.some(o => /ifc/i.test(o))).toBe(false);
+      expect(wf14!.tags).not.toContain("ifc");
+      expect(wf14!.tags).not.toContain("bim");
     });
   });
 
