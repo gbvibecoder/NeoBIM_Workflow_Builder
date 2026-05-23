@@ -24,7 +24,12 @@ export type TemplatePreview =
 const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
 
 export const TEMPLATE_PREVIEWS: Record<string, TemplatePreview> = {
-  "wf-09": { type: "image", url: `/boq-cost-estimate-preview.png` },
+  // wf-09 deliberately absent — the bespoke `IllusBOQ` SVG illustration
+  // (in templates/page.tsx → ILLUS_MAP) reads better in small card slots
+  // than the detailed cost-estimate-preview.png. Falls through to the
+  // SVG via TemplatePreviewMedia's `fallback` prop (light grid + hero
+  // deck) and DarkFeaturedTemplate's ILLUS_MAP fallback chain (dark
+  // featured row). Public /templates pane gracefully omits when absent.
   "wf-01": { type: "image", url: `/templates/text-to-floor-plan.png` },
   "wf-12": { type: "image", url: `/templates/ifc-clash-detection.png` },
   "wf-08": { type: "video", url: `/templates/pdf-to-video-walkthrough.mp4`, start: 0 },
