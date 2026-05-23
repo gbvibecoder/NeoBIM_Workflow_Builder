@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
+import { TEMPLATE_PREVIEWS } from "@/features/workflows/constants/template-previews";
+import { TemplatePreviewMedia } from "@/features/workflows/components/TemplatePreviewMedia";
 
 function slugify(name: string): string {
   return name
@@ -89,6 +91,7 @@ export default function TemplatesPage() {
             const nodeCount = t.tileGraph.nodes.length;
             const cColor =
               COMPLEXITY_COLORS[t.complexity] || "#5C5C78";
+            const hasPreview = Boolean(TEMPLATE_PREVIEWS[t.id]);
 
             return (
               <Link
@@ -117,6 +120,33 @@ export default function TemplatesPage() {
                   (e.currentTarget as HTMLElement).style.boxShadow = "none";
                 }}
               >
+                {/* Media pane — preview-first, no fallback art on the
+                    public page (the page was text-only previously; a
+                    missing preview just collapses the pane). All 8
+                    shipped templates have a preview entry today. */}
+                {hasPreview && (
+                  <div
+                    style={{
+                      width: "100%",
+                      aspectRatio: "16 / 10",
+                      background: "#0A0A14",
+                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                      overflow: "hidden",
+                      position: "relative",
+                    }}
+                  >
+                    <TemplatePreviewMedia
+                      wfId={t.id}
+                      alt={t.name}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
+                  </div>
+                )}
                 {/* Header */}
                 <div
                   style={{

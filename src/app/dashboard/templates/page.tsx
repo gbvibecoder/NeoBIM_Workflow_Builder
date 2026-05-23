@@ -15,6 +15,8 @@ import { awardXP } from "@/lib/award-xp";
 import { BriefRendersTemplateCard } from "@/features/brief-renders/components/BriefRendersTemplateCard";
 import { canAccessTemplate, getUpgradeTargetForTemplate } from "@/features/billing/lib/template-access";
 import { TemplateLockBadge } from "@/features/workflows/components/TemplateLockBadge";
+import { TemplatePreviewMedia } from "@/features/workflows/components/TemplatePreviewMedia";
+import { TEMPLATE_PREVIEWS } from "@/features/workflows/constants/template-previews";
 import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
 import {
   openInlineUpgradeCheckout,
@@ -79,17 +81,13 @@ function hexToRgb(hex: string): string {
   return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
 }
 
-/* ── Preview mapping ── */
-const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
-const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: number } | { type: "svg"; output: string } | { type: "image"; url: string }> = {
-  "wf-09": { type: "image", url: `/boq-cost-estimate-preview.png` },
-  "wf-01": { type: "image", url: `/floor-plan-editor-preview.png` },
-  "wf-12": { type: "svg", output: "clash" },
-  "wf-08": { type: "video", url: `${R2}/pdf-to-3d-model.mp4`, start: 2 },
-  "wf-06": { type: "video", url: `${R2}/floor-plan-to-video-render.mp4`, start: 2 },
-  "wf-05": { type: "video", url: `${R2}/interactive-3d-model.mp4`, start: 8 },
-  "wf-11": { type: "video", url: `${R2}/img-to-renovation.mp4`, start: 0 },
-};
+/* ── Preview mapping ──
+ * `TEMPLATE_PREVIEWS` lives in src/features/workflows/constants/template-previews.ts
+ * (single source of truth, consumed by every template surface — dark card,
+ * light grid card, light featured card, hero deck Illus slot, public
+ * /templates page). Imported above. Values byte-identical to the prior
+ * inline definition; the dark-card render path at line ~188 still reads
+ * from the same `TEMPLATE_PREVIEWS` identifier — only the source moved. */
 
 /* ── SVG output illustration (dark theme) ── */
 function OutputPreviewSVG({ output, color }: { output: string; color: string }) {
@@ -608,6 +606,32 @@ function deriveChain(wf: WorkflowTemplate): string[] {
   return out;
 }
 
+/** Build the `Illus` component for one DeckTemplate entry. Returns a
+ *  zero-prop React.FC that renders the bitmap/video preview first, with
+ *  the existing SVG illustration as a fallback. The hero deck consumes
+ *  the existing DeckTemplate.Illus shape unchanged — no prop-shape change
+ *  in TemplatesHeroDeck.
+ *
+ *  Identity is stable within the deckTemplates useMemo (which is keyed on
+ *  [deckSource, userRole, t]), so videos/images don't remount when other
+ *  unrelated state changes. */
+function buildDeckIllus(
+  wfId: string,
+  alt: string,
+  Fallback: React.FC | undefined,
+): React.FC {
+  return function DeckPreviewOrIllus() {
+    return (
+      <TemplatePreviewMedia
+        wfId={wfId}
+        alt={alt}
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        fallback={Fallback ? <Fallback /> : null}
+      />
+    );
+  };
+}
+
 function deriveChips(wf: WorkflowTemplate): string[] {
   const chips: string[] = [];
   chips.push(`${wf.tileGraph.nodes.length} nodes`);
@@ -754,7 +778,7 @@ export default function TemplatesPage() {
           tagline: HUMOR_TAGLINES[w.id],
           accentVar,
           badge: badge || undefined,
-          Illus: ILLUS_MAP[w.id],
+          Illus: buildDeckIllus(w.id, w.name, ILLUS_MAP[w.id]),
           locked: !canAccessTemplate(userRole, w.requiredTier),
         };
       }),
@@ -944,7 +968,12 @@ export default function TemplatesPage() {
             {wf.category}
           </div>
           <div className={s.cardArt}>
-            {IllusComp ? <IllusComp /> : <CardArtFallback category={wf.category} />}
+            <TemplatePreviewMedia
+              wfId={wf.id}
+              alt={wf.name}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              fallback={IllusComp ? <IllusComp /> : <CardArtFallback category={wf.category} />}
+            />
           </div>
           {isLocked && upgradeTarget ? (
             <TemplateLockBadge
@@ -1231,7 +1260,12 @@ export default function TemplatesPage() {
                   onKeyDown={e => { if (e.key === "Enter") handleUse(featuredWf); }}
                 >
                   <div className={s.featuredIllus}>
-                    {FeaturedIllus && <FeaturedIllus />}
+                    <TemplatePreviewMedia
+                      wfId={featuredWf.id}
+                      alt={featuredWf.name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      fallback={FeaturedIllus ? <FeaturedIllus /> : null}
+                    />
                   </div>
                   <div className={s.featuredContent}>
                     <span className={s.featuredNum}>01</span>
