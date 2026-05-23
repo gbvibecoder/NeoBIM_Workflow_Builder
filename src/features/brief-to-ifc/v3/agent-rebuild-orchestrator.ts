@@ -84,7 +84,7 @@ export async function rebuildAgentPipeline(
 
   // 3. Vision inspect (optional — may fail if render endpoint unavailable)
   let qualityScore = 0;
-  let visionIssues: VisionIssue[] = [];
+  const visionIssues: VisionIssue[] = [];
   try {
     const { inspectIFC } = await import("./vision-inspector");
     // Vision inspector needs rendered PNGs — we'd need to render first.

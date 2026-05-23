@@ -390,9 +390,13 @@ export const handleTR008: NodeHandler = async (ctx) => {
 
   // ── DIAGNOSTIC: Track which path each element takes ──
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  let pathIS1200 = 0, pathUSD = 0, pathFallback = 0;
+  let pathIS1200 = 0, pathFallback = 0;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  let costIS1200 = 0, costUSD = 0, costFallback = 0;
+  let costIS1200 = 0, costFallback = 0;
+  // pathUSD/costUSD are never incremented (no USD-only branch in the IS1200
+  // path); kept as zeroed diagnostic placeholders.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const pathUSD = 0, costUSD = 0;
 
   // ── Grade-aware rebar estimation lookup (used in both IS1200 loop and derived quantities) ──
   const GRADE_REBAR_KG: Record<string, number> = {

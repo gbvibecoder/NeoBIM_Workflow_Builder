@@ -59,14 +59,13 @@ export function Toolbar() {
     router.replace("/dashboard/floor-plan");
   }, [resetToWelcome, router]);
 
-  if (!project) return null;
-
-  const floors = project.floors;
-  const activeFloor = floors.find((f) => f.id === activeFloorId);
-  const zoomPercent = Math.round(viewport.zoom * 1250);
+  // All hooks must precede the `if (!project)` early return below (Rules of
+  // Hooks). None of these depend on `project`; when project is null the
+  // component still returns null right after, and the effect is a no-op
+  // (zoomEditing stays false), so runtime behaviour is unchanged. zoomPercent
+  // only needs `viewport`, which is available here.
   const mirrorFloor = useFloorPlanStore((s) => s.mirrorFloor);
-
-  // Zoom percentage input
+  const zoomPercent = Math.round(viewport.zoom * 1250);
   const [zoomEditing, setZoomEditing] = useState(false);
   const [zoomInput, setZoomInput] = useState("");
   const zoomInputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +76,11 @@ export function Toolbar() {
       setTimeout(() => zoomInputRef.current?.select(), 0);
     }
   }, [zoomEditing]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!project) return null;
+
+  const floors = project.floors;
+  const activeFloor = floors.find((f) => f.id === activeFloorId);
 
   const handleZoomInputKey = (e: ReactKE<HTMLInputElement>) => {
     if (e.key === "Enter") {

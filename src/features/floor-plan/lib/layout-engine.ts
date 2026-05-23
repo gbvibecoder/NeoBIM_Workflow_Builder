@@ -1964,7 +1964,7 @@ function layoutWithZones(
   const { publicZone, privateZone, corridor } = cls;
 
   // ── Corridor: fixed 1.2m depth (NBC 2016 residential minimum) ──
-  let corridorDepth = grid(CORRIDOR_DEPTH); // 1.2m
+  const corridorDepth = grid(CORRIDOR_DEPTH); // 1.2m
 
   // ── Private zone depth: based on room content, not proportional area ──
   // Calculate the minimum depth needed for bedroom-bathroom pairs.

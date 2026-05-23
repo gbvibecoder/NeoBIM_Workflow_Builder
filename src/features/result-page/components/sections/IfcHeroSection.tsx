@@ -27,12 +27,14 @@ interface IfcHeroSectionProps {
  * the "ifc" hero kind and renders this component.
  */
 export function IfcHeroSection({ data }: IfcHeroSectionProps) {
+  // useReducedMotion must be called before the early return below (Rules of
+  // Hooks); it has no side effects, so position is otherwise immaterial.
+  const reduce = useReducedMotion();
   const ifc = data.ifcExport;
   // Defensive: the selectHero priority guarantees this is set when
   // the page renders this component, but the type is still nullable.
   if (!ifc) return null;
   const accent = getWorkflowAccent("ifc");
-  const reduce = useReducedMotion();
 
   const bboxLabel = ifc.worldBbox
     ? `${ifc.worldBbox[0].toFixed(2)} × ${ifc.worldBbox[1].toFixed(2)} × ${ifc.worldBbox[2].toFixed(2)} m`

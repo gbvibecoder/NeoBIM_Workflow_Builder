@@ -1,5 +1,9 @@
 /**
- * EX-007 (IFC Export + Preview) handler tests.
+ * EX-007 (IFC Export) handler tests.
+ *
+ * EX-007 is a pure passthrough of the finalized TR-027 IFC asset; preview
+ * rendering lives in TR-032. These tests assert the file-artifact shape +
+ * the ifcUrl guard, not any rendering behaviour.
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -29,34 +33,30 @@ const baseCtx: Omit<NodeHandlerContext, "inputData"> = {
   dbExecutionId: undefined,
 };
 
-describe("EX-007 handler — IFC Export + Preview", () => {
+describe("EX-007 handler — IFC Export (passthrough)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("renders previews and returns top + iso image URLs + viewer deep link", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          runId: "run-ok",
-          ifcUrl: "https://r2.example/x.ifc",
-          topPngUrl: "https://r2.example/top.png",
-          isoPngUrl: "https://r2.example/iso.png",
-          meshCount: 70,
-          durationMs: 8_400,
-        }),
-        { status: 200 },
-      ),
-    );
+  it("passes the finalized IFC through as a file artifact with viewer deep link", async () => {
+    // EX-007 is a pure passthrough of the TR-027 IFC asset — no preview
+    // rendering, no network call. (Preview rendering moved to TR-032.)
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await handleEX007({
       ...baseCtx,
-      inputData: { ifcUrl: "https://r2.example/x.ifc", runId: "run-ok" },
+      inputData: {
+        ifcUrl: "https://r2.example/x.ifc",
+        runId: "run-ok",
+        entityCount: 70,
+        verdict: "pass",
+        worldBbox: [1, 2, 3],
+      },
     });
 
-    const [url] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://trybuildflow.in/api/brief-to-ifc/v3/render-previews");
+    // No HTTP call: the asset is already finalized upstream.
+    expect(fetchMock).not.toHaveBeenCalled();
 
     if (!("type" in result) || !("data" in result)) {
       throw new Error("expected an ExecutionArtifact");
@@ -79,12 +79,13 @@ describe("EX-007 handler — IFC Export + Preview", () => {
     expect(artifact.data.ifcViewerUrl).toBe(
       "/dashboard/ifc-viewer?url=https%3A%2F%2Fr2.example%2Fx.ifc",
     );
-    expect(artifact.data.topPngUrl).toBe("https://r2.example/top.png");
-    expect(artifact.data.isoPngUrl).toBe("https://r2.example/iso.png");
-    const images = artifact.data.images as Array<{ label: string; url: string }>;
-    expect(images).toHaveLength(2);
-    expect(images[0].label).toBe("Top view");
-    expect(images[1].label).toBe("Isometric view");
+    // Upstream metadata (entityCount/verdict/bbox/runId) is passed through
+    // verbatim for the result-page hero card.
+    expect(artifact.data.runId).toBe("run-ok");
+    expect(artifact.data.entityCount).toBe(70);
+    expect(artifact.data.verdict).toBe("pass");
+    expect(artifact.data.worldBbox).toEqual([1, 2, 3]);
+    expect(artifact.metadata.stage).toBe("ifc-export");
     expect(artifact.metadata.mimeType).toBe("application/x-step");
   });
 
@@ -94,23 +95,11 @@ describe("EX-007 handler — IFC Export + Preview", () => {
     ).rejects.toThrow(/requires an `ifcUrl`/);
   });
 
-  it("throws on render-previews error", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            error: { code: "PREVIEW_RENDER_EMPTY", message: "no_meshes" },
-          }),
-          { status: 502 },
-        ),
-      ),
-    );
+  it("rejects an implausibly short ifcUrl as missing", async () => {
+    // The handler treats a ≤8-char ifcUrl as absent (guards against
+    // truncated/garbage upstream values) and throws like the empty case.
     await expect(
-      handleEX007({
-        ...baseCtx,
-        inputData: { ifcUrl: "https://r2.example/empty.ifc" },
-      }),
-    ).rejects.toThrow(/Preview rendering failed/);
+      handleEX007({ ...baseCtx, inputData: { ifcUrl: "x.ifc" } }),
+    ).rejects.toThrow(/requires an `ifcUrl`/);
   });
 });

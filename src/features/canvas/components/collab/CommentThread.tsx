@@ -5,7 +5,7 @@
  * Shows full comment + replies + add reply input.
  */
 
-import React, { memo, useState, useCallback, useRef, useEffect } from "react";
+import React, { memo, useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { X, Check, RotateCcw } from "lucide-react";
 import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
@@ -59,12 +59,16 @@ export const CommentThread = memo(function CommentThread({ comment, collaborator
     activeIndex: number;
   } | null>(null);
 
-  const filteredUsers = mentionState
-    ? collaborators.filter((u) => {
-        const q = mentionState.query.toLowerCase();
-        return (u.name ?? "").toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-      })
-    : [];
+  const filteredUsers = useMemo(
+    () =>
+      mentionState
+        ? collaborators.filter((u) => {
+            const q = mentionState.query.toLowerCase();
+            return (u.name ?? "").toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+          })
+        : [],
+    [mentionState, collaborators],
+  );
 
   const insertMention = useCallback((user: MentionUser) => {
     if (!mentionState) return;

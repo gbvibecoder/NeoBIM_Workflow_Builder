@@ -12,7 +12,17 @@ interface InteractiveDotGridProps {
   glowRadius?: number;
 }
 
-export function InteractiveDotGrid({
+export function InteractiveDotGrid(props: InteractiveDotGridProps) {
+  // Reduced-motion users get nothing — bail before mounting the animated
+  // canvas. This wrapper calls a single hook then returns; the canvas
+  // component below calls its remaining hooks unconditionally (Rules of
+  // Hooks — the early return previously preceded useCallback/useEffect).
+  const prefersReduced = useReducedMotion();
+  if (prefersReduced) return null;
+  return <InteractiveDotGridCanvas {...props} />;
+}
+
+function InteractiveDotGridCanvas({
   dotColor = "rgba(0,0,0,0.15)",
   activeColor = "rgba(13,148,136,0.5)",
   dotSize = 1.3,
@@ -20,13 +30,9 @@ export function InteractiveDotGrid({
   spacing = 24,
   glowRadius = 90,
 }: InteractiveDotGridProps) {
-  const prefersReduced = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: -9999, y: -9999 });
   const rafRef = useRef<number>(0);
-
-  // Don't render the animated grid if user prefers reduced motion
-  if (prefersReduced) return null;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;

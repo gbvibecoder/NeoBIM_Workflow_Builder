@@ -126,7 +126,10 @@ function PdfHeroPage({ shot }: { shot: HeroShotInfo }) {
 
 export function CompleteHero({ job, onStartNew }: CompleteHeroProps) {
   const spec = job.specResult as BriefSpec | null;
-  const shots = (job.shots as ShotResult[] | null) ?? [];
+  const shots = useMemo(
+    () => (job.shots as ShotResult[] | null) ?? [],
+    [job.shots],
+  );
   const totalShots = shots.length || 12;
   const heroCount = countHeroShots(spec);
   const totalPages = totalShots + 1;

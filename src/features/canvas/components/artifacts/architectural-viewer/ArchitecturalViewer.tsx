@@ -596,8 +596,8 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
         scene?.traverse((obj) => {
           if (obj instanceof Mesh) obj.geometry?.dispose();
         });
-        renderer!?.dispose();
-        minimapRenderer!?.dispose();
+        renderer?.dispose();
+        minimapRenderer?.dispose();
         if (mats!) disposeMaterials(mats!);
         scene?.clear();
       } catch { /* cleanup errors are non-critical */ }

@@ -37,16 +37,32 @@ function makeJob(overrides: Partial<BriefRenderJobView> = {}): BriefRenderJobVie
 
 describe("JobStatusBanner", () => {
   it("renders for RUNNING with progress + stage label", () => {
+    // Default makeJob() is the "rendering" stage → title "Generating renders…",
+    // eyebrow "Stage 3 of 4", and a 35% base in the progress meta (0/12 shots).
     render(<JobStatusBanner job={makeJob()} />);
     const banner = screen.getByTestId("job-status-banner");
     expect(banner.getAttribute("data-status")).toBe("RUNNING");
-    expect(banner.textContent).toContain("Generating images");
-    expect(banner.textContent).toContain("50%");
+    expect(banner.textContent).toContain("Generating");
+    expect(banner.textContent).toContain("Stage 3 of 4");
+    expect(banner.textContent).toContain("35%");
   });
 
   it("clamps progress to [0,100]", () => {
-    render(<JobStatusBanner job={makeJob({ progress: 9999 })} />);
-    expect(screen.getByTestId("job-status-banner").textContent).toContain("100%");
+    // Non-rendering stages pass job.progress straight through the [0,100] clamp.
+    const high = render(
+      <JobStatusBanner
+        job={makeJob({ progress: 9999, currentStage: "compiling" })}
+      />,
+    );
+    expect(high.getByTestId("job-status-banner").textContent).toContain("100%");
+    high.unmount();
+
+    const low = render(
+      <JobStatusBanner
+        job={makeJob({ progress: -50, currentStage: "compiling" })}
+      />,
+    );
+    expect(low.getByTestId("job-status-banner").textContent).toContain("0%");
   });
 
   it("renders nothing for terminal states", () => {
@@ -66,12 +82,14 @@ describe("JobStatusBanner", () => {
     expect(cancelled.container.innerHTML).toBe("");
   });
 
-  it("falls back to raw stage when label is missing", () => {
+  it("maps an unrecognized stage to the Stage 1 fallback", () => {
+    // The redesigned banner no longer echoes a raw stage string; unknown
+    // stages collapse to Stage 1 via mapStageToNumber's default branch.
     render(
       <JobStatusBanner job={makeJob({ currentStage: "totally_unknown" })} />,
     );
     expect(screen.getByTestId("job-status-banner").textContent).toContain(
-      "totally_unknown",
+      "Stage 1 of 4",
     );
   });
 });

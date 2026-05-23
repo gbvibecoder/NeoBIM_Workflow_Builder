@@ -5,7 +5,7 @@
  * Comment composer with @mention autocomplete.
  */
 
-import React, { memo, useState, useCallback, useRef, useEffect } from "react";
+import React, { memo, useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useCanvasTheme } from "@/features/canvas/stores/canvas-theme-store";
 import { useCanvasToken } from "@/features/canvas/lib/canvas-tokens";
 import {
@@ -54,12 +54,16 @@ export const CommentComposer = memo(function CommentComposer({ workflowId, posit
     setMentions([]);
   }, [setComposerPosition]);
 
-  const filteredUsers = mentionState
-    ? collaborators.filter((u) => {
-        const q = mentionState.query.toLowerCase();
-        return (u.name ?? "").toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-      })
-    : [];
+  const filteredUsers = useMemo(
+    () =>
+      mentionState
+        ? collaborators.filter((u) => {
+            const q = mentionState.query.toLowerCase();
+            return (u.name ?? "").toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+          })
+        : [],
+    [mentionState, collaborators],
+  );
 
   const insertMention = useCallback((user: MentionUser) => {
     if (!mentionState) return;

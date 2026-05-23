@@ -44,11 +44,11 @@ export const CanvasControls = memo(function CanvasControls({ onChatToggle, isCha
 
   const btnHover = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.background = tk.controlBtnHover;
-  }, []);
+  }, [tk.controlBtnHover]);
   const btnLeave = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     const isActive = e.currentTarget.dataset.active === "true";
     e.currentTarget.style.background = isActive ? tk.controlBtnActiveBg : "transparent";
-  }, []);
+  }, [tk.controlBtnActiveBg]);
 
   return (
       <div

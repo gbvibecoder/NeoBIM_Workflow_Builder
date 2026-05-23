@@ -36,6 +36,9 @@ export default function FeedbackPage() {
       .then((d) => setSubmissions(d.feedbacks ?? []))
       .catch(() => { toast.error(isDE ? "Laden fehlgeschlagen" : "Failed to load submissions"); })
       .finally(() => setLoadingSubmissions(false));
+    // isDE only localizes the error toast; a locale toggle should not
+    // re-request submissions, so it is intentionally not a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitted]);
 
   // Load "You asked, we built"

@@ -319,7 +319,7 @@ function validateAndClamp(
     // "Master Bedroom" as a hard NO-MATCH (different discriminators) so
     // we no longer produce the "Master Bedroom 2" duplicate bug.
     const match = pickBestMatch(r.labelAsShown, r.matchedName, expectedNames);
-    let name = match.name;
+    const name = match.name;
     if (match.source === "fallback" && !expectedSet.has(r.matchedName.toLowerCase())) {
       unexpectedRoomsFound.push(r.labelAsShown);
     }

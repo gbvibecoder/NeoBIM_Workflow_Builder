@@ -212,7 +212,7 @@ export function HeroBuildingShowcase() {
     let resizeObserver: ResizeObserver | null = null;
     let onKeyDown: ((e: KeyboardEvent) => void) | null = null;
     let onKeyUp: ((e: KeyboardEvent) => void) | null = null;
-    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const moveState = { f: false, b: false, l: false, r: false };
     const velocity = new Vector3();
 

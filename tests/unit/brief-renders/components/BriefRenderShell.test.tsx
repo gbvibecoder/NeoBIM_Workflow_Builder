@@ -208,6 +208,7 @@ describe("BriefRenderShell — routing", () => {
     useJobMock.mockReturnValue({
       job: jobView({
         status: "RUNNING",
+        currentStage: "rendering",
         specResult: { apartments: [] },
         shots: [],
       }),

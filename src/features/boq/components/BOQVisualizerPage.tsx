@@ -28,13 +28,21 @@ interface BOQVisualizerPageProps {
   executionId: string;
 }
 
-export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps) {
-  // Hard-stop check: if BOQ was blocked, show the stop card instead of the full visualizer
+export function BOQVisualizerPage({ data }: BOQVisualizerPageProps) {
+  // Hard-stop check: if BOQ was blocked, show the stop card instead of the
+  // full visualizer. This wrapper calls NO hooks, so the inner component can
+  // call all of its hooks unconditionally (Rules of Hooks — the early return
+  // previously preceded the hooks below and tripped the rule). The inner
+  // component only ever renders with valid (non-hard-stop) BOQ data, so its
+  // hooks never touch the minimal hard-stop payload.
   const dataAny = data as unknown as Record<string, unknown>;
   if (dataAny._hardStop) {
     return <HardStopCard reason={String(dataAny._hardStopReason ?? "Estimate unavailable — live market data and rate library both unusable.")} />;
   }
+  return <BOQVisualizerPageInner data={data} />;
+}
 
+function BOQVisualizerPageInner({ data }: { data: BOQData }) {
   // Price control state
   const [prices, setPrices] = useState<PriceOverrides>(() => ({
     steel: data.market?.steelPerTonne ?? DEFAULT_PRICES.steel,

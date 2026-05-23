@@ -177,8 +177,8 @@ function getRoomDir(room: Room, floor: Floor): VastuDirection {
 
   const relX = centroid.x - bounds.min.x;
   const relY = centroid.y - bounds.min.y;
-  let col = Math.max(0, Math.min(2, Math.floor(relX / cellW)));
-  let row = Math.max(0, Math.min(2, Math.floor(relY / cellH)));
+  const col = Math.max(0, Math.min(2, Math.floor(relX / cellW)));
+  const row = Math.max(0, Math.min(2, Math.floor(relY / cellH)));
   const gridRow = 2 - row;
 
   const GRID: VastuDirection[][] = [

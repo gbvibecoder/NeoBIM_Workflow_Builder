@@ -196,8 +196,10 @@ describe("Parameterized i18n strings — all consumers interpolate", () => {
 
   it("LightPricing.tsx calls interpolatePlanString on tArray results", () => {
     const src = readSrc("features/landing/components/light/LightPricing.tsx");
-    // The tArray call should be followed by .map(... interpolatePlanString ...)
-    expect(src).toMatch(/tArray\([^)]+\)\.map\([^)]*interpolatePlanString/);
+    // The tArray call should be followed by .map(... interpolatePlanString ...).
+    // [\s\S]*? crosses the `.map((s) => …)` arrow's parens + newlines, which
+    // the previous `[^)]*` class could not.
+    expect(src).toMatch(/tArray\([^)]+\)\.map\([\s\S]*?interpolatePlanString/);
   });
 });
 

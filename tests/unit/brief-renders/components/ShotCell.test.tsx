@@ -146,7 +146,7 @@ describe("ShotCell — regenerate action", () => {
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     // Wait for the button to come back out of "Queuing…" (busy=false).
     await waitFor(() =>
-      expect(screen.getByTestId("regen-0").textContent).toBe("Regenerate"),
+      expect(screen.getByTestId("regen-0").textContent).toBe("↻ Regenerate"),
     );
     fireEvent.click(screen.getByTestId("regen-0"));
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));

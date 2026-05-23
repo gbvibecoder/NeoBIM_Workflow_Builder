@@ -133,11 +133,11 @@ export function RecentResponsesTable({ rows, pageSize = 10 }: RecentResponsesTab
                   </td>
                   <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>
                     {r.discovery ?? "—"}
-                    {r.discoveryOther && <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", fontStyle: "italic" }}>"{r.discoveryOther}"</div>}
+                    {r.discoveryOther && <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", fontStyle: "italic" }}>&quot;{r.discoveryOther}&quot;</div>}
                   </td>
                   <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>
                     {r.profession ?? "—"}
-                    {r.professionOther && <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", fontStyle: "italic" }}>"{r.professionOther}"</div>}
+                    {r.professionOther && <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", fontStyle: "italic" }}>&quot;{r.professionOther}&quot;</div>}
                   </td>
                   <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>{r.teamSize ?? "—"}</td>
                   <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>{r.pricing ?? "—"}</td>

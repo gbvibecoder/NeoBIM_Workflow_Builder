@@ -623,7 +623,7 @@ function generateCandidate(
         if (bathW > stripW - verticalBedMinW) bathW = grid(stripW - verticalBedMinW);
         const bedW = grid(stripW - bathW);
 
-        let bathDepth = grid(Math.max(bathMins.minDepth,
+        const bathDepth = grid(Math.max(bathMins.minDepth,
           Math.min(bathTargetArea / bathW, bathW * bathMaxAR, rowDepth)));
 
         const bathY = config.bathBelow

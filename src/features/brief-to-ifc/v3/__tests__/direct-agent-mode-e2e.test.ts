@@ -69,7 +69,7 @@ describe("Direct Agent Mode — E2E Integration (Phase gamma.1)", () => {
 
     // ── Iteration 1: quality 60 ──────────────────────────────
     // Mock runGenerator for iteration 1: agent builds 4 items as collapsed boxes
-    let iteration1Called = false;
+    const iteration1Called = false;
     let iteration1BriefText: string | undefined;
     let iteration1Feedback: string | undefined;
 

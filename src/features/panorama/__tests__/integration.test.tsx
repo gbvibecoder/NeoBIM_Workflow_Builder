@@ -1,9 +1,13 @@
 /* @vitest-environment happy-dom */
 /* V2 panorama integration test — `PanoramaSection` is now a controlled
-   component (no internal apply/reset). These tests verify:
-     · auto-detected type chip
-     · thumbnail click bubbles up via onSelectionChange
-     · Tier 2 conflict warning visibility + Keep override button
+   component (no internal apply/reset). After the Phase Z.IFC.2 compression
+   pass the UI surface changed: the standalone "Detected:" chip and the
+   "Staged: …" / "No panorama selected" status row were dropped, and the
+   Tier-2 conflict warning became a toggle pill ("Ground skipped" ⇄
+   "Ground kept"). These tests verify:
+     · detected type seeds the building-type <select>
+     · thumbnail click / dropdown change stage a selection (Clear appears)
+     · Tier 2 conflict pill visibility + keep-override toggle
      · clearing selection
 */
 import React, { useState } from "react";
@@ -18,7 +22,6 @@ import {
 import type { ParseResultLike } from "@/features/panorama/types";
 
 const FIRST_RESIDENTIAL = PANORAMA_MANIFEST["residential-apartment"][0];
-const FIRST_OFFICE = PANORAMA_MANIFEST["office"][0];
 
 /* Escape regex metachars in user-facing display names — Poly Haven slugs
    include parens like "Urban Rooftop (Day)" that would otherwise be
@@ -54,62 +57,67 @@ function Harness({
 }
 
 describe("PanoramaSection (V2 controlled picker)", () => {
-  it("renders the detected-type chip from the parse result", () => {
+  it("detected building type seeds the bucket select", () => {
     const parseResult: ParseResultLike = {
       classifications: { nbc: ["Group A"] },
     };
     render(<Harness parseResult={parseResult} />);
-    expect(screen.getByText(/Detected:/i).textContent).toMatch(
-      /Residential apartment/i,
-    );
+    // The standalone "Detected:" chip was dropped; the detected bucket now
+    // seeds the building-type <select> directly.
+    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    expect(select.value).toBe(FIRST_RESIDENTIAL.bucket);
+    expect(
+      select.options[select.selectedIndex].textContent,
+    ).toMatch(/Residential apartment/i);
   });
 
-  it("clicking a thumbnail bubbles selection via onSelectionChange", () => {
+  it("clicking a thumbnail stages the selection via onSelectionChange", () => {
     render(<Harness parseResult={{ classifications: { nbc: ["Group A"] } }} />);
+    // Nothing staged yet → no Clear control.
+    expect(screen.queryByRole("button", { name: /Clear/i })).toBeNull();
     /* The first thumbnail in the residential bucket is `balcony`. */
-    const thumb = screen.getByTitle(new RegExp(escapeRegex(FIRST_RESIDENTIAL.displayName), "i"));
+    const thumb = screen.getByTitle(
+      new RegExp(escapeRegex(FIRST_RESIDENTIAL.displayName), "i"),
+    );
     fireEvent.click(thumb);
-    /* The Status row should now show "Staged: <displayName>". */
-    expect(screen.getByText(new RegExp(`Staged: ${escapeRegex(FIRST_RESIDENTIAL.displayName)}`, "i"))).toBeTruthy();
+    // Selection bubbled to the parent → staged asset surfaces the Clear
+    // control (the "Staged: …" row was removed in the redesign).
+    expect(screen.getByRole("button", { name: /Clear/i })).toBeTruthy();
   });
 
   it("dropdown change preselects the first asset of the new bucket", () => {
     render(<Harness />);
-    const select = screen.getByRole("combobox");
+    const select = screen.getByRole("combobox") as HTMLSelectElement;
     fireEvent.change(select, { target: { value: "office" } });
-    expect(screen.getByText(new RegExp(`Staged: ${escapeRegex(FIRST_OFFICE.displayName)}`, "i"))).toBeTruthy();
+    // Bucket switched to office and its first asset was auto-staged
+    // (Clear only renders when an asset is staged).
+    expect(select.value).toBe("office");
+    expect(screen.getByRole("button", { name: /Clear/i })).toBeTruthy();
   });
 
-  it("Tier 2 conflict warning is hidden when no asset is staged", () => {
+  it("Tier 2 conflict pill is hidden when no asset is staged", () => {
     render(<Harness initialTier2Ground={true} />);
-    expect(screen.queryByText(/Ground plane will be skipped/i)).toBeNull();
+    expect(screen.queryByText(/Ground (skipped|kept)/i)).toBeNull();
   });
 
-  it("Tier 2 conflict warning appears when selection + tier2GroundEnabled", () => {
+  it("Tier 2 conflict pill appears when selection + tier2GroundEnabled", () => {
     render(<Harness initial={FIRST_RESIDENTIAL} initialTier2Ground={true} />);
-    expect(screen.getByText(/Ground plane will be skipped/i)).toBeTruthy();
+    expect(screen.getByText(/Ground skipped/i)).toBeTruthy();
   });
 
-  it('"Keep ground anyway" link toggles into "Skip ground"', () => {
+  it("the tier-2 pill toggles between Ground skipped and Ground kept", () => {
     render(<Harness initial={FIRST_RESIDENTIAL} initialTier2Ground={true} />);
-    const keepBtn = screen.getByText(/Keep ground anyway/i);
-    fireEvent.click(keepBtn);
-    /* After click, the warning text and link both swap. */
-    expect(
-      screen.getByText(/Ground plane will mount on top of the panorama/i),
-    ).toBeTruthy();
-    expect(screen.getByText(/Skip ground/i)).toBeTruthy();
+    const pill = screen.getByText(/Ground skipped/i);
+    fireEvent.click(pill);
+    // Clicking the pill flips the keep-override; the copy swaps.
+    expect(screen.getByText(/Ground kept/i)).toBeTruthy();
   });
 
   it("Clear button removes the staged selection", () => {
     render(<Harness initial={FIRST_RESIDENTIAL} />);
-    expect(
-      screen.getByText(new RegExp(`Staged: ${escapeRegex(FIRST_RESIDENTIAL.displayName)}`, "i")),
-    ).toBeTruthy();
     const clearBtn = screen.getByRole("button", { name: /Clear/i });
     fireEvent.click(clearBtn);
-    expect(
-      screen.getByText(/No panorama selected/i),
-    ).toBeTruthy();
+    // Cleared → the Clear control unmounts (no asset staged).
+    expect(screen.queryByRole("button", { name: /Clear/i })).toBeNull();
   });
 });
