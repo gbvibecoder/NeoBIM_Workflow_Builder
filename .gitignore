@@ -80,10 +80,16 @@ tests/floor-plan/snapshots/snapshot-*.json
 !neobim-ifc-service/tests/fixtures/sample_briefs/*.txt
 *_SUMMARY.md
 *_REPORT.md
+# Cited by billing code comments (razorpay/webhook, check-execution-eligibility
+# reference "§T of PLAN_CAP_AUDIT_AND_FIX_REPORT.md") — it's the rationale doc
+# for quota logic, so it ships despite the *_REPORT.md catch-all above.
+!PLAN_CAP_AUDIT_AND_FIX_REPORT.md
 # Date-suffixed working notes (eg. *_REPORT_2026-05-18.md, *_ANALYSIS_2026-…)
 # slip past the *_SUFFIX.md patterns above because they end in the date,
 # not the suffix. These two catch-alls cover them.
 *_REPORT_*.md
+# Durable 3D-pipeline technical doc (not a dated phase note); ships explicitly.
+!docs/TECHNICAL_REPORT_3D_Pipeline.md
 *_ANALYSIS_*.md
 ANALYSIS_*.md
 *_COMPLETE.md
@@ -129,6 +135,12 @@ eng.traineddata
 
 # Local Claude Code artifacts
 temp/
+
+# Archived working notes — session reports, phase logs, analyses, audits,
+# runbooks. Local-only by design (see the *_REPORT/*_PLAN/PHASE_* rules
+# above). Moved here to keep the repo root readable. Recoverable from git
+# history; nothing here is product source or read at runtime.
+_reports/
 
 # SOL Properties concierge brief — locally generated authoring artefact,
 # not product source. Uploaded through the /brief-renders UI, not committed.
