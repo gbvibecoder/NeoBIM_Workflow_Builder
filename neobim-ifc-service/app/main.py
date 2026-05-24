@@ -229,6 +229,7 @@ from app.routers import health, export, audit, design, builder_script  # noqa: E
 from app.routers import v3_generator  # noqa: E402  — Phase v3 generator agent tools.
 from app.routers import v3_previews  # noqa: E402  — Canvas EX-007 preview renderer.
 from app.routers import kos_drawing_parser  # noqa: E402  — KOS Week 5C-1 DXF parser.
+from app.routers import kos_panel_mapper  # noqa: E402  — KOS Week 5D-1 panel-grid mapper.
 from app.routers import v3_verifier  # noqa: E402  — Phase ε.5 hard verifier endpoint.
 
 app.include_router(health.router)
