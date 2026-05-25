@@ -270,13 +270,12 @@ function makeCapBlock(role: PlanKey, limit: number): EligibilityBlock {
     };
   }
   if (role === "PRO") {
-    const target = STRIPE_PLANS.TEAM;
     return {
       type: "plan_limit",
       title: `You've used all ${limit} Pro executions this month`,
-      message: `Upgrade to Team for ${target.limits.runsPerMonth} workflows + executions/month at ${formatINRPrice(target.price)}.`,
-      action: `Upgrade to Team — ${formatINRPrice(target.price)}/month`,
-      actionUrl: "/dashboard/billing?plan=TEAM",
+      message: "Need more capacity? Contact our sales team for a custom Team plan tailored to your organization.",
+      action: "Contact Sales for Team",
+      actionUrl: "/contact?subject=Team+Plan+Enquiry",
       secondaryAction: "View all plans",
       secondaryActionUrl: "/dashboard/billing",
     };

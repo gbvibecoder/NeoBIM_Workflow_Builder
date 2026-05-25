@@ -521,8 +521,9 @@ describe("plan-pricing — getPlanValueEUR (Purchase value contract)", () => {
     expect(getPlanValueEUR("MINI")).toBe(1);
     expect(getPlanValueEUR("STARTER")).toBe(8);
     expect(getPlanValueEUR("PRO")).toBe(20);
-    expect(getPlanValueEUR("TEAM")).toBe(45);
-    expect(getPlanValueEUR("TEAM_ADMIN")).toBe(45);
+    // TEAM is custom-priced (sales-negotiated) — ad-platform value = 0
+    expect(getPlanValueEUR("TEAM")).toBe(0);
+    expect(getPlanValueEUR("TEAM_ADMIN")).toBe(0);
   });
 
   it("returns 0 for unknown / null / undefined roles (never throws, never NaN)", async () => {

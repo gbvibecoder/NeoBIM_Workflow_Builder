@@ -48,7 +48,9 @@ function tierToPlanKey(tier: TemplateTier): "MINI" | "STARTER" | "PRO" | "TEAM_A
     case "MINI": return "MINI";
     case "STARTER": return "STARTER";
     case "PRO": return "PRO";
-    case "TEAM": return "TEAM_ADMIN";
+    // TEAM is sales-only — no self-serve checkout. Returning null blocks the
+    // inline checkout flow; the caller should show "Contact Sales" instead.
+    case "TEAM": return null;
     default: return null;
   }
 }

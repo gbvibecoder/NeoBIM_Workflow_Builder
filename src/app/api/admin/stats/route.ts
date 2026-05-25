@@ -172,8 +172,10 @@ export async function GET() {
   const successCount = executionsByStatus.find((s) => s.status === "SUCCESS")?._count ?? 0;
   const successRate = totalExecutions > 0 ? successCount / totalExecutions : 0;
 
-  // Calculate MRR from paid tiers with active subscriptions (INR prices)
-  const PLAN_PRICES: Record<string, number> = { MINI: 99, STARTER: 799, PRO: 1999, TEAM_ADMIN: 4999 };
+  // Calculate MRR from paid tiers with active subscriptions (INR prices).
+  // TEAM_ADMIN is custom-priced (sales-negotiated) — set to 0 to avoid
+  // inflating MRR. TODO: read actual subscription amount per user.
+  const PLAN_PRICES: Record<string, number> = { MINI: 99, STARTER: 799, PRO: 1999, TEAM_ADMIN: 0 };
   const mrr = paidUsersCount.reduce((sum, u) => sum + (PLAN_PRICES[u.role] || 0), 0);
 
   // Count active subscribers per role

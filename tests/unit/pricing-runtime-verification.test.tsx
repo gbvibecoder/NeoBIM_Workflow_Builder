@@ -455,7 +455,9 @@ describe("E. PricingSection (dark landing) — DOM render", () => {
     expect(text).toContain("99");
     expect(text).toContain("799");
     expect(text).toMatch(/1,?999/);
-    expect(text).toMatch(/4,?999/);
+    // TEAM is now "Contact Sales" with custom pricing — no ₹4,999 in DOM
+    expect(text).toContain("Custom");
+    expect(text).toContain("Contact Sales");
     expect(text).toContain("3"); // MINI renders
     expect(text).toContain("7"); // PRO videos
   });

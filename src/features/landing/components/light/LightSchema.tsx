@@ -44,8 +44,12 @@ const schemas = [
       {
         "@type": "Offer",
         name: "Team",
-        price: "4999",
+        price: "0",
         priceCurrency: "INR",
+        priceSpecification: {
+          "@type": "PriceSpecification",
+          description: "Custom pricing — contact sales",
+        },
       },
     ],
   },
@@ -119,8 +123,12 @@ const schemas = [
         {
           "@type": "Offer",
           name: "Team",
-          price: "4999",
+          price: "0",
           priceCurrency: "INR",
+          priceSpecification: {
+            "@type": "PriceSpecification",
+            description: "Custom pricing — contact sales",
+          },
         },
       ],
     },

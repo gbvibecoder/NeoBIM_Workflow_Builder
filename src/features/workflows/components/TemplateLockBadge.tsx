@@ -45,6 +45,9 @@ interface TemplateLockBadgeProps {
   label: string;
   /** Monthly price in INR (₹). Rendered in the sub-line beneath the CTA. */
   price: number;
+  /** True when pricing is sales-negotiated (TEAM). Shows "Contact Sales"
+   *  instead of a price + self-serve checkout CTA. */
+  isCustom?: boolean;
 }
 
 /** Indian-locale grouping for INR display (₹1,999 / ₹2,999 / ₹4,999). */
@@ -56,7 +59,7 @@ function formatINR(n: number): string {
   }
 }
 
-export function TemplateLockBadge({ tier, label, price }: TemplateLockBadgeProps) {
+export function TemplateLockBadge({ tier, label, price, isCustom }: TemplateLockBadgeProps) {
   const Icon = tier === "PRO" || tier === "TEAM" ? Crown : Lock;
   const tierUpper = label.toUpperCase();
 
@@ -81,14 +84,20 @@ export function TemplateLockBadge({ tier, label, price }: TemplateLockBadgeProps
           <span className={s.ctaIcon}>
             <Crown size={16} strokeWidth={2.4} aria-hidden="true" />
           </span>
-          <span className={s.ctaLabel}>Upgrade to {label}</span>
+          <span className={s.ctaLabel}>{isCustom ? "Contact Sales" : `Upgrade to ${label}`}</span>
           <span className={s.shine} aria-hidden="true" />
         </div>
         <div className={s.sub}>
-          <strong className={s.subPrice}>₹{formatINR(price)}</strong>
-          <span className={s.subSep}>/month</span>
-          <span className={s.subDot}>·</span>
-          <span>unlocks all {label} templates</span>
+          {isCustom ? (
+            <span>Custom pricing · unlocks all {label} templates</span>
+          ) : (
+            <>
+              <strong className={s.subPrice}>₹{formatINR(price)}</strong>
+              <span className={s.subSep}>/month</span>
+              <span className={s.subDot}>·</span>
+              <span>unlocks all {label} templates</span>
+            </>
+          )}
         </div>
       </div>
     </>

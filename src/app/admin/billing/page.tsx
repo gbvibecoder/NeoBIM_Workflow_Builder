@@ -24,7 +24,10 @@ import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
 
 const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
-const PLAN_PRICES: Record<string, number> = { MINI: 99, STARTER: 799, PRO: 1999, TEAM_ADMIN: 4999 };
+// TEAM_ADMIN is custom-priced (sales-negotiated) — MRR contribution cannot
+// be derived from a fixed number. Set to 0 so dashboard doesn't inflate MRR
+// with a stale ₹4,999 figure. TODO: read actual subscription amount per user.
+const PLAN_PRICES: Record<string, number> = { MINI: 99, STARTER: 799, PRO: 1999, TEAM_ADMIN: 0 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

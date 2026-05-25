@@ -539,10 +539,11 @@ export default function BillingPage() {
     {
       name: t('billing.team'),
       tier: "Team",
-      price: "4,999",
-      period: t('billing.perMonth'),
+      price: t('billing.customPricing'),
+      period: "",
       description: t('billing.teamDesc'),
       icon: <Users size={20} />,
+      isCustom: true,
       features: [
         t('billing.teamFeature1'),
         t('billing.teamFeature2'),
@@ -556,7 +557,7 @@ export default function BillingPage() {
         { icon: <Box size={13} />, label: t('billing.modelCredits'), value: formatPlanLimit(STRIPE_PLANS.TEAM.limits.modelsPerMonth) },
         { icon: <Image size={13} />, label: t('billing.renderCredits'), value: formatPlanLimit(STRIPE_PLANS.TEAM.limits.rendersPerMonth) },
       ],
-      cta: currentPlan === "Team" ? t('billing.currentPlan') : t('billing.upgradeToTeam'),
+      cta: currentPlan === "Team" ? t('billing.currentPlan') : t('billing.contactSales'),
       ctaDisabled: currentPlan === "Team",
       isDowngrade: _isDowngrade("Team"),
       highlighted: false,
@@ -792,11 +793,17 @@ export default function BillingPage() {
 
                   {/* Price */}
                   <div className={s.planPrice}>
-                    <div className={s.planPriceRow}>
-                      <span className={s.planPriceCurrency}>₹</span>
-                      <span className={s.planPriceAmount}>{plan.price}</span>
-                      <span className={s.planPriceSuffix}>/ {t('billing.perMonthShort')}</span>
-                    </div>
+                    {(plan as { isCustom?: boolean }).isCustom ? (
+                      <div className={s.planPriceRow}>
+                        <span className={s.planPriceAmount}>{plan.price}</span>
+                      </div>
+                    ) : (
+                      <div className={s.planPriceRow}>
+                        <span className={s.planPriceCurrency}>₹</span>
+                        <span className={s.planPriceAmount}>{plan.price}</span>
+                        <span className={s.planPriceSuffix}>/ {t('billing.perMonthShort')}</span>
+                      </div>
+                    )}
                     <div className={s.priceAnnotation}>
                       <DimLine />
                       <span>{plan.annotation}</span>
@@ -865,7 +872,13 @@ export default function BillingPage() {
                     }
                     whileTap={!isActive && !plan.isDowngrade && upgradingTo === null ? { scale: 0.98 } : {}}
                     disabled={isActive || plan.isDowngrade || upgradingTo !== null}
-                    onClick={() => plan.planType && handleUpgrade(plan.planType as 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN')}
+                    onClick={() => {
+                      if ((plan as { isCustom?: boolean }).isCustom && !isActive) {
+                        window.location.href = "/contact?subject=Team+Plan+Enquiry";
+                        return;
+                      }
+                      plan.planType && handleUpgrade(plan.planType as 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN');
+                    }}
                     className={s.planCta}
                     data-variant={
                       isActive ? "active" :

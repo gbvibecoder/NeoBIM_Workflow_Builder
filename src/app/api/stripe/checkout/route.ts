@@ -39,7 +39,23 @@ export async function POST(req: Request) {
 
     // Validate plan (accept both 'TEAM' and 'TEAM_ADMIN' from frontend)
     const normalizedPlan = plan === 'TEAM' ? 'TEAM_ADMIN' : plan;
-    if (!normalizedPlan || !['MINI', 'STARTER', 'PRO', 'TEAM_ADMIN'].includes(normalizedPlan)) {
+
+    // TEAM is sales-only — block self-serve checkout creation.
+    // Existing TEAM_ADMIN subscribers renew via Stripe webhooks (untouched).
+    if (normalizedPlan === 'TEAM_ADMIN') {
+      return NextResponse.json(
+        formatErrorResponse({
+          title: 'Team plan — contact sales',
+          message: 'Team pricing is customized per organization. Please contact our sales team to get started.',
+          code: 'BILL_001',
+          action: 'Contact Sales',
+          actionUrl: '/contact',
+        }),
+        { status: 400 }
+      );
+    }
+
+    if (!normalizedPlan || !['MINI', 'STARTER', 'PRO'].includes(normalizedPlan)) {
       return NextResponse.json(
         formatErrorResponse(FormErrors.REQUIRED_FIELD("plan")),
         { status: 400 }

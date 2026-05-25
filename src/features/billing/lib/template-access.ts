@@ -45,6 +45,9 @@ export interface UpgradeTarget {
   price: number;
   /** Currency symbol from STRIPE_PLANS (always "₹" for now). */
   currency: string;
+  /** True when pricing is sales-negotiated (TEAM). UI should show
+   *  "Contact Sales" instead of a price + checkout CTA. */
+  isCustom: boolean;
 }
 
 /** Returns the upgrade target a locked-out user should be sent to.
@@ -63,5 +66,6 @@ export function getUpgradeTargetForTemplate(
     label: plan.name,
     price: plan.price,
     currency: plan.currency,
+    isCustom: 'isCustom' in plan && plan.isCustom === true,
   };
 }
