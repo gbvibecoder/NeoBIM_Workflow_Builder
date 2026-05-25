@@ -41,11 +41,32 @@ _TEXT_SAMPLE_LIMIT = 4000
 
 _SECTION_TOKENS = ("SECTION A-A", "SECTION 1-1", "SECTION B-B", "SECTION")
 _ELEVATION_TOKENS = ("FFL", "+0.000", " GL ", "GROUND LEVEL", "ELEVATION")
-_PLAN_TOKENS = ("PLAN", "FLOOR", "SETOUT", "BASEMENT", "GROUND FLOOR", "LAYOUT")
+_PLAN_TOKENS = (
+    # Original 5C-1 tokens
+    "PLAN", "FLOOR", "SETOUT", "BASEMENT", "GROUND FLOOR", "LAYOUT",
+    # 5C-3 PR 4 — expanded for Team2 + common AU/UK/IN architectural conventions.
+    # Title-block path (_PLAN_TITLE_RE) ALREADY recognises 90VR's
+    # "Concrete Setout Plan-Basement-Part" via "setout"/"plan", but the body-text
+    # path also needs these keywords for drawings where the title block didn't
+    # extract cleanly.
+    "CONCRETE SETOUT", "SETTING OUT", "STRUCTURAL PLAN", "STRUCTURAL SETOUT",
+    "FOUNDATION PLAN", "FRAMING PLAN", "SLAB PLAN", "WALL PLAN",
+    "GENERAL ARRANGEMENT", "GA PLAN", "SITE PLAN",
+    "LOWER GROUND FLOOR", "UPPER GROUND FLOOR",
+    "FIRST FLOOR", "SECOND FLOOR", "THIRD FLOOR",
+    "LEVEL 1 PLAN", "LEVEL 2 PLAN", "LEVEL 3 PLAN",
+)
 
 # Title-block drawing-title keywords that mark a plan/setout/layout drawing —
-# the authoritative FLOOR_PLAN signal (Section A, Step 0).
-_PLAN_TITLE_RE = re.compile(r"(plan|setout|layout|floor)", re.IGNORECASE)
+# the authoritative FLOOR_PLAN signal (Section A, Step 0). "concrete" added for
+# 90VR-style "Concrete Setout Plan" titles where "concrete" precedes "setout"
+# (current regex already matches via "setout"/"plan" but the inclusive keyword
+# makes the rationale explicit).
+_PLAN_TITLE_RE = re.compile(
+    r"(plan|setout|setting\s*out|layout|floor|concrete\s*setout|"
+    r"general\s*arrangement|ga\s*plan)",
+    re.IGNORECASE,
+)
 
 # Title-block level values that name a building storey — a positive FLOOR_PLAN hint.
 _LEVEL_FLOOR_TOKENS = (

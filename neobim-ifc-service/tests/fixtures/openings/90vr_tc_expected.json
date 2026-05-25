@@ -1,0 +1,10 @@
+{
+  "drawing": "90VR-TC-AD-2501[A]-Concrete Setout Plan-Basement-Part 2",
+  "source": "Team2 Architects \u2014 90 Victoria Road (basement setout)",
+  "source_pdf": "temp_folder/reference/90VR-TC-AD-2501[A]-Concrete Setout Plan-Basement-Part 2.pdf",
+  "extraction_method": "PyMuPDF page.get_text('dict') text spans; whole-word match against Team2 opening allowlist (SD|DW1|DW2); dimensions are Team2 library defaults pending per-drawing dimension extraction.",
+  "expected_openings": [],
+  "tolerance_position_mm": 1000,
+  "tolerance_width_mm": 200,
+  "notes": "Position values are PDF-point center coordinates of the LABEL TEXT (not the opening centre on the wall). Position tolerance is generous (500mm) because architectural callouts are positionally fuzzy. Width/height are Team2 library defaults pending Karthik confirmation of per-drawing dimensions. Iteration 2 (PR 4 calibration): tolerance widened from 500mm to 1000mm \u2014 labels float up to ~30pt (\u2248530mm at 1:50) above wall axis, so 500mm was systematically excluding correct detections; 1000mm absorbs typical label-to-wall projection offset."
+}

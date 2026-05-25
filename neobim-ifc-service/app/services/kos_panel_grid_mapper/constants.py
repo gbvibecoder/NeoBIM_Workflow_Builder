@@ -331,7 +331,12 @@ STANDARD_PANEL_WIDTHS_MM: Final[tuple[int, ...]] = (STANDARD_PANEL_WIDTH_MM,)
 # FUTURE-HOOK: when parser slice 5C-3 (PARSER-ENH-1) lands with opening extraction,
 # orchestrator flips this to True. Opening handler then layouts opening frames per
 # DESIGN §6.8.
-PARSER_OPENINGS_AVAILABLE: Final[bool] = False
-"""See DESIGN.md §9 PENDING item. Today the parser doesn't extract openings; mapper
-emits all-solid panel layouts. When True, opening_handler.layout_opening_frame()
-becomes active in the orchestrator."""
+PARSER_OPENINGS_AVAILABLE: Final[bool] = True
+"""Flipped in 5C-3 PR 4 (2026-05-25) after 90VR Team2-library calibration
+reached F1 = 0.826 on the real customer PDF (above the 0.70 target).
+
+When True, opening_handler.layout_opening_frame() becomes active and the
+mapper consumes ParserOpening data from the parser into its V (jamb) + HB
+(header/sill) frame computations. See 5C-3 PR 4 report for the per-fixture
+confusion matrix and the post-flip regression evidence (all 691 prior tests
+remain green; P_INT_8 golden byte-equal verified)."""

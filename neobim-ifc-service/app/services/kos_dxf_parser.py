@@ -43,6 +43,8 @@ from app.services.kos_drawing_geometry import (
     _enrich_thickness,
     _seg_to_wall,
 )
+from app.services.kos_opening_detector import detect_openings
+from app.services.kos_opening_dxf import extract_dxf_entities
 
 log = structlog.get_logger()
 
@@ -588,6 +590,37 @@ def parse_dxf_walls(dxf_path: str, filename: str | None = None) -> dict:
     walls, tier = _detect_walls(ebt, doc, mult, warnings, msp)
     junctions = _detect_junctions(walls, warnings)
 
+    # ── Phase 5C-3: opening (door/window) extraction ────────────────────────
+    # Extract raw INSERT / ARC / TEXT / MTEXT entities into a pure-dict bag
+    # (already in mm via ``mult``) and run the multi-tier detector. We
+    # default the classification to "FLOOR_PLAN" here — the router applies a
+    # downstream gate that re-runs the orchestrator with the actual
+    # classification, blanking openings for non-floor-plan drawings. The
+    # parser's responsibility is to make the entity bag + openings tuple
+    # available; per-classification policy lives at the router edge.
+    try:
+        raw_entities = extract_dxf_entities(msp, mult)
+    except Exception as exc:  # noqa: BLE001 — never let detection abort a parse
+        warnings.append(
+            f"opening entity extraction failed ({type(exc).__name__}: {exc})"
+        )
+        raw_entities = {"inserts": [], "arcs": [], "texts": []}
+
+    try:
+        openings, opening_warnings = detect_openings(
+            walls=walls,
+            junctions=junctions,
+            raw_entities=raw_entities,
+            source_type="dxf",
+            classification="FLOOR_PLAN",
+        )
+        warnings.extend(opening_warnings)
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(
+            f"opening detection failed ({type(exc).__name__}: {exc})"
+        )
+        openings = ()
+
     # Confidence: base on tier, penalise missing thickness + missing dims.
     tier_conf = {1: 0.85, 2: 0.65, 3: 0.50, 4: 0.30}[tier]
     any_thickness = any(w["thickness_mm"] is not None for w in walls)
@@ -611,6 +644,8 @@ def parse_dxf_walls(dxf_path: str, filename: str | None = None) -> dict:
         "_msp": msp,
         "walls": walls,
         "junctions": junctions,
+        "openings": openings,
+        "raw_opening_entities": raw_entities,
         "detection_tier": tier,
         "overall_confidence": round(overall, 2),
         "walls_field_confidence": round(walls_field_conf, 2),

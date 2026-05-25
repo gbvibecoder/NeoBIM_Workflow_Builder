@@ -75,18 +75,22 @@ def split_symmetric(inp: SplitInput) -> SplitResult:
     if n_full == 0:
         # Tiny fillable: emit one panel at fillable width IF above absorb threshold.
         if residual_total > SPLITTER_RESIDUAL_DROP_THRESHOLD_MM:
+            # PR-HOTFIX-1: same int-rounded cursor advance as minimize_cuts'
+            # residual handling — keeps panel.width consistent with cursor
+            # for C-3 (no float-epsilon overlap on short segments).
+            infill_width = int(round(residual_total))
             vertical_panels.append(
                 _build_panel(
                     label=label_counter.next_s(),
                     sku_type="CTC",
                     thickness_mm=inp.sku_thickness_mm,
-                    width_mm=int(round(residual_total)),
+                    width_mm=infill_width,
                     cut_length_mm=cut_len,
                     position_mm=cursor,
                     orientation="vertical",
                 )
             )
-            cursor += residual_total
+            cursor += infill_width
     elif n_full == 1:
         # One AP carrying the whole fillable.
         actual_w = int(round(fillable))

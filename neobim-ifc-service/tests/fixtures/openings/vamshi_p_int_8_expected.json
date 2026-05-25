@@ -1,0 +1,9 @@
+{
+  "wall_id": "P_INT_8",
+  "wall_length_mm": 2101,
+  "expected_openings": [],
+  "tolerance_position_mm": 100,
+  "tolerance_width_mm": 50,
+  "source": "Vamshi PDF sheet PF_VAM_A011",
+  "notes": "Solid wall — phantom-prevention test. Shortest wall in Vamshi inventory."
+}

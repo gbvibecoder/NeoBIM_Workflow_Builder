@@ -240,10 +240,13 @@ def test_default_split_strategy_is_minimize_cuts() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_parser_openings_available_is_false_in_pr1() -> None:
-    """Today the parser doesn't extract opening objects; this baseline is False.
-    When PARSER-ENH-1 lands (parser slice 5C-3), this flips to True."""
-    assert C.PARSER_OPENINGS_AVAILABLE is False
+def test_parser_openings_available_flipped_in_5c3_pr4() -> None:
+    """Flipped to True in 5C-3 PR 4 (2026-05-25) after the 90VR Team2
+    calibration reached F1 = 0.826 on the real customer PDF (above the 0.70
+    target). When True, opening_handler.layout_opening_frame() becomes
+    active in the mapper orchestrator and the parser's ParserOpening data
+    feeds V/HB frame computations."""
+    assert C.PARSER_OPENINGS_AVAILABLE is True
 
 
 def test_joint_overlap_mm_starts_at_zero() -> None:

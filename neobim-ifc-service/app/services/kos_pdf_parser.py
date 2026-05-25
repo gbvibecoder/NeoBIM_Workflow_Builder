@@ -369,6 +369,31 @@ def parse_pdf_walls(pdf_path: str, filename: str | None = None) -> dict:
     _enrich_thickness(walls, None, warnings)
     junctions = _detect_junctions(walls, warnings)
 
+    # ── Phase 5C-3: opening detection on PDF source ──────────────────────
+    # The parser extracts arc-shaped paths + text spans into a pure-dict
+    # bag; the orchestrator's PDF branch (PR 3) runs Tier 2/3/4 detectors
+    # (no Tier 1 — PDFs have no block semantics). Tier 3 (wall gaps) is
+    # the workhorse since vector arcs are often absent from rendered PDFs.
+    try:
+        from app.services.kos_opening_detector import detect_openings
+        from app.services.kos_opening_pdf import extract_pdf_entities
+
+        raw_entities = extract_pdf_entities(page, pt_to_mm)
+        openings, opening_warnings = detect_openings(
+            walls=walls,
+            junctions=junctions,
+            raw_entities=raw_entities,
+            source_type="pdf",
+            classification="FLOOR_PLAN",
+        )
+        warnings.extend(opening_warnings)
+    except Exception as exc:  # noqa: BLE001 — never let detection abort a parse
+        warnings.append(
+            f"PDF opening detection failed ({type(exc).__name__}: {exc})"
+        )
+        openings = ()
+        raw_entities = {"arcs": [], "texts": []}
+
     any_thickness = any(w["thickness_mm"] is not None for w in walls)
     has_dims = counts["DIMENSION"] > 0  # flattened PDFs carry no DIMENSION entities
     overall = tier_conf - (0.0 if any_thickness else 0.1) - (0.0 if has_dims else 0.1)
@@ -384,6 +409,8 @@ def parse_pdf_walls(pdf_path: str, filename: str | None = None) -> dict:
         "title_block": title_block,
         "walls": walls,
         "junctions": junctions,
+        "openings": openings,
+        "raw_opening_entities": raw_entities,
         "detection_tier": tier,
         "overall_confidence": round(overall, 2),
         "walls_field_confidence": round(walls_field_conf, 2),

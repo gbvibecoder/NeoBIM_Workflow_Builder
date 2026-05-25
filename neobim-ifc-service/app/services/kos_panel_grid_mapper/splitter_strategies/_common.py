@@ -227,17 +227,158 @@ def _compute_envelope(
 ) -> SplitEnvelope:
     """Compute the common splitter pre-amble.
 
-    Handles 4 cases for each end (left + right):
-      - reservation present: emit reservation panel (left) or reserve width (right)
-      - external + None: R5 INTEGRATED — use neighbour_covered_*_mm as the offset
-      - internal + None (left): emit ECM default (ASSUMPTION-A13)
-      - internal + None (right): reserve STANDARD_PANEL_WIDTH_MM for CTC terminator
+    Handles 5 cases for each end (left + right) — order matters:
+      1. reservation present:           emit reservation panel
+      2. neighbour_covered_*_mm > 0:    R5 — neighbour owns this corner; use
+                                        offset, emit no default panel. PR-HOTFIX-1
+                                        widened this from external-only to
+                                        application-agnostic because
+                                        corner_handler sets covered_*_mm for
+                                        ALL corners regardless of application.
+      3. external + no covered:         cursor stays at 0 / right_covered = 0
+      4. internal/etc + no covered, LEFT:  emit ECM default (ASSUMPTION-A13)
+      5. internal/etc + no covered, RIGHT: reserve CTC terminator (ASSUMPTION-A14)
+
+    Sub-corner-cover edge case (covered_left + covered_right > segment_length
+    AND no reservations): segment is too short for the standard corner kit;
+    emit a soft warning and return an empty envelope so the splitter emits
+    only horizontal bands (no overflow). The C-1 invariant will still hard-fail
+    on such segments until the orchestrator routes them to CustomQuoteRequest;
+    that orchestrator change is outside this hotfix's scope (PR-HOTFIX-1 §3
+    Phase B rules limit to splitter modules only). 90VR-MR/TC contain no
+    sub-corner-cover segments (smallest = 834mm > 600mm standard cover sum),
+    so this guard is forward-looking.
     """
     warnings: list[str] = []
     initial_panels: list[Panel] = []
     w_std = STANDARD_PANEL_WIDTH_MM
     cut_len = STANDARD_PANEL_CUT_LENGTH_MM
     cursor = 0.0
+
+    # ── Short-segment envelope-overflow detection (PR-HOTFIX-1) ──────
+    # Compute the MINIMUM contribution each end will consume under the
+    # default branches that follow:
+    #   LEFT:  reservation.width if reserved; else covered_left if >0;
+    #          else 0 for external; else w_std (ECM default)
+    #   RIGHT: reservation.width if reserved; else covered_right if >0;
+    #          else 0 for external; else w_std (CTC terminator default)
+    # If left_min + right_min > segment_length, the envelope's defaults
+    # overflow. We resolve by emitting only the SACROSANCT panels
+    # (reservations + covered offsets — those are authoritative) plus an
+    # optional fitted CTC infill in the remaining usable room.
+    #
+    # If both reservations AND covered are 0 (e.g. external + no corners),
+    # left_min + right_min is 0 and this branch never fires; the segment
+    # is fully fillable by the standard AP loop.
+    from ..constants import SPLITTER_RESIDUAL_DROP_THRESHOLD_MM
+
+    left_min = (
+        first_panel_reservation.width_mm if first_panel_reservation is not None
+        else (
+            neighbour_covered_left_mm if neighbour_covered_left_mm > 0
+            else (0.0 if application == "external" else w_std)
+        )
+    )
+    right_min = (
+        last_panel_reservation.width_mm if last_panel_reservation is not None
+        else (
+            neighbour_covered_right_mm if neighbour_covered_right_mm > 0
+            else (0.0 if application == "external" else w_std)
+        )
+    )
+
+    if left_min + right_min > segment_length_mm + 0.5:
+        # Sacrosanct widths = reservation width OR covered offset (zero if
+        # the side's overhead is just the skippable default).
+        sacro_left = (
+            first_panel_reservation.width_mm if first_panel_reservation is not None
+            else neighbour_covered_left_mm
+        )
+        sacro_right = (
+            last_panel_reservation.width_mm if last_panel_reservation is not None
+            else neighbour_covered_right_mm
+        )
+        usable = segment_length_mm - sacro_left - sacro_right
+
+        # Emit sacrosanct panels + optional fitted CTC. Skip the default
+        # ECM (left) and CTC terminator (right) — they're what's overflowing.
+        cursor = 0.0
+
+        # LEFT sacrosanct
+        if first_panel_reservation is not None:
+            fallback_lbl = label_counter.next_s()
+            p = _build_panel_from_reservation(
+                first_panel_reservation,
+                position_mm=cursor,
+                fallback_label=fallback_lbl,
+            )
+            initial_panels.append(p)
+            cursor += first_panel_reservation.width_mm
+            if first_panel_reservation.label is not None:
+                label_counter.s -= 1
+        elif neighbour_covered_left_mm > 0:
+            cursor = neighbour_covered_left_mm
+
+        # FITTED MIDDLE (only when there's room above the absorb threshold)
+        if usable > SPLITTER_RESIDUAL_DROP_THRESHOLD_MM:
+            width_mm = int(round(usable))
+            fitted = _build_panel(
+                label=label_counter.next_s(),
+                sku_type="CTC",
+                thickness_mm=sku_thickness_mm,
+                width_mm=width_mm,
+                cut_length_mm=cut_len,
+                position_mm=cursor,
+                orientation="vertical",
+            )
+            initial_panels.append(fitted)
+            cursor += width_mm
+
+        # RIGHT sacrosanct
+        right_covered = 0.0
+        if last_panel_reservation is not None:
+            fallback_lbl = label_counter.next_v()
+            p = _build_panel_from_reservation(
+                last_panel_reservation,
+                position_mm=cursor,
+                fallback_label=fallback_lbl,
+            )
+            initial_panels.append(p)
+            cursor += last_panel_reservation.width_mm
+            if last_panel_reservation.label is not None:
+                label_counter.v -= 1
+        elif neighbour_covered_right_mm > 0:
+            right_covered = neighbour_covered_right_mm
+
+        # Warning surface: always include "segment too short" to satisfy
+        # existing test asserts; include detailed diagnostics for operators.
+        if usable > SPLITTER_RESIDUAL_DROP_THRESHOLD_MM:
+            warnings.append(
+                f"segment too short for envelope kit ({application}): "
+                f"left_min({left_min:.0f}) + right_min({right_min:.0f}) = "
+                f"{left_min + right_min:.0f}mm > segment_length_mm={segment_length_mm:.1f}. "
+                f"Emitted sacrosanct + fitted CTC-{int(round(usable))} infill "
+                f"(usable={usable:.1f}mm). Custom-quote review recommended."
+            )
+        else:
+            warnings.append(
+                f"sub-corner-cover (segment too short): "
+                f"segment_length_mm={segment_length_mm:.1f}, "
+                f"sacrosanct(left={sacro_left:.0f}, right={sacro_right:.0f}) "
+                f"leaves usable={usable:.1f}mm ≤ "
+                f"{SPLITTER_RESIDUAL_DROP_THRESHOLD_MM:.0f}mm absorb threshold — "
+                f"no infill emitted. Recommend custom-quote review."
+            )
+
+        return SplitEnvelope(
+            initial_panels=initial_panels,
+            cursor=cursor,
+            last_reserve_width_mm=0.0,
+            right_covered_mm=right_covered,
+            fillable_mm=0.0,
+            emit_terminator=False,
+            warnings=warnings,
+        )
 
     # ── LEFT side ─────────────────────────────────────────────────────
     if first_panel_reservation is not None:
@@ -254,17 +395,29 @@ def _compute_envelope(
         if first_panel_reservation.label is not None:
             # Rewind label counter: we burned a number we shouldn't have.
             label_counter.s -= 1
-    elif application == "external":
-        # R5: left side is covered by neighbour's owned corner. Skip the
-        # covered offset; emit no panel.
+    elif neighbour_covered_left_mm > 0:
+        # PR-HOTFIX-1: neighbour owns this segment's LEFT corner — skip the
+        # default ECM emission and use the covered region as the cursor
+        # offset. This branch fires regardless of `application` because
+        # corner_handler sets covered_*_mm for all CORNER junctions
+        # (internal-internal L-corners, internal-external corners, etc.).
+        # Pre-hotfix, internal walls fell through to the ECM default which
+        # double-counted the covered region against C-1.
+        # Warning string keeps the "R5:" prefix unchanged — existing tests
+        # depend on it. Application is substituted into the message so the
+        # log surface still tells operators what kind of segment this was.
         cursor = neighbour_covered_left_mm
-        if neighbour_covered_left_mm > 0:
-            warnings.append(
-                f"R5: external segment, no first_panel_reservation; "
-                f"starting cursor at neighbour_covered_left_mm={neighbour_covered_left_mm:.0f}mm"
-            )
+        warnings.append(
+            f"R5: {application} segment, no first_panel_reservation; "
+            f"starting cursor at neighbour_covered_left_mm={neighbour_covered_left_mm:.0f}mm"
+        )
+    elif application == "external":
+        # External + no reservation + no covered → cursor stays at 0, no panel.
+        # (Equivalent to setting cursor=neighbour_covered_left_mm=0 in the
+        # pre-hotfix code; preserved here for symmetry with the other branches.)
+        cursor = neighbour_covered_left_mm
     else:
-        # Internal wall with free left end → emit ECM default (ASSUMPTION-A13).
+        # Internal / basement / retaining + free left end → ECM default (ASSUMPTION-A13).
         p = _build_panel(
             label=label_counter.next_s(),
             sku_type="ECM",
@@ -282,19 +435,25 @@ def _compute_envelope(
         last_reserve_width = float(last_panel_reservation.width_mm)
         right_covered = 0.0
         emit_terminator = False     # the reservation IS the terminator
-    elif application == "external":
-        # R5: right side covered by neighbour; no reservation needed.
+    elif neighbour_covered_right_mm > 0:
+        # PR-HOTFIX-1: neighbour owns this segment's RIGHT corner — no
+        # terminator, use the covered offset for fillable accounting.
+        # Mirror of the LEFT new branch above; same rationale.
         last_reserve_width = 0.0
         right_covered = neighbour_covered_right_mm
         emit_terminator = False
-        if neighbour_covered_right_mm > 0:
-            warnings.append(
-                f"R5: external segment, no last_panel_reservation; "
-                f"reserving neighbour_covered_right_mm={neighbour_covered_right_mm:.0f}mm "
-                f"for covered region"
-            )
+        warnings.append(
+            f"R5: {application} segment, no last_panel_reservation; "
+            f"reserving neighbour_covered_right_mm={neighbour_covered_right_mm:.0f}mm "
+            f"for covered region"
+        )
+    elif application == "external":
+        # External + no reservation + no covered → no terminator.
+        last_reserve_width = 0.0
+        right_covered = neighbour_covered_right_mm
+        emit_terminator = False
     else:
-        # Internal wall with free right end → reserve for CTC terminator (ASSUMPTION-A14).
+        # Internal / basement / retaining + free right end → CTC terminator (ASSUMPTION-A14).
         last_reserve_width = float(w_std)
         right_covered = 0.0
         emit_terminator = True

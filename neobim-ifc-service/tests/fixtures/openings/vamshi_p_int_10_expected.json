@@ -1,0 +1,9 @@
+{
+  "wall_id": "P_INT_10",
+  "wall_length_mm": 3016,
+  "expected_openings": [],
+  "tolerance_position_mm": 100,
+  "tolerance_width_mm": 50,
+  "source": "Vamshi PDF sheet PF_VAM_A013",
+  "notes": "Solid wall — phantom-prevention test. Same length as P_INT_6 but distinct in the schedule."
+}
