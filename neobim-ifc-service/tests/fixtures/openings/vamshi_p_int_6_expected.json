@@ -1,0 +1,9 @@
+{
+  "wall_id": "P_INT_6",
+  "wall_length_mm": 3016,
+  "expected_openings": [],
+  "tolerance_position_mm": 100,
+  "tolerance_width_mm": 50,
+  "source": "Vamshi PDF sheet PF_VAM_A009",
+  "notes": "Solid wall — phantom-prevention test. Detector must emit 0 openings."
+}

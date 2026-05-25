@@ -146,6 +146,23 @@ def map_walls_to_panels(inp: MapperInput) -> PanelGridMapperOutput:
     walls_by_id = {w.id: w for w in po.walls}
     enriched = _enrich_segments(drafts, walls_by_id, po, pc)
 
+    # PR-HOTFIX-2: detect parser openings whose parent_wall_id is not in any
+    # segment.source_wall_ids — these are "orphan" openings the segmenter
+    # dropped (e.g. opening on a wall the segmenter classified as noise).
+    # Surface as soft warnings on the output so operators can review.
+    if po.openings:
+        segment_wall_ids: set[str] = set()
+        for d in drafts:
+            segment_wall_ids.update(d.source_wall_ids)
+        orphan_opening_warnings = tuple(
+            f"opening {o.id} references parent_wall_id={o.parent_wall_id!r} "
+            f"not in any segment.source_wall_ids — dropped during segmentation; "
+            f"this opening will not appear in mapper output."
+            for o in po.openings
+            if o.parent_wall_id not in segment_wall_ids
+        )
+        input_warnings = input_warnings + orphan_opening_warnings
+
     # ── Phase 3: cross-segment corner + T-junction handling ──
     enriched_by_id = {e["draft"].id: e for e in enriched}
     for j in po.junctions:
@@ -272,6 +289,18 @@ def _enrich_segments(
     system, lifts, openings, curves). Returns a list of mutable dicts that
     Phase 3 mutates with reservation info.
     """
+    # PR-HOTFIX-2: pre-bucket parser openings by parent_wall_id so each
+    # segment can pull its openings via a set-membership check on
+    # source_wall_ids in O(segment_walls). Single pass over po.openings —
+    # zero cost when the parser emitted none (empty for-loop). Orphan
+    # openings (those whose parent_wall_id isn't in any segment) are
+    # surfaced as soft warnings by the orchestrator, NOT by this enricher.
+    openings_by_parent_wall: dict[str, list] = {}
+    for po_opening in po.openings:
+        openings_by_parent_wall.setdefault(
+            po_opening.parent_wall_id, []
+        ).append(po_opening)
+
     enriched: list[dict] = []
     for draft in drafts:
         # Junctions whose wall_ids intersect this segment's source walls.
@@ -309,9 +338,19 @@ def _enrich_segments(
             application=orient_res.application,
         )
 
+        # PR-HOTFIX-2: collect the parser openings whose parent wall lies
+        # inside this segment. Order is preserved from po.openings (which
+        # was already deterministic-sorted by the parser orchestrator).
+        seg_parser_openings: list = []
+        for wid in draft.source_wall_ids:
+            if wid in openings_by_parent_wall:
+                seg_parser_openings.extend(openings_by_parent_wall[wid])
+
         open_res = detect_openings(
             segment=draft,
             junctions_in_segment=seg_junctions,
+            parser_openings=tuple(seg_parser_openings),
+            walls_by_id=walls_by_id,
         )
 
         curve_res = detect_curve(seg_walls)

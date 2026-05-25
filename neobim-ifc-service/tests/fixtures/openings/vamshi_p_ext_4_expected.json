@@ -1,0 +1,31 @@
+{
+  "wall_id": "P_EXT_4",
+  "wall_length_mm": 6692,
+  "expected_openings": [
+    {
+      "opening_type": "door",
+      "position_mm": 1000,
+      "width_mm": 900,
+      "height_mm": 2100,
+      "sill_height_mm": 0
+    },
+    {
+      "opening_type": "door",
+      "position_mm": 2900,
+      "width_mm": 900,
+      "height_mm": 2100,
+      "sill_height_mm": 0
+    },
+    {
+      "opening_type": "door",
+      "position_mm": 4800,
+      "width_mm": 900,
+      "height_mm": 2100,
+      "sill_height_mm": 0
+    }
+  ],
+  "tolerance_position_mm": 100,
+  "tolerance_width_mm": 50,
+  "source": "Vamshi PDF sheet PF_VAM_A006",
+  "notes": "3 doors all 900mm wide; positions placeholder pending PDF measurement in PR 3."
+}

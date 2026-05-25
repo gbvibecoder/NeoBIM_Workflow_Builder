@@ -111,6 +111,37 @@ def _assemble_response(upload_name, fmt, size, parsed, title_block, classificati
     duration_ms = int((time.monotonic() - started) * 1000)
     tier = parsed["detection_tier"]
 
+    # ── Phase 5C-3: classification-gated openings ──────────────────────────
+    # The parser ran detect_openings() with a default classification of
+    # "FLOOR_PLAN". For non-floor-plan drawings (SECTION / ELEVATION /
+    # DETAIL) the orchestrator's short-circuit means the parser already
+    # returned an empty tuple; we mirror that here defensively so a future
+    # parser-side default change can't accidentally leak openings into a
+    # section/elevation response.
+    raw_openings = parsed.get("openings", ())
+    if classification["type"] != "FLOOR_PLAN":
+        openings_payload: tuple = ()
+    else:
+        # Serialise ParserOpening dataclasses into plain dicts for the JSON
+        # response. dataclasses.asdict isn't used because tuples become lists
+        # — we want explicit field control to keep the wire shape stable.
+        openings_payload = tuple(
+            {
+                "id": o.id,
+                "opening_type": o.opening_type,
+                "parent_wall_id": o.parent_wall_id,
+                "position_mm": round(o.position_mm, 2),
+                "width_mm": round(o.width_mm, 2),
+                "height_mm": round(o.height_mm, 2),
+                "sill_height_mm": round(o.sill_height_mm, 2),
+                "detection_tier": o.detection_tier,
+                "detection_method": o.detection_method,
+                "confidence": round(o.confidence, 2),
+                "source_entities": list(o.source_entities),
+            }
+            for o in raw_openings
+        )
+
     response = {
         "filename": upload_name,
         "format": fmt,
@@ -124,6 +155,7 @@ def _assemble_response(upload_name, fmt, size, parsed, title_block, classificati
         "title_block": title_block,
         "walls": walls,
         "junctions": junctions,
+        "openings": list(openings_payload),
         "layers_found": parsed["layers_found"],
         "drawing_bounds": parsed["drawing_bounds"],
         "units_detected": parsed["units_detected"],

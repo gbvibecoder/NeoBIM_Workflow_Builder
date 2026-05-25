@@ -12,6 +12,8 @@ Coverage:
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from app.services.kos_panel_grid_mapper import (
@@ -22,6 +24,22 @@ from app.services.kos_panel_grid_mapper import (
     detect_openings,
 )
 from app.services.kos_panel_grid_mapper.opening_handler import layout_opening_frame
+
+
+# 5C-3 PR 4 (2026-05-25) flipped PARSER_OPENINGS_AVAILABLE to True so the
+# mapper's opening_handler consumes parser-provided ParserOpening data. The
+# tests in the "Interior END junction counting" + "Closed-loop" sections
+# below validate the LEGACY heuristic path (PARSER_OPENINGS_AVAILABLE = False)
+# that still ships as a safety fallback. We use a context manager fixture to
+# temporarily restore the False branch for those tests; the heuristic code
+# itself is unchanged and remains exercised under this monkey-patch.
+@pytest.fixture
+def _force_legacy_heuristic():
+    with patch(
+        "app.services.kos_panel_grid_mapper.opening_handler.PARSER_OPENINGS_AVAILABLE",
+        False,
+    ):
+        yield
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -73,7 +91,7 @@ def test_today_always_returns_empty_openings_list() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_no_interior_ends_not_inferable() -> None:
+def test_no_interior_ends_not_inferable(_force_legacy_heuristic) -> None:
     """Solid wall with no interior ENDs → openings_inferable=False."""
     seg = _draft("P_INT_8", polyline=((0, 0), (2101, 0)))
     end_at_start = _j((0, 0), "END")
@@ -87,7 +105,7 @@ def test_no_interior_ends_not_inferable() -> None:
     assert result.warnings == ()
 
 
-def test_one_interior_end_not_inferable() -> None:
+def test_one_interior_end_not_inferable(_force_legacy_heuristic) -> None:
     """1 interior END is ambiguous (could be a dead-end internal partition tip
     or one side of a small opening — need a pair to confirm)."""
     seg = _draft("P_EXT_1", polyline=((0, 0), (9370, 0)))
@@ -102,7 +120,7 @@ def test_one_interior_end_not_inferable() -> None:
     assert result.interior_end_count == 1
 
 
-def test_two_interior_ends_inferable_with_warning() -> None:
+def test_two_interior_ends_inferable_with_warning(_force_legacy_heuristic) -> None:
     """2 interior ENDs = one opening (left jamb + right jamb) → inferable=True."""
     seg = _draft("P_EXT_1", polyline=((0, 0), (9370, 0)))
     end_start = _j((0, 0), "END")
@@ -120,7 +138,7 @@ def test_two_interior_ends_inferable_with_warning() -> None:
     assert "P_EXT_1" in result.warnings[0]
 
 
-def test_four_interior_ends_two_openings_inferable() -> None:
+def test_four_interior_ends_two_openings_inferable(_force_legacy_heuristic) -> None:
     """4 interior ENDs = 2 openings."""
     seg = _draft("P_EXT_3", polyline=((0, 0), (9370, 0)))
     junctions = (
@@ -182,7 +200,7 @@ def test_end_near_polyline_endpoint_within_tolerance_not_counted() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_closed_loop_segment_all_ends_are_interior() -> None:
+def test_closed_loop_segment_all_ends_are_interior(_force_legacy_heuristic) -> None:
     """For closed-loop segments (perimeter), the polyline endpoints are part
     of the loop, not natural "ends". Treat all ENDs in the segment as interior."""
     # Vamshi P_EXT_3 with 2 openings — even though it's "closed_loop",

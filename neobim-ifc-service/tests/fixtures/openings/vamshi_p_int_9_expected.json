@@ -1,0 +1,24 @@
+{
+  "wall_id": "P_INT_9",
+  "wall_length_mm": 3632,
+  "expected_openings": [
+    {
+      "opening_type": "door",
+      "position_mm": 660,
+      "width_mm": 750,
+      "height_mm": 2100,
+      "sill_height_mm": 0
+    },
+    {
+      "opening_type": "door",
+      "position_mm": 2070,
+      "width_mm": 900,
+      "height_mm": 2100,
+      "sill_height_mm": 0
+    }
+  ],
+  "tolerance_position_mm": 100,
+  "tolerance_width_mm": 50,
+  "source": "Vamshi PDF sheet PF_VAM_A012",
+  "notes": "2 doors @ 750/900mm wide on a tight 3632mm wall; positions placeholder pending PDF measurement in PR 3."
+}

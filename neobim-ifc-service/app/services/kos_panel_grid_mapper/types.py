@@ -16,6 +16,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, Optional
 
+# PR-HOTFIX-2: re-export ParserOpening from the parser-side geometry module
+# so consumers of mapper.types can construct a fully populated ParserOutput
+# without a second import. This is a NEW EXPORT (not a new schema field on
+# any existing dataclass), so no test fixture needs updating.
+from app.services.kos_drawing_geometry import ParserOpening
+
 from .constants import (
     Application,
     BracingHeightClass,
@@ -108,6 +114,12 @@ class ParserOutput:
     phase: str
     duration_ms: float
     warnings: tuple[str, ...]
+    # PR-HOTFIX-2: parser-emitted openings (5C-3 PR 2/3). DEFAULTED to empty
+    # tuple so every existing ParserOutput constructor (production router,
+    # all 489 mapper tests) continues to work unchanged. When populated,
+    # the mapper's orchestrator routes each opening to its target segment
+    # via parent_wall_id ∈ segment.source_wall_ids.
+    openings: tuple[ParserOpening, ...] = ()
 
 
 # Caller-supplied project metadata. DESIGN §3.2.

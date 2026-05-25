@@ -92,18 +92,24 @@ def split_minimize_cuts(inp: SplitInput) -> SplitResult:
         pass
     elif residual <= SPLITTER_RESIDUAL_INFILL_THRESHOLD_MM:
         # 50 < residual ≤ 250: emit one narrow CTC infill at custom width.
+        # PR-HOTFIX-1: cursor must advance by the SAME int-rounded width as
+        # the panel itself, otherwise the next panel's position_mm and
+        # the previous panel's right edge can disagree by a sub-millimetre
+        # — surfacing as C-3 "overlapping vertical panels" on short
+        # segments where the float residual rounds to ±0.5mm.
+        infill_width = int(round(residual))
         vertical_panels.append(
             _build_panel(
                 label=label_counter.next_s(),
                 sku_type="CTC",
                 thickness_mm=inp.sku_thickness_mm,
-                width_mm=int(round(residual)),
+                width_mm=infill_width,
                 cut_length_mm=cut_len,
                 position_mm=cursor,
                 orientation="vertical",
             )
         )
-        cursor += residual
+        cursor += infill_width
     else:
         # > 250: round-up to one more standard AP, absorb the smaller new residual.
         vertical_panels.append(

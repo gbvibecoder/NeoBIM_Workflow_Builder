@@ -24,6 +24,10 @@ Determinism: pure function. Same inputs ⇒ same OpeningHandlerResult.
 
 from __future__ import annotations
 
+import math
+
+from app.services.kos_drawing_geometry import ParserOpening
+
 from .constants import (
     JUNCTION_TOLERANCE_MM,
     PARSER_OPENINGS_AVAILABLE,
@@ -32,6 +36,7 @@ from .types import (
     Opening,
     OpeningHandlerResult,
     ParserJunction,
+    ParserWall,
     WallSegmentDraft,
 )
 
@@ -43,40 +48,72 @@ _MIN_INTERIOR_ENDS_FOR_INFERABLE: int = 2
 def detect_openings(
     segment: WallSegmentDraft,
     junctions_in_segment: tuple[ParserJunction, ...],
+    parser_openings: tuple[ParserOpening, ...] = (),
+    walls_by_id: dict[str, "ParserWall"] | None = None,
 ) -> OpeningHandlerResult:
     """Detect openings (or inferability) for one wall segment.
 
     Args:
-      segment:                   The segment to scan (its plan_polyline
-                                 establishes the natural endpoints).
-      junctions_in_segment:      Junctions whose `point` lies on the
-                                 segment's wall-chain (the caller filters
-                                 these from the full ParserOutput.junctions).
+      segment:               The segment to scan (its plan_polyline
+                             establishes the natural endpoints).
+      junctions_in_segment:  Junctions whose `point` lies on the segment's
+                             wall-chain.
+      parser_openings:       PR-HOTFIX-2 — parser-emitted openings the
+                             orchestrator filtered for this segment (i.e.
+                             those whose ``parent_wall_id`` is in
+                             ``segment.source_wall_ids``). Defaulted to
+                             empty so legacy callers stay compatible.
+      walls_by_id:           PR-HOTFIX-2 — full parser-wall lookup used by
+                             the projection step (each parser wall's
+                             ``start`` is projected onto the segment axis to
+                             compute the wall's offset within the segment).
+                             Required when ``parser_openings`` is non-empty.
 
     Returns:
-      OpeningHandlerResult with the heuristic flag + diagnostic count +
-      warnings. Today `openings` is always empty.
+      OpeningHandlerResult with the openings list (populated when
+      ``PARSER_OPENINGS_AVAILABLE`` is True and openings were supplied) +
+      the heuristic inferable flag + diagnostic count + warnings.
     """
     warnings: list[str] = []
 
-    # ── Future path: actual opening extraction ────────────────────────
-    if PARSER_OPENINGS_AVAILABLE:    # pragma: no cover (False today; future-hook)
-        # When the parser slice 5C-3 lands, the orchestrator will pass an
-        # additional `openings_from_parser` parameter and this handler will
-        # build the full frame layout per DESIGN §6.8 (see layout_opening_frame
-        # below for the scaffolded implementation).
-        warnings.append(
-            "PARSER_OPENINGS_AVAILABLE = True but detect_openings() called "
-            "without opening data — caller should use the future overload"
-        )
+    # ── Parser-openings path (PR-HOTFIX-2 wiring active) ──────────────
+    if PARSER_OPENINGS_AVAILABLE:
+        # When the flag is on, the orchestrator routes through here even
+        # if the segment has zero openings (parser_openings = ()). Empty
+        # is a legitimate state (P_INT_8 has 0 openings); we return an
+        # empty list silently.
+        if parser_openings:
+            if walls_by_id is None:
+                warnings.append(
+                    f"segment {segment.id}: parser_openings supplied but "
+                    f"walls_by_id is None — cannot project to segment "
+                    f"coordinates. No openings emitted."
+                )
+                return OpeningHandlerResult(
+                    openings=(),
+                    openings_inferable=False,
+                    interior_end_count=0,
+                    warnings=tuple(warnings),
+                )
+            converted, conv_warnings = _project_parser_openings_to_segment(
+                parser_openings, segment, walls_by_id,
+            )
+            warnings.extend(conv_warnings)
+            return OpeningHandlerResult(
+                openings=converted,
+                openings_inferable=False,
+                interior_end_count=0,
+                warnings=tuple(warnings),
+            )
+        # No parser openings for this segment — return empty without warning.
         return OpeningHandlerResult(
             openings=(),
             openings_inferable=False,
             interior_end_count=0,
-            warnings=tuple(warnings),
+            warnings=(),
         )
 
-    # ── Today's path: heuristic detection only ────────────────────────
+    # ── Heuristic path: PARSER_OPENINGS_AVAILABLE = False ─────────────
     interior_ends = _count_interior_end_junctions(segment, junctions_in_segment)
 
     inferable = interior_ends >= _MIN_INTERIOR_ENDS_FOR_INFERABLE
@@ -96,6 +133,134 @@ def detect_openings(
         interior_end_count=interior_ends,
         warnings=tuple(warnings),
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PR-HOTFIX-2 — parser → mapper opening conversion
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _project_parser_openings_to_segment(
+    parser_openings: tuple[ParserOpening, ...],
+    segment: WallSegmentDraft,
+    walls_by_id: dict[str, ParserWall],
+) -> tuple[tuple[Opening, ...], list[str]]:
+    """Convert wall-relative ParserOpenings into segment-relative Openings.
+
+    Math: each parser opening lives on a single parser wall whose start +
+    end are in absolute (drawing) coordinates. The mapper's segment is
+    composed of multiple parser walls; its ``plan_polyline`` traces the
+    segment centerline in the same absolute coordinates. To map an
+    opening's wall-relative position onto the segment axis:
+
+      1. Compute the segment's start point S = polyline[0] and the
+         segment's unit direction D = (polyline[-1] - S) / |polyline[-1] - S|.
+      2. For each opening, look up its parent wall W. Project W.start
+         onto the segment axis: wall_offset = (W.start - S) · D.
+      3. Determine the parent wall's direction sign relative to D
+         (wux*Dx + wuy*Dy). If the wall is traced in the SAME direction
+         as the segment, the opening sits at
+         ``segment_position = wall_offset + opening.position_mm``.
+         If the wall is REVERSED (the segmenter chained it head-to-tail),
+         the opening is at
+         ``segment_position = wall_offset - opening.position_mm - opening.width_mm``
+         — i.e. the opening's left edge in segment coords lies that far
+         BEFORE the wall's start projection.
+
+    Returns ``(openings, warnings)`` with the openings sorted by
+    ``position_mm`` ascending (deterministic). Returns empty + warnings
+    if the segment polyline is degenerate.
+
+    Notes / limitations:
+      - Handles segment polylines with a SINGLE straight axis (one edge
+        from polyline[0] to polyline[-1]). For multi-edge L-shaped
+        polylines, the projection collapses onto the chord between first
+        and last vertex; minor offset error for openings on the bend.
+        90VR segments are predominantly straight; documented as a future
+        refinement.
+      - Openings whose projection lands outside [0, segment.length_mm]
+        emit a soft warning (clamped to nearest endpoint, still emitted).
+    """
+    warnings: list[str] = []
+
+    if not segment.plan_polyline or len(segment.plan_polyline) < 2:
+        warnings.append(
+            f"segment {segment.id}: polyline has < 2 points — cannot project "
+            f"openings; no openings emitted."
+        )
+        return (), warnings
+
+    seg_start = segment.plan_polyline[0]
+    seg_end = segment.plan_polyline[-1]
+    dx = seg_end[0] - seg_start[0]
+    dy = seg_end[1] - seg_start[1]
+    seg_len = math.hypot(dx, dy)
+    if seg_len == 0:
+        warnings.append(
+            f"segment {segment.id}: zero-length polyline chord — cannot project "
+            f"openings; no openings emitted."
+        )
+        return (), warnings
+    ux, uy = dx / seg_len, dy / seg_len
+
+    converted: list[Opening] = []
+    for po in parser_openings:
+        wall = walls_by_id.get(po.parent_wall_id)
+        if wall is None:
+            warnings.append(
+                f"opening {po.id}: parent_wall_id={po.parent_wall_id!r} not in "
+                f"walls_by_id — skipping (parser may have referenced a wall the "
+                f"segmenter dropped)."
+            )
+            continue
+
+        # Project wall.start onto segment axis.
+        wx = wall.start[0] - seg_start[0]
+        wy = wall.start[1] - seg_start[1]
+        wall_offset = wx * ux + wy * uy
+
+        # Determine wall direction relative to segment.
+        wdx = wall.end[0] - wall.start[0]
+        wdy = wall.end[1] - wall.start[1]
+        wall_len = math.hypot(wdx, wdy)
+        if wall_len == 0:
+            warnings.append(
+                f"opening {po.id}: parent wall {po.parent_wall_id} has zero length "
+                f"— skipping."
+            )
+            continue
+        wux, wuy = wdx / wall_len, wdy / wall_len
+        sign = wux * ux + wuy * uy  # > 0 same direction, < 0 reversed
+
+        if sign >= 0:
+            segment_position = wall_offset + po.position_mm
+        else:
+            segment_position = wall_offset - po.position_mm - po.width_mm
+
+        # Clamp + warn if outside [0, segment.length_mm].
+        if segment_position < -1.0:
+            warnings.append(
+                f"opening {po.id}: projected segment_position={segment_position:.1f} "
+                f"< 0; clamping to 0."
+            )
+            segment_position = 0.0
+        elif segment_position + po.width_mm > segment.length_mm + 1.0:
+            warnings.append(
+                f"opening {po.id}: projected end={segment_position + po.width_mm:.1f} "
+                f"> segment.length_mm={segment.length_mm:.1f}; opening extends past "
+                f"segment end."
+            )
+
+        converted.append(Opening(
+            position_mm=max(0.0, segment_position),
+            width_mm=po.width_mm,
+            height_mm=po.height_mm,
+            sill_height_mm=po.sill_height_mm,
+        ))
+
+    # Sort deterministically by along-segment position.
+    converted.sort(key=lambda o: o.position_mm)
+    return tuple(converted), warnings
 
 
 # ──────────────────────────────────────────────────────────────────────────────

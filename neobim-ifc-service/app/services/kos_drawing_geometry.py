@@ -9,12 +9,17 @@ names, so its behaviour is byte-identical (pure functions, identical literals).
 
 Contains: the canonical wall-dict builder (:func:`_seg_to_wall`), the
 non-exclusive thickness-enrichment pass (:func:`_enrich_thickness`) and its
-geometry helpers, and junction clustering (:func:`_detect_junctions`).
+geometry helpers, junction clustering (:func:`_detect_junctions`), and — as of
+Phase 5C-3 PR 1 — the :class:`ParserOpening` record + opening list utilities
+(:func:`opening_overlaps`, :func:`dedupe_openings_by_proximity`,
+:func:`sort_openings_canonical`) consumed by the multi-tier opening detector.
 """
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, replace
+from typing import Iterable, Literal
 
 # Walls shorter than this (in mm) are treated as noise (dimension ticks,
 # hatch fragments, leader stubs) and dropped.
@@ -224,3 +229,173 @@ def _detect_junctions(walls: list[dict], warnings: list[str]) -> list[dict]:
     except Exception as exc:  # noqa: BLE001 — best-effort feature
         warnings.append(f"junction detection failed ({type(exc).__name__}: {exc})")
         return []
+
+
+# ── openings (Phase 5C-3) ─────────────────────────────────────────────────────
+#
+# Phase 5C-3 introduces multi-tier opening (door/window) detection. The parser
+# emits openings into ``ParserOutput.openings``; the mapper's opening_handler
+# consumes them once ``PARSER_OPENINGS_AVAILABLE`` flips to True (mapper
+# constants.py, flipped in 5C-3 PR 4). This module owns the parser-side record
+# and the spatial-proximity dedupe / sort that the detector orchestrator needs.
+#
+# The opening_overlaps / DEDUPE_PROXIMITY_MM threshold is calibrated against the
+# Vamshi ground-truth fixture set (see tests/fixtures/openings/) — the smallest
+# door in Vamshi is 750mm wide, so two distinct openings on the same wall are
+# always > 200mm apart along the wall axis. 200mm is the smallest gap two
+# detectors should ever disagree on for the SAME opening (block insert centre
+# vs swing arc centre can drift by ~150mm). See §1.3 / §2.3 of the 5C-3 prompt.
+
+
+# Two detected openings whose along-wall positions differ by less than this many
+# millimetres AND that target the same parent_wall_id are treated as the same
+# opening (lower-tier detection deduplicated against the higher-tier hit).
+DEDUPE_PROXIMITY_MM: float = 200.0
+
+
+# Allowed values for ParserOpening.opening_type. Sill_height == 0 → door;
+# sill_height > 0 → window. The literal is kept narrow because the mapper's
+# Opening dataclass takes the same two semantic flavours (door vs window).
+OpeningType = Literal["door", "window"]
+
+
+@dataclass(frozen=True)
+class ParserOpening:
+    """A door or window detected in a wall.
+
+    Lives in ``ParserOutput.openings`` (declared in
+    ``kos_panel_grid_mapper/types.py`` as the matching ``Opening`` dataclass).
+    The mapper consumes this once 5C-3 PR 4 flips ``PARSER_OPENINGS_AVAILABLE``.
+
+    Field invariants (verified by orchestrator tests):
+      - id matches r"^o\\d+$" and is unique within a single parse
+      - opening_type is "door" or "window"
+      - parent_wall_id matches the id of a wall in the same ParserOutput
+      - position_mm ≥ 0; position_mm + width_mm ≤ parent wall length_mm
+      - width_mm > 0; height_mm > 0; sill_height_mm ≥ 0
+      - door → sill_height_mm == 0; window → sill_height_mm > 0
+      - detection_tier ∈ {1, 2, 3, 4, 5}
+      - confidence ∈ [0.0, 1.0]
+      - source_entities is a tuple (frozen for determinism)
+    """
+
+    id: str
+    opening_type: OpeningType
+    parent_wall_id: str
+    position_mm: float
+    width_mm: float
+    height_mm: float
+    sill_height_mm: float
+    detection_tier: int
+    detection_method: str
+    confidence: float
+    source_entities: tuple[str, ...]
+
+
+def opening_overlaps(
+    a: ParserOpening,
+    b: ParserOpening,
+    proximity_mm: float = DEDUPE_PROXIMITY_MM,
+) -> bool:
+    """True iff two openings should be considered the same physical detection.
+
+    Two openings overlap when:
+      1. They are on the SAME parent wall, AND
+      2. Their along-wall position-ranges either intersect OR their centres are
+         within ``proximity_mm`` of each other.
+
+    Rule 2's "OR" handles both detection-jitter (same opening detected with
+    slightly different position from two tiers) AND honest geometric overlap
+    (rare in real drawings, but possible when a swing arc and a block-insert
+    both register near the same jamb). Either condition is sufficient.
+    """
+    if a.parent_wall_id != b.parent_wall_id:
+        return False
+
+    a_start = a.position_mm
+    a_end = a.position_mm + a.width_mm
+    b_start = b.position_mm
+    b_end = b.position_mm + b.width_mm
+
+    if a_start < b_end and b_start < a_end:
+        return True
+
+    a_centre = a.position_mm + a.width_mm / 2.0
+    b_centre = b.position_mm + b.width_mm / 2.0
+    return abs(a_centre - b_centre) <= proximity_mm
+
+
+def dedupe_openings_by_proximity(
+    openings: Iterable[ParserOpening],
+    proximity_mm: float = DEDUPE_PROXIMITY_MM,
+) -> tuple[ParserOpening, ...]:
+    """Collapse overlapping detections, keeping the highest-confidence record.
+
+    Algorithm (O(n²) worst-case — fine; n ≤ ~50 openings per drawing in practice):
+      1. Sort input by (-confidence, parent_wall_id, position_mm) so the most
+         confident wins ties deterministically.
+      2. Greedy union: for each candidate, attach it to an existing kept
+         opening (if ``opening_overlaps`` returns True) by union-find logic.
+      3. Survivors are returned in canonical sort order.
+
+    Determinism: the sort key includes parent_wall_id + position_mm so two
+    openings with identical confidence ALWAYS resolve in the same direction.
+    """
+    candidates = list(openings)
+    if not candidates:
+        return ()
+
+    # Sort by (-confidence, parent_wall_id, position_mm) so the leading element
+    # of each spatial cluster is always the highest-confidence detection.
+    sorted_candidates = sorted(
+        candidates,
+        key=lambda o: (-o.confidence, o.parent_wall_id, o.position_mm),
+    )
+
+    kept: list[ParserOpening] = []
+    for c in sorted_candidates:
+        merged = False
+        for i, k in enumerate(kept):
+            if opening_overlaps(k, c, proximity_mm):
+                # Higher confidence already won (we iterate sorted by -conf);
+                # but record the source_entities + detection_method of the
+                # loser so we don't lose audit trail when tiers agree.
+                if c.confidence > k.confidence:
+                    kept[i] = replace(
+                        k,
+                        confidence=c.confidence,
+                        detection_tier=c.detection_tier,
+                        detection_method=c.detection_method,
+                        source_entities=tuple(
+                            sorted(set(k.source_entities) | set(c.source_entities))
+                        ),
+                    )
+                else:
+                    kept[i] = replace(
+                        k,
+                        source_entities=tuple(
+                            sorted(set(k.source_entities) | set(c.source_entities))
+                        ),
+                    )
+                merged = True
+                break
+        if not merged:
+            kept.append(c)
+
+    return sort_openings_canonical(kept)
+
+
+def sort_openings_canonical(
+    openings: Iterable[ParserOpening],
+) -> tuple[ParserOpening, ...]:
+    """Deterministic sort: by parent_wall_id, then position_mm, then id.
+
+    The id tie-breaker is theoretical (ids are unique by orchestrator
+    contract) but keeps the sort total and the output bit-stable across runs.
+    """
+    return tuple(
+        sorted(
+            openings,
+            key=lambda o: (o.parent_wall_id, o.position_mm, o.id),
+        )
+    )
