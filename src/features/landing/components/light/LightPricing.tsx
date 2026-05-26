@@ -205,15 +205,17 @@ function PricingCard({
           marginBottom: 16,
         }}
       >
-        <span
-          style={{
-            fontSize: 14,
-            color: "var(--light-soft)",
-            fontWeight: 500,
-          }}
-        >
-          {"\u20B9"}
-        </span>
+        {plan.tier !== "Team" && (
+          <span
+            style={{
+              fontSize: 14,
+              color: "var(--light-soft)",
+              fontWeight: 500,
+            }}
+          >
+            {"\u20B9"}
+          </span>
+        )}
         <span
           style={{
             fontSize: 36,
@@ -226,15 +228,17 @@ function PricingCard({
         >
           {price}
         </span>
-        <span
-          style={{
-            fontSize: 13,
-            color: "var(--light-soft)",
-            marginLeft: 4,
-          }}
-        >
-          / {t("billing.perMonthShort")}
-        </span>
+        {plan.tier !== "Team" && (
+          <span
+            style={{
+              fontSize: 13,
+              color: "var(--light-soft)",
+              marginLeft: 4,
+            }}
+          >
+            / {t("billing.perMonthShort")}
+          </span>
+        )}
       </div>
 
       {/* Features */}
@@ -295,7 +299,7 @@ function PricingCard({
 
       {/* CTA */}
       <Link
-        href={`/register?plan=${plan.tier.toLowerCase()}`}
+        href={plan.tier === "Team" ? "/contact?subject=Team+Plan+Enquiry" : `/register?plan=${plan.tier.toLowerCase()}`}
         onClick={() =>
           trackCTAClick(t(plan.ctaKey), `pricing_${plan.tier.toLowerCase()}`)
         }

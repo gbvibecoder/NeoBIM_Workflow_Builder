@@ -986,6 +986,7 @@ export default function TemplatesPage() {
               tier={upgradeTarget.tier}
               label={upgradeTarget.label}
               price={upgradeTarget.price}
+              isCustom={upgradeTarget.isCustom}
             />
           ) : (
             <span className={isDarkIllus ? s.cardNumLight : s.cardNum}>{String(idx + 1).padStart(2, "0")}</span>

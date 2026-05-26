@@ -4,7 +4,9 @@ import type { Prisma } from "@prisma/client";
 import { isAdminRequest, unauthorizedResponse } from "@/lib/admin-server";
 
 const PAID_ROLES: Prisma.UserWhereInput["role"] = { in: ["MINI", "STARTER", "PRO", "TEAM_ADMIN"] };
-const PLAN_PRICES: Record<string, number> = { MINI: 99, STARTER: 799, PRO: 1999, TEAM_ADMIN: 4999 };
+// TEAM_ADMIN is custom-priced (sales-negotiated) — set to 0 to avoid
+// inflating revenue summaries. TODO: read actual subscription amount per user.
+const PLAN_PRICES: Record<string, number> = { MINI: 99, STARTER: 799, PRO: 1999, TEAM_ADMIN: 0 };
 
 function parseDate(raw: string | null): Date | null {
   if (!raw) return null;

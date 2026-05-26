@@ -70,7 +70,7 @@ export function AecElevationFooter() {
           {/* Spire + light bulb */}
           <line x1="865" y1="12" x2="865" y2="30" stroke="rgba(107,69,102,0.8)" strokeWidth="1.5" />
           <circle cx="865" cy="10" r="2.5" fill="rgba(229,168,120,0.9)" stroke="rgba(107,69,102,0.5)" strokeWidth="0.5" />
-          <text x="865" y="192" textAnchor="middle" fontSize="10" fontFamily="monospace" fill="rgba(14,18,24,0.45)" letterSpacing="0.18em" fontWeight="500">TEAM · ₹4,999</text>
+          <text x="865" y="192" textAnchor="middle" fontSize="10" fontFamily="monospace" fill="rgba(14,18,24,0.45)" letterSpacing="0.18em" fontWeight="500">TEAM · Custom</text>
         </g>
 
         {/* Tree right */}

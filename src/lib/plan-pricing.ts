@@ -5,13 +5,20 @@
  * No Node-only imports so this file is safe in client bundles.
  */
 
+/**
+ * TEAM/TEAM_ADMIN INR values are set to 0 because Team pricing is now
+ * sales-negotiated (custom per organization). Ad-platform Purchase events
+ * for Team will report value=0 — acceptable since custom deals are tracked
+ * offline. When actual closed amounts are known, track them server-side
+ * via a manual CAPI fire with the real amount.
+ */
 const PLAN_VALUE_INR: Record<string, number> = {
   FREE: 0,
   MINI: 99,
   STARTER: 799,
   PRO: 1999,
-  TEAM: 4999,
-  TEAM_ADMIN: 4999,
+  TEAM: 0,
+  TEAM_ADMIN: 0,
 };
 
 /**
@@ -25,8 +32,8 @@ const PLAN_VALUE_INR: Record<string, number> = {
  *   MINI (₹99)   → €1
  *   STARTER (₹799)  → €8
  *   PRO (₹1999)  → €20
- *   TEAM (₹4999) → €45
- *   TEAM_ADMIN   → €45  (legacy alias for TEAM)
+ *   TEAM         → €0  (custom pricing — tracked offline)
+ *   TEAM_ADMIN   → €0  (custom pricing — tracked offline)
  *   FREE         → €0
  */
 const PLAN_VALUE_EUR: Record<string, number> = {
@@ -34,8 +41,8 @@ const PLAN_VALUE_EUR: Record<string, number> = {
   MINI: 1,
   STARTER: 8,
   PRO: 20,
-  TEAM: 45,
-  TEAM_ADMIN: 45,
+  TEAM: 0,
+  TEAM_ADMIN: 0,
 };
 
 /** Monthly subscription price in INR. Kept for non-Meta usage and tests. */

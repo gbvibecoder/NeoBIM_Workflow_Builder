@@ -238,15 +238,14 @@ describe("paid monthly cap (1:1 spec — workflows = executions)", () => {
     }
   });
 
-  it("PRO at cap (45) → 'Upgrade to Team ₹4,999' CTA (PRO is no longer top tier)", async () => {
+  it("PRO at cap (45) → 'Contact Sales for Team' CTA (TEAM is sales-only)", async () => {
     prismaMocks.userFindUnique.mockResolvedValue({ role: "PRO", legacyLimits: null });
     prismaMocks.executionCount.mockResolvedValue(45);
     const result = await checkExecutionEligibility({ ...baseArgs, userRole: "PRO" });
     expect(result.canExecute).toBe(false);
     if (!result.canExecute) {
-      expect(result.blocks[0].action).toContain("Upgrade to Team");
-      expect(result.blocks[0].action).toContain("₹4,999");
-      expect(result.blocks[0].actionUrl).toBe("/dashboard/billing?plan=TEAM");
+      expect(result.blocks[0].action).toContain("Contact Sales");
+      expect(result.blocks[0].actionUrl).toContain("/contact");
     }
   });
 
@@ -666,7 +665,7 @@ describe("per-plan parameterized matrix (1:1 spec)", () => {
     { role: "FREE",    cap: 1,   actionContains: "Upgrade to Mini",    actionUrl: "/dashboard/billing?plan=MINI" },
     { role: "MINI",    cap: 3,   actionContains: "Upgrade to Starter", actionUrl: "/dashboard/billing?plan=STARTER" },
     { role: "STARTER", cap: 15,  actionContains: "Upgrade to Pro",     actionUrl: "/dashboard/billing?plan=PRO" },
-    { role: "PRO",     cap: 45,  actionContains: "Upgrade to Team",    actionUrl: "/dashboard/billing?plan=TEAM" },
+    { role: "PRO",     cap: 45,  actionContains: "Contact Sales",      actionUrl: "/contact?subject=Team+Plan+Enquiry" },
     { role: "TEAM",    cap: 300, actionContains: "Contact support",    actionUrl: "mailto:support@buildflow.app" },
   ];
 

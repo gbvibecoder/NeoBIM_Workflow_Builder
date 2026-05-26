@@ -124,6 +124,11 @@ export const STRIPE_PLANS = {
     name: 'Team',
     price: 4999,
     currency: '₹',
+    /** TEAM pricing is negotiated by sales — not self-serve. The numeric
+     *  `price` is kept as an internal fallback so `.price` readers never
+     *  see NaN/undefined, but every UI surface must check `isCustom` and
+     *  show "Contact Sales" instead of a formatted number. */
+    isCustom: true as const,
     priceId: process.env.STRIPE_TEAM_PRICE_ID as string | undefined,
     features: [
       'Everything in Pro',
@@ -131,7 +136,7 @@ export const STRIPE_PLANS = {
       '20 video walkthroughs',
       '30 AI 3D models',
       '60 concept renders',
-      '5 team members',
+      'Custom team size',
       'Team analytics',
       'Dedicated support',
     ],

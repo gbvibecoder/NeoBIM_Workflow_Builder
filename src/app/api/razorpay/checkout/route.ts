@@ -34,7 +34,23 @@ export async function POST(req: Request) {
 
     // Normalize plan name
     const normalizedPlan = plan === 'TEAM' ? 'TEAM_ADMIN' : plan;
-    if (!normalizedPlan || !['MINI', 'STARTER', 'PRO', 'TEAM_ADMIN'].includes(normalizedPlan)) {
+
+    // TEAM is sales-only — block self-serve checkout creation.
+    // Existing TEAM_ADMIN subscribers renew via webhooks (untouched).
+    if (normalizedPlan === 'TEAM_ADMIN') {
+      return NextResponse.json(
+        formatErrorResponse({
+          title: 'Team plan — contact sales',
+          message: 'Team pricing is customized per organization. Please contact our sales team to get started.',
+          code: 'BILL_001',
+          action: 'Contact Sales',
+          actionUrl: '/contact',
+        }),
+        { status: 400 },
+      );
+    }
+
+    if (!normalizedPlan || !['MINI', 'STARTER', 'PRO'].includes(normalizedPlan)) {
       return NextResponse.json(
         formatErrorResponse({ title: 'Invalid plan', message: 'Please select a valid plan.', code: 'VAL_001' }),
         { status: 400 },
