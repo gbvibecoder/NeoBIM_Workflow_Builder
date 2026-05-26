@@ -241,6 +241,11 @@ app.include_router(v3_generator.router, prefix="/api/v3/generator")
 app.include_router(v3_previews.router, prefix="/api/v3/generator")
 # KOS drawing parser — router carries its own /kos prefix, no app prefix.
 app.include_router(kos_drawing_parser.router)
+# KOS panel-grid mapper — router carries its own /kos prefix.
+# Source: HOTFIX-3 — pre-existing registration gap surfaced by PR 6 BOQ slice
+# (import existed at L232 but include_router was never called, leaving
+# POST /kos/generate-panel-layout silently unreachable).
+app.include_router(kos_panel_mapper.router)
 # Phase ε.5 — mount the verifier router (TS hard-verifier was hitting
 # /api/v3/verifier/check-build → 404 in production for the entire ε
 # phase). build_verifier.check_build had the logic since β.3+4 but no
@@ -248,6 +253,13 @@ app.include_router(kos_drawing_parser.router)
 # (ε.3) and re-activates the parts_decomposition sub-signal of the
 # composite quality metric (δ.2).
 app.include_router(v3_verifier.router, prefix="/api/v3/verifier")
+
+# KOS BOQ Generator (Phase 5E-1 PR 6) — router carries its own /boq prefix.
+from app.routers import kos_boq_router  # noqa: E402
+from app.routers.kos_boq_router import register_boq_exception_handlers  # noqa: E402
+
+app.include_router(kos_boq_router.router)
+register_boq_exception_handlers(app)
 
 
 @app.get("/")

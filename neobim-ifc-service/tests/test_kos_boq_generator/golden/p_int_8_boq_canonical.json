@@ -1,0 +1,392 @@
+{
+  "boq_id": "fd9d8a26-97e4-50e2-a623-47327379d185",
+  "generated_at": "2026-05-25T00:00:00Z",
+  "schema_version": "0.1.0",
+  "tier_1_summary": {
+    "project_name": "VAMSHI RESIDENCE",
+    "quote_number": "Q-P_INT_8_TEST-001-20260525",
+    "quote_date": "2026-05-25",
+    "quote_validity_until": "2026-06-24",
+    "total_standard_panels": 5,
+    "total_accessory_pieces": 4,
+    "total_custom_quote_items": 0,
+    "total_curve_segments": 0,
+    "total_openings_in_walls": 0,
+    "total_orphan_openings": 0,
+    "total_weight_kg": 104.92397234794471,
+    "total_weight_kg_skin": 62.95438340876682,
+    "total_weight_kg_rib": 41.96958893917789,
+    "standard_panels_subtotal_inr": 10891.193657387317,
+    "accessories_subtotal_inr": 7409.499193998389,
+    "custom_quotes_pending_count": 0,
+    "custom_quotes_estimated_weight_kg": 0.0,
+    "discount_inr": 0.0,
+    "subtotal_after_discount_inr": 18300.692851385706,
+    "tax_inr": 3294.124713249427,
+    "grand_total_inr": 21594.817564635134,
+    "grand_total_inr_formatted": "₹21,594.82",
+    "has_unpriced_items": false
+  },
+  "tier_2_categories": {
+    "standard_panels": {
+      "count": 5,
+      "weight_kg": 62.44284363568728,
+      "subtotal_inr": 10891.193657387317
+    },
+    "accessories": {
+      "count": 4,
+      "weight_kg": 42.48112871225743,
+      "subtotal_inr": 7409.499193998389
+    },
+    "custom_quotes": {
+      "count": 0,
+      "weight_kg_estimated": 0.0,
+      "subtotal_inr": "TBD",
+      "by_reason": []
+    }
+  },
+  "tier_3_sku_types": [
+    {
+      "sku_prefix": "AP",
+      "total_count": 5,
+      "total_area_sqft": 48.40530514394363,
+      "total_weight_kg": 62.44284363568728,
+      "total_price_inr": 10891.193657387317,
+      "notes": "vertical panel (standard stretcher)"
+    },
+    {
+      "sku_prefix": "BT",
+      "total_count": 1,
+      "total_area_sqft": 6.7844927356521385,
+      "total_weight_kg": 8.751995628991258,
+      "total_price_inr": 1526.5108655217311,
+      "notes": "bottom track (horizontal)"
+    },
+    {
+      "sku_prefix": "TC",
+      "total_count": 1,
+      "total_area_sqft": 6.7844927356521385,
+      "total_weight_kg": 8.751995628991258,
+      "total_price_inr": 1526.5108655217311,
+      "notes": "top cap (horizontal)"
+    },
+    {
+      "sku_prefix": "CTC",
+      "total_count": 1,
+      "total_area_sqft": 9.681061028788726,
+      "total_weight_kg": 12.488568727137457,
+      "total_price_inr": 2178.2387314774633,
+      "notes": "connector / corner / terminator"
+    },
+    {
+      "sku_prefix": "ECM",
+      "total_count": 1,
+      "total_area_sqft": 9.681061028788726,
+      "total_weight_kg": 12.488568727137457,
+      "total_price_inr": 2178.2387314774633,
+      "notes": "end cap male"
+    }
+  ],
+  "tier_4_sku_details": [
+    {
+      "sku_code": "AP110-2998",
+      "sku_prefix": "AP",
+      "thickness_mm": 110,
+      "description": "AP110 vertical panel (standard stretcher), 2998mm cut",
+      "quantity": 5,
+      "unit_area_sqft": 9.681061028788726,
+      "unit_weight_kg": 12.488568727137457,
+      "unit_price_inr": 2178.2387314774633,
+      "line_total_area_sqft": 48.40530514394363,
+      "line_total_weight_kg": 62.44284363568728,
+      "line_total_price_inr": 10891.193657387317
+    },
+    {
+      "sku_code": "BT110-2101",
+      "sku_prefix": "BT",
+      "thickness_mm": 110,
+      "description": "BT110 bottom track (horizontal), 2101mm cut",
+      "quantity": 1,
+      "unit_area_sqft": 6.7844927356521385,
+      "unit_weight_kg": 8.751995628991258,
+      "unit_price_inr": 1526.5108655217311,
+      "line_total_area_sqft": 6.7844927356521385,
+      "line_total_weight_kg": 8.751995628991258,
+      "line_total_price_inr": 1526.5108655217311
+    },
+    {
+      "sku_code": "CTC110-2998",
+      "sku_prefix": "CTC",
+      "thickness_mm": 110,
+      "description": "CTC110 connector / corner / terminator, 2998mm cut",
+      "quantity": 1,
+      "unit_area_sqft": 9.681061028788726,
+      "unit_weight_kg": 12.488568727137457,
+      "unit_price_inr": 2178.2387314774633,
+      "line_total_area_sqft": 9.681061028788726,
+      "line_total_weight_kg": 12.488568727137457,
+      "line_total_price_inr": 2178.2387314774633
+    },
+    {
+      "sku_code": "ECM110-2998",
+      "sku_prefix": "ECM",
+      "thickness_mm": 110,
+      "description": "ECM110 end cap male, 2998mm cut",
+      "quantity": 1,
+      "unit_area_sqft": 9.681061028788726,
+      "unit_weight_kg": 12.488568727137457,
+      "unit_price_inr": 2178.2387314774633,
+      "line_total_area_sqft": 9.681061028788726,
+      "line_total_weight_kg": 12.488568727137457,
+      "line_total_price_inr": 2178.2387314774633
+    },
+    {
+      "sku_code": "TC110-2101",
+      "sku_prefix": "TC",
+      "thickness_mm": 110,
+      "description": "TC110 top cap (horizontal), 2101mm cut",
+      "quantity": 1,
+      "unit_area_sqft": 6.7844927356521385,
+      "unit_weight_kg": 8.751995628991258,
+      "unit_price_inr": 1526.5108655217311,
+      "line_total_area_sqft": 6.7844927356521385,
+      "line_total_weight_kg": 8.751995628991258,
+      "line_total_price_inr": 1526.5108655217311
+    }
+  ],
+  "tier_5_wall_segments": [
+    {
+      "wall_id": "P_INT_8",
+      "system": "K4-110",
+      "application": "internal",
+      "length_mm": 2101.0,
+      "height_mm": 3000,
+      "is_custom_order": false,
+      "is_curved": false,
+      "curve_radius_mm": null,
+      "area_sqft": 67.84492735652138,
+      "panel_count": 9,
+      "openings": [],
+      "sku_breakdown": [
+        {
+          "sku_code": "AP110-2998",
+          "sku_prefix": "AP",
+          "thickness_mm": 110,
+          "description": "AP110 vertical panel (standard stretcher), 2998mm cut",
+          "quantity": 5,
+          "unit_area_sqft": 9.681061028788726,
+          "unit_weight_kg": 12.488568727137457,
+          "unit_price_inr": 2178.2387314774633,
+          "line_total_area_sqft": 48.40530514394363,
+          "line_total_weight_kg": 62.44284363568728,
+          "line_total_price_inr": 10891.193657387317
+        },
+        {
+          "sku_code": "BT110-2101",
+          "sku_prefix": "BT",
+          "thickness_mm": 110,
+          "description": "BT110 bottom track (horizontal), 2101mm cut",
+          "quantity": 1,
+          "unit_area_sqft": 6.7844927356521385,
+          "unit_weight_kg": 8.751995628991258,
+          "unit_price_inr": 1526.5108655217311,
+          "line_total_area_sqft": 6.7844927356521385,
+          "line_total_weight_kg": 8.751995628991258,
+          "line_total_price_inr": 1526.5108655217311
+        },
+        {
+          "sku_code": "CTC110-2998",
+          "sku_prefix": "CTC",
+          "thickness_mm": 110,
+          "description": "CTC110 connector / corner / terminator, 2998mm cut",
+          "quantity": 1,
+          "unit_area_sqft": 9.681061028788726,
+          "unit_weight_kg": 12.488568727137457,
+          "unit_price_inr": 2178.2387314774633,
+          "line_total_area_sqft": 9.681061028788726,
+          "line_total_weight_kg": 12.488568727137457,
+          "line_total_price_inr": 2178.2387314774633
+        },
+        {
+          "sku_code": "ECM110-2998",
+          "sku_prefix": "ECM",
+          "thickness_mm": 110,
+          "description": "ECM110 end cap male, 2998mm cut",
+          "quantity": 1,
+          "unit_area_sqft": 9.681061028788726,
+          "unit_weight_kg": 12.488568727137457,
+          "unit_price_inr": 2178.2387314774633,
+          "line_total_area_sqft": 9.681061028788726,
+          "line_total_weight_kg": 12.488568727137457,
+          "line_total_price_inr": 2178.2387314774633
+        },
+        {
+          "sku_code": "TC110-2101",
+          "sku_prefix": "TC",
+          "thickness_mm": 110,
+          "description": "TC110 top cap (horizontal), 2101mm cut",
+          "quantity": 1,
+          "unit_area_sqft": 6.7844927356521385,
+          "unit_weight_kg": 8.751995628991258,
+          "unit_price_inr": 1526.5108655217311,
+          "line_total_area_sqft": 6.7844927356521385,
+          "line_total_weight_kg": 8.751995628991258,
+          "line_total_price_inr": 1526.5108655217311
+        }
+      ],
+      "segment_weight_kg": 104.92397234794471,
+      "segment_price_inr": 18300.69285138571,
+      "notes": ""
+    }
+  ],
+  "tier_6_panel_pieces": [
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "HB1",
+      "sku_code": "BT110-2101",
+      "position_mm": 0.0,
+      "cut_length_mm": 2101,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 6.7844927356521385,
+      "weight_kg": 8.751995628991258,
+      "price_inr": 1526.5108655217311
+    },
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "HB2",
+      "sku_code": "TC110-2101",
+      "position_mm": 0.0,
+      "cut_length_mm": 2101,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 6.7844927356521385,
+      "weight_kg": 8.751995628991258,
+      "price_inr": 1526.5108655217311
+    },
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "S1",
+      "sku_code": "ECM110-2998",
+      "position_mm": 0.0,
+      "cut_length_mm": 2998,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 9.681061028788726,
+      "weight_kg": 12.488568727137457,
+      "price_inr": 2178.2387314774633
+    },
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "S2",
+      "sku_code": "AP110-2998",
+      "position_mm": 300.0,
+      "cut_length_mm": 2998,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 9.681061028788726,
+      "weight_kg": 12.488568727137457,
+      "price_inr": 2178.2387314774633
+    },
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "S3",
+      "sku_code": "AP110-2998",
+      "position_mm": 600.0,
+      "cut_length_mm": 2998,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 9.681061028788726,
+      "weight_kg": 12.488568727137457,
+      "price_inr": 2178.2387314774633
+    },
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "S4",
+      "sku_code": "AP110-2998",
+      "position_mm": 900.0,
+      "cut_length_mm": 2998,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 9.681061028788726,
+      "weight_kg": 12.488568727137457,
+      "price_inr": 2178.2387314774633
+    },
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "S5",
+      "sku_code": "AP110-2998",
+      "position_mm": 1200.0,
+      "cut_length_mm": 2998,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 9.681061028788726,
+      "weight_kg": 12.488568727137457,
+      "price_inr": 2178.2387314774633
+    },
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "S6",
+      "sku_code": "AP110-2998",
+      "position_mm": 1500.0,
+      "cut_length_mm": 2998,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 9.681061028788726,
+      "weight_kg": 12.488568727137457,
+      "price_inr": 2178.2387314774633
+    },
+    {
+      "wall_id": "P_INT_8",
+      "panel_label": "V1",
+      "sku_code": "CTC110-2998",
+      "position_mm": 1800.0,
+      "cut_length_mm": 2998,
+      "width_mm": 300,
+      "is_cut_member": false,
+      "area_sqft": 9.681061028788726,
+      "weight_kg": 12.488568727137457,
+      "price_inr": 2178.2387314774633
+    }
+  ],
+  "custom_quote_items": [],
+  "operator_review_items": [],
+  "commercial_terms": {
+    "delivery_terms": "Ex-works Kalzen factory",
+    "payment_terms": "50% advance, 50% before dispatch",
+    "quote_validity_until": "2026-06-24",
+    "notes": ""
+  },
+  "audit_trail": {
+    "mapper_output_hash": "2aba9af930cd77d2467fe4b14576f80522cf4f13c9e69623145b85e39b725588",
+    "boq_calculation_version": "v1.0",
+    "karthik_pricing_version": "v1.0: ₹225/sft flat (2026-05-23)",
+    "custom_quote_review_required": false,
+    "operator_review_required": false,
+    "pipeline_versions": [
+      [
+        "boq",
+        "v1.0"
+      ],
+      [
+        "mapper",
+        "v1.0"
+      ],
+      [
+        "mapper_hotfix_1",
+        "splitter-short-segment-hardening"
+      ],
+      [
+        "mapper_hotfix_2",
+        "opening-consumer-wiring"
+      ],
+      [
+        "parser",
+        "v1.0"
+      ]
+    ]
+  },
+  "warnings": [],
+  "assumptions_made": [],
+  "pending_karthik": []
+}
