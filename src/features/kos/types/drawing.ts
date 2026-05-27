@@ -9,8 +9,46 @@
  * Phase 1 is DXF-only. `DrawingFormat` widens to include `"pdf"` in 5C-2.
  */
 
-/** Upload format. PDF parsing lands in 5C-2; DWG is converted locally first. */
-export type DrawingFormat = "dxf";
+/**
+ * Upload format the sidecar's `/kos/parse-drawing` accepts on the wire.
+ *
+ * Originally `"dxf"`-only (5C-1, Phase 1). 5I PR 2a widens to include
+ * `"pdf"` because 5C-2 shipped on the Python side — see
+ * `temp_folder/pdf-probe/REPORT.md` which captured 200-OK responses with
+ * `format: "pdf"` against real customer setout plans.
+ *
+ * DWG is still converted locally first (no DWG support upstream).
+ */
+export type DrawingFormat = "dxf" | "pdf";
+
+/**
+ * 5I PR 1 — superset of DrawingFormat for the customer-side upload
+ * pipeline. DrawingFormat (above) is the sidecar's wire contract
+ * (DXF-only in Phase 1); DRAWING_SOURCE_FORMATS is the set of file
+ * shapes a customer can attach to a chat (DXF native, DWG converted,
+ * PDF parsed in PR 2 via Vision, PNG/JPG handled as raster references).
+ *
+ * The two types intentionally diverge in PR 1 and reconcile in PR 2
+ * when the bot's `process_drawing` tool routes each source format to
+ * the right parser branch.
+ */
+export const DRAWING_SOURCE_FORMATS = [
+  "dxf",
+  "dwg",
+  "pdf",
+  "png",
+  "jpg",
+  "jpeg",
+] as const;
+export type DrawingSourceFormat = (typeof DRAWING_SOURCE_FORMATS)[number];
+
+/** Type guard — narrow unknown user input to a valid DrawingSourceFormat. */
+export function isDrawingSourceFormat(x: unknown): x is DrawingSourceFormat {
+  return (
+    typeof x === "string" &&
+    (DRAWING_SOURCE_FORMATS as readonly string[]).includes(x)
+  );
+}
 
 /** Drawing classification produced by the heuristic classifier. */
 export type DrawingType =
@@ -106,6 +144,13 @@ export interface DrawingParseResult {
   title_block: TitleBlockDto;
   walls: WallDto[];
   junctions: JunctionDto[];
+  /**
+   * Openings (doors, windows) detected by the PDF parser (5C-2+).
+   * Always present in the response shape; the DXF parser (5C-1) emits
+   * an empty array. Sub-shape is intentionally `unknown` for now —
+   * see `temp_folder/pdf-probe/REPORT.md` for example payloads.
+   */
+  openings: unknown[];
   layers_found: string[];
   drawing_bounds: DrawingBounds;
   units_detected: string;

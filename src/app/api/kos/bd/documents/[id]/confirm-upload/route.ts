@@ -61,8 +61,8 @@ export async function POST(
       );
     }
 
-    const exists = await headKosObject(tenant, doc.s3Key);
-    if (!exists) {
+    const head = await headKosObject(tenant, doc.s3Key);
+    if (!head.exists) {
       throw new KosError(
         "KOS_DOC_005",
         `S3 object missing for document ${id} (key=${doc.s3Key}). Re-upload via /upload-url.`,
