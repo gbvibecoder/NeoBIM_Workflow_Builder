@@ -83,4 +83,12 @@ export interface KosCustomerView {
   displayName: string | null;
   isAnonymous: boolean;
   createdAt?: string;
+  /**
+   * 5I PR 4b1 — locator pointer to the customer's most recently active
+   * conversation. Used by ChatSurface (PR 4b2) on mount so reload
+   * hydrates the right conversation. Null until the customer has
+   * sent at least one successful turn (orchestrator updates it
+   * best-effort right after persistCustomerMessage succeeds).
+   */
+  currentConversationId?: string | null;
 }

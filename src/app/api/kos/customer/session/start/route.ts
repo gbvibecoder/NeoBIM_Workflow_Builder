@@ -106,6 +106,7 @@ function serializeCustomer(c: {
   name: string | null;
   isAnonymous: boolean | null;
   createdAt: Date;
+  currentConversationId?: string | null;
 }) {
   return {
     id: c.id,
@@ -113,5 +114,9 @@ function serializeCustomer(c: {
     displayName: c.displayName ?? c.name ?? null,
     isAnonymous: c.isAnonymous ?? true,
     createdAt: c.createdAt.toISOString(),
+    // 5I PR 4b1 — locator pointer so the chat UI knows which
+    // conversation to hydrate on mount. Null until the customer
+    // sends their first message (orchestrator updates it then).
+    currentConversationId: c.currentConversationId ?? null,
   };
 }

@@ -1253,9 +1253,9 @@ model BriefToIfcV3Run {
   // (matches iterationHistory[i].iteration). Authoritative for which
   // ifcUrl/entityCount/finalValidation got written into the COMPLETED
   // row's user-facing fields.
-  currentIteration  Int                   @default(0)
-  iterationHistory  Json                  @default("[]")
-  bestIteration     Int?
+  currentIteration Int  @default(0)
+  iterationHistory Json @default("[]")
+  bestIteration    Int?
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
@@ -1405,12 +1405,12 @@ model Tenant {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  customers     KosCustomer[]
-  documents     KosDocument[]
-  conversations KosConversation[]
-  bdUsers       KosBdUser[]
+  customers        KosCustomer[]
+  documents        KosDocument[]
+  conversations    KosConversation[]
+  bdUsers          KosBdUser[]
   // Week 5A — BIM panel/accessory family library (Dincel/Kalzen via APS).
-  bimFamilies   KosBimFamily[]
+  bimFamilies      KosBimFamily[]
   // 5I PR 1 — customer-uploaded drawings (DXF/DWG/PDF/PNG/JPG).
   customerDrawings KosCustomerDrawing[]
 
@@ -1420,16 +1420,16 @@ model Tenant {
 }
 
 model KosCustomer {
-  id               String     @id @default(cuid())
-  tenantId         String
+  id                    String     @id @default(cuid())
+  tenantId              String
   // E.164 (e.g. "+919876543210"). The canonical identity across channels.
-  phone            String
-  name             String?
-  email            String?
-  firstSeenChannel KosChannel
+  phone                 String
+  name                  String?
+  email                 String?
+  firstSeenChannel      KosChannel
   // Mirrored CRM ID; unique so we can resolve back from a Frappe webhook
   // without scanning. Null until the first sync writes it.
-  frappeLeadId     String?    @unique
+  frappeLeadId          String?    @unique
   // Stage B (Phase 3A) — bot-facing identity.
   //   • displayName — friendly name surfaced in the bot's system prompt.
   //     Distinct from `name` which holds the canonical contact-card name.
@@ -1438,11 +1438,18 @@ model KosCustomer {
   //   • isAnonymous — true until the customer completes phone-OTP
   //     verification (Phase 4); defaults to true so a fresh
   //     CUSTOMER_SESSION_START row carries the right flag.
-  displayName      String?
-  lastSeenAt       DateTime?  @default(now())
-  isAnonymous      Boolean    @default(true)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  displayName           String?
+  lastSeenAt            DateTime?  @default(now())
+  isAnonymous           Boolean    @default(true)
+  // 5I PR 4b1 — locator pointer used by the chat UI on reload to
+  // know which conversation to hydrate. Updated best-effort after
+  // every customer message is persisted (see bot-orchestrator).
+  // Soft reference: no FK constraint; a stale pointer to a deleted
+  // conversation is handled by the read side returning empty
+  // history. Null for customers who have never sent a message.
+  currentConversationId String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
 
   tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   conversations KosConversation[]
@@ -1501,9 +1508,9 @@ model KosDocument {
 }
 
 model KosDocumentChunk {
-  id         String   @id @default(cuid())
+  id         String                       @id @default(cuid())
   documentId String
-  content    String   @db.Text
+  content    String                       @db.Text
   pageNum    Int?
   chunkIndex Int
   // pgvector type. Prisma emits BYTEA by default; the kos_pgvector
@@ -1516,7 +1523,7 @@ model KosDocumentChunk {
   // recreated after the type flip.
   embedding  Unsupported("halfvec(3072)")
   metadata   Json?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime                     @default(now())
 
   document KosDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -1545,9 +1552,9 @@ model KosConversation {
   escalationReason   String?
   metadata           Json?
 
-  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer KosCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  bdUser   KosBdUser?   @relation(fields: [assignedBdUserId], references: [id], onDelete: SetNull)
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer KosCustomer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bdUser   KosBdUser?           @relation(fields: [assignedBdUserId], references: [id], onDelete: SetNull)
   messages KosMessage[]
   // 5I PR 1 — drawings the customer attached during this conversation.
   drawings KosCustomerDrawing[]
@@ -1576,6 +1583,12 @@ model KosMessage {
   citations         Json?
   // { model, inputTokens, outputTokens, latencyMs } — bot replies only.
   llmMetadata       Json?
+  // 5I PR 4b1 — drawing IDs the customer attached in this turn.
+  // Stored as a JSON array of strings (e.g. ["cdraw_abc", "cdraw_xyz"]).
+  // Null for bot messages and for customer messages with no
+  // attachments. Used by reload-hydration (PR 4b2) so refreshing
+  // the chat re-renders ArtifactBubbles under their original turn.
+  attachmentRefs    Json?
   // Stage B (Phase 3A) — KosAuditLog.id of the BOT_RETRIEVAL row that
   // sourced the citations on this BOT message. Soft reference (no FK)
   // so audit rows can be purged independently. Null for non-bot
@@ -1663,14 +1676,14 @@ model KosMagicLink {
 // `tokenHash` is bcrypt(token, 12). The raw token only ever lives in
 // the HttpOnly cookie; a DB leak alone cannot impersonate a BD user.
 model KosBdSession {
-  id         String    @id @default(cuid())
-  bdUserId   String
-  tokenHash  String    @unique
-  expiresAt  DateTime
-  userAgent  String?
-  ipAddress  String?
-  createdAt  DateTime  @default(now())
-  revokedAt  DateTime?
+  id        String    @id @default(cuid())
+  bdUserId  String
+  tokenHash String    @unique
+  expiresAt DateTime
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
 
   bdUser KosBdUser @relation(fields: [bdUserId], references: [id], onDelete: Cascade)
 
@@ -1814,7 +1827,7 @@ enum KosBimAccessoryType {
 
 // One row per ingested .rfa / .dwg source file.
 model KosBimFamily {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   tenantId       String
   // Bare filename (e.g. "Profile_DIN-200P-1.rfa").
   sourceFilename String
@@ -1869,32 +1882,32 @@ model KosBimFamily {
 
 // Structured panel SKU derived from a PANEL-category family (profiles/).
 model KosBimPanelType {
-  id             String    @id @default(cuid())
-  tenantId       String
-  familyId       String
+  id              String    @id @default(cuid())
+  tenantId        String
+  familyId        String
   // Normalised SKU code, e.g. "DIN-200P-1".
-  skuCode        String
-  displayName    String
-  widthMm        Decimal?
-  heightMm       Decimal?
-  thicknessMm    Decimal?
-  weightKg       Decimal?
-  material       String?
-  ribPattern     String?
+  skuCode         String
+  displayName     String
+  widthMm         Decimal?
+  heightMm        Decimal?
+  thicknessMm     Decimal?
+  weightKg        Decimal?
+  material        String?
+  ribPattern      String?
   fireRatingHours Decimal?
-  acousticRw     Int?
-  pricePerUnit   Decimal?
-  priceCurrency  String?
-  priceUpdatedAt DateTime?
+  acousticRw      Int?
+  pricePerUnit    Decimal?
+  priceCurrency   String?
+  priceUpdatedAt  DateTime?
   // Raw extracted APS parameters (defensive store for later re-mapping).
-  parameters     Json      @default("{}")
+  parameters      Json      @default("{}")
   // APS internal objectid of the source type, when resolvable.
-  sourceTypeId   String?
+  sourceTypeId    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  family   KosBimFamily   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family   KosBimFamily    @relation(fields: [familyId], references: [id], onDelete: Cascade)
   geometry KosBimGeometry?
 
   @@unique([tenantId, skuCode])
@@ -1922,8 +1935,8 @@ model KosBimAccessory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  family   KosBimFamily    @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  geometry KosBimGeometry?
+  family                KosBimFamily     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  geometry              KosBimGeometry?
   // Spacing-rule back-relations (BracingRule table seeded empty in 5A).
   bracingRulesAsBracing KosBracingRule[] @relation("BracingRule_Bracing")
   bracingRulesAsTie     KosBracingRule[] @relation("BracingRule_Tie")
@@ -1987,19 +2000,19 @@ model KosBimGeometry {
 // populated in a later phase from Dincel installation manuals once the
 // accessory SKUs above exist to reference.
 model KosBracingRule {
-  id                    String   @id @default(cuid())
-  tenantId              String
-  wallHeightMinMm       Decimal
-  wallHeightMaxMm       Decimal
-  pourRateMin           Decimal?
-  pourRateMax           Decimal?
-  bracingAccessoryId    String?
-  bracingSpacingMm      Decimal?
-  tieAccessoryId        String?
+  id                     String   @id @default(cuid())
+  tenantId               String
+  wallHeightMinMm        Decimal
+  wallHeightMaxMm        Decimal
+  pourRateMin            Decimal?
+  pourRateMax            Decimal?
+  bracingAccessoryId     String?
+  bracingSpacingMm       Decimal?
+  tieAccessoryId         String?
   tieSpacingHorizontalMm Decimal?
-  tieSpacingVerticalMm  Decimal?
-  sourceDocument        String?
-  notes                 String?
+  tieSpacingVerticalMm   Decimal?
+  sourceDocument         String?
+  notes                  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

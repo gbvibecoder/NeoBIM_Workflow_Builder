@@ -34,6 +34,7 @@ import type {
 
 import { prisma } from "@/lib/db";
 import { KosError } from "@/features/kos/lib/kos-errors";
+import { kosLog } from "@/features/kos/lib/kos-logger";
 import {
   KOS_AUDIT,
   KOS_BOT_HISTORY_DEPTH,
@@ -329,6 +330,25 @@ export async function* runBotTurn(
 
     // ── 2. Persist the customer message + audit ──────────────────
     await persistCustomerMessage(conversation, input);
+
+    // 5I PR 4b1 — update the customer's locator pointer so the chat
+    // UI can find this conversation on reload. Best-effort: a failed
+    // update must NOT block the bot turn. On retry the next successful
+    // turn will fix the pointer; worst case the customer reloads to a
+    // slightly stale (but still owned) conversation.
+    try {
+      await prisma.kosCustomer.update({
+        where: { id: input.customerId },
+        data: { currentConversationId: conversation.id },
+      });
+    } catch (err) {
+      kosLog.warn("kos_current_conv_update_failed", {
+        code: "KOS_CURRENT_CONV_001",
+        customerId: input.customerId,
+        conversationId: conversation.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     // ── 3. Load history → Anthropic message format ───────────────
     const history = await loadHistoryAsMessages(conversation.id);
@@ -889,6 +909,14 @@ async function persistCustomerMessage(
   conversation: KosConversation,
   input: RunBotTurnInput,
 ): Promise<KosMessage> {
+  // 5I PR 4b1 — persist attachmentRefs so PR 4b2 reload-hydration can
+  // re-render ArtifactBubbles under their original turn. Omit the field
+  // entirely when empty (Prisma → SQL NULL); the JSONB column stays
+  // sparse and `WHERE attachmentRefs IS NOT NULL` reliably picks out
+  // turns with attachments.
+  const refs = (input.attachmentRefs ?? []).filter(
+    (r) => typeof r === "string" && r.length > 0,
+  );
   const msg = await prisma.kosMessage.create({
     data: {
       conversationId: conversation.id,
@@ -897,6 +925,9 @@ async function persistCustomerMessage(
       authorType: "CUSTOMER",
       authorId: input.customerId,
       content: input.customerMessage,
+      ...(refs.length > 0
+        ? { attachmentRefs: refs as unknown as object }
+        : {}),
     },
   });
   await prisma.kosConversation.update({

@@ -22,6 +22,11 @@ export async function GET(req: NextRequest) {
       displayName: customer.displayName ?? customer.name ?? null,
       isAnonymous: customer.isAnonymous,
       tenantSlug: tenant.slug,
+      // 5I PR 4b1 — locator pointer surfaced so the chat UI can hydrate
+      // past messages on reload. Null for customers who haven't sent a
+      // message yet (or whose locator was never written due to a
+      // best-effort failure in the bot orchestrator).
+      currentConversationId: customer.currentConversationId ?? null,
     });
   } catch (err) {
     return formatKosErrorResponse(err);
