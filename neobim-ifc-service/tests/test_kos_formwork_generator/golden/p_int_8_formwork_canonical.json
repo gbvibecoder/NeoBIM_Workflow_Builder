@@ -1,0 +1,228 @@
+{
+  "assumptions_made": [
+    "POLICY-FORMWORK-AUDIT-TRAIL",
+    "POLICY-FORMWORK-WASTE-5PCT",
+    "POLICY-FORMWORK-GASKET-LINEAR-METER-PROVISIONAL",
+    "POLICY-FORMWORK-STARTER-TRACK-ONE-PER-WALL-PROVISIONAL",
+    "POLICY-FORMWORK-QUANTITY-ONLY-PER-KARTHIK-2026-05-26"
+  ],
+  "audit_trail": {
+    "context_hash": "1ca9e2049ae72129f2958354b205f052295cfa6d3843264a7b2650228dccd727",
+    "custom_quote_review_required": false,
+    "field_rule_book_version": "KZ-FIELD-RB-001 v1.0 (2026-05-23)",
+    "formwork_calculation_version": "v0.1.0",
+    "mapper_output_hash": "2aba9af930cd77d2467fe4b14576f80522cf4f13c9e69623145b85e39b725588",
+    "operator_review_required": false,
+    "pipeline_versions": [
+      [
+        "field_rule_book",
+        "KZ-FIELD-RB-001 v1.0 (2026-05-23)"
+      ],
+      [
+        "formwork",
+        "v0.1.0"
+      ],
+      [
+        "mapper",
+        "v1.0"
+      ]
+    ]
+  },
+  "custom_quote_items": [],
+  "formwork_id": "8fad4da7-12da-5686-9373-a1c252f2b1ba",
+  "generated_at": "2026-05-25T00:00:00Z",
+  "operator_review_items": [],
+  "pending_karthik": [
+    "Joint gasket formula '(panel_count - 1) × wall_height' provisional; Karthik confirms during PR 1",
+    "Missing SKU codes: raker prop (KZ-RAKER-01 placeholder), turnbuckle, alignment brace — engineer confirms applicability",
+    "Vamshi reference project (DWG + reference Formwork Quantities sheet) — for Phase 5H E2E validation",
+    "Formwork Quantities format example — Karthik confirmed quantity-only structure; format optional pending visual reference"
+  ],
+  "schema_version": "0.1.0",
+  "tier_1_summary": {
+    "operator_review_items_count": 0,
+    "project_name": "VAMSHI RESIDENCE",
+    "quote_date": "2026-05-25",
+    "total_base_plates": 5,
+    "total_corner_clamps": 0,
+    "total_corners_detected": 0,
+    "total_custom_quote_items": 0,
+    "total_diagonal_braces": 0,
+    "total_joint_gasket_meters": 0.0,
+    "total_kickers": 9,
+    "total_prop_heads": 5,
+    "total_props": 5,
+    "total_raker_props": 0,
+    "total_starter_track_meters": 2.20605,
+    "total_walers": 0,
+    "total_wall_segments_with_bracing": 1
+  },
+  "tier_2_categories": {
+    "bracing_primary": {
+      "count": 14,
+      "linear_meters": 0.0
+    },
+    "bracing_secondary": {
+      "count": 10,
+      "linear_meters": 2.20605
+    },
+    "custom_quotes": {
+      "count": 0,
+      "note": "Custom quote — engineer reviews (no pricing in 5F output per Karthik 2026-05-26).",
+      "pending_count": 0
+    }
+  },
+  "tier_3_sku_types": [
+    {
+      "sku_prefix": "PROP",
+      "total_count": 5,
+      "total_linear_meters": 0.0
+    },
+    {
+      "sku_prefix": "KICK",
+      "total_count": 9,
+      "total_linear_meters": 0.0
+    },
+    {
+      "sku_prefix": "BP",
+      "total_count": 5,
+      "total_linear_meters": 0.0
+    },
+    {
+      "sku_prefix": "PH",
+      "total_count": 5,
+      "total_linear_meters": 0.0
+    },
+    {
+      "sku_prefix": "TRACK",
+      "total_count": 0,
+      "total_linear_meters": 2.20605
+    }
+  ],
+  "tier_4_sku_details": [
+    {
+      "base_quantity": 4.0,
+      "description": "Light-duty prop (yellow label, K4/K6 ≤3.0m)",
+      "sku_code": "KZ-PROP-L",
+      "sku_prefix": "PROP",
+      "thickness_mm": 0,
+      "total_quantity": 5.0,
+      "unit": "nos",
+      "wastage_quantity": 1.0
+    },
+    {
+      "base_quantity": 8.0,
+      "description": "Kicker (timber, K4 600mm / K6 600/400mm)",
+      "sku_code": "KZ-KICK-01",
+      "sku_prefix": "KICK",
+      "thickness_mm": 0,
+      "total_quantity": 9.0,
+      "unit": "nos",
+      "wastage_quantity": 1.0
+    },
+    {
+      "base_quantity": 4.0,
+      "description": "Base plate (steel, 1 per prop on hard surface)",
+      "sku_code": "KZ-BP-01",
+      "sku_prefix": "BP",
+      "thickness_mm": 0,
+      "total_quantity": 5.0,
+      "unit": "nos",
+      "wastage_quantity": 1.0
+    },
+    {
+      "base_quantity": 4.0,
+      "description": "Prop head adapter (1 per prop)",
+      "sku_code": "KZ-PH-01",
+      "sku_prefix": "PH",
+      "thickness_mm": 0,
+      "total_quantity": 5.0,
+      "unit": "nos",
+      "wastage_quantity": 1.0
+    },
+    {
+      "base_quantity": 2.101,
+      "description": "Starter track 110mm",
+      "sku_code": "KZ-TRACK-110",
+      "sku_prefix": "TRACK",
+      "thickness_mm": 110,
+      "total_quantity": 2.20605,
+      "unit": "linear_m",
+      "wastage_quantity": 0.10505
+    }
+  ],
+  "tier_5_wall_segments": [
+    {
+      "application": "internal",
+      "bracing_height_class": "2.4_to_3.0m",
+      "bracing_scheme_applied": "K4-110_2.4_to_3.0m_1lift",
+      "height_mm": 3000,
+      "is_custom_order": false,
+      "joint_gasket_meters": 0.0,
+      "length_mm": 2101.0,
+      "notes": "",
+      "pour_rate_applied_m_per_hr": 3.0,
+      "prop_sku": "KZ-PROP-L",
+      "prop_spacing_m": 2.0,
+      "starter_track_meters": 2.20605,
+      "system": "K4-110",
+      "total_base_plates": 5,
+      "total_corner_clamps": 0,
+      "total_diagonals": 0,
+      "total_kickers": 9,
+      "total_prop_heads": 5,
+      "total_props": 5,
+      "total_raker_props": 0,
+      "total_walers": 0,
+      "wall_id": "P_INT_8"
+    }
+  ],
+  "tier_6_components": [
+    {
+      "component_id": "C-0001",
+      "component_type": "prop",
+      "quantity": 5.0,
+      "sku_code": "KZ-PROP-L",
+      "source_rule": "FRB Appendix A Card 1 row 2 (K4-110 2.4-3.0m) + FRB §2.1 5% wastage",
+      "unit": "nos",
+      "wall_segment_id": "P_INT_8"
+    },
+    {
+      "component_id": "C-0002",
+      "component_type": "kicker",
+      "quantity": 9.0,
+      "sku_code": "KZ-KICK-01",
+      "source_rule": "FRB §9.4 RULE BI-14 (K4 600mm) + FRB §2.1 5% wastage",
+      "unit": "nos",
+      "wall_segment_id": "P_INT_8"
+    },
+    {
+      "component_id": "C-0003",
+      "component_type": "base_plate",
+      "quantity": 5.0,
+      "sku_code": "KZ-BP-01",
+      "source_rule": "FRB §9.1 RULE BI-5 (1 per prop, hard surface) + FRB §2.1 5% wastage",
+      "unit": "nos",
+      "wall_segment_id": "P_INT_8"
+    },
+    {
+      "component_id": "C-0004",
+      "component_type": "prop_head",
+      "quantity": 5.0,
+      "sku_code": "KZ-PH-01",
+      "source_rule": "FRB §9.1 RULE BI-6 (1 per prop) + FRB §2.1 5% wastage",
+      "unit": "nos",
+      "wall_segment_id": "P_INT_8"
+    },
+    {
+      "component_id": "C-0005",
+      "component_type": "starter_track",
+      "quantity": 2.20605,
+      "sku_code": "KZ-TRACK-110",
+      "source_rule": "FRB §2.1 item 4 (starter track per wall thickness) + 5% wastage",
+      "unit": "linear_m",
+      "wall_segment_id": "P_INT_8"
+    }
+  ],
+  "warnings": []
+}
