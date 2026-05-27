@@ -261,6 +261,13 @@ from app.routers.kos_boq_router import register_boq_exception_handlers  # noqa: 
 app.include_router(kos_boq_router.router)
 register_boq_exception_handlers(app)
 
+# KOS Formwork Generator (Phase 5F PR 6) — router carries its own /formwork prefix.
+from app.routers import kos_formwork_router  # noqa: E402
+from app.routers.kos_formwork_router import register_formwork_exception_handlers  # noqa: E402
+
+app.include_router(kos_formwork_router.router)
+register_formwork_exception_handlers(app)
+
 
 @app.get("/")
 async def root():
