@@ -164,6 +164,69 @@ function coerceEvent(name: string, payload: unknown): KosBotEvent | null {
         message:
           typeof p.message === "string" ? p.message : "Unknown stream error.",
       };
+    // 5I PR 3 — drawing progress events.
+    case "drawing_status":
+      if (typeof p.drawingId !== "string" || typeof p.status !== "string") return null;
+      return {
+        type: "drawing_status",
+        drawingId: p.drawingId,
+        status: p.status as never,
+        message: typeof p.message === "string" ? p.message : undefined,
+        errorCode: typeof p.errorCode === "string" ? p.errorCode : undefined,
+        errorMessage:
+          typeof p.errorMessage === "string" ? p.errorMessage : undefined,
+        summary:
+          p.summary && typeof p.summary === "object"
+            ? (p.summary as never)
+            : undefined,
+      };
+    case "artifact_ready":
+      if (
+        typeof p.drawingId !== "string" ||
+        typeof p.s3Key !== "string" ||
+        (p.kind !== "boq" && p.kind !== "formwork")
+      ) {
+        return null;
+      }
+      return {
+        type: "artifact_ready",
+        drawingId: p.drawingId,
+        kind: p.kind,
+        s3Key: p.s3Key,
+        summary:
+          p.summary && typeof p.summary === "object"
+            ? (p.summary as never)
+            : ({} as never),
+      };
+    case "artifact_failed":
+      if (
+        typeof p.drawingId !== "string" ||
+        (p.kind !== "boq" && p.kind !== "formwork")
+      ) {
+        return null;
+      }
+      return {
+        type: "artifact_failed",
+        drawingId: p.drawingId,
+        kind: p.kind,
+        errorCode: typeof p.errorCode === "string" ? p.errorCode : "KOS_BOT_TOOL_ERR",
+        errorMessage:
+          typeof p.errorMessage === "string" ? p.errorMessage : "Artifact failed.",
+      };
+    case "classification_needed":
+      if (typeof p.drawingId !== "string") return null;
+      return {
+        type: "classification_needed",
+        drawingId: p.drawingId,
+        message: typeof p.message === "string" ? p.message : "",
+        titleBlock:
+          p.titleBlock && typeof p.titleBlock === "object"
+            ? (p.titleBlock as never)
+            : undefined,
+        suggestedHints: Array.isArray(p.suggestedHints)
+          ? (p.suggestedHints as never)
+          : ([] as never),
+      };
     default:
       console.warn(`[kos-sse] unknown event type "${name}" — skipping.`);
       return null;

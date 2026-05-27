@@ -30,7 +30,13 @@ export interface KosCitation {
  * `type` is taken from the SSE `event:` line; the payload is the
  * `data:` JSON (the server strips `type` from the payload, so we
  * re-attach it on parse).
+ *
+ * 5I PR 3 — extended with drawing-progress events. The KosDrawingSseEvent
+ * union is imported (type-only, so no transitive server pulls) from the
+ * shared wire-format module.
  */
+import type { KosDrawingSseEvent } from "@/features/kos/lib/kos-sse-events";
+
 export type KosBotEvent =
   | { type: "text_delta"; text: string }
   | { type: "tool_call_start"; tool: string; input: unknown }
@@ -38,7 +44,8 @@ export type KosBotEvent =
   | { type: "citations"; citations: KosCitation[] }
   | { type: "escalation"; reason: string }
   | { type: "done"; messageId: string; conversationId: string }
-  | { type: "error"; code: string; message: string };
+  | { type: "error"; code: string; message: string }
+  | KosDrawingSseEvent;
 
 /** A single rendered turn in the chat transcript. */
 export interface UIMessage {
@@ -55,6 +62,18 @@ export interface UIMessage {
   /** Human-friendly error line shown inline on a failed bot turn. */
   errorText?: string;
   timestamp: number;
+  /**
+   * 5I PR 3 — drawing IDs the customer attached to this turn (only
+   * present on customer messages). Used to spawn ArtifactBubble(s)
+   * inline below the message bubble.
+   */
+  attachmentRefs?: string[];
+  /**
+   * 5I PR 3 — display info for attachments, captured at send time so
+   * the ArtifactBubble can show the filename even after attachments
+   * are cleared from the composer.
+   */
+  attachmentDisplay?: Array<{ drawingId: string; filename: string }>;
 }
 
 /** Customer identity as serialized by `POST /api/kos/customer/session/start`. */

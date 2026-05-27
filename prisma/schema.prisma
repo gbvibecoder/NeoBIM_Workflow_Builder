@@ -2067,6 +2067,11 @@ model KosCustomerDrawing {
   errorCode            String?
   errorText            String?
   parsedAt             DateTime?
+  // 5I PR 2b — S3 keys for generated artifacts. JSONs for now; PR 4
+  // adds rendered Excel/PDF. Each is the full S3 key under the
+  // tenant's bucket (built via kosS3Key("drawings", drawingId, …)).
+  boqResultS3Key       String?
+  formworkResultS3Key  String?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 

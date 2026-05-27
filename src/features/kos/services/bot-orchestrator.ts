@@ -25,9 +25,11 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type {
+  KosCustomer,
   KosDocType,
   KosConversation,
   KosMessage,
+  Tenant,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
@@ -36,12 +38,41 @@ import {
   KOS_AUDIT,
   KOS_BOT_HISTORY_DEPTH,
   KOS_BOT_MAX_TOKENS,
-  KOS_BOT_MAX_TOOL_ITERATIONS,
   KOS_BOT_MODEL,
 } from "@/features/kos/lib/kos-constants";
+import {
+  KOS_BOT_MAX_ITERATIONS,
+  KOS_BOT_MAX_SIDECAR_CALLS_PER_TURN,
+  TOOL_GENERATE_BOQ,
+  TOOL_GENERATE_FORMWORK,
+  TOOL_GENERATE_SHOP_DRAWING,
+  TOOL_PROCESS_DRAWING,
+} from "@/features/kos/lib/kos-bot-constants";
 import { getKosAnthropicClient } from "@/features/kos/services/anthropic-client";
 import { retrieveChunks } from "@/features/kos/services/rag-retriever";
 import { buildKalzenSystemPrompt } from "@/features/kos/prompts/system-prompt";
+import {
+  processDrawingTool,
+  type ProcessDrawingArgs,
+} from "@/features/kos/services/bot-tools/tool-process-drawing";
+import {
+  generateBoqTool,
+  type GenerateBoqToolArgs,
+} from "@/features/kos/services/bot-tools/tool-generate-boq";
+import {
+  generateFormworkTool,
+  type GenerateFormworkToolArgs,
+} from "@/features/kos/services/bot-tools/tool-generate-formwork";
+import {
+  generateShopDrawingTool,
+  type GenerateShopDrawingToolArgs,
+} from "@/features/kos/services/bot-tools/tool-generate-shop-drawing";
+import {
+  SSE_EVT_ARTIFACT_FAILED,
+  SSE_EVT_ARTIFACT_READY,
+  SSE_EVT_CLASSIFICATION_NEEDED,
+  SSE_EVT_DRAWING_STATUS,
+} from "@/features/kos/lib/kos-sse-events";
 
 // ─── Public event type ────────────────────────────────────────────────
 
@@ -53,6 +84,11 @@ export interface BotCitation {
   title: string;
 }
 
+// 5I PR 3 — re-export drawing SSE event types so the orchestrator's
+// yield union covers them. The type module is the wire-format source
+// of truth; this orchestrator widens BotEvent additively.
+import type { KosDrawingSseEvent } from "@/features/kos/lib/kos-sse-events";
+
 export type BotEvent =
   | { type: "text_delta"; text: string }
   | { type: "tool_call_start"; tool: string; input: unknown }
@@ -60,7 +96,8 @@ export type BotEvent =
   | { type: "citations"; citations: BotCitation[] }
   | { type: "escalation"; reason: string }
   | { type: "done"; messageId: string; conversationId: string }
-  | { type: "error"; code: string; message: string };
+  | { type: "error"; code: string; message: string }
+  | KosDrawingSseEvent;
 
 export interface RunBotTurnInput {
   tenantId: string;
@@ -69,6 +106,14 @@ export interface RunBotTurnInput {
   customerId: string;
   customerMessage: string;
   customerDisplayName: string;
+  /**
+   * 5I PR 2b — drawing IDs the customer attached this turn. The chat
+   * route validates (tenant, customer) ownership upfront and forwards
+   * the list verbatim. The orchestrator surfaces them to the model
+   * inside the customer message envelope so the model knows it has
+   * drawings to call `process_drawing` on.
+   */
+  attachmentRefs?: string[];
 }
 
 // ─── Tool definitions (Anthropic JSON schema) ─────────────────────────
@@ -131,7 +176,116 @@ const TOOL_ESCALATE_TO_HUMAN = {
   },
 };
 
-const TOOLS = [TOOL_RETRIEVE_DOCUMENTS, TOOL_ESCALATE_TO_HUMAN];
+// ─── 5I PR 2b — Drawing tools ─────────────────────────────────────────
+
+const APPLICATION_HINT_VALUES = [
+  "internal_partition",
+  "villa_external",
+  "apartment_external_g3",
+  "apartment_external_g5",
+  "school_commercial_g3",
+  "lift_shaft_g5",
+  "shear_wall_g10",
+  "basement_lt3m",
+  "basement_gt3m",
+  "retaining",
+] as const;
+
+const TOOL_PROCESS_DRAWING_DEF = {
+  name: TOOL_PROCESS_DRAWING,
+  description:
+    "Parse a customer-uploaded drawing and prepare it for BOQ/Formwork generation. Call this when the customer has attached a drawing (drawing_id is provided in the conversation context). If the call returns status='needs_classification', the parser couldn't auto-identify the drawing — present the suggested wall types to the user and call process_drawing again with the chosen application_hint.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      drawing_id: {
+        type: "string",
+        description:
+          "The ID of the drawing to process. The customer's message envelope lists drawing IDs they attached this turn.",
+      },
+      application_hint: {
+        type: "string",
+        enum: APPLICATION_HINT_VALUES,
+        description:
+          "Type of wall the customer confirmed. Only pass on re-classification rounds after status='needs_classification'.",
+      },
+      project_context: {
+        type: "object",
+        description:
+          "Optional overrides for project context. Sidecar defaults apply otherwise.",
+        properties: {
+          project_name: { type: "string" },
+          seismic_zone: { type: "string", enum: ["II", "III", "IV", "V"] },
+          split_strategy: {
+            type: "string",
+            enum: ["minimize_panels", "minimize_cuts", "symmetric"],
+          },
+          wall_height_mm: { type: "number", minimum: 1, maximum: 20000 },
+        },
+      },
+    },
+    required: ["drawing_id"],
+  },
+};
+
+const TOOL_GENERATE_BOQ_DEF = {
+  name: TOOL_GENERATE_BOQ,
+  description:
+    "Generate the Bill of Quantities (BOQ) for a drawing. Only call this AFTER process_drawing has returned status='ready' for the same drawing_id. Returns a summary the customer wants to see (panel counts, grand total INR, custom-quote pending count). Can be called in parallel with generate_formwork in the same turn.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      drawing_id: { type: "string" },
+      project_id: {
+        type: "string",
+        description: "Optional project ID; defaults to drawing_id.",
+      },
+      project_name: { type: "string" },
+      quote_date: {
+        type: "string",
+        pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+        description: "YYYY-MM-DD; defaults to today.",
+      },
+    },
+    required: ["drawing_id"],
+  },
+};
+
+const TOOL_GENERATE_FORMWORK_DEF = {
+  name: TOOL_GENERATE_FORMWORK,
+  description:
+    "Generate the formwork quantities (props, walers, kickers, starter track) for a drawing. Only call AFTER process_drawing has returned status='ready'. No pricing in the response by design (Karthik 2026-05-26). Can be called in parallel with generate_boq.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      drawing_id: { type: "string" },
+      project_id: { type: "string" },
+      project_name: { type: "string" },
+      quote_date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+    },
+    required: ["drawing_id"],
+  },
+};
+
+const TOOL_GENERATE_SHOP_DRAWING_DEF = {
+  name: TOOL_GENERATE_SHOP_DRAWING,
+  description:
+    "Generate shop drawings (assembly diagrams, cut sheets) for a drawing. NOT IMPLEMENTED YET — returns a polite not-implemented message. Only call if the user explicitly asks for shop drawings.",
+  input_schema: {
+    type: "object" as const,
+    properties: { drawing_id: { type: "string" } },
+    required: ["drawing_id"],
+  },
+};
+
+const TOOLS = [
+  TOOL_RETRIEVE_DOCUMENTS,
+  TOOL_ESCALATE_TO_HUMAN,
+  TOOL_PROCESS_DRAWING_DEF,
+  TOOL_GENERATE_BOQ_DEF,
+  TOOL_GENERATE_FORMWORK_DEF,
+  TOOL_GENERATE_SHOP_DRAWING_DEF,
+];
 
 // ─── Local helper types ───────────────────────────────────────────────
 
@@ -179,11 +333,24 @@ export async function* runBotTurn(
     // ── 3. Load history → Anthropic message format ───────────────
     const history = await loadHistoryAsMessages(conversation.id);
 
-    // The new customer turn is already in the DB. Append it to the
-    // in-memory messages array we'll send to Anthropic.
+    // 5I PR 2b — when the customer has attached drawings this turn,
+    // append a parenthetical hint to the user message so the model sees
+    // the drawing IDs and knows to call `process_drawing`. The DB-
+    // persisted message (from persistCustomerMessage above) stays as-is
+    // — the hint is in-memory only, for tool-routing.
+    const attachmentRefs = (input.attachmentRefs ?? []).filter(
+      (r) => typeof r === "string" && r.length > 0,
+    );
+    const messageWithAttachmentHint =
+      attachmentRefs.length === 0
+        ? input.customerMessage
+        : `${input.customerMessage}\n\n[The customer attached ${attachmentRefs.length} drawing(s) this turn. drawing_id(s): ${attachmentRefs
+            .map((id) => `"${id}"`)
+            .join(", ")}. Use the process_drawing tool to parse them.]`;
+
     const messages: MessageParam[] = [
       ...history,
-      { role: "user", content: input.customerMessage },
+      { role: "user", content: messageWithAttachmentHint },
     ];
 
     // ── 4. Tool-use loop ────────────────────────────────────────
@@ -200,10 +367,70 @@ export async function* runBotTurn(
     let accumulatedText = "";
     let stopReason: string | null = null;
 
+    // 5I PR 2b — shared per-turn sidecar quota; passed to drawing tools.
+    const sidecarCallsRemaining = {
+      count: KOS_BOT_MAX_SIDECAR_CALLS_PER_TURN,
+    };
+
+    // Lazily-loaded full Tenant + KosCustomer rows. The drawing tools
+    // need them (parseDrawingFromS3 + uploadKosObject take a `Tenant`).
+    // Loaded once per turn on first need.
+    let tenantRow: Tenant | null = null;
+    let customerRow: KosCustomer | null = null;
+    const loadTenant = async (): Promise<Tenant> => {
+      if (tenantRow) return tenantRow;
+      const t = await prisma.tenant.findUnique({
+        where: { id: input.tenantId },
+      });
+      if (!t) {
+        throw new KosError(
+          "KOS_BOT_004",
+          `Tenant ${input.tenantId} not found (orchestrator could not load row for drawing tool).`,
+          500,
+        );
+      }
+      tenantRow = t;
+      return t;
+    };
+    const loadCustomer = async (): Promise<KosCustomer> => {
+      if (customerRow) return customerRow;
+      const c = await prisma.kosCustomer.findUnique({
+        where: { id: input.customerId },
+      });
+      if (!c) {
+        throw new KosError(
+          "KOS_BOT_005",
+          `KosCustomer ${input.customerId} not found (orchestrator could not load row for drawing tool).`,
+          500,
+        );
+      }
+      customerRow = c;
+      return c;
+    };
+
     let iter = 0;
     let exceededIterations = false;
 
-    while (iter < KOS_BOT_MAX_TOOL_ITERATIONS) {
+    // 5I PR 3 — track which drawings have completed both BOQ and Formwork
+    // so we can emit a single `drawing_status: COMPLETE` event per drawing.
+    // Keyed by drawingId. Each entry starts undefined and is set when the
+    // first artifact succeeds.
+    const drawingArtifactProgress = new Map<
+      string,
+      { boqDone: boolean; formworkDone: boolean; completeEmitted: boolean }
+    >();
+    const noteArtifactDone = (drawingId: string, kind: "boq" | "formwork"): void => {
+      const cur = drawingArtifactProgress.get(drawingId) ?? {
+        boqDone: false,
+        formworkDone: false,
+        completeEmitted: false,
+      };
+      if (kind === "boq") cur.boqDone = true;
+      if (kind === "formwork") cur.formworkDone = true;
+      drawingArtifactProgress.set(drawingId, cur);
+    };
+
+    while (iter < KOS_BOT_MAX_ITERATIONS) {
       iter++;
 
       const turn = await runOneStreamingTurn({
@@ -255,11 +482,255 @@ export async function* runBotTurn(
           // Reflect the new status on our local cache so subsequent
           // reads in this function see ESCALATED state.
           conversation = { ...conversation, status: "AWAITING_HUMAN" };
+        } else if (tool.name === TOOL_PROCESS_DRAWING) {
+          // 5I PR 3 — emit pre-event so UI shows "Parsing…" immediately.
+          const argsAny = tool.input as ProcessDrawingArgs;
+          if (argsAny?.drawing_id) {
+            yield {
+              type: SSE_EVT_DRAWING_STATUS,
+              drawingId: argsAny.drawing_id,
+              status: "PROCESSING_PARSE",
+              message: "Parsing drawing",
+            };
+          }
+          try {
+            const tenant = await loadTenant();
+            const customer = await loadCustomer();
+            const res = await processDrawingTool(argsAny, {
+              tenant,
+              customer,
+              sidecarCallsRemaining,
+            });
+            resultPayload = res;
+
+            // 5I PR 3 — emit per-status post-event.
+            if (res.status === "ready") {
+              yield {
+                type: SSE_EVT_DRAWING_STATUS,
+                drawingId: res.drawing_id,
+                status: "READY_FOR_GENERATION",
+                message: res.drawing_summary.title_block_drawing_title ?? undefined,
+                summary: {
+                  walls: res.drawing_summary.walls_count,
+                  junctions: res.drawing_summary.junctions_count,
+                  openings: res.drawing_summary.openings_count,
+                  titleBlockDrawingTitle:
+                    res.drawing_summary.title_block_drawing_title ?? null,
+                },
+              };
+            } else if (res.status === "needs_classification") {
+              yield {
+                type: SSE_EVT_CLASSIFICATION_NEEDED,
+                drawingId: res.drawing_id,
+                message: res.message,
+                titleBlock: {
+                  drawingTitle: res.title_block?.drawing_title ?? null,
+                  level: res.title_block?.level ?? null,
+                },
+                suggestedHints: res.suggested_hints,
+              };
+              yield {
+                type: SSE_EVT_DRAWING_STATUS,
+                drawingId: res.drawing_id,
+                status: "NEEDS_CLASSIFICATION",
+              };
+            } else if (res.status === "scanned_pdf") {
+              yield {
+                type: SSE_EVT_DRAWING_STATUS,
+                drawingId: res.drawing_id,
+                status: "FAILED",
+                errorCode: "KOS_DRAWING_004",
+                errorMessage: res.message,
+                message: res.message,
+              };
+            } else if (res.status === "failed") {
+              yield {
+                type: SSE_EVT_DRAWING_STATUS,
+                drawingId: res.drawing_id,
+                status: "FAILED",
+                errorCode: res.error_code,
+                errorMessage: res.error_message,
+              };
+            }
+          } catch (err) {
+            resultPayload = toToolErrorPayload(err);
+            // The tool itself threw (quota / C2 / infra). Surface a
+            // FAILED event so the UI shows the bubble red instead of
+            // hanging on "Parsing…" forever.
+            if (argsAny?.drawing_id) {
+              const code =
+                err instanceof KosError ? err.code : "KOS_BOT_TOOL_ERR";
+              const msg = err instanceof Error ? err.message : String(err);
+              yield {
+                type: SSE_EVT_DRAWING_STATUS,
+                drawingId: argsAny.drawing_id,
+                status: "FAILED",
+                errorCode: code,
+                errorMessage: msg,
+              };
+            }
+          }
+        } else if (tool.name === TOOL_GENERATE_BOQ) {
+          const argsAny = tool.input as GenerateBoqToolArgs;
+          if (argsAny?.drawing_id) {
+            yield {
+              type: SSE_EVT_DRAWING_STATUS,
+              drawingId: argsAny.drawing_id,
+              status: "GENERATING_BOQ",
+              message: "Generating Bill of Quantities",
+            };
+          }
+          try {
+            const tenant = await loadTenant();
+            const customer = await loadCustomer();
+            const res = await generateBoqTool(argsAny, {
+              tenant,
+              customer,
+              sidecarCallsRemaining,
+            });
+            resultPayload = res;
+
+            if (res.status === "generated") {
+              yield {
+                type: SSE_EVT_ARTIFACT_READY,
+                drawingId: res.drawing_id,
+                kind: "boq",
+                s3Key: res.s3_key,
+                summary: {
+                  boqId: res.boq_id,
+                  totalStandardPanels: res.summary.total_standard_panels,
+                  grandTotalInrFormatted: res.summary.grand_total_inr_formatted,
+                  customQuotesPendingCount: res.summary.custom_quotes_pending_count,
+                  warningsCount: res.warnings_count,
+                  pendingKarthikCount: res.pending_karthik_count,
+                },
+              };
+              noteArtifactDone(res.drawing_id, "boq");
+            } else if (res.status === "failed" || res.status === "no_mapper_output") {
+              yield {
+                type: SSE_EVT_ARTIFACT_FAILED,
+                drawingId: res.drawing_id,
+                kind: "boq",
+                errorCode: res.error_code,
+                errorMessage: res.error_message,
+              };
+            }
+          } catch (err) {
+            resultPayload = toToolErrorPayload(err);
+            if (argsAny?.drawing_id) {
+              const code =
+                err instanceof KosError ? err.code : "KOS_BOT_TOOL_ERR";
+              const msg = err instanceof Error ? err.message : String(err);
+              yield {
+                type: SSE_EVT_ARTIFACT_FAILED,
+                drawingId: argsAny.drawing_id,
+                kind: "boq",
+                errorCode: code,
+                errorMessage: msg,
+              };
+            }
+          }
+
+          // Same COMPLETE check as in the Formwork branch — model may
+          // dispatch BOQ AFTER Formwork, in which case the check must
+          // fire here too. completeEmitted flag prevents double-emit.
+          for (const [drawingId, progress] of drawingArtifactProgress.entries()) {
+            if (progress.boqDone && progress.formworkDone && !progress.completeEmitted) {
+              progress.completeEmitted = true;
+              yield {
+                type: SSE_EVT_DRAWING_STATUS,
+                drawingId,
+                status: "COMPLETE",
+              };
+            }
+          }
+        } else if (tool.name === TOOL_GENERATE_FORMWORK) {
+          const argsAny = tool.input as GenerateFormworkToolArgs;
+          if (argsAny?.drawing_id) {
+            yield {
+              type: SSE_EVT_DRAWING_STATUS,
+              drawingId: argsAny.drawing_id,
+              status: "GENERATING_FORMWORK",
+              message: "Generating Formwork quantities",
+            };
+          }
+          try {
+            const tenant = await loadTenant();
+            const customer = await loadCustomer();
+            const res = await generateFormworkTool(argsAny, {
+              tenant,
+              customer,
+              sidecarCallsRemaining,
+            });
+            resultPayload = res;
+
+            if (res.status === "generated") {
+              yield {
+                type: SSE_EVT_ARTIFACT_READY,
+                drawingId: res.drawing_id,
+                kind: "formwork",
+                s3Key: res.s3_key,
+                summary: {
+                  formworkId: res.formwork_id,
+                  propsCount: res.summary.total_props,
+                  walersCount: res.summary.total_walers,
+                  kickersCount: res.summary.total_kickers,
+                  starterTrackMeters: res.summary.total_starter_track_meters,
+                  warningsCount: res.warnings_count,
+                  pendingKarthikCount: res.pending_karthik_count,
+                },
+              };
+              noteArtifactDone(res.drawing_id, "formwork");
+            } else if (res.status === "failed" || res.status === "no_mapper_output") {
+              yield {
+                type: SSE_EVT_ARTIFACT_FAILED,
+                drawingId: res.drawing_id,
+                kind: "formwork",
+                errorCode: res.error_code,
+                errorMessage: res.error_message,
+              };
+            }
+          } catch (err) {
+            resultPayload = toToolErrorPayload(err);
+            if (argsAny?.drawing_id) {
+              const code =
+                err instanceof KosError ? err.code : "KOS_BOT_TOOL_ERR";
+              const msg = err instanceof Error ? err.message : String(err);
+              yield {
+                type: SSE_EVT_ARTIFACT_FAILED,
+                drawingId: argsAny.drawing_id,
+                kind: "formwork",
+                errorCode: code,
+                errorMessage: msg,
+              };
+            }
+          }
+
+          // After every tool dispatch where the drawing has both BOQ +
+          // Formwork generated, emit COMPLETE once.
+          for (const [drawingId, progress] of drawingArtifactProgress.entries()) {
+            if (progress.boqDone && progress.formworkDone && !progress.completeEmitted) {
+              progress.completeEmitted = true;
+              yield {
+                type: SSE_EVT_DRAWING_STATUS,
+                drawingId,
+                status: "COMPLETE",
+              };
+            }
+          }
+        } else if (tool.name === TOOL_GENERATE_SHOP_DRAWING) {
+          try {
+            resultPayload = await generateShopDrawingTool(
+              tool.input as GenerateShopDrawingToolArgs,
+            );
+          } catch (err) {
+            resultPayload = toToolErrorPayload(err);
+          }
         } else {
           // Unknown tool name — Anthropic returned a tool we didn't
           // define. Surface as a tool error so the model can recover.
           resultPayload = {
-            error: `Unknown tool "${tool.name}". Available: retrieve_documents, escalate_to_human.`,
+            error: `Unknown tool "${tool.name}". Available: retrieve_documents, escalate_to_human, process_drawing, generate_boq, generate_formwork, generate_shop_drawing.`,
           };
         }
 
@@ -300,7 +771,7 @@ export async function* runBotTurn(
         })),
       });
 
-      if (iter === KOS_BOT_MAX_TOOL_ITERATIONS && stopReason === "tool_use") {
+      if (iter === KOS_BOT_MAX_ITERATIONS && stopReason === "tool_use") {
         exceededIterations = true;
         break;
       }
@@ -310,7 +781,7 @@ export async function* runBotTurn(
       yield {
         type: "error",
         code: "KOS_BOT_002",
-        message: `Max tool-use iterations (${KOS_BOT_MAX_TOOL_ITERATIONS}) exceeded — bot stopped without a final answer.`,
+        message: `Max tool-use iterations (${KOS_BOT_MAX_ITERATIONS}) exceeded — bot stopped without a final answer.`,
       };
       // Still persist whatever text we have — partial answer is
       // better than silence for debugging.
@@ -769,6 +1240,26 @@ function parseEscalationInput(raw: unknown): {
     );
   }
   return { reason, customerSummary };
+}
+
+// ─── 5I PR 2b — drawing-tool error envelope ─────────────────────────
+//
+// Drawing tools (process_drawing / generate_boq / generate_formwork)
+// throw KosError for true infrastructure failures (C2 boundary, S3 PUT
+// failure, quota exhausted). The model needs to see those errors in a
+// shape it can reason about — surface a structured payload, not a
+// thrown exception that would tear down the whole turn.
+function toToolErrorPayload(err: unknown): {
+  error_code: string;
+  error_message: string;
+} {
+  if (err instanceof KosError) {
+    return { error_code: err.code, error_message: err.message };
+  }
+  return {
+    error_code: "KOS_TOOL_INTERNAL_001",
+    error_message: err instanceof Error ? err.message : String(err),
+  };
 }
 
 // ─── Citation mapper ─────────────────────────────────────────────────

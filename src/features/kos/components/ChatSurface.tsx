@@ -35,6 +35,11 @@ import {
   useChatAttachments,
   type AttachmentState,
 } from "@/features/kos/hooks/useChatAttachments";
+import {
+  ArtifactBubble,
+  type ArtifactBubbleState,
+} from "./ArtifactBubble";
+import { useDrawingArtifactHydration } from "@/features/kos/hooks/useDrawingArtifactHydration";
 
 const GOLD = "var(--kos-secondary, #c9a55a)";
 const GREEN = "var(--kos-primary, #0a3d2e)";
@@ -130,6 +135,14 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
   const { customer, isLoading, error: sessionError, retry } = useKosCustomer();
 
   const [messages, setMessages] = useState<UIMessage[]>([]);
+  // 5I PR 3 — live drawing-progress state keyed by drawingId. SSE
+  // events upsert into this map; ArtifactBubble re-renders from props.
+  // 5I PR 4 — additionally hydrated with real download URLs via the
+  // useDrawingArtifactHydration hook (below). SSE state takes priority
+  // over hydration — see hook implementation for the merge rules.
+  const [drawingArtifacts, setDrawingArtifacts] = useState<
+    Record<string, ArtifactBubbleState>
+  >({});
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [escalated, setEscalated] = useState(false);
@@ -319,6 +332,103 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
           markBotError(botId, event.code, event.message);
           break;
         }
+        // ─── 5I PR 3 — drawing progress events ────────────────────
+        case "drawing_status": {
+          const { drawingId } = event;
+          setDrawingArtifacts((prev) => {
+            const cur = prev[drawingId];
+            if (!cur) {
+              // SSE event arrived for a drawing we don't have a bubble
+              // for (e.g., bot processing a stale ref). Quietly add it
+              // — the bubble will appear underneath whatever message
+              // can claim it, or just float orphaned. Safer than
+              // dropping the event and leaving the UI confused.
+              return {
+                ...prev,
+                [drawingId]: {
+                  drawingId,
+                  filename: drawingId, // fallback — no display name yet
+                  status: event.status,
+                  message: event.message,
+                  errorCode: event.errorCode,
+                  errorMessage: event.errorMessage,
+                  summary: event.summary,
+                },
+              };
+            }
+            return {
+              ...prev,
+              [drawingId]: {
+                ...cur,
+                status: event.status,
+                message: event.message ?? cur.message,
+                errorCode: event.errorCode ?? cur.errorCode,
+                errorMessage: event.errorMessage ?? cur.errorMessage,
+                summary: event.summary ?? cur.summary,
+              },
+            };
+          });
+          break;
+        }
+        case "artifact_ready": {
+          const { drawingId, kind } = event;
+          setDrawingArtifacts((prev) => {
+            const cur = prev[drawingId] ?? {
+              drawingId,
+              filename: drawingId,
+              status: "PROCESSING_PARSE" as const,
+            };
+            return {
+              ...prev,
+              [drawingId]: {
+                ...cur,
+                [kind]: { s3Key: event.s3Key, summary: event.summary },
+              },
+            };
+          });
+          break;
+        }
+        case "artifact_failed": {
+          const { drawingId, kind } = event;
+          setDrawingArtifacts((prev) => {
+            const cur = prev[drawingId] ?? {
+              drawingId,
+              filename: drawingId,
+              status: "PROCESSING_PARSE" as const,
+            };
+            const errKey = kind === "boq" ? "boqError" : "formworkError";
+            return {
+              ...prev,
+              [drawingId]: {
+                ...cur,
+                [errKey]: {
+                  errorCode: event.errorCode,
+                  errorMessage: event.errorMessage,
+                },
+              },
+            };
+          });
+          break;
+        }
+        case "classification_needed": {
+          const { drawingId } = event;
+          setDrawingArtifacts((prev) => {
+            const cur = prev[drawingId] ?? {
+              drawingId,
+              filename: drawingId,
+              status: "NEEDS_CLASSIFICATION" as const,
+            };
+            return {
+              ...prev,
+              [drawingId]: {
+                ...cur,
+                status: "NEEDS_CLASSIFICATION",
+                message: event.message,
+              },
+            };
+          });
+          break;
+        }
       }
     },
     [scheduleFlush, cancelRaf, markBotError],
@@ -349,9 +459,20 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
     reBootstrapSession,
   });
 
+  // 5I PR 4 — Hydrate drawing artifacts with real download URLs by
+  // fetching the per-drawing summary endpoint whenever a customer
+  // message carries `attachmentRefs`. Idempotent (de-duped by id);
+  // SSE-fresh state is preserved (status === COMPLETE not regressed).
+  useDrawingArtifactHydration(messages, setDrawingArtifacts);
+
   // ── The streaming send ───────────────────────────────────────────────
   const runStream = useCallback(
-    async (message: string, botId: string, retried = false): Promise<void> => {
+    async (
+      message: string,
+      botId: string,
+      attachmentRefs: string[] | undefined,
+      retried = false,
+    ): Promise<void> => {
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -363,6 +484,11 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
           body: JSON.stringify({
             conversationId: conversationIdRef.current,
             message,
+            // 5I PR 3 — forward drawing refs to the server so the bot
+            // tools can process them. Server validates ownership.
+            ...(attachmentRefs && attachmentRefs.length > 0
+              ? { attachmentRefs }
+              : {}),
           }),
           signal: controller.signal,
         });
@@ -371,7 +497,7 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
         if (res.status === 401 && !retried) {
           const ok = await reBootstrapSession();
           if (ok) {
-            return runStream(message, botId, true);
+            return runStream(message, botId, attachmentRefs, true);
           }
           markBotError(
             botId,
@@ -486,11 +612,27 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
 
       setInputError(null);
 
+      // 5I PR 3 — capture attachment metadata BEFORE clearing.
+      // drainPending returns the uploaded drawingIds (failed/in-flight
+      // attachments are left in place by drainPending).
+      const refs = attachments.drainPending();
+      const pendingNow = attachments.pendingAttachments;
+      const attachmentDisplay = refs.map((r) => {
+        const matched = pendingNow.find((a) => a.drawingId === r.drawingId);
+        return {
+          drawingId: r.drawingId,
+          filename:
+            matched?.originalFilename ?? matched?.filename ?? r.drawingId,
+        };
+      });
+      const attachmentRefs = refs.map((r) => r.drawingId);
+
       const customerMsg: UIMessage = {
         id: genId(),
         role: "customer",
         content: text,
         timestamp: Date.now(),
+        ...(attachmentRefs.length > 0 ? { attachmentRefs, attachmentDisplay } : {}),
       };
       const botId = genId();
       const botMsg: UIMessage = {
@@ -506,6 +648,23 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
       streamTextRef.current = "";
       streamingBotIdRef.current = botId;
 
+      // 5I PR 3 — seed initial ArtifactBubble state for each attachment
+      // so the bubble shows "Parsing…" immediately, before any SSE
+      // event arrives. Filename comes from the attachment state.
+      if (attachmentRefs.length > 0) {
+        setDrawingArtifacts((prev) => {
+          const next = { ...prev };
+          for (const r of attachmentDisplay) {
+            next[r.drawingId] = {
+              drawingId: r.drawingId,
+              filename: r.filename,
+              status: "PROCESSING_PARSE",
+            };
+          }
+          return next;
+        });
+      }
+
       setMessages((prev) => [...prev, customerMsg, botMsg]);
       setInput("");
       setShowSuggestions(false);
@@ -519,13 +678,11 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
 
       if (textareaRef.current) textareaRef.current.style.height = "auto";
 
-      void runStream(text, botId);
+      void runStream(text, botId, attachmentRefs.length > 0 ? attachmentRefs : undefined);
 
-      // 5I PR 1 — clear uploaded attachments now that the message is
-      // in flight. Failed + in-flight attachments stay so the customer
-      // doesn't lose state. PR 2 will also serialise attachmentRefs
-      // into the chat POST body; for PR 1 the upload is end-of-pipeline
-      // (the bot tools that consume drawingIds don't exist yet).
+      // 5I PR 1+3 — clear any remaining attachments (failed / cancelled)
+      // from the composer. The pending refs we sent are already drained
+      // by drainPending() above; this clear() catches edge cases.
       attachments.clear();
     },
     [runStream, scrollToBottom, cancelRaf, attachments],
@@ -535,6 +692,26 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
     abortRef.current?.abort();
     void readerRef.current?.cancel().catch(() => {});
   }, []);
+
+  // 5I PR 3 — stub download handler. PR 4 replaces with a real fetch
+  // against /api/kos/customer/drawings/[id]/{boq,formwork}/download.
+  // Kept simple + dependency-free: no toast lib, no network call.
+  const handleDownloadStub = useCallback(
+    (kind: "boq" | "formwork", drawingId: string) => {
+      const label = kind === "boq" ? "Bill of Quantities" : "Formwork Quantities";
+      if (typeof window !== "undefined" && typeof window.alert === "function") {
+        // eslint-disable-next-line no-alert
+        window.alert(
+          `${label} download is coming in the next update. Your file is ready and will be downloadable soon.`,
+        );
+      }
+      // Local console trace — visible in DevTools, no network.
+      console.warn(
+        `[kos] artifact_download_stub_clicked drawingId=${drawingId} kind=${kind}`,
+      );
+    },
+    [],
+  );
 
   const handleRetry = useCallback(() => {
     if (lastSentRef.current) sendMessage(lastSentRef.current);
@@ -735,6 +912,21 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
             {messages.map((m, i) => {
               const prev = messages[i - 1];
               const gapTop = i === 0 ? 0 : prev.role === m.role ? 16 : 24;
+              // 5I PR 3 — extract this message's artifact bubble states
+              // by drawingId so the row gets a stable per-message slice.
+              const artifactStates =
+                m.attachmentRefs && m.attachmentRefs.length > 0
+                  ? m.attachmentRefs.map(
+                      (id) =>
+                        drawingArtifacts[id] ?? {
+                          drawingId: id,
+                          filename:
+                            m.attachmentDisplay?.find((d) => d.drawingId === id)
+                              ?.filename ?? id,
+                          status: "PROCESSING_PARSE" as const,
+                        },
+                    )
+                  : null;
               return (
                 <MessageRow
                   key={m.id}
@@ -742,6 +934,8 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
                   gapTop={gapTop}
                   toolActivity={m.isStreaming ? toolActivity : null}
                   onRetry={handleRetry}
+                  artifactStates={artifactStates}
+                  onDownloadStub={handleDownloadStub}
                 />
               );
             })}
@@ -1120,11 +1314,17 @@ const MessageRow = memo(function MessageRow({
   gapTop,
   toolActivity,
   onRetry,
+  artifactStates,
+  onDownloadStub,
 }: {
   message: UIMessage;
   gapTop: number;
   toolActivity: string | null;
   onRetry: () => void;
+  // 5I PR 3 — per-customer-message artifact-bubble states. null for
+  // messages with no attachments (most messages).
+  artifactStates?: ArtifactBubbleState[] | null;
+  onDownloadStub?: (kind: "boq" | "formwork", drawingId: string) => void;
 }) {
   const isCustomer = message.role === "customer";
   return (
@@ -1133,6 +1333,29 @@ const MessageRow = memo(function MessageRow({
         <CustomerBubble text={message.content} />
       ) : (
         <BotBubble message={message} toolActivity={toolActivity} onRetry={onRetry} />
+      )}
+      {/* 5I PR 3 — inline ArtifactBubble(s) below customer messages
+          that carried drawing attachmentRefs. */}
+      {isCustomer && artifactStates && artifactStates.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            marginTop: 8,
+            // Visually parented to the customer bubble (right-aligned column).
+            alignItems: "flex-end",
+          }}
+        >
+          {artifactStates.map((state) => (
+            <div
+              key={state.drawingId}
+              style={{ width: "min(420px, 92%)" }}
+            >
+              <ArtifactBubble state={state} onDownloadStub={onDownloadStub} />
+            </div>
+          ))}
+        </div>
       )}
       <div
         style={{

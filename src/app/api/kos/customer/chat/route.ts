@@ -30,6 +30,13 @@ import {
   type BotEvent,
   runBotTurn,
 } from "@/features/kos/services/bot-orchestrator";
+import { KOS_CHAT_MAX_ATTACHMENT_REFS } from "@/features/kos/lib/kos-bot-constants";
+import { kosLog } from "@/features/kos/lib/kos-logger";
+import { startSseKeepalive } from "@/features/kos/services/kos-sse-keepalive";
+
+// 5I PR 3 — SSE comment ping every 15s to keep the connection alive
+// past intermediate-proxy idle timeouts (AWS ALB default 60s).
+const SSE_KEEPALIVE_INTERVAL_MS = 15_000;
 
 export const dynamic = "force-dynamic";
 // SSE responses are long-running by design; lift the Vercel cap so
@@ -41,6 +48,12 @@ const MAX_MESSAGE_CHARS = 2000;
 interface ChatRequestBody {
   conversationId?: string | null;
   message: string;
+  /**
+   * 5I PR 2b — drawing IDs the customer attached this turn. Each must
+   * belong to the (tenant, customer) pair of this request; route
+   * validates ownership before forwarding to the orchestrator.
+   */
+  attachmentRefs?: string[];
 }
 
 function isChatRequestBody(x: unknown): x is ChatRequestBody {
@@ -53,6 +66,12 @@ function isChatRequestBody(x: unknown): x is ChatRequestBody {
     typeof obj.conversationId !== "string"
   )
     return false;
+  if (obj.attachmentRefs !== undefined) {
+    if (!Array.isArray(obj.attachmentRefs)) return false;
+    for (const r of obj.attachmentRefs) {
+      if (typeof r !== "string" || r.length === 0) return false;
+    }
+  }
   return true;
 }
 
@@ -128,6 +147,47 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+
+    // 5I PR 2b — validate attachmentRefs ownership BEFORE streaming.
+    // Defect-C2 boundary: each drawingId must belong to THIS (tenant,
+    // customer). Single findMany + count check is the cheapest path.
+    // Returns 404 (not 403) on miss to avoid leaking existence.
+    if (body.attachmentRefs && body.attachmentRefs.length > 0) {
+      if (body.attachmentRefs.length > KOS_CHAT_MAX_ATTACHMENT_REFS) {
+        throw new KosError(
+          "KOS_CHAT_DRAWING_005",
+          `attachmentRefs may contain at most ${KOS_CHAT_MAX_ATTACHMENT_REFS} drawings per turn (got ${body.attachmentRefs.length}).`,
+          400,
+        );
+      }
+      // De-dupe to prevent count-check bypass via duplicates
+      const uniqueRefs = Array.from(new Set(body.attachmentRefs));
+      const owned = await prisma.kosCustomerDrawing.findMany({
+        where: {
+          id: { in: uniqueRefs },
+          tenantId,
+          customerId,
+        },
+        select: { id: true },
+      });
+      if (owned.length !== uniqueRefs.length) {
+        // At least one drawingId either doesn't exist, belongs to a
+        // different customer, or belongs to a different tenant. 404 to
+        // avoid existence leakage.
+        throw new KosError(
+          "KOS_CHAT_DRAWING_004",
+          "One or more attached drawings were not found for the current customer.",
+          404,
+        );
+      }
+      body.attachmentRefs = uniqueRefs;
+      kosLog.info("kos_chat_attachments_validated", {
+        tenantId,
+        customerId,
+        drawingIds: uniqueRefs,
+        count: uniqueRefs.length,
+      });
+    }
   } catch (err) {
     return formatKosErrorResponse(err);
   }
@@ -136,8 +196,17 @@ export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
   const upstream = req.signal;
 
-  const stream = new ReadableStream({
+  const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // 5I PR 3 — install the keepalive BEFORE the generator starts.
+      // The stop() call in finally clears the interval whether the
+      // turn completed cleanly, errored, or was aborted.
+      const stopKeepalive = startSseKeepalive(
+        controller,
+        encoder,
+        SSE_KEEPALIVE_INTERVAL_MS,
+      );
+
       try {
         const generator = runBotTurn({
           tenantId,
@@ -146,6 +215,7 @@ export async function POST(req: NextRequest) {
           customerId,
           customerMessage: body.message,
           customerDisplayName,
+          attachmentRefs: body.attachmentRefs,
         });
 
         for await (const event of generator) {
@@ -169,6 +239,7 @@ export async function POST(req: NextRequest) {
           // Stream may already be closed by client abort.
         }
       } finally {
+        stopKeepalive();
         try {
           controller.close();
         } catch {
@@ -178,7 +249,8 @@ export async function POST(req: NextRequest) {
     },
     cancel() {
       // Client closed the connection. The for-await loop above
-      // notices upstream.aborted on its next iteration.
+      // notices upstream.aborted on its next iteration. Keepalive
+      // is stopped in the start() finally block.
     },
   });
 
