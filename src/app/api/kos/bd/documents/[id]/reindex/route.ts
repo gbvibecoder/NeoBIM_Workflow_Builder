@@ -48,8 +48,8 @@ export async function POST(
 
     // Sanity-check the source PDF is still in S3 (lifecycle policies
     // could have aged it out between the original upload and now).
-    const exists = await headKosObject(tenant, doc.s3Key);
-    if (!exists) {
+    const head = await headKosObject(tenant, doc.s3Key);
+    if (!head.exists) {
       throw new KosError(
         "KOS_DOC_005",
         `Cannot reindex — source S3 object missing for document ${id} (key=${doc.s3Key}). Re-upload the file.`,
