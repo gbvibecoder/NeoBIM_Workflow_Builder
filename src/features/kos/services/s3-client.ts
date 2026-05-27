@@ -322,28 +322,56 @@ export async function createKosPresignedDownloadUrl(
 }
 
 /**
- * Verify an object exists in S3. Used by the upload-confirm endpoint
- * to make sure the browser PUT actually landed before flipping the
- * KosDocument row into PARSING.
+ * Result of a HEAD on an S3 object. Always populated when the object
+ * exists; consumers that just need a yes/no should read `.exists` —
+ * `if (!head.exists) ...` (not `if (!head)`, since a falsy result is
+ * still an object).
+ */
+export interface KosHeadObjectResult {
+  exists: boolean;
+  contentLength?: number;
+  contentType?: string;
+  lastModified?: Date;
+  etag?: string;
+}
+
+/**
+ * Verify an object exists in S3 and surface its size + content-type.
+ * Used by the upload-confirm endpoint to make sure the browser PUT
+ * actually landed AND to verify the byte count matches the claimed
+ * upload size.
  *
- * Returns true on 200; false on 404 / 403. Throws on any other error
- * (network, region misconfiguration) so the caller gets a specific
- * KosError rather than a silent false.
+ * Returns `{ exists: true, contentLength, ... }` on 200; `{ exists:
+ * false }` on 404 / 403. Throws KosError on any other error (network,
+ * region misconfiguration) so the caller gets a specific failure
+ * rather than a silent `exists: false`.
+ *
+ * Note (5I PR 1 extension): previously returned a bare `Promise<boolean>`.
+ * All existing callers were migrated to read `.exists` explicitly. If
+ * you see a `const exists = await headKosObject(...)` style usage,
+ * fix it — `exists` is now an object, and `!exists` is always false.
  */
 export async function headKosObject(
   tenant: Tenant,
   key: string,
-): Promise<boolean> {
+): Promise<KosHeadObjectResult> {
   const bucket = getKosBucket(tenant);
   const client = getKosS3Client(tenant);
   try {
-    await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-    return true;
+    const out = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return {
+      exists: true,
+      contentLength:
+        typeof out.ContentLength === "number" ? out.ContentLength : undefined,
+      contentType: out.ContentType ?? undefined,
+      lastModified: out.LastModified ?? undefined,
+      etag: out.ETag ? out.ETag.replace(/^"|"$/g, "") : undefined,
+    };
   } catch (err) {
     // AWS SDK v3 surfaces 404 via `NotFound` / `$metadata.httpStatusCode`.
     const meta = (err as { $metadata?: { httpStatusCode?: number } })?.$metadata;
     const status = meta?.httpStatusCode;
-    if (status === 404 || status === 403) return false;
+    if (status === 404 || status === 403) return { exists: false };
     throw new KosError(
       "KOS_S3_011",
       `HEAD failed for s3://${bucket}/${key}: ${

@@ -31,6 +31,10 @@ import { useKosCustomer } from "./CustomerSessionProvider";
 import { BotMessage } from "./BotMessage";
 import { KosSseDecoder } from "@/features/kos/lib/kos-sse";
 import type { KosBotEvent, UIMessage } from "@/features/kos/types/chat";
+import {
+  useChatAttachments,
+  type AttachmentState,
+} from "@/features/kos/hooks/useChatAttachments";
 
 const GOLD = "var(--kos-secondary, #c9a55a)";
 const GREEN = "var(--kos-primary, #0a3d2e)";
@@ -84,6 +88,38 @@ const KOS_STYLES = `
   .kos-th-btn { align-self: flex-end; }
   .kos-send-label { display: none; }
 }
+/* ── 5I PR 1 attachment + drop-zone keyframes ────────────────── */
+@keyframes kos-attach-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.kos-attach-bubble {
+  animation: kos-attach-fade-in 0.18s ease-out;
+}
+@keyframes kos-drop-pulse {
+  0%, 100% { border-color: rgba(201,165,90,1); }
+  50%      { border-color: rgba(201,165,90,0.5); }
+}
+.kos-drop-overlay {
+  animation: kos-drop-pulse 1.4s infinite ease-in-out;
+}
+@keyframes kos-progress-stripe {
+  from { background-position: 0 0; }
+  to   { background-position: 40px 0; }
+}
+.kos-progress-bar { position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.kos-progress-bar > .fill {
+  position: absolute; inset: 0 auto 0 0;
+  background: linear-gradient(90deg, rgba(201,165,90,1), rgba(201,165,90,1) 50%, rgba(255,255,255,0.18) 50%, rgba(201,165,90,1));
+  background-size: 40px 6px;
+  animation: kos-progress-stripe 0.8s linear infinite;
+  transition: width 0.18s ease-out;
+}
+.kos-paperclip:not(:disabled):hover { background: rgba(201,165,90,0.12) !important; }
+.kos-attach-action:hover { background: rgba(201,165,90,0.16) !important; }
+@media (pointer: coarse) {
+  .kos-drop-overlay { display: none; }
+}
 `;
 
 function KosStyles() {
@@ -121,6 +157,11 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
   const lastScrollRef = useRef(0);
   const scrollTimerRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // ── 5I PR 1 attachments — paperclip + drop zone ──────────────
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const dragCounterRef = useRef(0);
 
   // ── Scroll management ────────────────────────────────────────────────
   const scrollToBottom = useCallback((smooth = false) => {
@@ -297,6 +338,17 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
     }
   }, []);
 
+  // ── 5I PR 1 — drawing attachments (paperclip + drop zone) ────────────
+  // Pass the current conversationId at render time. The hook captures
+  // the value via useCallback deps — each render with a new
+  // conversationId rebuilds the upload closures. reBootstrapSession's
+  // Promise<boolean> return is assignable to Promise<unknown> per the
+  // hook's signature (the boolean is discarded).
+  const attachments = useChatAttachments({
+    conversationId: conversationIdRef.current,
+    reBootstrapSession,
+  });
+
   // ── The streaming send ───────────────────────────────────────────────
   const runStream = useCallback(
     async (message: string, botId: string, retried = false): Promise<void> => {
@@ -401,7 +453,20 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
 
   const sendMessage = useCallback(
     (raw: string) => {
-      const text = raw.trim();
+      const trimmed = raw.trim();
+      // 5I PR 1 — if the customer has only attached a drawing and
+      // typed no text, ship a friendly placeholder so the existing
+      // chat route's empty-message validator stays happy. PR 2 will
+      // wire attachmentRefs into the POST body and the bot tool will
+      // surface the drawing directly — at which point this default
+      // becomes irrelevant.
+      const hasUploadedAttachment = attachments.pendingAttachments.length > 0;
+      const text =
+        trimmed.length > 0
+          ? trimmed
+          : hasUploadedAttachment
+            ? "I've shared a drawing — please take a look."
+            : "";
       if (text.length < 1) {
         setInputError("Type a message before sending.");
         return;
@@ -455,8 +520,15 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
       if (textareaRef.current) textareaRef.current.style.height = "auto";
 
       void runStream(text, botId);
+
+      // 5I PR 1 — clear uploaded attachments now that the message is
+      // in flight. Failed + in-flight attachments stay so the customer
+      // doesn't lose state. PR 2 will also serialise attachmentRefs
+      // into the chat POST body; for PR 1 the upload is end-of-pipeline
+      // (the bot tools that consume drawingIds don't exist yet).
+      attachments.clear();
     },
-    [runStream, scrollToBottom, cancelRaf],
+    [runStream, scrollToBottom, cancelRaf, attachments],
   );
 
   const stopStreaming = useCallback(() => {
@@ -514,10 +586,40 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
   }
 
   const charCount = input.length;
-  const sendDisabled = input.trim().length === 0;
+  // 5I PR 1 — Send is enabled when EITHER text OR at least one
+  // successfully uploaded attachment is present, and nothing is mid-
+  // upload. Future PR 2 will gate this further on attachmentRefs the
+  // bot can consume; for PR 1 the attachment is purely decorative
+  // (no bot tool yet), so we keep the simpler "text OR attachment" rule.
+  const sendDisabled =
+    (input.trim().length === 0 &&
+      attachments.pendingAttachments.length === 0) ||
+    attachments.hasInFlight;
 
   return (
     <div
+      onDragEnter={(e) => {
+        // Only react to file drags, not in-DOM text/element drags.
+        if (!e.dataTransfer?.types?.includes("Files")) return;
+        e.preventDefault();
+        dragCounterRef.current++;
+        setDragActive(true);
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+      }}
+      onDragLeave={() => {
+        dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+        if (dragCounterRef.current === 0) setDragActive(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer?.types?.includes("Files")) return;
+        e.preventDefault();
+        dragCounterRef.current = 0;
+        setDragActive(false);
+        const f = e.dataTransfer?.files?.[0];
+        if (f) void attachments.addFile(f);
+      }}
       style={{
         position: "relative",
         display: "flex",
@@ -533,6 +635,32 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
       }}
     >
       <KosStyles />
+
+      {/* 5I PR 1 — drop-zone overlay (only when actively dragging a file). */}
+      {dragActive && (
+        <div
+          className="kos-drop-overlay"
+          role="region"
+          aria-live="polite"
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 10,
+            background: "rgba(10, 61, 46, 0.85)",
+            border: "2px dashed var(--kos-secondary, #c9a55a)",
+            borderRadius: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--kos-secondary, #c9a55a)",
+            fontSize: 18,
+            fontWeight: 600,
+            pointerEvents: "none",
+          }}
+        >
+          Drop your drawing here
+        </div>
+      )}
 
       {/* Header */}
       <header
@@ -663,6 +791,29 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
           background: "rgba(0,0,0,0.25)",
         }}
       >
+        {/* 5I PR 1 — attachment bubbles (above input). */}
+        {attachments.attachments.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              marginBottom: 10,
+            }}
+          >
+            {attachments.attachments.map((att) => (
+              <AttachmentBubble
+                key={att.localId}
+                attachment={att}
+                onCancel={() => attachments.cancel(att.localId)}
+                onRetry={() => {
+                  void attachments.retry(att.localId);
+                }}
+              />
+            ))}
+          </div>
+        )}
+
         {inputError && (
           <div
             role="alert"
@@ -672,6 +823,48 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
           </div>
         )}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+          {/* 5I PR 1 — paperclip button + hidden file input. */}
+          <button
+            type="button"
+            className="kos-paperclip"
+            aria-label="Attach drawing"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming || attachments.hasInFlight}
+            style={{
+              flexShrink: 0,
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              border: `1px solid rgba(201,165,90,0.45)`,
+              background: "transparent",
+              color: GOLD,
+              cursor:
+                isStreaming || attachments.hasInFlight
+                  ? "not-allowed"
+                  : "pointer",
+              opacity: isStreaming || attachments.hasInFlight ? 0.45 : 1,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background 120ms ease, opacity 120ms ease",
+            }}
+          >
+            <PaperclipIcon />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".dxf,.dwg,.pdf,.png,.jpg,.jpeg"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void attachments.addFile(f);
+              // Reset so re-selecting the same file fires onChange again.
+              e.target.value = "";
+            }}
+            aria-hidden="true"
+          />
+
           <div style={{ flex: 1, position: "relative" }}>
             <textarea
               ref={textareaRef}
@@ -1316,6 +1509,222 @@ function CenteredNotice({
           Retry
         </button>
       )}
+    </div>
+  );
+}
+
+/* ── 5I PR 1 — attachment UI ───────────────────────────────────────────── */
+
+function PaperclipIcon() {
+  return (
+    <svg
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+    </svg>
+  );
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function AttachmentBubble({
+  attachment,
+  onCancel,
+  onRetry,
+}: {
+  attachment: AttachmentState;
+  onCancel: () => void;
+  onRetry: () => void;
+}) {
+  const isFailed = attachment.phase === "failed";
+  const isUploaded = attachment.phase === "uploaded";
+  const isUploading = attachment.phase === "uploading";
+
+  return (
+    <div
+      className="kos-attach-bubble"
+      role="group"
+      aria-label={`Attachment ${attachment.originalFilename}, ${attachment.phase}`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 11px",
+        borderRadius: 10,
+        border: `1px solid ${
+          isFailed
+            ? "rgba(252,165,165,0.4)"
+            : isUploaded
+              ? "rgba(201,165,90,0.45)"
+              : "rgba(255,255,255,0.12)"
+        }`,
+        background: isFailed
+          ? "rgba(220,38,38,0.08)"
+          : "rgba(255,255,255,0.03)",
+        fontSize: 13,
+      }}
+    >
+      {/* Status icon */}
+      <span
+        aria-hidden
+        style={{
+          width: 28,
+          height: 28,
+          flexShrink: 0,
+          borderRadius: 6,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: isFailed
+            ? "rgba(220,38,38,0.16)"
+            : "rgba(201,165,90,0.14)",
+          color: isFailed ? "#fca5a5" : GOLD,
+          fontWeight: 700,
+          fontSize: 11,
+          fontFamily: "var(--font-jetbrains), monospace",
+        }}
+      >
+        {isFailed
+          ? "!"
+          : isUploaded
+            ? "✓"
+            : attachment.sourceFormat?.toUpperCase().slice(0, 3) ?? "DOC"}
+      </span>
+
+      {/* Filename + size / progress / error */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: 8,
+            color: "#f0f0f0",
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: 200,
+            }}
+            title={attachment.originalFilename}
+          >
+            {attachment.originalFilename}
+          </span>
+          <span style={{ fontSize: 11, opacity: 0.55, flexShrink: 0 }}>
+            {formatBytes(attachment.sizeBytes)}
+          </span>
+        </div>
+        {isUploading && (
+          <div
+            className="kos-progress-bar"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={attachment.progress ?? 0}
+            aria-label={`Upload progress for ${attachment.originalFilename}`}
+            style={{ marginTop: 6 }}
+          >
+            <div
+              className="fill"
+              style={{ width: `${Math.min(100, attachment.progress ?? 0)}%` }}
+            />
+          </div>
+        )}
+        {isFailed && attachment.errorText && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 4,
+              fontSize: 11.5,
+              color: "#fca5a5",
+              lineHeight: 1.4,
+            }}
+          >
+            {attachment.errorText}
+            {attachment.errorCode ? (
+              <span
+                style={{
+                  marginLeft: 6,
+                  opacity: 0.55,
+                  fontFamily: "var(--font-jetbrains), monospace",
+                  fontSize: 10.5,
+                }}
+              >
+                ({attachment.errorCode})
+              </span>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "inline-flex", gap: 6, flexShrink: 0 }}>
+        {isFailed && attachment.canRetry && (
+          <button
+            type="button"
+            className="kos-attach-action"
+            onClick={onRetry}
+            aria-label="Retry upload"
+            style={{
+              padding: "5px 10px",
+              borderRadius: 7,
+              border: "1px solid rgba(201,165,90,0.45)",
+              background: "transparent",
+              color: GOLD,
+              fontSize: 11.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "background 120ms ease",
+            }}
+          >
+            Retry
+          </button>
+        )}
+        <button
+          type="button"
+          className="kos-attach-action"
+          onClick={onCancel}
+          aria-label={
+            isUploaded
+              ? "Remove attachment"
+              : isUploading
+                ? "Cancel upload"
+                : "Remove"
+          }
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            border: "1px solid rgba(255,255,255,0.18)",
+            background: "transparent",
+            color: "#cccccc",
+            fontSize: 14,
+            lineHeight: 1,
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }

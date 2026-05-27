@@ -1411,6 +1411,8 @@ model Tenant {
   bdUsers       KosBdUser[]
   // Week 5A — BIM panel/accessory family library (Dincel/Kalzen via APS).
   bimFamilies   KosBimFamily[]
+  // 5I PR 1 — customer-uploaded drawings (DXF/DWG/PDF/PNG/JPG).
+  customerDrawings KosCustomerDrawing[]
 
   @@index([slug])
   @@index([customDomain])
@@ -1445,6 +1447,8 @@ model KosCustomer {
   tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   conversations KosConversation[]
   sessions      KosCustomerSession[]
+  // 5I PR 1 — drawings this customer has uploaded.
+  drawings      KosCustomerDrawing[]
 
   @@unique([tenantId, phone])
   @@index([phone])
@@ -1545,6 +1549,8 @@ model KosConversation {
   customer KosCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   bdUser   KosBdUser?   @relation(fields: [assignedBdUserId], references: [id], onDelete: SetNull)
   messages KosMessage[]
+  // 5I PR 1 — drawings the customer attached during this conversation.
+  drawings KosCustomerDrawing[]
 
   @@index([tenantId, customerId])
   @@index([tenantId, status])
@@ -2003,4 +2009,74 @@ model KosBracingRule {
 
   @@index([tenantId, wallHeightMinMm, wallHeightMaxMm])
   @@map("kos_bracing_rules")
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 5I PR 1 — Customer-uploaded drawings (DXF / DWG / PDF / PNG / JPG).
+// Anonymous customers attach drawings via the chat composer; rows are
+// minted in AWAITING_UPLOAD on presign, flipped to UPLOADED on
+// confirm-upload (server HEAD verifies the S3 PUT landed), and later
+// to PARSING/PARSED/FAILED when PR 2 wires the bot's process_drawing
+// tool. The direct customerId FK is the C2 (cross-customer ownership)
+// safety boundary — even if a customer guesses a drawingId, the
+// confirm-upload findFirst() requires customerId match.
+// ════════════════════════════════════════════════════════════════════
+
+enum KosDrawingStatus {
+  AWAITING_UPLOAD
+  UPLOADED
+  PARSING
+  PARSED
+  FAILED
+}
+
+model KosCustomerDrawing {
+  id                   String           @id @default(cuid())
+  tenantId             String
+  customerId           String
+  conversationId       String?
+  // Sanitized filename (S3-key-safe; never contains path separators
+  // or special chars). Persisted alongside originalFilename which
+  // preserves the user-supplied display string.
+  filename             String
+  originalFilename     String
+  // DrawingSourceFormat value: "dxf" | "dwg" | "pdf" | "png" | "jpg" | "jpeg".
+  // Kept as plain string here rather than an enum so PR 2 can add new
+  // source formats without an enum migration.
+  sourceFormat         String
+  // Size the client claimed at presign time. Bounded by the 15 MB
+  // route cap so this column never holds a value over 15 * 1024 * 1024.
+  sizeBytes            Int
+  // Size the server measured via S3 HEAD on confirm-upload. Null
+  // until the PUT lands; differs from sizeBytes when the client lied
+  // (caught by the 10% tolerance check in confirm-upload).
+  actualSizeBytes      Int?
+  // S3 key under the tenant's bucket — built by kosS3Key("drawings",
+  // customerId, drawingId, "source.<ext>"). Holds the sentinel
+  // "PENDING" between the create() and the s3Key update() in the
+  // upload-url route (fixed in the same request before commit).
+  s3Key                String
+  status               KosDrawingStatus @default(AWAITING_UPLOAD)
+  // Reserved for PR 2 — the sidecar's parse result (walls, junctions,
+  // title-block) trimmed to the bits the bot will actually retrieve.
+  parseResult          Json?
+  // Pointer to the FULL parse blob stashed in S3 when it's too large
+  // for the JSONB column (debug PNG, raw entity lists, etc.).
+  fullParseResultS3Key String?
+  parserVersion        String?
+  errorCode            String?
+  errorText            String?
+  parsedAt             DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
+  customer     KosCustomer      @relation(fields: [customerId], references: [id])
+  conversation KosConversation? @relation(fields: [conversationId], references: [id])
+
+  @@index([tenantId, customerId])
+  @@index([tenantId, conversationId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("kos_customer_drawings")
 }
