@@ -40,6 +40,7 @@ import {
   type ArtifactBubbleState,
 } from "./ArtifactBubble";
 import { useDrawingArtifactHydration } from "@/features/kos/hooks/useDrawingArtifactHydration";
+import { useConversationMessages } from "@/features/kos/hooks/useConversationMessages";
 
 const GOLD = "var(--kos-secondary, #c9a55a)";
 const GREEN = "var(--kos-primary, #0a3d2e)";
@@ -160,6 +161,16 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const lastSentRef = useRef<string | null>(null);
 
+  // ── 5I PR 4b2 — reload-hydration ─────────────────────────────────────
+  // Read the customer's locator pointer (PR 4b1) and fetch past messages
+  // so a refresh restores the transcript + ArtifactBubbles + downloads.
+  const hydrationConversationId = customer?.currentConversationId ?? null;
+  const historical = useConversationMessages(hydrationConversationId);
+  // Ensures the merge-not-replace seed runs at most once per mount,
+  // so SSE messages added after the first seed cannot be clobbered by
+  // a delayed re-render of the hook's result.
+  const seededRef = useRef(false);
+
   // rAF-throttled streamed-text accumulator.
   const streamTextRef = useRef("");
   const streamingBotIdRef = useRef<string | null>(null);
@@ -249,6 +260,30 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
       }
     };
   }, []);
+
+  // ── 5I PR 4b2 — seed local messages from historical fetch (once) ─────
+  // CRITICAL: this merge-not-replace path runs at most once per mount.
+  // If a customer's SSE stream pushed new messages while the fetch was
+  // in flight (race: typing + Send during the loading state), the local
+  // state already holds them — historical entries get prepended with
+  // de-dup by id, never overwriting the local list. seededRef latches
+  // the moment the fetch resolves (success OR empty) so subsequent
+  // re-renders from the hook (e.g. the result memo changing identity)
+  // cannot trigger a second merge.
+  useEffect(() => {
+    if (seededRef.current) return;
+    if (historical.loading) return;
+    seededRef.current = true;
+    if (historical.messages.length === 0) return;
+    setMessages((currentLocal) => {
+      const localIds = new Set(currentLocal.map((m) => m.id));
+      const merged = historical.messages.filter((m) => !localIds.has(m.id));
+      return [...merged, ...currentLocal];
+    });
+    if (hydrationConversationId && !conversationIdRef.current) {
+      conversationIdRef.current = hydrationConversationId;
+    }
+  }, [historical.loading, historical.messages, hydrationConversationId]);
 
   const markBotError = useCallback(
     (botId: string, code: string, errorText?: string) => {
@@ -906,7 +941,24 @@ export default function ChatSurface({ tenantName }: { tenantName: string }) {
         )}
 
         {messages.length === 0 ? (
-          <EmptyState tenantName={tenantName} onPick={fillInput} />
+          historical.loading ? (
+            // 5I PR 4b2 — initial hydration in flight. Don't show welcome
+            // copy yet, because if there IS history it'd flicker.
+            <div
+              data-testid="kos-hydration-loading"
+              style={{
+                padding: "32px 20px",
+                textAlign: "center",
+                color: "rgba(255,255,255,0.55)",
+                fontSize: 13,
+                letterSpacing: 0.2,
+              }}
+            >
+              Loading conversation history…
+            </div>
+          ) : (
+            <EmptyState tenantName={tenantName} onPick={fillInput} />
+          )
         ) : (
           <>
             {messages.map((m, i) => {
